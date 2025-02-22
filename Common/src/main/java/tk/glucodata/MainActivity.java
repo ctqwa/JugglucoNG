@@ -324,6 +324,12 @@ void showSystemBarsAppearance() {
    } */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+    if(android.os.Build.VERSION.SDK_INT >= 21) {
+         Log.i(LOG_ID,"sdk 21 or larger") ;
+        }
+    else
+        Log.i(LOG_ID,"smaller than sdk 21") ;
+
         if(isWearable) {
            Specific.splash(this);
          }
@@ -394,8 +400,13 @@ void handleIntent(Intent intent) {
        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0&&"android.nfc.action.TECH_DISCOVERED".intern()==action) {
            curve.waitnfc=true;
            Log.d(LOG_ID,"TECH_DISCOVERED");
-           Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-           startnfc(tag);
+           try {
+               Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+               startnfc(tag);
+               }
+           catch(Throwable th) {
+                Log.stack(LOG_ID,"handleIntent",th);
+                }
        return;
        }
       if("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE".intern() ==action)  {

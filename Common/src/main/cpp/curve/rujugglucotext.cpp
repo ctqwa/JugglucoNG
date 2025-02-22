@@ -213,7 +213,9 @@ rutext.amount},
 .receivingpastvalues="Получение старых значений",
 .receivingdata="Receiving data",
 .unsupportedSibionics="Unsupported Sibionics Sensor"sv,
-.waitingforconnection="Waiting for connection"sv
+.waitingforconnection="Waiting for connection"sv,
+.deleted="Deleted"sv
+
 
 
 		}

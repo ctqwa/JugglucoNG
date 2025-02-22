@@ -98,6 +98,7 @@ std::string_view receivingpastvalues;
 std::string_view receivingdata;
 std::string_view unsupportedSibionics;
 std::string_view waitingforconnection;
+std::string_view deleted;
 #ifndef WEAROS
 std::string_view getTrendName(int type) const {
     const std::string_view *trends=&Undetermined; 

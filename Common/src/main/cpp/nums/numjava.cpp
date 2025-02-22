@@ -86,12 +86,16 @@ extern "C" JNIEXPORT jint JNICALL fromjava(getchangedNum)(JNIEnv *env, jclass th
 	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
 	 return numdata->getchangedpos();
 	 }
+extern "C" JNIEXPORT void JNICALL fromjava(setchangedNum)(JNIEnv *env, jclass thiz,jlong ptr,jint pos) {
+	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
+        numdata->getchangedpos()=pos;
+        }
 extern "C" JNIEXPORT jint JNICALL fromjava(getonechangeNum)(JNIEnv *env, jclass thiz,jlong ptr) {
 	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
 	 return numdata->getonechange();
 	 }
 
-extern "C" JNIEXPORT void JNICALL fromjava(setchangedNum)(JNIEnv *env, jclass thiz,jlong ptr,jint pos) {
+extern "C" JNIEXPORT void JNICALL fromjava(setchangedNumLater)(JNIEnv *env, jclass thiz,jlong ptr,jint pos) {
 	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
 	if(pos>numdata->getchangedpos()) {
 		 numdata->getchangedpos()=pos;
@@ -113,6 +117,8 @@ extern "C" JNIEXPORT void JNICALL fromjava(saveNum)(JNIEnv *env, jclass thiz,jlo
 extern "C" JNIEXPORT jobject JNICALL fromjava(getNumitem)(JNIEnv *env, jclass thiz,jlong ptr,jint pos) {
 	Numdata *numdata=reinterpret_cast<Numdata *>(ptr);
 	const Num &num=numdata->at(pos);
+        if(!numdata->valid(&num))
+                return nullptr;
 //	LOGGER("getNumitem(%p,%d)={%ld,%f,%d}\n",numdata,pos,num.time,num.value,num.type);
 	static jclass  item=(jclass) env->NewGlobalRef(env->FindClass("tk/glucodata/nums/item"));
   	static jmethodID iconstruct = env->GetMethodID(item,"<init>","(JIFI)V");

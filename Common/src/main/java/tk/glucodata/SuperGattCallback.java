@@ -257,7 +257,7 @@ static void endtalk() {
         Applic.updatescreen();
 
         if(!isWearable) {
-            if (dotalk||alarmspeak)  {
+            if(dotalk&&!alarmspeak)  {
                 talker.selspeak(sglucose.value);
                 }
             }

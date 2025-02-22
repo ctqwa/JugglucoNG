@@ -1989,7 +1989,7 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
        else {
            time_t starttime=hist->getstarttime();
            auto wait= nu-starttime;
-           const int warmup=hist->getWarmupMIN(); 
+           const int warmup=hist->getWarmupMIN()+2; 
            LOGGER("waited=%lu warmup=%d starttime=%lu %s",wait,warmup,starttime,ctime(&starttime));
            
           if(wait<(warmup*60)) {

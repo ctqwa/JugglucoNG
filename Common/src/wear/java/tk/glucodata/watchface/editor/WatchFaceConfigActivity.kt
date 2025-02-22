@@ -18,7 +18,8 @@ package tk.glucodata.watchface.editor
 
 import android.Manifest
 import android.app.Activity
-import androidx.appcompat.app.AlertDialog
+//import androidx.appcompat.app.AlertDialog
+import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -38,6 +39,8 @@ import tk.glucodata.databinding.ActivityWatchFaceConfigBinding
 import tk.glucodata.watchface.utils.*
 import tk.glucodata.watchface.utils.EXTREMERIGHT_COMPLICATION_ID
 import tk.glucodata.watchface.utils.TOP_COMPLICATION_ID
+//import kotlin.Deprecated as Deprecated1
+
 //import androidx.annotation.Keep
 
 /**
@@ -96,7 +99,7 @@ class WatchFaceConfigActivity : ComponentActivity() {
         Log.d(LOG_ID, "\tselected color style: $colorStyleId")
 
         binding.preview.watchFaceBackground.setImageBitmap(userStylesAndPreview.previewImage)
-	binding.heartRate.isChecked = Applic.getHeartRate()
+    binding.heartRate.isChecked = Applic.getHeartRate()
 
 
         enabledWidgets()
@@ -136,76 +139,78 @@ private var  heartratebox:CheckBox?=null
 fun askpermission(perm:String) {
  requestPermissions(arrayOf(perm), SENSOR_REQUEST_CODE)
  }
+
+@Deprecated ("rotop")
 override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     when (requestCode) {
         SENSOR_REQUEST_CODE -> {
-  	    val granted=(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)
+          val granted=(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)
             if(granted) {
-			heartratebox?.setChecked(true)
-			Log.i(LOG_ID,"Sensor granted")
-            	} else {
-			Log.i(LOG_ID,"Sensor not granted")
-            	}
-	    Natives.setheartrate(granted)
-	    heartratebox=null
+            heartratebox?.setChecked(true)
+            Log.i(LOG_ID,"Sensor granted")
+                } else {
+            Log.i(LOG_ID,"Sensor not granted")
+                }
+        Natives.setheartrate(granted)
+        heartratebox=null
             return
         }
 
         else -> {
-		Log.i(LOG_ID,"On known permission "+requestCode);
+        Log.i(LOG_ID, "On known permission $requestCode");
         }
     }
 }
 /*
 private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission() ){
-	isGranted: Boolean -> {
-		Natives.setheartrate(isGranted) 
-		Log.i(LOG_ID,"RequestPermission "+isGranted)
-		if(isGranted) {
-			heartratebox?.setChecked(true)
-			}
-		heartratebox=null;
-		}
-	}*/
-				//	requestPermissionLauncher.launch(bodies) 
+    isGranted: Boolean -> {
+        Natives.setheartrate(isGranted) 
+        Log.i(LOG_ID,"RequestPermission "+isGranted)
+        if(isGranted) {
+            heartratebox?.setChecked(true)
+            }
+        heartratebox=null;
+        }
+    }*/
+                //    requestPermissionLauncher.launch(bodies) 
 
 
     fun onClickHearRate(view: View) {
-	Log.i(LOG_ID,"onClickHearRate")
+    Log.i(LOG_ID,"onClickHearRate")
       if(heartratebox==null) {
-		val box= view as CheckBox
-		val on=box.isChecked()
-		if(on) {
-			val bodies= Manifest.permission.BODY_SENSORS
-			if(ActivityCompat.checkSelfPermission(Applic.app, bodies) != PackageManager.PERMISSION_GRANTED) {
-				heartratebox=box
-			       box.setChecked(false)
-				Log.i(LOG_ID,"No sensor permission")
-				if(shouldShowRequestPermissionRationale(bodies)) {
-					    heartratebox=null
-					    val builder = AlertDialog.Builder(this)
-					    builder.setTitle(R.string.sensorpermission)
-					    builder.setMessage(R.string.sensorpermissionmessage).
+        val box= view as CheckBox
+        val on=box.isChecked()
+        if(on) {
+            val bodies= Manifest.permission.BODY_SENSORS
+            if(ActivityCompat.checkSelfPermission(Applic.app, bodies) != PackageManager.PERMISSION_GRANTED) {
+                heartratebox=box
+                   box.setChecked(false)
+                Log.i(LOG_ID,"No sensor permission")
+                if(shouldShowRequestPermissionRationale(bodies)) {
+                        heartratebox=null
+                        val builder = AlertDialog.Builder(this)
+                        builder.setTitle(R.string.sensorpermission)
+                        builder.setMessage(R.string.sensorpermissionmessage).
                         setPositiveButton(R.string.ok, { _, _ -> {
-                               Log.i(LOG_ID, "now ask permission")
-//							    heartratebox = box askpermission(bodies)
+                        Log.i(LOG_ID, "now ask permission")
+//                                heartratebox = box askpermission(bodies)
 
                            }
                        }) .show().setCanceledOnTouchOutside(false)
                         }
-				else {
-				     askpermission(bodies)
-					}
+                else {
+                     askpermission(bodies)
+                    }
 
-				return;
+                return;
 
-				}
+                }
 
-			}
-		Natives.setheartrate(on)
-		}
-	}
+            }
+        Natives.setheartrate(on)
+        }
+    }
 
 
 

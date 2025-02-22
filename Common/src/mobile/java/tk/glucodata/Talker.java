@@ -43,6 +43,7 @@ import static tk.glucodata.util.getlocale;
 
 import android.app.Activity;
 import android.content.Context;
+import android.media.AudioAttributes;
 import android.os.Build;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.Voice;
@@ -171,10 +172,28 @@ void destruct() {
          }
             }
           });
-}
+    if(android.os.Build.VERSION.SDK_INT >= minandroid)
+        engine.setAudioAttributes(defaultAudioAttributes);
+   }
 
 public void speak(String message) {
     engine.speak(message, TextToSpeech.QUEUE_FLUSH, null);
+    }
+
+//private static final AudioAttributes defaultAudioAttributes = (new AudioAttributes.Builder()) .setLegacyStreamType(TextToSpeech.Engine.DEFAULT_STREAM) .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH) .build(); 
+private static final AudioAttributes defaultAudioAttributes = Notify.notification_audio;
+public void speak(String message, AudioAttributes attr) {
+    if(android.os.Build.VERSION.SDK_INT >= minandroid) {
+        if(attr!=defaultAudioAttributes) {
+            engine.setAudioAttributes(attr);
+           }
+           }
+    
+    engine.speak(message, TextToSpeech.QUEUE_FLUSH, null);
+    if(android.os.Build.VERSION.SDK_INT >= minandroid) {
+        if(attr!=defaultAudioAttributes)
+            engine.setAudioAttributes(defaultAudioAttributes);
+         }
     }
 static long nexttime=0L;
 void selspeak(String message) {
@@ -271,7 +290,9 @@ public static void config(MainActivity context) {
     if(!istalking()) {
          SuperGattCallback.newtalker(context);
         }
+
     var separation=new EditText(context);
+
     separation.setImeOptions(editoptions);
     separation.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
     separation.setMinEms(2);
@@ -446,6 +467,10 @@ public static void config(MainActivity context) {
     context.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
 
     }
+
+
+
+
 }
 /*
 TODO

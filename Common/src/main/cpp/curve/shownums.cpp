@@ -128,10 +128,12 @@ template<typename T>   bool searchhit(const T *ptr);
 extern template   bool searchhit<Num>(const Num *ptr); 
 void	shower(NVGcontext* vg,const Num *num,const float xpos,const float xend,const float ypos) {
 	if(num->type>=settings->getlabelcount()) {
-		constexpr char const deleted[]="Deleted";
-	        nvgFillColor(vg, *getgray());
+//		constexpr char const deleted[]="Deleted";
+        const char *deleted=usedtext->deleted.data();
+        const int dellen=usedtext->deleted.size();
+        nvgFillColor(vg, *getgray());
 		nvgTextAlign(vg,NVG_ALIGN_CENTER|NVG_ALIGN_TOP); 
-		nvgText(vg, (xpos+xend)/2,ypos,deleted,deleted+sizeof(deleted)-1);
+		nvgText(vg, (xpos+xend)/2,ypos,deleted,deleted+dellen);
 		return;
 		}
 	if(searchhit(num)) {

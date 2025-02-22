@@ -30,7 +30,7 @@ import tk.glucodata.Applic;
 public class AllData  {
 	public Object devices;
 
-	public AllData(@NonNull Applic app) {
+	public AllData() {
 	}
 public void deletelast(int base,int pos,int end ) {
 	}
@@ -52,6 +52,8 @@ public void changedback(int base) {
 	public void sendglucose(String serialNumber, long tim, float gl, float rate, int alarm) {
 	}
 
+	public void startall() {
+	    }
 	public void sync() {
 	}
 	public void stopalarm() {

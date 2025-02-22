@@ -918,30 +918,27 @@ again.</p>
 </string>
 <string name="kerfstok" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/be/kerfstok.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/kerfstok.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/kerfstok.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/kerfstok.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/kerfstok.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/kerfstok.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/kerfstok.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/kerfstok.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/kerfstok.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/kerfstok.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/kerfstok.html?lang=en">en</a>&emsp;&emsp;</p>
-<h1 class="western">Kerfstok</h1>
-<p style="line-height: 100%; margin-bottom: 0in">This view is used to
-solve connection problems with Kerfstok
+<p><a href="https://www.juggluco.nl/Jugglucohelp/be/kerfstok.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/kerfstok.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/kerfstok.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/kerfstok.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/kerfstok.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/kerfstok.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/kerfstok.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/kerfstok.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/kerfstok.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/kerfstok.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/kerfstok.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Kerfstok</h1>
+<p style="line-height: 100%; margin-bottom: 0in">Kerfstok
 (<a href="https://apps.garmin.com/en-US/apps/b6348ccc-86d8-4780-8013-d9e19fed5260">https://apps.garmin.com/en-US/apps/b6348ccc-86d8-4780-8013-d9e19fed5260</a>
-(see also <a href="https://www.juggluco.nl/Kerfstok/index.html">https://www.juggluco.nl/Kerfstok/index.html</a>).
-Kerfstok is a watch app for programmable Garmin smartwatches with
-touchscreen. Kerfstok has the following uses:</p>
+(see also <a href="https://www.juggluco.nl/Kerfstok/index.html">https://www.juggluco.nl/Kerfstok/index.html</a>)
+is a watch app for programmable Garmin smartwatches with touchscreen.
+Kerfstok has the following uses:</p>
 <ul>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Enter numbers
-	and exchange them with Juggluco;</p>
+	and exchange them with Juggluco;</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Displays the
-	stream glucose value received from Juggluco;</p>
+	stream glucose value received from Juggluco;</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Displays this
 	glucose value during sport, while also showing speed and distance.
 	The activity will be recorded and can be displayed in Garmin\'s
-	connect app.</p>
+	connect app.</p></li>
 </ul>
 <p style="line-height: 100%; margin-bottom: 0in">This watch app can
 connect via Bluetooth with Juggluco to exchange amounts and
 continually display your current glucose value. 
 </p>
-<p style="line-height: 100%; margin-bottom: 0in">When a problem
-arrives, can this screen help to find its cause:</p>
+<p style="line-height: 100%; margin-bottom: 0in"><b>TROUBLESHOOTING</b>:</p>
 <p style="line-height: 100%; margin-bottom: 0in">First, your watch
 name should be shown &quot;<i>CONNECTED</i>&quot;. If not, solve the
 problem in Garmin\'s Connect app. Second, Kerfstok should be started
@@ -966,20 +963,6 @@ reinit can be of use.</p>
 connection and for some reason the amounts on watch and phone are out
 of sync, you can press <b>Sync, </b>to make them send the numbers
 they haven\'t sent yet, to each other.</p>
-<p style="line-height: 100%; margin-bottom: 0in">On startup of
-Juggluco, <i>Sync</i> is automatically called. This means that after
-you reinstall Kerfstok, all numbers will also be removed in Juggluco.
-The only way to keep these numbers, is to make a mirror and send it
-back to Juggluco. Be careful because the mirror also is immediately
-synced with its original. To function as a backup, all connection
-with the original should be broken at some point in time. You can
-also connect the watch to a device that is a mirror (left middle
-menu-&gt;<a href="https://www.juggluco.nl/Jugglucohelp/connectionoverview.html">Mirror</a>) of the device in which you entered the numbers.</p>
-<p style="line-height: 100%; margin-bottom: 0in"><b>Refresh</b>
-rewrites this dialog with new information (e.g. after Reinit or
-Sync).</p>
-<p style="line-height: 100%; margin-bottom: 0in">Checking &quot;<b>Glucose&quot;</b>
-determines if glucose values are sent to the watch.</p>
 <p style="line-height: 100%; margin-bottom: 0in">Sometimes a button
 named &quot;<b>Send Queue&quot;</b> is shown; this means that there
 are messages that are not yet sent to the watch. Normally they will
@@ -988,8 +971,34 @@ and pressing on <i>Send queue</i> will continue the sending. But if
 it was not sent because of a broken connecting this has very little
 benefit. Pressing <i>Send Queue </i>during an ongoing transaction can
 break the connection.</p>
+<p style="line-height: 100%; margin-bottom: 0in">Sometimes when “<i>Send
+Queue</i>” is shown, there is a connection problem that makes that
+messages are only send from phone to watch but not in the other
+direction. This is the case when the time after “<i>Receive</i>”
+is older than the time after “<i>Send</i>”. To repair this, you
+have again do one or all of the following one or multiple times:</p>
+<ul>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Press Reinit;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Force stop, the
+	Garmin Connect app and start it again followed by pressing Reinit;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Switch
+	Bluetooth off and on;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Reboot the
+	watch;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Reboot the
+	phone.</p>
+</ul>
+	<p style="line-height: 100%; margin-bottom: 0in"><b>Refresh</b>
+	rewrites this dialog with new information (e.g. after Reinit or
+	Sync).</p>
+	<p style="line-height: 100%; margin-bottom: 0in">Checking &quot;<b>Glucose&quot;</b>
+	determines if glucose values are sent to the watch.</p></li>
 <p style="line-height: 100%; margin-bottom: 0in"><a href="https://www.juggluco.nl/Jugglucohelp/garminconfig.html"><b>Config</b></a>:
 set Dark mode, Shortcuts and ID.</p>
+<p style="line-height: 100%; margin-bottom: 0in"><b>WARNING: Juggluco
+can only be used with one Kerfstok. You can’t connect Juggluco to
+Kerfstok on multiple watches or on a watch and a bike computer. </b>
+</p>
 <p style="line-height: 100%; margin-bottom: 0in"><br/>
 
 </p>

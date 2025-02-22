@@ -51,24 +51,24 @@ private static final String LOG_ID="numio";
 public static long[] numptrs={0L,0L};
 public static long newhit;
 
-static 	private final String datadir="watch";
+static    private final String datadir="watch";
 static class noAccessToFilesDirException extends RuntimeException {
 public noAccessToFilesDirException(String name) { 
-	super(name);
-	}
-	};
+   super(name);
+   }
+   };
 static void settingsnull() {
-	throw new NullPointerException("settings==null");
-	}
+   throw new NullPointerException("settings==null");
+   }
 static void settingsdatanullmisc() {
-	throw new NullPointerException("settings->data()==null");
-	}
+   throw new NullPointerException("settings->data()==null");
+   }
 static void settingsnoaccessfile()  {
-	throw new noAccessToFilesDirException("no access settings.dat");
-	}
+   throw new noAccessToFilesDirException("no access settings.dat");
+   }
 static void settingsnoaccessdir()   {
-	throw new noAccessToFilesDirException("no access files");
-	}
+   throw new noAccessToFilesDirException("no access files");
+   }
 
         static void settingsdataaccessEACCES()    { throw new noAccessToFilesDirException("no access files: EACCES"); }
 
@@ -92,231 +92,225 @@ static void makefilesfailed()   { throw new noAccessToFilesDirException("no acce
 
 static public boolean setlibrary(Applic con) {
 if(true) {
-	var loc=Locale.getDefault();
+   var loc=Locale.getDefault();
        String country=loc.getCountry();
-	var locstr=loc.getLanguage();
-	Applic.curlang=locstr;
-	File files=con.getFilesDir();
-	String filespath=files.getAbsolutePath();
-	if(!files.isDirectory())  {
-	    Log.e(LOG_ID,filespath+" not a directory");
-	    if(!files.mkdirs()) {
-		 Log.e(LOG_ID,"mkdirs "+filespath+" failed");
-		 try {
-		    Thread.sleep(5000L);
-		    }
-		 catch(Throwable th) {
-		    Log.stack(LOG_ID,"sleep",th);
-		    };
-		 files=con.getFilesDir();
-		 filespath=files.getAbsolutePath();
-		if(!files.isDirectory()) {
-		      if(!files.mkdirs()) {
-			   Log.e(LOG_ID,"mkdirs "+filespath+" failed");
-			   Applic.stopprogram=2;
-	   		   System.exit(8);
-			    return false;
-		       }
-		      else
-		       Log.i(LOG_ID,"mkdirs "+filespath+" succeeded");
-		}
-		 else
-		    Log.i(LOG_ID,filespath+" is a directory");
-		}
-		}
-	int ret=130;
-	final String nativedir=con.getApplicationInfo().nativeLibraryDir;
-//        Natives.setlocale(locstr,(Applic.hour24= DateFormat.is24HourFormat(con)));
+   var locstr=loc.getLanguage();
+   Applic.curlang=locstr;
+   File files=con.getFilesDir();
+   String filespath=files.getAbsolutePath();
+   if(!files.isDirectory())  {
+       Log.e(LOG_ID,filespath+" not a directory");
+       if(!files.mkdirs()) {
+       Log.e(LOG_ID,"mkdirs "+filespath+" failed");
+       try {
+          Thread.sleep(5000L);
+          }
+       catch(Throwable th) {
+          Log.stack(LOG_ID,"sleep",th);
+          };
+       files=con.getFilesDir();
+       filespath=files.getAbsolutePath();
+      if(!files.isDirectory()) {
+            if(!files.mkdirs()) {
+            Log.e(LOG_ID,"mkdirs "+filespath+" failed");
+            Applic.stopprogram=2;
+               System.exit(8);
+             return false;
+             }
+            else
+             Log.i(LOG_ID,"mkdirs "+filespath+" succeeded");
+      }
+       else
+          Log.i(LOG_ID,filespath+" is a directory");
+      }
+      }
+   int ret=130;
+   final String nativedir=con.getApplicationInfo().nativeLibraryDir;
         Natives.setlocale(locstr);
-	switch (ret=Natives.setfilesdir(filespath, country,nativedir)) {
-		case 1:
-			settingsnull();
-			break;
-		case 2:
-			settingsdatanullmisc();
-			break;
-		case 3:
-			settingsnoaccessdir();
-			break;
-		case 4:
-			settingsnoaccessfile();
-			break;
-		case 5:
-			settingsdataaccessEACCES();
-			break;
+   switch (ret=Natives.setfilesdir(filespath, country,nativedir)) {
+      case 1:
+         settingsnull();
+         break;
+      case 2:
+         settingsdatanullmisc();
+         break;
+      case 3:
+         settingsnoaccessdir();
+         break;
+      case 4:
+         settingsnoaccessfile();
+         break;
+      case 5:
+         settingsdataaccessEACCES();
+         break;
 
-		case 6:
-			settingsdataaccessELOOP();
-			break;
+      case 6:
+         settingsdataaccessELOOP();
+         break;
 
-		case 7:
-			settingsdataaccessENAMETOOLONG();
-			break;
+      case 7:
+         settingsdataaccessENAMETOOLONG();
+         break;
 
-		case 8:
-			settingsdataaccessENOENT();
-			break;
+      case 8:
+         settingsdataaccessENOENT();
+         break;
 
-		case 9:
-			settingsdataaccessENOTDIR();
-			break;
+      case 9:
+         settingsdataaccessENOTDIR();
+         break;
 
-		case 10:
-			settingsdataaccessEROFS();
-			break;
+      case 10:
+         settingsdataaccessEROFS();
+         break;
 
-		case 11:
-			settingsdataaccessEBADF();
-			break;
+      case 11:
+         settingsdataaccessEBADF();
+         break;
 
-		case 12:
-			settingsdataaccessEINVAL();
-			break;
+      case 12:
+         settingsdataaccessEINVAL();
+         break;
 
-		case 13:
-			settingsdataaccessETXTBSY();
-			break;
-		default:
-	}
+      case 13:
+         settingsdataaccessETXTBSY();
+         break;
+      default:
+   }
 
-	if(doLog) {
-		var build=new StringBuilder();
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-			build.append("\nVERSION.BASE_OS: "+ Build.VERSION.BASE_OS);
-			}
-		build.append("\nVERSION.RELEASE: "+ RELEASE+"\n"+
-		"VERSION.SDK_INT: "+ Build.VERSION.SDK_INT+"\n"+
-		"BRAND: "+ Build.BRAND+"\n"+
-		"CPU_ABI2: "+ Build.CPU_ABI2+"\n"+
-		"CPU_ABI: "+ Build.CPU_ABI+"\n"+
-		"DEVICE: "+ Build.DEVICE+"\n"+
-		"FINGERPRINT: "+ Build.FINGERPRINT+"\n"+
-		"MANUFACTURER: "+ Build.MANUFACTURER+"\n"+
-		"PRODUCT: "+ Build.PRODUCT+"\n"+
-		"MODEL: "+ Build.MODEL);
+   if(doLog) {
+      var build=new StringBuilder();
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+         build.append("\nVERSION.BASE_OS: "+ Build.VERSION.BASE_OS);
+         }
+      build.append("\nVERSION.RELEASE: "+ RELEASE+"\n"+
+      "VERSION.SDK_INT: "+ Build.VERSION.SDK_INT+"\n"+
+      "BRAND: "+ Build.BRAND+"\n"+
+      "CPU_ABI2: "+ Build.CPU_ABI2+"\n"+
+      "CPU_ABI: "+ Build.CPU_ABI+"\n"+
+      "DEVICE: "+ Build.DEVICE+"\n"+
+      "FINGERPRINT: "+ Build.FINGERPRINT+"\n"+
+      "MANUFACTURER: "+ Build.MANUFACTURER+"\n"+
+      "PRODUCT: "+ Build.PRODUCT+"\n"+
+      "MODEL: "+ Build.MODEL);
 
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			build.append("\nSUPPORTED_ABIS: ");
-			for(var ap: Build.SUPPORTED_ABIS) {
-				build.append(ap);
-				build.append(", ");
-				}
-		}
-	build.append('\n');
-		Natives.log(build.toString());
-		 final String version= BuildConfig.VERSION_CODE+" "+ BuildConfig.VERSION_NAME +" "+ BuildConfig.BUILD_TIME+"\n";
-		Log.i(LOG_ID,version+locstr+" "+country+" nativeDir="+nativedir);
-		}
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+         build.append("\nSUPPORTED_ABIS: ");
+         for(var ap: Build.SUPPORTED_ABIS) {
+            build.append(ap);
+            build.append(", ");
+            }
+      }
+   build.append('\n');
+      Natives.log(build.toString());
+       final String version= BuildConfig.VERSION_CODE+" "+ BuildConfig.VERSION_NAME +" "+ BuildConfig.BUILD_TIME+"\n";
+      Log.i(LOG_ID,version+locstr+" "+country+" nativeDir="+nativedir);
+      }
 
-	if(!isWearable)
-		setDevice(Build.MANUFACTURER, Build.MODEL, RELEASE);
+   if(!isWearable)
+      setDevice(Build.MANUFACTURER, Build.MODEL, RELEASE);
 
- 	startsensors( );
-	startmeals();
-	Natives.startthreads();
-	Log.i(LOG_ID,"after startthreads");
-	numptrs[1]=Natives.openNums("here",0L);
-	newhit=Natives.newhit();
-	numptrs[0]=Natives.openNums(datadir,-1L); //order important!!
-	Natives.calccurvegegs();
-	Log.i(LOG_ID,"end setlibrary");
+    startsensors( );
+   startmeals();
+   Natives.startthreads();
+   Log.i(LOG_ID,"after startthreads");
+   numptrs[1]=Natives.openNums("here",0L);
+   newhit=Natives.newhit();
+   numptrs[0]=Natives.openNums(datadir,-1L); //order important!!
+   Natives.calccurvegegs();
+   Log.i(LOG_ID,"end setlibrary");
    Applic.stopprogram=0;
-	return true;
-	}
-	else {
-		Applic.stopprogram=2;
-		return false;
-		}
-	
-	}
+   return true;
+   }
+   else {
+      Applic.stopprogram=2;
+      return false;
+      }
+   
+   }
 
 public static long getident() {
-	return Natives.getident(numio.numptrs[0]);
-	}
+   return Natives.getident(numio.numptrs[0]);
+   }
 public static void setident(long ident) {
-	 Natives.setident(numio.numptrs[0],ident);
-	}
+    Natives.setident(numio.numptrs[0],ident);
+   }
 
 static void open(String base,long ident) {
          Log.d(LOG_ID,"open("+base+","+ident+")");
-	 if(numio.numptrs[0]!=0L) {
-	 	if(ident==-1L||getident()==ident) 
-			return;
-		Natives.closeNums(numio.numptrs[0]);
-	 	}
-	numio.numptrs[0]= Natives.openNums(base,ident);
+    if(numio.numptrs[0]!=0L) {
+       if(ident==-1L||getident()==ident) 
+         return;
+      Natives.closeNums(numio.numptrs[0]);
+       }
+   numio.numptrs[0]= Natives.openNums(base,ident);
   }
 
 static public  ArrayList<String> getlabels() {
-	return Natives.getLabels();
-	}
+   return Natives.getLabels();
+   }
 static void close() {
-	if(numio.numptrs[0]!=0L)
-		Natives.closeNums(numio.numptrs[0]);
-	}
+   if(numio.numptrs[0]!=0L)
+      Natives.closeNums(numio.numptrs[0]);
+   }
 static void delete(int base,int pos) {
-	Natives.removeNum(numio.numptrs[base],pos);
-	}
+   Natives.removeNum(numio.numptrs[base],pos);
+   }
 static void writeAr(int base,int pos, List<Number> dat)  {
-	if(dat==null) {
-		delete(base,pos);
-		return;
-		}
-	Natives.saveNumpos(numio.numptrs[base],pos,(long)((int)dat.get(0)),(float)dat.get(1),(int)dat.get(2),(dat.size()<4)?0:(int)dat.get(3));
-	}
+   if(dat==null) {
+      delete(base,pos);
+      return;
+      }
+   Natives.saveNumpos(numio.numptrs[base],pos,(long)((int)dat.get(0)),(float)dat.get(1),(int)dat.get(2),(dat.size()<4)?0:(int)dat.get(3));
+   }
 
-static item readitem(int base,int pos) {
-	item uit=Natives.getNumitem(numio.numptrs[base], pos);
-//	Log.i(LOG_ID,"readitem("+base+","+pos+")={"+uit.time+","+uit.value+","+uit.label+"}");
-	if(uit.label==0xFFFFFFFF)
-		return null;
-	return uit;
- 	}
+private static item readitem(int base,int pos) {
+//   Log.i(LOG_ID,"readitem("+base+","+pos+")={"+uit.time+","+uit.value+","+uit.label+"}");
+   return Natives.getNumitem(numio.numptrs[base], pos);
+    }
 static List<Number>  readAr(int base,int pos)  {
- 	item it=readitem(base,pos) ;
-	if(it==null)
-		return null;
-	if(it.time==0L)
-		return null;
-	List<Number> uit=new ArrayList<>();
-	uit.add((int)(it.time&0xFFFFFFFFL));
-	uit.add(it.value);
-	uit.add(it.label);
-	if(it.mealptr!=0)
-		uit.add(it.mealptr);
-	return uit;
-	}
+   final item it=readitem(base,pos) ;
+   if(it==null)
+      return null;
+   List<Number> uit=new ArrayList<>();
+   uit.add((int)(it.time&0xFFFFFFFFL));
+   uit.add(it.value);
+   uit.add(it.label);
+   if(it.mealptr!=0)
+      uit.add(it.mealptr);
+   return uit;
+   }
 
 static public void updated(int base,int last)  {
-	Natives.updatedNum(numio.numptrs[base],last);
-	}
+   Natives.updatedNum(numio.numptrs[base],last);
+   }
 static public void updatedstartend(int base,int start,int end)  {
-	Natives.updatedNumstartend(numio.numptrs[base],start,end);
-	}
-	/*
+   Natives.updatedNumstartend(numio.numptrs[base],start,end);
+   }
+   /*
 static public int readlast(int base)  {
-	return Natives.getlastNum(numio.numptrs[base]);
-	}
+   return Natives.getlastNum(numio.numptrs[base]);
+   }
 */
 public static int getlastnum(int base) {
-	long ptr=numio.numptrs[base];
-	return Natives.getlastNum(ptr); 
-	}
+   long ptr=numio.numptrs[base];
+   return Natives.getlastNum(ptr); 
+   }
 public static void setlastnum(int base,int last) {
-	long ptr=numio.numptrs[base];
-	Natives.setlastNum(ptr,last);
-	}
-	
+   long ptr=numio.numptrs[base];
+   Natives.setlastNum(ptr,last);
+   }
+   
 public static int getlastpollednum(int base) {
-	long ptr=numio.numptrs[base];
-	return Natives.getlastpolledNum(ptr); 
-	}
+   long ptr=numio.numptrs[base];
+   return Natives.getlastpolledNum(ptr); 
+   }
 public static boolean didreceivebackup(int base) {
-	long ptr=numio.numptrs[base];
-	var res=Natives.receivedbackup(ptr); 
-	Log.i(LOG_ID,"didreceivebackup("+base+")="+res);
-	return res;
-	}
-	
+   long ptr=numio.numptrs[base];
+   var res=Natives.receivedbackup(ptr); 
+   Log.i(LOG_ID,"didreceivebackup("+base+")="+res);
+   return res;
+   }
+   
 }
 

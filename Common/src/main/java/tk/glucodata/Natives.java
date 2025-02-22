@@ -156,6 +156,7 @@ public static native boolean isreceiving( );
 //    public static native void setfirstNum(long ptr,int pos); //unused
     public static native void setlastNum(long ptr,int pos); //unused
 
+    public static native void setchangedNumLater(long ptr,int pos);
     public static native void setchangedNum(long ptr,int pos);
     public static native void updatedNum(long ptr,int pos);
 	public static native void updatedNumstartend(long ptr,int start,int end);
@@ -193,8 +194,7 @@ public static native void setunit(int unit);
 public static native boolean setlabel(int pos,String label, float prec,float weight);
 public static native void setnrlabel(int nr);
 public static native boolean shouldsendlabels();
-public static native void havesendlabels();
-public static native void receivedcuts();
+public static native void setshouldsendlabels(boolean val);
 public static native int getunit();
 public static native float graphlow( );
 public static native float graphhigh( );
@@ -244,6 +244,7 @@ public static native ArrayList<ArrayList<Object>> getShortcuts();
 public static native int setShortcut(int index,String name,String value);
 public static native void setnrshortcuts(int nr);
 public static native boolean sendcuts();
+public static native void setsendcuts(boolean val);
 public static native void setnodebug(boolean val);
 public static native void sethaslibrary(boolean val);
 //public static native void sethaslib(boolean val);

@@ -214,7 +214,9 @@ hourminstr,
 .receivingpastvalues="Odbiór starych wartości",
 .receivingdata="Odbiór danych",
 .unsupportedSibionics="Nieobsługiwany sensor Sibionics"sv,
-.waitingforconnection="Czekam na połączenie"sv
+.waitingforconnection="Czekam na połączenie"sv,
+.deleted="Deleted"sv
+
 
 
 		}

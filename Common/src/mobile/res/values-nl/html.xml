@@ -906,21 +906,22 @@ sensor.</font></p>
 <string name="kerfstok" >
 <![CDATA[
 <p><a href="https://www.juggluco.nl/Jugglucohelp/be/kerfstok.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/kerfstok.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/kerfstok.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/kerfstok.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/kerfstok.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/kerfstok.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/kerfstok.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/kerfstok.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/kerfstok.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/kerfstok.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/kerfstok.html?lang=en">en</a>&emsp;&emsp;</p><h1>Kerfstok</h1>
-<p style="line-height: 100%; margin-bottom: 0in">Dit schermpje dient
-om connectie problemen met Kerfstok op te lossen. Kerfstok
+<p style="line-height: 100%; margin-bottom: 0in">Kerfstok
 (<a href="https://www.juggluco.nl/Kerfstok/index.html">https://www.juggluco.nl/Kerfstok/index.html</a>)
 is een horloge app voor programmeerbare Garmin smartwatches met
 touchscreen. Kerfstok heeft de volgende functies:</p>
 <ul>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Je kunt nummers
-	invoeren die ook met Juggluco uitgewisseld kunnen worden;</p>
+	invoeren die ook met Juggluco uitgewisseld kunnen worden;</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Kerfstok kan
-	stream glucose waarden ontvangen van Juggluco en continue weergeven;</p>
+	stream glucose waarden ontvangen van Juggluco en continue weergeven;</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Kerfstok kan
 	tijdens het sporten, snelheid en afgelegde afstand weergeven naast
 	je huidige glucose niveau en de sport activiteit opnemen zodat ze in
-	Garmin’s connect app weergegeven kunnen worden.</p>
+	Garmin’s connect app weergegeven kunnen worden.</p></li>
 </ul>
+<p style="line-height: 100%; margin-bottom: 0in"><b>Problemen
+oplossen:</b></p>
 <p style="line-height: 100%; margin-bottom: 0in">Allereerst moet het
 horloge in de linkerbovenhoek verbonden (CONNECTED) getoond worden.</p>
 <p style="line-height: 100%; margin-bottom: 0in">Ten tweede moet
@@ -937,15 +938,15 @@ staat, helpt meestal het volgende:</p>
 <ul>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Ga naar Android
 	<i>App-Info</i> van <i>Garmin Connect</i> en druk een aantal malen
-	op “<i>Stop forceren</i>”.</p>
+	op “<i>Stop forceren</i>”.</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Start <i>Garmin
 	Connect</i>. 
-	</p>
+	</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Ga terug naar
 	dit schermpje en druk op <i>Reinit</i>. 
-	</p>
+	</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Wacht op de
-	volgende glucose waarde van de sensor.</p>
+	volgende glucose waarde van de sensor.</p></li>
 </ul>
 <p style="line-height: 100%; margin-bottom: 0in">Als
 <b>FAILURE_DURING_TRANSFER</b> als status weergegeven wordt, helpt
@@ -956,6 +957,35 @@ toezien dat hier <i>Glucose</i> aangevinkt is. Soms werkte het pas na
 meerdere keren of ontstaan er ook “<i>no status information</i>”
 fouten die op de eerder beschreven manier afgehandeld moeten worden.
 In zeldzame gevallen moet je smartphone gereboot worden.</p>
+<p style="line-height: 100%; margin-bottom: 0in">Soms wordt een knop
+met de naam &quot;<b>Send Queue&quot;</b> weergegeven; dit betekent
+dat er berichten zijn die nog niet naar het horloge zijn verzonden.
+Normaal gesproken worden ze automatisch verzonden op het juiste
+moment, maar soms werd dit onderbroken en door op <i>Send queue</i>
+te drukken wordt het verzenden voortgezet. Maar als het niet is
+verzonden vanwege een verbroken verbinding, heeft dit weinig nut.
+Door op <i>Send Queue</i> te drukken tijdens een lopende transactie
+kan de verbinding worden verbroken.</p>
+<p style="line-height: 100%; margin-bottom: 0in">Soms wanneer &quot;<i>Send
+Queue</i>&quot; wordt weergegeven, is er een verbindingsprobleem
+waardoor berichten alleen van de telefoon naar het horloge worden
+verzonden, maar niet andersom. Dit is het geval wanneer de tijd na
+&quot;<i>Receive</i> &quot; ouder is dan de tijd na &quot;<i>Send</i>&quot;.
+Om dit te herstellen, moet je opnieuw een of alle van de volgende
+handelingen uitvoeren, een of meerdere keren:</p>
+<ul>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Druk op <i>Reinit</i>
+	starten;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Druk op
+	“Gedwongen stoppen” van de Garmin Connect-app en start deze
+	opnieuw, gevolgd door <i>Reinit</i>;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Schakel
+	Bluetooth uit en weer in;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Reboot het
+	horloge;</p></li>
+	<li><p style="line-height: 100%; margin-bottom: 0in">Reboot the
+	telefoon.</p></li>
+</ul>
 <p style="line-height: 100%; margin-bottom: 0in"><b>Sync</b>:
 Hoeveelheden die nog niet verzonden zijn worden hiermee tussen
 horloge en telefoon uitgewisseld. Normaal hoeft hiervan geen gebruik
@@ -965,14 +995,9 @@ Ververst dit schermpje met nieuwe informatie (bijvoorbeeld na Reinit
 of Sync).</p>
 <p style="line-height: 100%; margin-bottom: 0in"><b>Glucose</b>: Het
 verzenden van glucosewaarden naar Kerfstok staat aan.</p>
-<p style="line-height: 100%; margin-bottom: 0in">Soms wordt een “Send
-queue” knop getoond. Dit betekent dat niet alles naar het horloge
-verzonden is. Meestal wordt dat verzenden dan later nog uitgevoerd,
-maar soms is dat onderbroken en kan het weer aan de gang gebracht
-worden door op <i>Send queue</i> te drukken. Als dit probleem
-ontstond door een kapotte verbinding, zal dit ook niet helpen. Op
-<i>Send queue</i> drukken als het verzenden bezig is, kan de
-verbinding kapot maken. Zie boven.</p>
+<p style="line-height: 100%; margin-bottom: 0in"><br/>
+
+</p>
 <p style="line-height: 100%; margin-bottom: 0in"><br/>
 
 </p>

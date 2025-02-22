@@ -181,7 +181,9 @@ volgende file)",
 .receivingpastvalues="Oude glucose waarden komen binnen",
 .receivingdata="Gegevens worden ontvangen",
 .unsupportedSibionics="Niet-ondersteunde Sibionics-sensor"sv,
-.waitingforconnection="Wacht op verbinding"sv
+.waitingforconnection="Wacht op verbinding"sv,
+.deleted="Verwijderd"sv
+
 		}
 
 

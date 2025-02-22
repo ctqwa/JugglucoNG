@@ -479,6 +479,7 @@ new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View
         removeContentView(lay) ;
         });
 
+    usealarm.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setUSEALARM(isChecked));
     Save.setOnClickListener(v->{
       final boolean hasloss= lossalarm.isChecked();
     if(hasloss) {
@@ -500,7 +501,7 @@ new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View
            Natives.setalarms(str2float(((EditText)lowalarm[1]).getText().toString()),
                     str2float(((EditText)highalarm[1]).getText().toString()),
                      haslow, hashigh, isvalue.isChecked(),hasloss);
-    Natives.setUSEALARM(usealarm.isChecked());
+    //    Natives.setUSEALARM(usealarm.isChecked());
        context.poponback();
         parview.setVisibility(VISIBLE);
         tk.glucodata.help.hidekeyboard(context);

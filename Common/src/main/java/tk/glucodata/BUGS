@@ -1,15 +1,10 @@
-Traag wanneer naar begin verschoven wordt.
-Show nums scherm sluit niet bij drukken sluiten, helemaal aan het begin.
-SOms sync needed.
-Na invoeren dat op horloge, oude gegevens weg.
-Labels niet in kerfstok
 Als iemand een oude sensor met zelfde pin heeft liggen leidt dit tot problemen.
 Die sensor kan geaccepteerd worden. Daarna neemt Juggluco nog alleen maar die sensor. Als het niet zo was zouden data door elkaar raken.
 Oplossingen:
 - Mogelijkheid toevoegen alle data van sensor te wissen;
 
-
 Creates second connection?
+
 Complications:
         - press large image complication no effect;
 
@@ -20,7 +15,6 @@ In the google Play version when a new language is selected that isn't used befor
 
 android_fdsan_close_with_tag
 AlertDialog allCaps on phone
-
 
 
 

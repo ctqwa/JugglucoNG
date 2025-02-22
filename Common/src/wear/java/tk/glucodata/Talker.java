@@ -15,6 +15,7 @@ Talker(Context context) { }
 
 
 void speak(String message) { }
+void speak(String message,Object obj) { }
 void selspeak(String message) { }
 public static void config(MainActivity context) {}
 }

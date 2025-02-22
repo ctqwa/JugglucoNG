@@ -140,10 +140,10 @@ Button mealbutton;
 public void  addnumberview(MainActivity activity, long hitptr) {
     if(currentnum!=0L&&currentnum!=numio.newhit) 
             Natives.freehitptr(currentnum);
-      long time= Natives.hittime(hitptr)*1000L;
-      int bron= Natives.gethitindex(hitptr);
+    long time= Natives.hittime(hitptr)*1000L;
+    int bron= Natives.gethitindex(hitptr);
     var type=Natives.hittype(hitptr);
-     addnumberview(activity, bron,time,Natives.hitvalue(hitptr),type,-1);
+    addnumberview(activity, bron,time,Natives.hitvalue(hitptr),type,-1);
     if(hitptr!=numio.newhit) {
         if(!Natives.staticnum())
             deletebutton.setVisibility(VISIBLE);
@@ -535,16 +535,16 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
 void deletedialog(View v,int[] mealptr) {
     if(currentnum==0L) {
         newnumview.setVisibility(GONE);
-           hidekeyboard();
-         // ((Applic) ((Activity) v.getContext()).getApplication()). redraw();
-         return;
-         }
+        hidekeyboard();
+        // ((Applic) ((Activity) v.getContext()).getApplication()). redraw();
+        return;
+        }
 //    Applic  context= ((Applic) ((Activity) v.getContext()).getApplication());
     MainActivity  context=  ((MainActivity) v.getContext());
 
-      long time= Natives.hittime(currentnum)*1000L;
-       float value=Natives.hitvalue(currentnum);
-       int type=Natives.hittype(currentnum);
+    long time= Natives.hittime(currentnum)*1000L;
+    float value=Natives.hitvalue(currentnum);
+    int type=Natives.hittype(currentnum);
     ArrayList<String> labels= ((Applic)context.getApplication()).getlabels();
     String mess= DateFormat.getDateTimeInstance(DateFormat.DEFAULT,DateFormat.DEFAULT).format(time)+" "+ labels.get(type)+" "+value;
        // AlertDialog.Builder builder = new AlertDialog.Builder(context,R.style.mydialogstyle);
@@ -568,7 +568,7 @@ void deletedialog(View v,int[] mealptr) {
                         if(pos<last)
                              alldata.changedback(index);
                              }
-                    Natives.freehitptr(currentnum);
+                        Natives.freehitptr(currentnum);
                       ((Applic) ((Activity) v.getContext()).getApplication()). redraw();
                       }
                 currentnum=0L;
@@ -641,11 +641,13 @@ private boolean saveamount(Activity activity,TextView timeview,TextView value,in
     try {
         val=(strval.length()==0)?0:Float.parseFloat(strval);
         }
-         catch(Exception e) {};
+    catch(Throwable e) {
+        Log.stack(LOG_ID,"parseFloat "+strval,e);
+        };
 
     if(currentnum!=0&&currentnum!=numio.newhit) {
         long dat=thedate==0L?Natives.hittime(currentnum)*1000L:thedate;
-            if(timeview!=null) {
+        if(timeview!=null) {
             cal.setTimeInMillis(dat);
             int minutes = thetime;
             if(minutes>=0) {
@@ -659,30 +661,28 @@ private boolean saveamount(Activity activity,TextView timeview,TextView value,in
         Natives.hitchange(currentnum,dat/1000L,val,labelsel,mealptr);
         int index=Natives.gethitindex(currentnum);
         if(!isWearable) {
-            tk.glucodata.nums.AllData  alldata=((Applic) activity.getApplication()).numdata;
+            tk.glucodata.nums.AllData  alldata=Applic.app.numdata;
             alldata.changedback(index);
             }
         Natives.freehitptr(currentnum);
         }
 
     else {
-//        long dat=thedate==0L?currentTimeMillis():thedate;
         long dat=thedate==0L?lasttime:thedate;
-//        DateFormat.getDateTimeInstance(DateFormat.DEFAULT,DateFormat.DEFAULT);
         cal.setTimeInMillis(dat);
         if(timeview!=null) {
-        int minutes = thetime;
-        if(minutes>=0) {
-            cal.set(Calendar.HOUR_OF_DAY, minutes / 60);
-            cal.set(Calendar.MINUTE, minutes % 60);
-            cal.set(Calendar.SECOND,0);
+            int minutes = thetime;
+            if(minutes>=0) {
+                cal.set(Calendar.HOUR_OF_DAY, minutes / 60);
+                cal.set(Calendar.MINUTE, minutes % 60);
+                cal.set(Calendar.SECOND,0);
+                }
             }
-        }
-         dat= cal.getTimeInMillis();
+        dat= cal.getTimeInMillis();
         final int index=1;
-            Natives.saveNum(numio.numptrs[index],dat/1000,val,labelsel,mealptr);
+        Natives.saveNum(numio.numptrs[index],dat/1000,val,labelsel,mealptr);
         if(!isWearable) {
-           tk.glucodata.nums.AllData  alldata=((Applic) activity.getApplication()).numdata;
+           tk.glucodata.nums.AllData  alldata=Applic.app.numdata;
             alldata.changedback(index);
             }
         }

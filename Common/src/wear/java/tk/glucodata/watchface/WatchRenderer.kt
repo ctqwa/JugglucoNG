@@ -300,27 +300,27 @@ override fun render(canvas: Canvas, bounds: Rect, zonedDateTime: ZonedDateTime,s
             val unixtime = zonedDateTime.toEpochSecond()
             rendertime=unixtime
             val glucose: strGlucose? = Natives.lastglucose()
-                val drawAmbient = renderParameters.drawMode == DrawMode.AMBIENT
-                if (drawAmbient) {
-                    timePaint.color = watchFaceColors.ambientPrimaryColor
-                    glucosePaint.color = watchFaceColors.ambientPrimaryColor
-                    agePaint.color = GRAY
-                }
+            val drawAmbient = renderParameters.drawMode == DrawMode.AMBIENT
+            if (drawAmbient) {
+                timePaint.color = watchFaceColors.ambientPrimaryColor
+                glucosePaint.color = watchFaceColors.ambientPrimaryColor
+                agePaint.color = GRAY
+            }
             else {
                     timePaint.color = watchFaceColors.activePrimaryColor
                     glucosePaint.color = watchFaceColors.activePrimaryColor
                     agePaint.setARGB(0xFF, 0xFF, 0, 0xFF)
                 }
 
-                glucosePaint.textSize =canvas.height*.25f
-      val localtime= zonedDateTime.toLocalTime()
-      watchtime(canvas,localtime)
-                if(glucose!=null)  {
-            val density=canvas.height/250.0f
-         val getx= canvas.width*0.5f
-         val gety= canvas.height*0.66f
-         showglucose(canvas,glucosePaint,agePaint,getx,gety,density,unixtime,glucose)
-         }
+            glucosePaint.textSize =canvas.height*.25f
+            val localtime= zonedDateTime.toLocalTime()
+            watchtime(canvas,localtime)
+            if(glucose!=null)  {
+                val density=canvas.height/250.0f
+                 val getx= canvas.width*0.5f
+                 val gety= canvas.height*0.66f
+                 showglucose(canvas,glucosePaint,agePaint,getx,gety,density,unixtime,glucose)
+                 }
       else
             Log.i(LOG_ID,"glucose==null")
     if(!heartrate.isNaN()) {
@@ -381,35 +381,35 @@ override fun render(canvas: Canvas, bounds: Rect, zonedDateTime: ZonedDateTime,s
        }
 private fun   showglucose(canvas:Canvas,glucosePaint:Paint,agePaint:Paint,getxin:Float,gety:Float,density:Float,unixtime:Long,glucose:strGlucose)  {
       var getx=getxin
-          Log.i(LOG_ID,"glucose=${glucose.value} time=${glucose.time}")
-           var age:Int=(unixtime-glucose.time).toInt()
+      Log.i(LOG_ID,"glucose=${glucose.value} time=${glucose.time}")
+      var age:Int=(unixtime-glucose.time).toInt()
 //           val oldage=(60.0f*5.0f)
 
-                val oldage=tk.glucodata.Notify.glucosetimeoutSEC
-         if(age<oldage) {
+      val oldage=tk.glucodata.Notify.glucosetimeoutSEC
+      if(age<oldage) {
             with(canvas) {
-             if(age<0) age=0
-            val rate=glucose.rate
-            if(rate.isNaN()) {
-//               getx=width*0.45f
-               getx*=0.82f
-               }
-            else  {
-                CommonCanvas.drawarrow(this,glucosePaint,density,rate,width*.25f,height*.55f)
-                }
-             drawText(glucose.value,getx,gety, glucosePaint)
-             val idbounds=Rect()
-             glucosePaint.textSize/=5.0f
-             val sensorid=glucose.sensorid
-             glucosePaint.getTextBounds(sensorid, 0,sensorid.length, idbounds)
-             val yid= gety+idbounds.height()*1.5f
-             val wid= idbounds.width()
-             val relage=age*wid/oldage
-             val xage= getx-wid*.5f
-             val hid= idbounds.height()
-             drawRect( xage,yid-hid*1.05f,xage +relage, yid+0.07f*hid,agePaint)
-             drawText(sensorid,getx,yid, glucosePaint)
-             }
+                if(age<0) age=0
+                val rate=glucose.rate
+                if(rate.isNaN()) {
+    //               getx=width*0.45f
+                   getx*=0.82f
+                   }
+                else  {
+                    CommonCanvas.drawarrow(this,glucosePaint,density,rate,width*.25f,height*.55f)
+                    }
+                 drawText(glucose.value,getx,gety, glucosePaint)
+                 val idbounds=Rect()
+                 glucosePaint.textSize/=5.0f
+                 val sensorid=glucose.sensorid
+                 glucosePaint.getTextBounds(sensorid, 0,sensorid.length, idbounds)
+                 val yid= gety+idbounds.height()*1.5f
+                 val wid= idbounds.width()
+                 val relage=age*wid/oldage
+                 val xage= getx-wid*.5f
+                 val hid= idbounds.height()
+                 drawRect( xage,yid-hid*1.05f,xage +relage, yid+0.07f*hid,agePaint)
+                 drawText(sensorid,getx,yid, glucosePaint)
+                 }
           }
       else {
          Log.i(LOG_ID,"age ($age) >= oldage ($oldage)")

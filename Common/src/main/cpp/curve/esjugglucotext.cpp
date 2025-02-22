@@ -220,7 +220,9 @@ son necesarios. En tu caso tiene problemas con el siguiente archivo)",
 .receivingpastvalues="Recibiendo valores antiguos"sv,
 .receivingdata="Recibiendo datos"sv,
 .unsupportedSibionics="Sensor Sibionics no compatible"sv,
-.waitingforconnection="Esperando conexión"sv
+.waitingforconnection="Esperando conexión"sv,
+.deleted="Deleted"sv
+
 }
 
 ;

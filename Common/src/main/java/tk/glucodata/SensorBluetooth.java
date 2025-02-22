@@ -874,7 +874,7 @@ private void addBluetoothStateReceiver() {
             } else if (intExtra == BluetoothAdapter.STATE_ON) {
                 Log.v(LOG_ID,"BLUETOOTH switched ON");
                 if(!isWearable) {
-                    Applic.app.numdata.sync();
+                    Applic.app.numdata.startall();
                     }
 //                if(wasScanning) { SensorBluetooth.this.startScan(250L); }
                 SensorBluetooth.this.connectToActiveDevice(500);

@@ -198,7 +198,8 @@ are needed. In your case it has problems with the following file)",
 .receivingpastvalues="Receiving old values"sv,
 .receivingdata="Receiving data"sv,
 .unsupportedSibionics="Unsupported Sibionics Sensor"sv,
-.waitingforconnection="Waiting for connection"sv
+.waitingforconnection="Waiting for connection"sv,
+.deleted="Deleted"sv
 		}
 
 

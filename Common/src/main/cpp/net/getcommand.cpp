@@ -195,8 +195,8 @@ for(int it=0;it<len;) {
 			ret=backupnuminit(reinterpret_cast<const numinit *>(data));
 			};break;
 		case snums: {
-			 numsend *numgeg=reinterpret_cast<numsend *>(data);
-			 comlen=numgeg->totlen;
+			numsend *numgeg=reinterpret_cast<numsend *>(data);
+			comlen=numgeg->totlen;
 			addlen(it,comlen);
 			if(it>len) {
 				return {it,comlen};

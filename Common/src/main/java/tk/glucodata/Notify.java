@@ -122,7 +122,7 @@ Ringtone setring(String uristr, int res) {
     }
 static final private int[] defaults ={ R.raw.siren, R.raw.classic, R.raw.ghost, R.raw.nudge,R.raw.elves};
 
-static private AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION) .build():null;
+static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION) .build():null;
 public static Ringtone getring(int kind) {
     return    mkrings(Natives.readring(kind),kind);
     }
@@ -371,6 +371,15 @@ static    void stoplossalarm(){
     private synchronized void playringhier(Ringtone ring,int duration,boolean sound,boolean flash,boolean vibrate,boolean disturb,int kind) {
         stopalarm();
 //        final int[] curfilter={-1};
+        if(!isWearable) {
+              if(kind<=1&&Natives.speakalarms()) {
+                 final var  glu=SuperGattCallback.previousglucose;
+                 if(glu!=null) {
+                           SuperGattCallback.talker.speak(glu.value, getUSEALARM()?ScanNfcV.audioattributes:notification_audio);
+//                            Applic.scheduler.schedule( () -> SuperGattCallback.talker.speak(glu.value, getUSEALARM()?ScanNfcV.audioattributes:notification_audio), 50, TimeUnit.MILLISECONDS);
+                            }
+                        }
+                }
         final boolean[] doplaysound={true};
         if(sound) {
             if(disturb) {
@@ -423,10 +432,12 @@ static    void stoplossalarm(){
                     stopvibratealarm();
                     }
                 if(!isWearable) {
-                    if(Natives.speakalarms()&&kind<=1) {
+                    if(kind<=1&&Natives.speakalarms()) {
                         final var  glu=SuperGattCallback.previousglucose;
-                        if(glu!=null)
-                            SuperGattCallback.talker.speak(glu.value);
+                        if(glu!=null) {
+                            Applic.scheduler.schedule(
+                            () -> SuperGattCallback.talker.speak(glu.value, getUSEALARM()?ScanNfcV.audioattributes:notification_audio), 300, TimeUnit.MILLISECONDS);
+                            }
                         }
                 if(kind<2) overwriteglucose(kind);
                   //overwriteglucose();

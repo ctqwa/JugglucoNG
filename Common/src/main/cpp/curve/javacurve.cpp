@@ -95,7 +95,7 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(setpaused)(JNIEnv *env, jclass cl,
 JavaVM *vmptr;
 static jmethodID summaryready=nullptr;
 
-   #ifdef  WEAROS
+#ifdef  WEAROS
 static jmethodID showsensorinfo=nullptr;
 #endif
 jmethodID  jdoglucose=nullptr, jupdateDevices=nullptr, jbluetoothEnabled=nullptr,jspeak=nullptr, jresetWearOS=nullptr;
@@ -103,7 +103,7 @@ jclass JNIApplic,JNIString;
 #ifdef OLDEVERSENSE
 #ifndef  WEAROS
 jclass EverSense;
-jmethodID  sendGlucoseBroadcast=nullptr;
+jmethodID  sendGlucoseBroadcast=nullptr,jtoGarmin=nullptr, jGarmindeletelast=nullptr;
 #endif
 #endif
 #ifdef WEAROS
@@ -208,6 +208,14 @@ if(cl) {
    if(!(jrminitlayout=env->GetStaticMethodID(JNIApplic,"rminitlayout","()V"))) {
       LOGAR(R"%(jrminitlayout=env->GetStaticMethodID(JNIApplic,"rminitlayout","()V)" failed)%" );
       }
+#else
+   if(!(jtoGarmin=env->GetStaticMethodID(JNIApplic,"toGarmin","(I)V"))) {
+      LOGAR(R"(jtoGarmin=env->GetStaticMethodID(JNIApplic,"toGarmin","(I)V") failed)" "");
+      }
+   if(!(jGarmindeletelast=env->GetStaticMethodID(JNIApplic,"Garmindeletelast","(III)V"))) {
+      LOGAR(R"(jGarmindeletelast=env->GetStaticMethodID(JNIApplic,"Garmindeletelast","(III)V") failed)" "");
+      }
+
 #endif
       /*
    if(!(jtoCalendar=env->GetStaticMethodID(JNIApplic,"toCalendar","()V"))) {
@@ -734,6 +742,20 @@ void speak(const char *message) {
       LOGAR("speak(null)");
       }
    }
+extern void toGarmin(int base);
+void toGarmin(int base) {
+#ifndef WEAROS
+    if(settings->data()->usegarmin)
+       getenv()->CallStaticVoidMethod(JNIApplic,jtoGarmin,!base); 
+#endif
+   }
+void Garmindeletelast(int base,int pos,int end ) {
+#ifndef WEAROS
+    if(settings->data()->usegarmin)
+       getenv()->CallStaticVoidMethod(JNIApplic,jGarmindeletelast,!base,pos,end); 
+#endif
+   }
+
    /*
 void toCalendar(const char *message) {
    if(message)

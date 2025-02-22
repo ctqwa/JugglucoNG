@@ -165,11 +165,11 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(setlabel)(JNIEnv *env, jclass 
 	return true;
 	}
 
-extern "C" JNIEXPORT void  JNICALL   fromjava(havesendlabels)(JNIEnv *env, jclass cl) {
-	settings->data()->sendlabels=false;
+extern "C" JNIEXPORT void  JNICALL   fromjava(setshouldsendlabels)(JNIEnv *env, jclass cl,jboolean val) {
+	settings->data()->sendlabels=val;
 	}
-extern "C" JNIEXPORT void  JNICALL   fromjava(receivedcuts)(JNIEnv *env, jclass cl) {
-	settings-> data()->sendcuts=false;
+extern "C" JNIEXPORT void  JNICALL   fromjava(setsendcuts)(JNIEnv *env, jclass cl,jboolean val) {
+	settings-> data()->sendcuts=val;
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(sendcuts)(JNIEnv *env, jclass cl) {
 	return settings-> data()->sendcuts;

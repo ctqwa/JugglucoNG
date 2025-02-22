@@ -173,7 +173,7 @@ public Applic() {
     uiThreadId=Thread.currentThread().getId();
     //android.util.Log.e(LOG_ID,"currentThread().getId");
     if(!isWearable) {
-        numdata=new AllData(this);
+        numdata=new AllData();
         }
     }
 void setnotify(boolean on) {
@@ -790,6 +790,19 @@ static void setinittext(String str) {
 static void rminitlayout() {
      RunOnUiThread(()-> {Specific.rmlayout();});
     }
+@Keep
+static void toGarmin(int base) {
+   if(!isWearable) { 
+        app.numdata.changedback(base);
+        }
+    }
+@Keep
+static void Garmindeletelast(int base,int pos,int end ) {
+       if(!isWearable) { 
+            app.numdata.deletelast(base,pos,end);
+            app.numdata.changedback(base);
+          }
+        }
 static public void startMain() {
     final var act=MainActivity.thisone;
     final var intent=new Intent(Applic.app,MainActivity.class);
