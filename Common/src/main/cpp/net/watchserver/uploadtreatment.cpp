@@ -1,5 +1,4 @@
 
-#ifndef WEAROS
 #include <jni.h>
 #include <charconv>
 #include <algorithm>
@@ -221,4 +220,3 @@ char *writetreatmentV3(char *outiter,const int numbase,const int pos,const Num*n
 	return outiter;
 	}
 //R"({"timestamp":%u000,"eventType":"<none>","enteredBy":"Juggluco","notes":"Walk 7","carbs":%g,"insulin":%g,"created_at":"2024-01-06T11:31:03Z","_id":"%s"}
-#endif

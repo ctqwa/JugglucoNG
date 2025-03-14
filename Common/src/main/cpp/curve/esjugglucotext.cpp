@@ -195,6 +195,7 @@ R"(Debería ser el mismo que cuando se activa el sensor. Use el menú izquierdo-
 .unknownNFC={"Error de escaneo NFC no reconocido",
 "Inténtelo de nuevo"},
 .nolibre3={"Sensor FreeStyle Libre 3",
+.needsandroid8="Needs minimally Android 8"sv,
 "Descargue la versión correcta de https://www.juggluco.nl/download.html"},
 #ifndef WEAROS
 .advancedstart= R"(<h1>Dispositivo modificado</h1>

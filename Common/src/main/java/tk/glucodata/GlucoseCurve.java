@@ -364,10 +364,11 @@ long multitime=0L;
             final float y = event.getY();
     
             if(Natives.isbutton(x, y)) {
-            if(Menus.on)
-            Menus.show((MainActivity)getContext());
-        else
-            requestRender();
+                render.badscan=0;
+                if(Menus.on)
+                    Menus.show((MainActivity)getContext());
+                else
+                    requestRender();
             }
             return false;
         }
@@ -469,15 +470,14 @@ void startlibrelink(String lang) {
                     }
                     }
                     break;
-                  case 3: 
-
-			       bluediag.start((MainActivity)getContext()); break;
-                    case 4: {
+                  case 3: bluediag.start((MainActivity)getContext()); 
+                      break;
+                  case 4: {
                     MainActivity activity = (MainActivity) getContext(); 
                     Settings.set(activity);
                     };break;
 
-                                case 5: {
+                case 5: {
                     if(!isWearable) {
                         MainActivity activity = (MainActivity) getContext();
                         if(SiBionics==1)
@@ -764,112 +764,112 @@ if(!isWearable) {
     editfocus.setedittext(under);
     }
     }
-      View searchcontrol=null;
+View searchcontrol=null;
 //    void search(View view) {
-    void search(boolean forward) {
-((MainActivity)getContext()).hideSystemUI();
-if(smallScreen) {
-    help.hidekeyboard((MainActivity)getContext());
-    }
-    float funder=0.0f;
-    try {
-             funder= Float.parseFloat(under.getText().toString());
-        } catch(Exception e) {};
-    float fabove=0.0f;
-    try {
-             fabove= Float.parseFloat(above.getText().toString());
-        } catch(Exception e) {};
-    float ingamount=0.0f;
-    try {
-        if(mealquantity!=null)
-            ingamount= Float.parseFloat(mealquantity.getText().toString());
-        } catch(Exception e) {};
-    String ingsearch=null;
-    if(mealingredient!=null) {
-        ingsearch=mealingredient.getText().toString();
-        if(ingsearch.length()==0)
-            ingsearch=null;
-            }
-       int glsearch=((historysearch.isChecked()?0x40000002:0)| (scansearch.isChecked()?0x40000001:0))|(streamsearch.isChecked()?0x40000004:0);
-   if(Natives.search(glsearch==0?labelsel:glsearch,funder,fabove,minutes[0],minutes[1],forward,ingsearch,ingamount)==0) {
-
-       search.setVisibility(GONE);
-       hidemealsearch();
-       hidekeyboard();
-       requestRender();
-        MainActivity activity=(MainActivity)getContext();
-    activity.poponback();
-       if(searchcontrol==null) {
-
-        /*  prev= new Button(activity); prev.setText("Earlier");*/
-
-           prev=new ImageButton(activity);
-           prev.setImageResource( R.drawable.baseline_navigate_before_white_36);
-           prev.setOnClickListener(v-> {
-               if (0 == Natives.earliersearch()) {
-                   next.setVisibility(VISIBLE);
-                    requestRender();
-                 }
-                else {
-                   if (next.getVisibility() != VISIBLE)
-                       searchaway();
-                   else
-                       v.setVisibility(INVISIBLE);
+void search(boolean forward) {
+    ((MainActivity)getContext()).hideSystemUI();
+    if(smallScreen) {
+        help.hidekeyboard((MainActivity)getContext());
+        }
+        float funder=0.0f;
+        try {
+                 funder= Float.parseFloat(under.getText().toString());
+            } catch(Exception e) {};
+        float fabove=0.0f;
+        try {
+                 fabove= Float.parseFloat(above.getText().toString());
+            } catch(Exception e) {};
+        float ingamount=0.0f;
+        try {
+            if(mealquantity!=null)
+                ingamount= Float.parseFloat(mealquantity.getText().toString());
+            } catch(Exception e) {};
+        String ingsearch=null;
+        if(mealingredient!=null) {
+            ingsearch=mealingredient.getText().toString();
+            if(ingsearch.length()==0)
+                ingsearch=null;
                 }
-        });
+           int glsearch=((historysearch.isChecked()?0x40000002:0)| (scansearch.isChecked()?0x40000001:0))|(streamsearch.isChecked()?0x40000004:0);
+       if(Natives.search(glsearch==0?labelsel:glsearch,funder,fabove,minutes[0],minutes[1],forward,ingsearch,ingamount)==0) {
 
-//           next= new Button(activity); next.setText("Later");
-           next=new ImageButton(activity);
-           next.setImageResource( R.drawable.baseline_navigate_next_white_36);
-           next.setOnClickListener(v-> {if(0== Natives.latersearch()) {
-               prev.setVisibility(VISIBLE);
-               requestRender();
-           }else
-               {
-                if(prev.getVisibility()!=VISIBLE)
+           search.setVisibility(GONE);
+           hidemealsearch();
+           hidekeyboard();
+           requestRender();
+            MainActivity activity=(MainActivity)getContext();
+        activity.poponback();
+           if(searchcontrol==null) {
+
+            /*  prev= new Button(activity); prev.setText("Earlier");*/
+
+               prev=new ImageButton(activity);
+               prev.setImageResource( R.drawable.baseline_navigate_before_white_36);
+               prev.setOnClickListener(v-> {
+                   if (0 == Natives.earliersearch()) {
+                       next.setVisibility(VISIBLE);
+                        requestRender();
+                     }
+                    else {
+                       if (next.getVisibility() != VISIBLE)
+                           searchaway();
+                       else
+                           v.setVisibility(INVISIBLE);
+                    }
+            });
+
+    //           next= new Button(activity); next.setText("Later");
+               next=new ImageButton(activity);
+               next.setImageResource( R.drawable.baseline_navigate_next_white_36);
+               next.setOnClickListener(v-> {if(0== Natives.latersearch()) {
+                   prev.setVisibility(VISIBLE);
+                   requestRender();
+               }else
+                   {
+                    if(prev.getVisibility()!=VISIBLE)
+                        searchaway();
+                    else
+                                v.setVisibility(INVISIBLE);
+                   }
+               });
+         ImageButton closecontrol=new ImageButton(activity);
+         closecontrol.setImageResource( android.R.drawable.ic_menu_close_clear_cancel);
+             closecontrol.setOnClickListener(v-> {
+             activity.poponback();
                     searchaway();
-                else
-                            v.setVisibility(INVISIBLE);
-               }
-           });
-     ImageButton closecontrol=new ImageButton(activity);
-     closecontrol.setImageResource( android.R.drawable.ic_menu_close_clear_cancel);
-         closecontrol.setOnClickListener(v-> {
-         activity.poponback();
-                searchaway();
-                 });
-    int closepad= (int)(closecontrol.getPaddingLeft()*.67);
-    int pad= (int)(closecontrol.getPaddingLeft()*.5);
-    closecontrol.setPadding(closepad,closepad,closepad,closepad);
-    next.setPadding(pad,pad,pad,pad);
-    prev.setPadding(pad,pad,pad,pad);
-          searchcontrol= new Layout(activity,(v,w,h) -> {
+                     });
+        int closepad= (int)(closecontrol.getPaddingLeft()*.67);
+        int pad= (int)(closecontrol.getPaddingLeft()*.5);
+        closecontrol.setPadding(closepad,closepad,closepad,closepad);
+        next.setPadding(pad,pad,pad,pad);
+        prev.setPadding(pad,pad,pad,pad);
+        searchcontrol= new Layout(activity,(v,w,h) -> {
            int height=getHeight();
-           int width=getWidth();
+           int width=getWidth()-systembarLeft-systembarRight;
            int columns=Natives.getcolumns(w);
            if(height>h && width>w) {
-               v.setY((height-h)/2);
+               v.setY((height-h)*.5f);
                if(columns==1)  {
-                   v.setX(width-w);
+                   v.setX(width-w+systembarLeft);
                 }
                else {
-                   v.setX((width-w)/2);
+                   v.setX((width-w)*.5f+systembarLeft);
                    }
             }
-                    requestRender();
-            return new int[] {w,h};
+          requestRender();
+          return new int[] {w,h};
           },new View[]{prev},new View[] {closecontrol},new View[] {next});
-           activity.addContentView(searchcontrol, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-       }
+               activity.addContentView(searchcontrol, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+           }
 
-       prev.setVisibility(VISIBLE);
-       next.setVisibility(VISIBLE);
-       searchcontrol.setVisibility(VISIBLE);
-       activity.setonback(this::searchaway);
-       }
-       else
-    Applic.argToaster(getContext(), getContext().getString(R.string.notfound), Toast.LENGTH_SHORT);
-    //((MainActivity)getContext()).curve.requestRender();
+           prev.setVisibility(VISIBLE);
+           next.setVisibility(VISIBLE);
+           searchcontrol.setVisibility(VISIBLE);
+           activity.setonback(this::searchaway);
+           }
+           else
+        Applic.argToaster(getContext(), getContext().getString(R.string.notfound), Toast.LENGTH_SHORT);
+        //((MainActivity)getContext()).curve.requestRender();
 }
 
  
@@ -1186,7 +1186,7 @@ public void onResume() {
 
     app.setcurve(this);
     app.setmintime();
-}
+    }
 
 @Override
 public void onPause() {

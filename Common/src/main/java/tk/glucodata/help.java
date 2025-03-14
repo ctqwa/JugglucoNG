@@ -194,15 +194,9 @@ public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,P
          helpscroll.setScrollbarFadingEnabled(false);
          ok=new Button(act);
          okbutton=new WeakReference<Button>(ok);
-
-
- 
+       ok.setText(R.string.ok);
        if(isWearable) {
               helpview.setPadding(0,0,0,(int)(MainActivity.screenheight*.20)); 
-              if(useclose)
-                   ok.setText(R.string.ok);
-              else
-                   ok.setVisibility(View.INVISIBLE);
               ViewGroup  layout=new Layout(act, place::place,new View[]{ok}, new View[]{helpview});
 
               var width=MainActivity.screenwidth;
@@ -218,7 +212,6 @@ public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,P
             }
 
     else  {
-         ok.setText(R.string.ok);
 //           var marg=Layout.getMargins(ok);
  //          marg.leftMargin=marg.rightMargin=marg.topMargin=marg.bottomMargin=0;
          helpscroll.addView(helpview);
@@ -245,30 +238,35 @@ public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,P
        else {
            helplayout.setVisibility(VISIBLE);
            helplayout.bringToFront();
-         if(!isWearable) {
-           ok.setVisibility(VISIBLE);
-           ok.bringToFront();
-            ViewGroup.MarginLayoutParams marg = (ViewGroup.MarginLayoutParams) helplayout.getLayoutParams();
-             marg.width=params.width; 
-             marg.height=params.height; 
-            marg.setMargins(
-                MainActivity.systembarLeft,
-                0,
-                MainActivity.systembarRight,
-               0//MainActivity.systembarBottom*3/4
-            );
-             helplayout.setLayoutParams(marg);
-            helplayout.requestLayout();
-            }
+           if(!isWearable) {
+               ok.setVisibility(VISIBLE);
+               ok.bringToFront();
+                ViewGroup.MarginLayoutParams marg = (ViewGroup.MarginLayoutParams) helplayout.getLayoutParams();
+                 marg.width=params.width; 
+                 marg.height=params.height; 
+                marg.setMargins(
+                    MainActivity.systembarLeft,
+                    0,
+                    MainActivity.systembarRight,
+                   0//MainActivity.systembarBottom*3/4
+                );
+                 helplayout.setLayoutParams(marg);
+                helplayout.requestLayout();
+                }
        }
-     ok.setY(MainActivity.systembarTop*.71f);
-      var width=GlucoseCurve.getwidth();
-      if(width<=10)
-          width=MainActivity.screenwidth;
-     int okwidth=ok.getMeasuredWidth();
-    float okx=width-okwidth-MainActivity.systembarRight - GlucoseCurve.getDensity();
-    ok.setX(okx);
-     Log.i(LOG_ID,"width="+width+" okx="+okx+" okwidth="+okwidth+" systembarRight="+ MainActivity.systembarRight );
+
+     if(isWearable)
+             ok.setVisibility(useclose?View.VISIBLE:View.INVISIBLE);
+     else {
+         ok.setY(MainActivity.systembarTop*.71f);
+         var width=GlucoseCurve.getwidth();
+         if(width<=10)
+              width=MainActivity.screenwidth;
+         int okwidth=ok.getMeasuredWidth();
+        float okx=width-okwidth-MainActivity.systembarRight - GlucoseCurve.getDensity();
+        ok.setX(okx);
+         Log.i(LOG_ID,"width="+width+" okx="+okx+" okwidth="+okwidth+" systembarRight="+ MainActivity.systembarRight );
+         }
      //   ViewGroup.MarginLayoutParams marg = (ViewGroup.MarginLayoutParams) helplayout.getLayoutParams();
 //       whelpview.get().setText(Html.fromHtml(text));
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

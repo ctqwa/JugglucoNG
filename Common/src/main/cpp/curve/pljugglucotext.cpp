@@ -190,6 +190,7 @@ hourminstr,
 	"Spróbuj ponownie"},
 .nolibre3={"Sensor FreeStyle Libre 3",
 	"Pobierz poprawną wersję ze strony https://www.juggluco.nl/download.html"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 	.advancedstart= R"(<h1>Urządzenie zmodyfikowane</h1>
 <p>Jedna z bibliotek używanych przez tę aplikację ma BŁĄD, który powoduje, że się zawiesza, jeśli wykryje pewne pliki.

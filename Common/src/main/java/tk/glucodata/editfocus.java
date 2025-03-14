@@ -30,23 +30,21 @@ import android.widget.EditText;
 class editfocus implements View.OnFocusChangeListener {
 //public static Editable edit;
 public static EditText editview;
-    @Override
-
-    public void onFocusChange(View v, boolean hasFocus) {
-      EditText ed= (EditText)v;
-	Log.v("editfocus","onfocuschange "+hasFocus);
+@Override
+public void onFocusChange(View v, boolean hasFocus) {
+    EditText ed= (EditText)v;
+    Log.v("editfocus","onfocuschange "+hasFocus);
     if(hasFocus) {
-//        editview=ed.getText();
         editview=ed;
+      }
     }
-    }
-    static   public void setedittext(EditText view) {
-        editview = view;
+static   public void setedittext(EditText view) {
+    editview = view;
     }
 static public EditText getedittext() {
-	return editview;
-	}
+   return editview;
+   }
 static public Editable getedit() {
-	return editview.getText();
-	}
+   return editview.getText();
+   }
 }

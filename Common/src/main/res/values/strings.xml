@@ -35,7 +35,7 @@
     <string name="amountshort">@string/amountsname</string>
     <string name="mealsname">Meals</string>
     <string name="closename">Close</string>
-    <string name="exporthelp">Saves to the last value displayed on the screen. The beginning is the number of specified days back in time.</string>
+    <string name="exporthelp">Saves up to the last value displayed on the screen. The beginning is the number of specified days back in time.</string>
     <string name="detect">Detect</string>
     <string name="testip">Test IP</string>
     <string name="testlabel">Test Label</string>
@@ -210,8 +210,8 @@
  <string name="wifi">Wifi</string>
  <string name="heartrate">Heart rate</string>
  <string name="xdripbroadcast">xDrip broadcast</string>
- <string name="sensorpermission">Sensors permission needed to display heart rate</string>
- <string name="sensorpermissionmessage">Set it in Device Settings, Apps, Permissions, Juggluco</string>
+ <string name="sensorpermission">Sensors permission</string>
+ <string name="sensorpermissionmessage">needed to display heart rate. Set it in Device Settings, Apps, Permissions, Juggluco</string>
  <string name="floatglucose">Floating glucose</string>
  <string name="floatglucoseshort">@string/floatglucose</string>
 
@@ -359,7 +359,7 @@
    <string name="text">Text</string>
    <string name="arrow">Arrow</string>
    <string name="notalldata">WARNING: “Receive from” not set, without sending all data.</string>
-<string name="libresetalllabels">You can only check “Send amounts” after you have specified for each label what should be done with it.</string>
+  <string name="libresetalllabels">First specify for each label what should be done with it.</string>
    <string name="photo">Photo</string>
    <string name="photomessage">Scan the data matrix of a Dexcom G7 or Chinese market Sibionics sensor.</string>
    <string name="exchanges">Exchange data</string>
@@ -371,4 +371,12 @@
    <string name="alarmclock">\u23F0</string> 
    <string name="filesize">File size</string> 
    <string name="logging">Logging</string> 
+    <string name="aspart">Insulin Aspart/NovoRapid/NovoLog</string>
+    <string name="fiasp">Fiasp</string>
+    <string name="lispro">Insulin Lispro/Humalog</string>
+    <string name="urli">URLi</string>
+    <string name="glulisine">Insulin Glulisine/Apidra</string>
+    <string name="humaninsulin">Human Insulin/Humulin R/Novolin R</string>
+    <string name="afrezza">Afrezza</string>
+    <string name="not">Not</string>
 </resources>

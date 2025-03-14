@@ -156,6 +156,7 @@ jugglucotext svtext {
 .nolibre3={
   "FreeStyle Libre 3 sensor",
 	"Ladda ner rätt version från https://www.juggluco.nl/download.html"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 	.advancedstart= R"(<h1>Modifierad enhet</h1>
 <p>Ett av biblioteken som används av denna applikation har en BUG som

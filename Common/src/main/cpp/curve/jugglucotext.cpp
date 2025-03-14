@@ -174,6 +174,7 @@ engtext.amount},
 	"Try again"},
 .nolibre3={"FreeStyle Libre 3 sensor",
 	"Download the correct version from https://www.juggluco.nl/download.html"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 	.advancedstart= R"(<h1>Modified device</h1>
 <p>One of the libraries used by this application has a BUG that makes

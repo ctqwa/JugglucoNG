@@ -207,8 +207,8 @@
  <string name="toolarg"> ist zu lang</string>
  <string name="heartrate">Herzfrequenz</string>
  <string name="xdripbroadcast">xDrip Broadcast</string>
- <string name="sensorpermission">Sensoren-Berechtigung erforderlich, um die Herzfrequenz anzuzeigen</string>
- <string name="sensorpermissionmessage">Sie können es in Geräteeinstellungen, Apps, Berechtigungen festlegen</string>
+ <string name="sensorpermission">Sensoren-Berechtigung</string>
+ <string name="sensorpermissionmessage">erforderlich, um die Herzfrequenz anzuzeigen. Sie können es in Geräteeinstellungen, Apps, Berechtigungen festlegen</string>
  <string name="floatglucose">Schwebende Glukose</string>
  <string name="floatglucoseshort">Schwebende</string>
  <string name="fontsize">Schriftgröße</string>
@@ -352,4 +352,5 @@
    <string name="useclose">Schließknopf</string> 
    <string name="filesize">Dateigröße</string> 
    <string name="logging">Protokollieren</string> 
+    <string name="not">Nicht</string>
 </resources>

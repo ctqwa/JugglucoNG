@@ -186,178 +186,184 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                 }
 
         if(uid.length==8&&uid[6]!=7) {
-            long streamptr;
-            streamptr=libre3NFC(tag);
-            vibrator.cancel();
-            if(streamptr==2L) {
-                Log.i(LOG_ID,"streamptr==2");
-                ret= 0xFD;
-                }
-            else {
-               if(libreVersion == 3) {
-                    if(streamptr>=0L&&streamptr<7L) {
-                    switch((int)(streamptr&0xFFFFFFF)) {
-                        case 1: {
-                            Log.i(LOG_ID,"streamptr==1");
-                            ret=0xFB;
-                            };break;
-                        case 5: {
-                            Log.i(LOG_ID,"terminated");
-                            ret=13;
-                            break;
-                            }
-                        case 6: {
-                            Log.i(LOG_ID,"ended");
-                            ret=4;
-                            break;
-                            }
-                        default: {
-                             if(streamptr>=0L&&streamptr<4L) {
-                                Log.i(LOG_ID,"p<streamptr<4");
-                                  ret=0xFA;
-                                  }
-                            }
-                        }
-                    }
-                 else {
-                     var name = Natives.getSensorName(streamptr);
-                     if(name==null){
-                        Log.i(LOG_ID,"name==null");
-                        ret=0xFA;
-                        Natives.freedataptr(streamptr);
-                        }
-                     else{
-                        Log.i(LOG_ID,"scanned "+name);
-                        if(SensorBluetooth.resetDeviceOrFree(streamptr, name))
-                            askpermission = true;
-                        ret = 0xFC;
-                        value=1;
-                        askcalendar=true;
-                        curve.render.badscan =calendar(main, ret, name);
-                        }
-                    }
+            if(android.os.Build.VERSION.SDK_INT >= 26) {
+                long streamptr;
+                streamptr=libre3NFC(tag);
+                vibrator.cancel();
+                if(streamptr==2L) {
+                    Log.i(LOG_ID,"streamptr==2");
+                    ret= 0xFD;
                     }
                 else {
-                     Log.i(LOG_ID,"libreVersion!=3");
-                    ret = 0xFE;
-                    }
-            }
-            if(ret!=0xFC)
-
-                failure(vibrator);
-               }
-            else {
-            byte[] info = AlgNfcV.nfcinfo(tag);
-            if(info==null) {
-                ret=17;
-                Log.i(LOG_ID,"Read Tag Info Error");
-                vibrator.cancel();
-                }
-            else  {
-                byte[] data;
-
-                if((data = AlgNfcV.readNfcTag(tag,uid,info)) != null) {
-                    curve.render.badscan =0xff;
-                    curve.requestRender();
-                    Log.d(LOG_ID,"Read Tag");
-                    /*showbytes("uid",uid);
-                    showbytes("info",info);
-                    showbytes("data",data); */
-                    int uit = Natives.nfcdata(uid, info, data);
-                    value = uit & 0xFFFF;
-                    Log.format("glucose=%.1f\n",(float)value/mgdLmult);
-                    ret = uit >> 16;
-                    if(newdevice!=null&& Arrays.equals(newdevice,uid)&& Applic.app.canusebluetooth() ) {
-                        if(value!=0|| (ret&0xFF)==5||(ret&0xFF)==7) {
-                            if(SensorBluetooth.resetDevice(Natives.getserial(uid,info)))
-                                askpermission=true;
-                            newdevice=null;
+                   if(libreVersion == 3) {
+                        if(streamptr>=0L&&streamptr<7L) {
+                        switch((int)(streamptr&0xFFFFFFF)) {
+                            case 1: {
+                                Log.i(LOG_ID,"streamptr==1");
+                                ret=0xFB;
+                                };break;
+                            case 5: {
+                                Log.i(LOG_ID,"terminated");
+                                ret=13;
+                                break;
+                                }
+                            case 6: {
+                                Log.i(LOG_ID,"ended");
+                                ret=4;
+                                break;
+                                }
+                            default: {
+                                 if(streamptr>=0L&&streamptr<4L) {
+                                    Log.i(LOG_ID,"p<streamptr<4");
+                                      ret=0xFA;
+                                      }
+                                }
                             }
                         }
-                    Log.d(LOG_ID,"Badscan "+ret);
-                    vibrator.cancel();
-                    switch(ret&0xFF) {
-                        case 8: {
-                            mayEnablestreaming(tag,uid,info);
-                            ret=0;
-                            break;
+                     else {
+                         var name = Natives.getSensorName(streamptr);
+                         if(name==null){
+                            Log.i(LOG_ID,"name==null");
+                            ret=0xFA;
+                            Natives.freedataptr(streamptr);
                             }
-                        case 9: {
-                            String sensorident = Natives.getserial(uid, info);
-                            Log.d(LOG_ID, "Streaming enabled, resetDevice " + sensorident);
-                            if(SensorBluetooth.resetDevice(sensorident))
-                                askpermission=true;
+                         else{
+                            Log.i(LOG_ID,"scanned "+name);
+                            if(SensorBluetooth.resetDeviceOrFree(streamptr, name))
+                                askpermission = true;
+                            ret = 0xFC;
+                            value=1;
+                            askcalendar=true;
+                            curve.render.badscan =calendar(main, ret, name);
                             }
-                            ret=0;
-                                break;
-                        case 4: 
-                             SensorBluetooth.sensorEnded(Natives.getserial(uid, info)); ;break;
-                        case 3: {
-                            if (value == 0) {
-                            
-                                boolean actsuccess = AlgNfcV.activate(tag, info, uid);
-                                if(actsuccess) {
-                                    final long[] needsactivationthrill = {20, 10, 40, 5,   2, 15,  35, 7, 12}; // [ms]
-                                    if(android.os.Build.VERSION.SDK_INT < 26) {
-                                        vibrator.vibrate(needsactivationthrill, -1);
-                                        }
-                                    else{
-                                        final int[] needsactivationthrillamp = {0,  255, 0, 255, 0, 255, 0, 255, 0}; // 
-                                        vibrator.vibrate(VibrationEffect.createWaveform(needsactivationthrill,needsactivationthrillamp, -1));
-                                        }
-                                    newdevice = uid;
-                                } else {
-                                    failure(vibrator);
-                                }
-                                main.runOnUiThread(() -> {
-                                    main.activateresult(actsuccess);
+                        }
+                        }
+                    else {
+                        Log.i(LOG_ID,"libreVersion!=3");
+                        ret = 0xFE;
+                        }
+                }
+                if(ret!=0xFC)
 
-                                });
-
-                                ret=0;
-                            }
-                            ;
-                        } ;break;
-                            case 0x85: mayEnablestreaming(tag,uid,info); 
-                                        ret&=~0x80;
-
-                            case 5: {
-                                final long[] newsensorwait = {50, 300, 100, 10};
-                                if(android.os.Build.VERSION.SDK_INT < 26) 
-                                    vibrator.vibrate(newsensorwait, -1);
-                                else
-                                    vibrator.vibrate(VibrationEffect.createWaveform(newsensorwait, -1));
-                                String sensorident = Natives.getserial(uid, info);
-                                curve.render.badscan = calendar(main,ret,sensorident);
-                            };break;
-                            case 0x87:  mayEnablestreaming(tag,uid,info); 
-                                        ret&=~0x80;
-                            case 7:
-                                final long[] newsensorVib =  {50, 150,50,50,12,8,15,73};
-                                if(android.os.Build.VERSION.SDK_INT < 26) 
-                                    vibrator.vibrate(newsensorVib, -1);
-                                else
-                                    vibrator.vibrate(VibrationEffect.createWaveform(newsensorVib, -1));
-                                String sensorident = Natives.getserial(uid, info);
-                                curve.render.badscan =calendar(main,ret,sensorident);
-        //                        ret=0;
-                                break;
-                    };
-                    }
-
+                    failure(vibrator);
+                   }
                else  {
-                ret=18;
-                vibrator.cancel();
-                Log.i(LOG_ID,"Read Tag Data Error");
-                if(getversion(info)==2&&!Natives.switchgen2()) {
-                        Openfile.reinstall=true;
-                        Natives.closedynlib();
-                        Applic.RunOnUiThread(() -> { getlibrary.openlibrary(main);    });
-                       }
+                      Log.i(LOG_ID,"No Libre 3 Android <8");
+                      ret=0xF9;
+                      }
+                   }
+                else {
+                byte[] info = AlgNfcV.nfcinfo(tag);
+                if(info==null) {
+                    ret=17;
+                    Log.i(LOG_ID,"Read Tag Info Error");
+                    vibrator.cancel();
+                    }
+                else  {
+                    byte[] data;
 
-               }
-             }
-             }
+                    if((data = AlgNfcV.readNfcTag(tag,uid,info)) != null) {
+                        curve.render.badscan =0xff;
+                        curve.requestRender();
+                        Log.d(LOG_ID,"Read Tag");
+                        /*showbytes("uid",uid);
+                        showbytes("info",info);
+                        showbytes("data",data); */
+                        int uit = Natives.nfcdata(uid, info, data);
+                        value = uit & 0xFFFF;
+                        Log.format("glucose=%.1f\n",(float)value/mgdLmult);
+                        ret = uit >> 16;
+                        if(newdevice!=null&& Arrays.equals(newdevice,uid)&& Applic.app.canusebluetooth() ) {
+                            if(value!=0|| (ret&0xFF)==5||(ret&0xFF)==7) {
+                                if(SensorBluetooth.resetDevice(Natives.getserial(uid,info)))
+                                    askpermission=true;
+                                newdevice=null;
+                                }
+                            }
+                        Log.d(LOG_ID,"Badscan "+ret);
+                        vibrator.cancel();
+                        switch(ret&0xFF) {
+                            case 8: {
+                                mayEnablestreaming(tag,uid,info);
+                                ret=0;
+                                break;
+                                }
+                            case 9: {
+                                String sensorident = Natives.getserial(uid, info);
+                                Log.d(LOG_ID, "Streaming enabled, resetDevice " + sensorident);
+                                if(SensorBluetooth.resetDevice(sensorident))
+                                    askpermission=true;
+                                }
+                                ret=0;
+                                    break;
+                            case 4: 
+                                 SensorBluetooth.sensorEnded(Natives.getserial(uid, info)); ;break;
+                            case 3: {
+                                if (value == 0) {
+                                
+                                    boolean actsuccess = AlgNfcV.activate(tag, info, uid);
+                                    if(actsuccess) {
+                                        final long[] needsactivationthrill = {20, 10, 40, 5,   2, 15,  35, 7, 12}; // [ms]
+                                        if(android.os.Build.VERSION.SDK_INT < 26) {
+                                            vibrator.vibrate(needsactivationthrill, -1);
+                                            }
+                                        else{
+                                            final int[] needsactivationthrillamp = {0,  255, 0, 255, 0, 255, 0, 255, 0}; // 
+                                            vibrator.vibrate(VibrationEffect.createWaveform(needsactivationthrill,needsactivationthrillamp, -1));
+                                            }
+                                        newdevice = uid;
+                                    } else {
+                                        failure(vibrator);
+                                    }
+                                    main.runOnUiThread(() -> {
+                                        main.activateresult(actsuccess);
+
+                                    });
+
+                                    ret=0;
+                                }
+                                ;
+                            } ;break;
+                                case 0x85: mayEnablestreaming(tag,uid,info); 
+                                            ret&=~0x80;
+
+                                case 5: {
+                                    final long[] newsensorwait = {50, 300, 100, 10};
+                                    if(android.os.Build.VERSION.SDK_INT < 26) 
+                                        vibrator.vibrate(newsensorwait, -1);
+                                    else
+                                        vibrator.vibrate(VibrationEffect.createWaveform(newsensorwait, -1));
+                                    String sensorident = Natives.getserial(uid, info);
+                                    curve.render.badscan = calendar(main,ret,sensorident);
+                                };break;
+                                case 0x87:  mayEnablestreaming(tag,uid,info); 
+                                            ret&=~0x80;
+                                case 7:
+                                    final long[] newsensorVib =  {50, 150,50,50,12,8,15,73};
+                                    if(android.os.Build.VERSION.SDK_INT < 26) 
+                                        vibrator.vibrate(newsensorVib, -1);
+                                    else
+                                        vibrator.vibrate(VibrationEffect.createWaveform(newsensorVib, -1));
+                                    String sensorident = Natives.getserial(uid, info);
+                                    curve.render.badscan =calendar(main,ret,sensorident);
+            //                        ret=0;
+                                    break;
+                        };
+                        }
+
+                   else  {
+                    ret=18;
+                    vibrator.cancel();
+                    Log.i(LOG_ID,"Read Tag Data Error");
+                    if(getversion(info)==2&&!Natives.switchgen2()) {
+                            Openfile.reinstall=true;
+                            Natives.closedynlib();
+                            Applic.RunOnUiThread(() -> { getlibrary.openlibrary(main);    });
+                           }
+
+                   }
+                 }
+                 }
          }
         catch( Throwable  error) {
             ret=19;

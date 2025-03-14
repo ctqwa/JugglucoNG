@@ -24,6 +24,7 @@ package tk.glucodata;
 import static android.app.PendingIntent.getBroadcast;
 import static android.bluetooth.BluetoothDevice.BOND_BONDED;
 import static android.bluetooth.BluetoothDevice.BOND_NONE;
+import static android.bluetooth.BluetoothDevice.TRANSPORT_LE;
 import static android.bluetooth.BluetoothGatt.GATT_SUCCESS;
 import static android.content.Context.ALARM_SERVICE;
 import static android.content.Context.POWER_SERVICE;
@@ -59,7 +60,6 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 
 public class DexGattCallback extends SuperGattCallback {
@@ -111,8 +111,8 @@ private void docmd0(BluetoothGatt bluetoothGatt) {
             Log.showbytes("onDescriptorWrite char: " + characteristic.getUuid().toString() + " desc: " + bluetoothGattDescriptor.getUuid().toString() + " status=" + status, value);
         }
        if(characteristic.equals(charact[2])) {
-         if(status == BluetoothGatt.GATT_SUCCESS) 
-            backfilled = true;
+             if(status == BluetoothGatt.GATT_SUCCESS)
+                backfilled = true;
             askbackfill();
             return;
             }
@@ -156,8 +156,8 @@ private void docmd0(BluetoothGatt bluetoothGatt) {
 //private ArrayList<String> triedsensors=new ArrayList<>();
 
 private static PowerManager.WakeLock getwakelock() {
-		return ((PowerManager) Applic.app.getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Juggluco::Dexcom");
-		}
+      return ((PowerManager) Applic.app.getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Juggluco::Dexcom");
+      }
 private PowerManager.WakeLock wakelock=null;
 
 private void getlock() {
@@ -484,7 +484,18 @@ private void saveDeviceName() {
              this.known=true;
              }
          }
-
+private static boolean    createBond(BluetoothDevice device) {
+    //if(Build.VERSION.SDK_INT<26) 
+    {
+        try {
+            Method method = device.getClass().getMethod("createBond", int.class);
+            return (boolean) method.invoke(device, TRANSPORT_LE);
+        } catch (Throwable e) {
+            Log.stack(LOG_ID, "invoke createBond", e);
+        }
+    }
+   return device.createBond() ;
+   }
  private static final byte[][] bondBytes = {{(byte) 0x06, (byte) 0x19}, 
  {(byte) 0xFF, (byte) 0x06, (byte) 0x01},
             {(byte) 0x06, (byte) 0x00}};
@@ -496,7 +507,8 @@ private boolean removedBond=false;
            for(var b : bondBytes) {
                if(Arrays.equals(b, value)) {
                    Log.i(LOG_ID,"createBond");
-                   if(mActiveBluetoothDevice.createBond()) {
+//                   if(mActiveBluetoothDevice.createBond()) {
+                   if(createBond(mActiveBluetoothDevice)) {
                         Log.i(LOG_ID,"createBond success");
                    }
                    else
@@ -773,6 +785,20 @@ private    void getdata(byte[] value) {
     }
 
 
+   @Override 
+   public void onCharacteristicRead(BluetoothGatt bluetoothGatt, BluetoothGattCharacteristic bluetoothGattCharacteristic, int status) {
+   switch(status) {
+    case GATT_SUCCESS: 
+            Log.i(LOG_ID, "onCharacteristicRead success");
+        return;
+    case BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION:
+            Log.i(LOG_ID, "onCharacteristicRead GATT_INSUFFICIENT_AUTHENTICATION");
+            return;
+    default:
+            Log.e(LOG_ID, "onCharacteristicRead "+bluetoothGattCharacteristic.getUuid()+ " status="+ status);
+            return;
+        }
+    }
     @Override
     public boolean matchDeviceName(String aname, String address) {
 //      if(triedsensors.contains(address)) return false;
@@ -798,7 +824,7 @@ private    void getdata(byte[] value) {
                 Log.i(LOG_ID, "Removed bond");
             }
             return;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.stack(LOG_ID, "ERROR: could not remove bond", e);
         }
     }
@@ -824,20 +850,38 @@ private    void getdata(byte[] value) {
         switch(bondstate) {
             case BluetoothDevice.BOND_BONDING: {
                 Log.i(LOG_ID,"bonding");
-                try {
-                    var uristr = "android.resource://" + app.getPackageName() + "/" + R.raw.bonded;
-                    Uri uri = Uri.parse(uristr);
-                    Ringtone ring = RingtoneManager.getRingtone(app, uri);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        ring.setLooping(false);
-                    }
-                    ring.play();
-                   // Applic.scheduler.schedule(ring::stop, 5, TimeUnit.SECONDS);
-                   disablenotification(mBluetoothGatt,charact[1]); charact[1]=null;
-                   disablenotification(mBluetoothGatt,charact[3]); charact[3]=null;
-                } catch (Throwable th) {
-                    Log.stack(LOG_ID, "bonded sound", th);
-                }
+                /*
+                if(Build.VERSION.SDK_INT < 26) {
+                    final var device = mActiveBluetoothDevice;
+                    if(device != null) {
+                       try {
+                        device.setPairingConfirmation(true);
+                        }
+                        catch(Throwable th) {
+                            Log.stack(LOG_ID,"setPairingConfirmation(true)",th);
+                            }
+                        }
+                    else {
+                        Log.e(LOG_ID,"bonded mActiveBluetoothDevice==null");
+                        }
+                     } */
+                    try {
+                        if(Build.VERSION.SDK_INT >=26) {
+                                var uristr = "android.resource://" + app.getPackageName() + "/" + R.raw.bonded;
+                                Uri uri = Uri.parse(uristr);
+                                Ringtone ring = RingtoneManager.getRingtone(app, uri);
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                    ring.setLooping(false);
+                                }
+                                ring.play();
+                                }
+                       // Applic.scheduler.schedule(ring::stop, 5, TimeUnit.SECONDS);
+                       disablenotification(mBluetoothGatt,charact[1]); charact[1]=null;
+                       disablenotification(mBluetoothGatt,charact[3]); charact[3]=null;
+
+                    } catch (Throwable th) {
+                        Log.stack(LOG_ID, "bonded sound", th);
+                   }
                 };break;
             case  BOND_BONDED:  {
                 Log.i(LOG_ID,"bonded");

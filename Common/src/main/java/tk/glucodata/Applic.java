@@ -32,6 +32,7 @@ import static android.net.NetworkCapabilities.TRANSPORT_WIFI_AWARE;
 import static android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS;
 import static android.view.View.INVISIBLE;
 //import java.text.DateFormat;
+import static java.lang.String.format;
 import static java.util.Locale.US;
 import static tk.glucodata.GlucoseCurve.STEPBACK;
 import static tk.glucodata.GlucoseCurve.smallfontsize;
@@ -141,7 +142,7 @@ static public    void argToaster(Context context,int res,int duration) {
 static public    void argToaster(Context context,String message,int duration) {
     Toast.makeText(context,message, duration).show();
     if(!isWearable) {
-        if(Natives.speakmessages()) 
+        if(initproccalled&&Natives.speakmessages()) 
             speak(message);
         }
     }
@@ -658,7 +659,9 @@ static boolean bluetoothEnabled() {
     }
 static final boolean usewakelock=true;
 @Keep
-static void doglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,boolean wasblueoff,long sensorstartmsec,long sensorptr,int sensorgen) {
+static void doglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,boolean wasblueoff,long sensorstartmsec, long sensorptr,int sensorgen) {
+   Log.i(LOG_ID,"doglucose "+SerialNumber+" "+ mgdl+" "+ gl+" "+rate+" "+ alarm+" "+timmsec+" "+ wasblueoff+ " "+ sensorstartmsec +" sensorptr="+format("%x",sensorptr)+" "+ sensorgen);
+
     var wakelock=    usewakelock?(((PowerManager) app.getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Juggluco::Applic")):null;
     if(wakelock!=null)
         wakelock.acquire();
@@ -668,9 +671,10 @@ static void doglucose(String SerialNumber, int mgdl, float gl, float rate, int a
     SuperGattCallback.dowithglucose( SerialNumber,  mgdl,  gl, rate,  alarm,  timmsec,sensorstartmsec,Notify.glucosetimeout,sensorgen);
     if(!isWearable) {
             if(sensorptr!=0L) {
-             if(Build.VERSION.SDK_INT >= 28) {
-                HealthConnection.Companion.writeAll(sensorptr,SerialNumber);
-                }
+                Log.i(LOG_ID,"sensorptr="+format("%x",sensorptr));
+                if(Build.VERSION.SDK_INT >= 28) {
+                    HealthConnection.Companion.writeAll(sensorptr,SerialNumber);
+                    }
                }
         }
     if(wakelock!=null)
@@ -729,7 +733,7 @@ if(isWearable) {
 
     Floating.init(); 
    final var initversion=Natives.getinitVersion();
-    if(initversion<30) {
+    if(initversion<31) {
       if(initversion<29) {
          if(initversion<22) {
             if(initversion<14) {
@@ -744,7 +748,7 @@ if(isWearable) {
             }
          sethour24(DateFormat.is24HourFormat(app));
          }
-      Natives.setinitVersion(30);
+      Natives.setinitVersion(31);
       }
 
    setjavahour24(Natives.gethour24());

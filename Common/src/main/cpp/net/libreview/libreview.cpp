@@ -52,7 +52,7 @@ constexpr const int startsensorlen=sizeof(R"({"type":"com.abbottdiabetescare.inf
 //constexpr const  std::string_view datastart=R"({"DeviceData":{"deviceSettings":{"factoryConfig":{"UOM":")"; 
 constexpr const  std::string_view datastart=R"({"DeviceData":{"connectedDevices":{"insulinDevices":[]},"deviceSettings":{"factoryConfig":{"UOM":")"; 
 //s/char\(.*\)\[\]=R\(.*\)$/constexpr  std::string_view \1=R\2/g
-constexpr const  std::string_view afterunit= R"("},"firmwareVersion":"2.10.1","miscellaneous":{"isStreaming":)";
+constexpr const  std::string_view afterunit= R"("},"firmwareVersion":"2.12.0","miscellaneous":{"isStreaming":)";
 constexpr const  std::string_view afterstreaming= R"(,"selectedLanguage":")";
 constexpr const  std::string_view afterlocale=R"(","valueGlucoseTargetRangeLowInMgPerDl":)";
 constexpr const  std::string_view afterlow=R"(,"valueGlucoseTargetRangeHighInMgPerDl":)";
@@ -84,8 +84,8 @@ const constexpr  std::string_view  aftertoken=R"(","Domain":"Libreview","Gateway
 
 
 
-inline static void valuestart(char *&ptr,float glvalue) {
-	ptr+=sprintf(ptr, R"({"valueInMgPerDl":%.1f,"extendedProperties":{"factoryTimestamp":")",glvalue);
+inline static void valuestart(char *&ptr,int glvalue) {
+	ptr+=sprintf(ptr, R"({"valueInMgPerDl":%d,"extendedProperties":{"factoryTimestamp":")",glvalue);
 	}
 
 
@@ -110,7 +110,7 @@ constexpr const char *int64printf() {
 	}
 static char *librehistel(const LibreHistEl *el,const int64_t histor,char *buf) {
 	char *ptr=buf;
-	valuestart(ptr, (float)el->mgdL);
+	valuestart(ptr, el->mgdL);
 	int mil=getmmsec();
 	ptr+=TdatestringGMT(el->ti,mil,ptr);
 	static constexpr const std::string_view prerecord=R"(","isFirstAfterTimeChange":false},"recordNumber":)"; 
@@ -142,7 +142,7 @@ static char *librehistel(const LibreHistEl *el,const int64_t histor,char *buf) {
 
 static char *libreScanel(const ScanData &scanel,const int16_t  nr,char *ptr) {
 	const auto mgdL= scanel.getmgdL();
-	valuestart(ptr, (float)mgdL);
+	valuestart(ptr, mgdL);
 	int mil=0;
 	ptr+=TdatestringGMT(scanel.gettime(),mil,ptr);
 	int16_t id=nr>>8|(nr&0xFF)<<8;
@@ -418,7 +418,7 @@ bool putwhenneeded(bool libre3,SensorGlucoseData *sensdata) {
 extern int betweenviews;
 static char *onecurrent(const ScanData &scanel,const int  nr,char *ptr,bool isviewed) {
 	const auto mgdL= scanel.getmgdL();
-	valuestart(ptr, (float)mgdL);
+	valuestart(ptr, mgdL);
 	int mil=getmmsec();
 	auto wastime= scanel.gettime();
 	
@@ -660,7 +660,7 @@ int startsensor=0;
 		dMANUFACTURER.size()+
 		afterHardwareName.size()+
 		aftermodelName.size()+
-		dRELEASE.size()+
+        5+
 		afterosVersionName.size()+
 	    appstart.size()+
 	sizeof(countries[0])+
@@ -716,7 +716,8 @@ int startsensor=0;
 		addstrview(uitptr,appstart);
 		addar(uitptr,countries[country]);
 		addstrview(uitptr,aftermodelName);
-		addstrview(uitptr,dRELEASE);
+//		addstrview(uitptr,dRELEASE);
+		addint(uitptr,SDK_INT);
 		addstrview(uitptr,afterosVersionName);
 
 
@@ -1369,7 +1370,8 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(askServerforAccountID)(JNIEnv *env
 	startlibrethread();
 	wakeaftermin(0);
 	 }
-std::string_view dRELEASE{};
+//std::string_view dRELEASE{};
+int SDK_INT=30;
 std::string_view dMANUFACTURER{};
 std::string_view dMODEL{};
 
@@ -1381,7 +1383,8 @@ std::string_view getjstring(JNIEnv *env,jstring jstr)  {
 	strbuf[strlen]='\0';
 	return {strbuf,strlen};
 	}
-extern "C" JNIEXPORT void JNICALL fromjava(setDevice) (JNIEnv *env, jclass clazz, jstring jMANUFACTURER, jstring jMODEL, jstring jRELEASE) { 
+//extern "C" JNIEXPORT void JNICALL fromjava(setDevice) (JNIEnv *env, jclass clazz, jstring jMANUFACTURER, jstring jMODEL, jstring jRELEASE) { 
+extern "C" JNIEXPORT void JNICALL fromjava(setDevice) (JNIEnv *env, jclass clazz, jstring jMANUFACTURER, jstring jMODEL, int SDK_INTin) { 
 	LOGAR("setDevice");
 	if(jMANUFACTURER) {
 		delete[] dMANUFACTURER.data(); //Ever called twice?
@@ -1391,10 +1394,12 @@ extern "C" JNIEXPORT void JNICALL fromjava(setDevice) (JNIEnv *env, jclass clazz
 		delete[] dMODEL.data();
 		dMODEL=getjstring(env,jMODEL);
 		}
+    SDK_INT=SDK_INTin;
+        /*
 	if(jRELEASE) {
 		delete[] dRELEASE.data();
 		dRELEASE=getjstring(env,jRELEASE);
-		}
+		} */
 	}
 
 /*

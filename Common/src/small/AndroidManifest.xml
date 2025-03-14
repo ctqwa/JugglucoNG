@@ -3,8 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
 
-    <uses-sdk tools:overrideLibrary="androidx.profileinstaller,androidx.activity,androidx.recyclerview,androidx.startup,androidx.core.ktx,androidx.core"/>
-
+    <uses-sdk tools:overrideLibrary="androidx.profileinstaller,androidx.activity,androidx.recyclerview,androidx.startup,androidx.core.ktx,androidx.core,androidx.core.viewtree"/>
 
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>

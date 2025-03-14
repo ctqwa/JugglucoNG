@@ -40,6 +40,7 @@ import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
 import static tk.glucodata.util.getlabel;
+import static tk.glucodata.util.getradiobutton;
 
 import android.content.Context;
 import android.view.View;
@@ -66,12 +67,6 @@ public class ColorConfig {
 //   static private final int[] names=new int[]{R.string.arrow,R.string.text,R.string.textborder, R.string.background};
    static private final int[] names=new int[]{R.string.arrow,R.string.text, R.string.background};
    private static final String LOG_ID="ColorConfig";
-   public static  RadioButton getradiobutton(Context context, int res) {
-         var radio=new RadioButton(context);
-         radio.setText(res);
-   //      radio.setChecked(value);
-         return radio;
-         }
 
    static boolean hasdefault(int val) {
       return val==0;

@@ -2142,69 +2142,7 @@ static void toend(NumIter<T> *numiters,int maxnum) {
 
 extern char *writetreatment(char *outiter,const int numbase,const int pos,const Num*num,int border,int borderID);
 
-int mkid(char *outiter,int base,int pos) {
-	int len=sprintf(outiter,"ba%de%d",base,pos);
-	int over=24-len;
-	memset(outiter+len,'b',over);
-	return 24;
-	}
 
-int mkidid(char *outiter,int base,int pos) {
-	int len=sprintf(outiter,"%u%07u%016" PRIx64  ,base,pos,settings->data()->jugglucoID);
-	return len;
-	}
-
-char *writetreatment(char *outiter,const int numbase,const int pos,const Num*num,int border,int borderID) {
-	const int type=num->type;
-	if(type<0||type>=settings->varcount()||!settings->data()->Nightnums[type].kind) {
-		return outiter;
-		}
-	const time_t tim=num->gettime();
-        struct tm tmbuf;
-        gmtime_r(&tim, &tmbuf);
-		addar(outiter,R"({"_id":")");
-	if(pos>=borderID) {
-		outiter+=mkidid(outiter,numbase,pos);
-		}
-	else {
-		if(pos>=border) 
-			outiter+=mkid(outiter,numbase,pos);
-		else
-			outiter+=sprintf(outiter,"num%d#%d",numbase,pos);
-		}
-
-
-	outiter+=sprintf(outiter,R"(","date":%lu)",tim);
-	addar(outiter,R"(000,"eventType":"<none>","enteredBy":"Juggluco","created_at":")");
-	outiter+=sprintf(outiter,R"(%04d-%02d-%02dT%02d:%02d:%02d.000Z",)",tmbuf.tm_year+1900,tmbuf.tm_mon+1,tmbuf.tm_mday, tmbuf.tm_hour, tmbuf.tm_min,tmbuf.tm_sec);
-
-	float w=0.0f;
-	 if((w=longNightWeight(type))!=0.0f) {
-	 	
-	 	addar(outiter,R"("notes":"Long-Acting",)");
-	 	}
-	else { if((w=rapidNightWeight(type))!=0.0f) {
-	 	addar(outiter,R"("notes":"Rapid-Acting",)");
-	 	}
-		}
-	if(w!=0.0f) {
-		const char * typestr=settings->getlabel(type).data();;
-		auto units=w*num->value;
-		//outiter+=sprintf(outiter,R"("carbs":null,"insulin":%g,"insulinType":"%s","insulinInjections":"[{\"insulin\":\"%s\",\"units\":%.1f}]"},)",units,typestr,typestr,units); //WARNING: treatments are not displayed in xDrip when insulinInjections is included. Problem?
-		outiter+=sprintf(outiter,R"("carbs":null,"insulin":%g,"insulinType":"%s"},)",units,typestr);
-
-		}
-	else {
-		if((w=carboNightWeight(type) )!=0.0f) {
-			outiter+=sprintf(outiter,R"("carbs":%g,"insulin":null},)",w*num->value);
-			}
-		else {
-			std::string_view typestr=settings->getlabel(type);
-			outiter+=sprintf(outiter,R"("notes":"%s %g","carbs":null,"insulin":null},)",typestr.data(),num->value);
-			}
-		}
-	return outiter;
-	}
 static bool givetreatments(const char *args,int argslen, std::string_view origin,recdata *outdata)  {
 	Sgvinterpret pret;
 	pret.datnr=100;
@@ -3065,38 +3003,6 @@ bool getv3entries(const char *cmdstart,const char *cmdend,std::string_view origi
 	mktypeheader(start,outiter,false,outdata, {buf,(size_t)(ptr-buf)},origin);
 	return true;
 
-	}
-
-int mkididV3(char *input,int base,int pos) {
-	char *outiter=input;
-	constexpr const  char temp[]="ffffffffffff";
-	memcpy(outiter,temp,4);
-	if(auto [ptr,ec]=std::to_chars(outiter,outiter+10,base);ec != std::errc()) {
-		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
-		}
-	outiter+=4;
-	uint16_t *id=reinterpret_cast<uint16_t *>(&settings->data()->jugglucoID);
-	outiter+=sprintf(outiter,"%04x-%04x-%04x-%04x-",id[0],id[1],id[2],id[3]);
-	memcpy(outiter,temp,sizeof(temp)-1);
-	if(auto [ptr,ec]=std::to_chars(outiter,outiter+10,pos);ec != std::errc()) {
-		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
-		}
-	return 36;
-	}
-
-
-
-int mkidV3(char *outiter,int base,int pos) {
-	constexpr const  char temp[]="ffffffff-ffff-ffff-ffff-ffffffffffff";
-	memcpy(outiter,temp,sizeof(temp));
-	if(auto [ptr,ec]=std::to_chars(outiter,outiter+10,base);ec != std::errc()) {
-		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
-		}
-	outiter+=24;
-	if(auto [ptr,ec]=std::to_chars(outiter,outiter+10,pos);ec != std::errc()) {
-		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
-		}
-	return sizeof(temp)-1;
 	}
 
 

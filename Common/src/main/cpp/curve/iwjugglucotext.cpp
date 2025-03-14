@@ -195,6 +195,7 @@ iwtext.newamount,
 	"ערכי גלוקוז יתקבלו כעת על ידי Juggluco"},
 .unknownNFC={"שגיאת סריקת NFC לא מזוהה", "נסה שוב"},
 .nolibre3={"חיישן FreeStyle Libre 3","לא נתמך על ידי גרסה זו של Juggluco"},
+.needsandroid8="Needs minimally Android 8"sv,
 
 
 

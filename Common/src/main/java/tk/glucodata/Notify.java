@@ -104,7 +104,7 @@ Ringtone setring(String uristr, int res) {
         uristr= "android.resource://" + Applic.app.getPackageName() + "/" + res;
         }
     Uri uri=Uri.parse(uristr);
-        Ringtone ring = RingtoneManager.getRingtone(Applic.app, uri);
+    Ringtone ring = RingtoneManager.getRingtone(Applic.app, uri);
     if(ring==null) {
         Log.i(LOG_ID,"ring==null default");
         uristr= "android.resource://" + Applic.app.getPackageName() + "/" + res;
@@ -113,11 +113,10 @@ Ringtone setring(String uristr, int res) {
         }
     try {
         if(Build.VERSION.SDK_INT >=23) ring.setLooping(true);
-
-            } catch(Throwable e) {
-               Log.stack(LOG_ID,"setring",e);
-                }
-
+        } 
+    catch(Throwable e) {
+           Log.stack(LOG_ID,"setring",e);
+           }
     return ring;
     }
 static final private int[] defaults ={ R.raw.siren, R.raw.classic, R.raw.ghost, R.raw.nudge,R.raw.elves};
@@ -469,23 +468,34 @@ static    void stoplossalarm(){
         playringhier(ring,duration,sound,flash,vibration,dist,kind);
     }
 
-    private static void showpopupalarm(String message,Boolean cancel) {
-        var act=MainActivity.thisone;
-        if(act!=null&&act.active) {
-            if(cancel)
-                MainActivity.showmessage=null;
-            Log.i(LOG_ID,"showpopupalarm direct "+message);
-            act.runOnUiThread(() -> act.showindialog( message,cancel));
-            }
-        else {
-            if(cancel) {
-                Log.i(LOG_ID,"showpopalarm "+message);
-                MainActivity.showmessage=message;
+
+private static void setmessage(String message,Boolean cancel) {
+    Log.i(LOG_ID,"setmessage "+message+" "+cancel);
+    if(cancel) {
+        MainActivity.showmessage=message;
+        }
+    else {
+        MainActivity.shownummessage.push(message);
+        }
+    }
+private static void showpopupalarm(String message,Boolean cancel) {
+    var act=MainActivity.thisone;
+    if(act!=null&&act.active) {
+        if(cancel)
+            MainActivity.showmessage=null;
+        Log.i(LOG_ID,"showpopupalarm direct "+message);
+        act.runOnUiThread(() ->  {
+            if(act.isFinishing()||act.isDestroyed()||!act.active) {
+                setmessage(message,cancel);
+                return;
                 }
-            else {
-                MainActivity.shownummessage.push(message);
-                }
+            act.showindialog( message,cancel);
             }
+            );
+        }
+    else {
+        setmessage(message,cancel);
+        }
     }
     private void soundalarm(int kind,int draw,String message,String type,boolean alarm) {
         if(alarm) {
@@ -618,15 +628,15 @@ static private String getglstring(float glvalue,int sensorgen2) {
    }
 
 private void setIcon( Notification.Builder GluNotBuilder,float glvalue,int sensorgen2) {
-        if(makeicon) {
-               final var icon=icons.getIcon(getglstring(glvalue,sensorgen2));  
-               GluNotBuilder.setSmallIcon(icon);
-            }
-          else  {
-                 var draw= GlucoseDraw.getgludraw(glvalue,sensorgen2);
-                  GluNotBuilder.setSmallIcon(draw);
-               }
-              }
+    if(makeicon) {
+           final var icon=icons.getIcon(getglstring(glvalue,sensorgen2));  
+           GluNotBuilder.setSmallIcon(icon);
+        }
+      else  {
+             var draw= GlucoseDraw.getgludraw(glvalue,sensorgen2);
+              GluNotBuilder.setSmallIcon(draw);
+           }
+       }
 private void  makeseparatenotification(float glvalue,String message,notGlucose glucose,String type) {
     if(!isWearable) {
         if(alertseparate) {

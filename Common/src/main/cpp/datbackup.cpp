@@ -42,6 +42,56 @@ void uptodate(passhost_t *host) {
     if(backup)
         uptodate(host-backup->getupdatedata()->allhosts);
     }
+int updateone::updateiob() {
+    const auto iobupdate=settings->data()->iobupdate;
+    if(iobupdate>iobupdated ) {
+          crypt_t *pass=getcrypt();
+           std::vector<subdata> vect;
+           vect.reserve(1);
+           const auto startinsulin=offsetof(Tings,insulintypes);
+           const auto endinsulin=offsetof(Tings,iobupdate)+sizeof(Tings::iobupdate);
+           LOGGER("updateiob start=%zd end=%zd\n",startinsulin,endinsulin);
+           vect.push_back({reinterpret_cast<const senddata_t *>(settings->data()->insulintypes),startinsulin,endinsulin-startinsulin});
+           if(!senddata(pass,getsock(),vect,settingsdat) )
+                    return 0;
+            iobupdated=iobupdate;
+            return 1;
+            }
+     return 2;
+    }
+#ifndef WEAROS
+int updateone::numbertypes() {
+    if(!sendNight&&!sendLibre) {
+        return 2;
+        }
+    const auto &host= backup->getHosts()[allindex]; 
+    if(!host.wearos)  {
+        sendLibre=false;
+        sendNight=false;
+        return 2;
+        }
+  std::vector<subdata> vect;
+  vect.reserve(2);
+  if(sendNight) {
+       const auto startnight=offsetof(Tings,Nightnums);
+       const auto endnight=offsetof(Tings,nightinterval);
+       LOGGER("Nightnums start=%zd end=%zd\n",startnight,endnight);
+       vect.push_back({reinterpret_cast<const senddata_t *>(settings->data()->Nightnums),startnight,endnight-startnight});
+       }
+  if(sendLibre) {
+       const auto startnight=offsetof(Tings,librenums);
+       const auto endnight=offsetof(Tings,libreaccountIDnum);
+       LOGGER("librenums start=%zd end=%zd\n",startnight,endnight);
+       vect.push_back({reinterpret_cast<const senddata_t *>(settings->data()->librenums),startnight,endnight-startnight});
+       }
+   if(!senddata(getcrypt(),getsock(),vect,settingsdat) )
+        return 0;
+    sendLibre=false;
+    sendNight=false;
+    return 1;
+  }
+#endif
+
 int updateone::update() {
     if(getsock()<0)
         return 0;
@@ -92,7 +142,7 @@ int updateone::update() {
             return 0; 
         ret|=subdid;
         }
-    auto update= settings->getupdate();
+    const auto update= settings->getupdate();
     static bool init=true;
     if(update>updatesettings||init) {
         init=false;
@@ -110,7 +160,17 @@ int updateone::update() {
         ret=1;
         }
     updatesettings=update;
-
+    if(int iobret=updateiob()) {
+        ret|=iobret;
+        }
+    else
+        return 0;
+#ifndef WEAROS
+    if(int numret=numbertypes())
+        ret|=numret;
+    else
+        return 0;
+#endif
     uptodate(allindex) ;
     if(!noacksendone(pass,getsock(), suptodate))
         return 0;
@@ -124,8 +184,8 @@ int updateone::update() {
         }
     return ret;
 //    return sendrender(getsock());
-
     }
+    
 extern int  updatenums(crypt_t *,int sock,struct changednums *nums,int);
 
 int     updateone::updatenums() {
@@ -385,44 +445,44 @@ bool hasnetwork() {
 void updatedata::wakesender() {
     LOGAR("wakesender");
     for(int i=0;i<hostnr;i++) {
-    passhost_t &host=allhosts[i];
-    if(host.deactivated) {
-        LOGGER("%d deactivated\n", i);
-        }
-    else {
-    if(
-#ifdef WEAROS_MESSAGES
-    !(wearmessages[i]&&host.wearos)&&
-#endif
-    host.activereceive) {
-        auto ind=host.activereceive-1;
-        LOGGER("active %d\n",ind);
-        if(active_receive[ind])  {
-            active_receive[ind]->wakebackup(Backup::wakeall);
+        passhost_t &host=allhosts[i];
+        if(host.deactivated) {
+            LOGGER("%d deactivated\n", i);
             }
-        }
-    else {
-            if(host.receivefrom==3&&host.index<0) {
-#ifdef WEAROS_MESSAGES
-            if(host.wearos&&wearmessages[i]) { //TODO
-            LOGAR("wearos messages");
-            }  else
-#endif
-            {    
-                std::thread wake(sendup,&host);
-                wake.detach();
+        else {
+        if(
+    #ifdef WEAROS_MESSAGES
+        !(wearmessages[i]&&host.wearos)&&
+    #endif
+        host.activereceive) {
+            auto ind=host.activereceive-1;
+            LOGGER("active %d\n",ind);
+            if(active_receive[ind])  {
+                active_receive[ind]->wakebackup(Backup::wakeall);
                 }
-                }
-            else {
-                if(host.index>=0&&backup->con_vars[host.index])  {
-                    LOGGER("con_vars[%d]->wakebackup\n",host.index);
-                      backup->con_vars[host.index]->wakebackup(Backup::wakesend);
-                      }
-                      
-                }
-        }
-        }
-    }
+            }
+        else {
+                if(host.receivefrom==3&&host.index<0) {
+    #ifdef WEAROS_MESSAGES
+                if(host.wearos&&wearmessages[i]) { //TODO
+                LOGAR("wearos messages");
+                }  else
+    #endif
+                {    
+                    std::thread wake(sendup,&host);
+                    wake.detach();
+                    }
+                    }
+                else {
+                    if(host.index>=0&&backup->con_vars[host.index])  {
+                        LOGGER("con_vars[%d]->wakebackup\n",host.index);
+                          backup->con_vars[host.index]->wakebackup(Backup::wakesend);
+                          }
+                          
+                    }
+            }
+            }
+       }
     }
 void updatedata::wakestreamsender() {
     LOGAR("wakestreamsender");
@@ -555,9 +615,9 @@ void resensordata(int sensorindex) {
     }
 
 int getgetsendnr() {
-        if(backup)
-           return backup->getupdatedata()->sendnr;
-         return 0;
+    if(backup)
+       return backup->getupdatedata()->sendnr;
+    return 0;
     }
 void wakesender() {
      backup->getupdatedata()->wakesender();    

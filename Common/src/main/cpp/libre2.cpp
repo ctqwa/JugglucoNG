@@ -909,7 +909,7 @@ unlink(libpath);
       );
         libpath=native.getlib();
         if(!linklib(libpath)) {
-            LOGGER("linking failed %s\n",libpath);
+            LOGGER("abbottinit linking failed %s\n",libpath);
             return -1;    
             }
         packager=native;
@@ -1165,8 +1165,13 @@ static int init=(init=doabbottinit(doch),initptr=&init,init);
 return init;
 }
 int  abbottreinit() {
-    if(!initptr) return  abbottinit(false);
-    return (*initptr=doabbottinit(false));
+   int res; 
+    if(!initptr) 
+        res= abbottinit(false);
+    else
+        res=(*initptr=doabbottinit(false));
+    LOGGER("abbottreinit()=%d\n",res);
+    return res;
     }
 
 timevalues     patchtimevalues(const data_t *info) {

@@ -85,6 +85,7 @@ errortype libre3wrongID;
 errortype libre3scansuccess;
 errortype unknownNFC;
 errortype nolibre3;
+std::string_view needsandroid8;
 #ifndef WEAROS
 std::string_view advancedstart;
 bool add_s;

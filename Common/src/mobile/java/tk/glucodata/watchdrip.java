@@ -23,11 +23,15 @@ package tk.glucodata;
 import static android.content.Context.RECEIVER_EXPORTED;
 import static tk.glucodata.Log.doLog;
 
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
+
+import androidx.core.content.ContextCompat;
 
 import com.eveningoutpost.dexdrip.services.broadcastservice.models.Settings;
 
@@ -82,11 +86,16 @@ private static   String  tostring(Bundle bundle) {
 
         	}
 static private watchdrip receiver=null;
+@SuppressLint("UnspecifiedRegisterReceiverFlag")
 static void register() {
 	if(receiver==null)
 		receiver=new watchdrip();
-	Applic.app.registerReceiver(receiver, new IntentFilter("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER"),RECEIVER_EXPORTED);
-	}
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Applic.app.registerReceiver(receiver, new IntentFilter("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER"),RECEIVER_EXPORTED);
+    }
+	else
+        Applic.app.registerReceiver(receiver, new IntentFilter("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER"));
+}
 static void unregister() {
 	if(receiver!=null) {
         try {

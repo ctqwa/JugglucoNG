@@ -114,6 +114,7 @@ public static native long getsensorptr(long dataptr);
 
     public static native void    freedataptr(long dataptr);
 public static native void setDeviceAddress(long dataptr,String deviceAddress );
+
 //public static native void setDeviceAddressB(long dataptr,byte[] address );
  
 public static native String getDeviceAddress(long dataptr,boolean getnew);
@@ -584,7 +585,7 @@ public static native int processint(int i2, byte[] bArr, byte[] bArr2);
 public static native byte[] processbar(int i2, byte[] bArr, byte[] bArr2);
 public static native boolean getShownintro( );
 public static native void setShownintro(boolean val);
-public static native void setDevice(String mani,String model,String release);
+public static native void setDevice(String mani,String model,int SDK_INT);
 public static native String getxDripTrendName(float rate);
 public static native boolean getkerfstokblack( );
 public static native void setkerfstokblack(boolean val);
@@ -810,6 +811,8 @@ public static native long[] activeSensorPtrs( );
 public static native String namefromSensorptr(long sensorptr);
 public static native String sensortextfromSensorptr(long sensorptr);
 public static native void finishfromSensorptr(long sensorptr);
+public static native void setInsulinType(int index,int type);
+public static native int getInsulinType(int index);
 
 
 //public static native void sendxdripold();

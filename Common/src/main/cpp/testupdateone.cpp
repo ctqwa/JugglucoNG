@@ -20,6 +20,7 @@
 
 
 #include <stdint.h>
+#include <stddef.h>
 #include "net/passhost.hpp"
 struct numspan {
 	int start;
@@ -39,24 +40,33 @@ struct changednums {
 		lastlastpos=0;
 		}
 	};
+
 struct updateone {
-//	struct sockaddr host;
-	int ind;
-	int allindex;
-	int startsensors;//vanwaaraf sensors.dat updaten
-//	char port[6];
-	uint8_t backupupdated;
-	uint32_t updatesettings;
-	int32_t firstsensor;
-	uint32_t starttime;
-	uint32_t reserved;
-	bool sendnums;
-	bool sendstream;
-	bool sendscans;
-	bool restore;
-	uint8_t pass[16];
-	struct changednums nums[2];
-	};
+//    struct sockaddr host;
+    int ind;
+    int allindex;
+    int startsensors;//vanwaaraf sensors.dat updaten
+//    char port[6];
+    uint8_t backupupdated;
+    uint8_t reserved1;
+    uint16_t reserved2;
+    uint32_t updatesettings;
+    int32_t firstsensor;
+    uint32_t starttime;
+    uint16_t starttimeindex;
+    bool resetdevices;
+    bool dontuseopen;
+
+    bool sendnums;
+    bool sendstream;
+    bool sendscans;
+    bool restore:7;
+    bool sendjugglucoid:1;
+
+    uint8_t passNotUsed[16];
+    struct changednums nums[2];
+
+    };
 constexpr const int maxhost=3;
 struct updatedata {
 int32_t hostnr;
@@ -71,6 +81,12 @@ updateone tosend[maxhost];
 };
 #include <stdio.h>
 int main() {
+printf("backupupdated %zd\n",offsetof(updateone,backupupdated));
+printf("updatesettings %zd\n",offsetof(updateone,updatesettings));
+printf("sendscans %zd\n",offsetof(updateone,sendscans));
+printf("passNotUsed %zd\n",offsetof(updateone,passNotUsed));
+printf("passNotUsed+16 %zd\n",offsetof(updateone,passNotUsed)+16);
+printf("nums %zd\n",offsetof(updateone,nums));
 printf("%zd\n",offsetof(updatedata,tosend[0]));
 printf("%zd\n",offsetof(updatedata,tosend[1]));
 printf("%zd\n",offsetof(updatedata,tosend[2]));

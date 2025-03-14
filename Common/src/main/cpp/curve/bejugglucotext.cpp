@@ -143,6 +143,7 @@ jugglucotext betext {
 .libre3scansuccess= {"FreeStyle Libre 3 датчык", "Цяпер Juggluco будзе атрымліваць значэнні глюкозы"},
 .unknownNFC={"Памылка нераспазнанага сканавання NFC", "Паспрабуй яшчэ"},
 .nolibre3={"FreeStyle Libre 3 датчык","Не падтрымліваецца гэтай версіяй Juggluco"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 	.advancedstart= R"(<h1>Мадыфікаванае прылада</h1>
 <p>У адной з бібліятэк, якія выкарыстоўваюцца гэтым дадаткам, ёсць ПАМЫЛКА, і

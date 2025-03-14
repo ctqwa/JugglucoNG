@@ -2397,6 +2397,33 @@ Amounts</a>.</p>
 </p>
 ]]>
 </string>
+<string name="IOBhelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/IOBhelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/IOBhelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/IOBhelp.html?lang=en">en</a>&emsp;&emsp;</p>
+<h1>Insulin onboard (IOB)</h1>
+<p>IOB is a measure of how much insulin remains from previous insulin
+doses. Before Juggluco 9.2.0 the Blood Insulin Concentration curve of
+Insulin Aspart was used to estimate IOB. Now you can specify the type
+of insulin and Juggluco will use a Blood Insulin concentration curve
+specific for that insulin type. Specify <i>Not</i> if the label
+doesn’t stand for a fast acting Insulin, otherwise specify the type
+of insulin. The choices are:</p>
+<ul>
+	<li>Human Insulin/Humulin R/Novolin R</li>
+	<li>Insulin Aspart/NovoRapid/NovoLog</li>
+	<li>Insulin Lispro/Humalog</li>
+	<li>Insulin Glulisine/Apidra</li>
+	<li>Fiasp</li>
+	<li>URLi</li>
+	<li>Afrezza</li>
+</ul>
+<p>If you know of a fast acting insulin type that is not mentioned
+you can send me an e-mail.</p>
+<p style="line-height: 100%; margin-bottom: 0in"><br/>
+
+</p>
+]]>
+</string>
 <string name="changestart" >
 <![CDATA[
 <p><a href="https://www.juggluco.nl/Jugglucohelp/de/changestart.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/changestart.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/changestart.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/changestart.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sv/changestart.html">sv</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/changestart.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/changestart.html?lang=en">en</a>&emsp;&emsp;</p><h1>Change start</h1>

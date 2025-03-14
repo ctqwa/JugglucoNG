@@ -29,26 +29,20 @@ import android.widget.EditText;
 
 
 class editclosefocus implements View.OnFocusChangeListener {
-//public static Editable edit;
-    @Override
-
-    public void onFocusChange(View v, boolean hasFocus) {
-      EditText ed= (EditText)v;
-	Log.v("editfocus","onfocuschange "+hasFocus);
+@Override
+public void onFocusChange(View v, boolean hasFocus) {
+    EditText ed= (EditText)v;
+    Log.v("editclosefocus","onfocuschange "+hasFocus);
     if(hasFocus) {
-	NumberView.closekeyboard(ed);
-	MainActivity act= (MainActivity) ed.getContext();
-	help.hidekeyboard(act);
-       act.hideSystemUI();
-       editfocus.setedittext(ed);
-//        edit=ed.getText();
-    }
+        NumberView.closekeyboard(ed);
+        MainActivity act= (MainActivity) ed.getContext();
+        help.hidekeyboard(act);
+        act.hideSystemUI();
+        editfocus.setedittext(ed);
+       }
     }
 
-/*static   public void setedit(Editable edit) {
-   	editfocus.edit=edit;
-   	} */
 static public Editable getedit() {
-	return editfocus.getedit();
-	}
+    return editfocus.getedit();
+    }
 }

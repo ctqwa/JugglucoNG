@@ -886,16 +886,52 @@ private void addBluetoothStateReceiver() {
         }
     }
 
-private BroadcastReceiver bondStateReceiver =null;
+private  BroadcastReceiver pairingRequestReceiver=null;
+
+private void addPairingRequestReceiver() {
+    removePairingRequestReceiver();
+    try {
+         pairingRequestReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Log.i(LOG_ID,"onReceive ACTION_PAIRING_REQUEST");
+            }
+        };
+         Applic.app.registerReceiver(pairingRequestReceiver, new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST));
+         } 
+    catch (Throwable e) {
+        Log.stack(LOG_ID, "registerReceiver ACTION_PAIRING_REQUEST", e);
+        }
+    }
+private void removePairingRequestReceiver() {
+    var rec=pairingRequestReceiver;
+    if(rec!=null) {
+        try {
+            Applic.app.unregisterReceiver(rec);
+             } 
+        catch (Throwable e) {
+            Log.stack(LOG_ID, "unregisterReceiver ACTION_PAIRING_REQUEST", e);
+            }
+       finally {
+        pairingRequestReceiver=null;
+        }
+       }
+    }
+
 
 private void addReceivers() {
-     addBluetoothStateReceiver();
-     addBondStateReceiver() ;
+   addBluetoothStateReceiver();
+   addBondStateReceiver() ;
+   if(Build.VERSION.SDK_INT <26)
+        addPairingRequestReceiver();
     }
 private void removeReceivers() {
-     removeBluetoothStateReceiver();
-     removeBondStateReceiver() ;
+   removeBluetoothStateReceiver();
+   removeBondStateReceiver() ;
+   if(Build.VERSION.SDK_INT <26)
+        removePairingRequestReceiver();
     }
+private BroadcastReceiver bondStateReceiver =null;
 private void addBondStateReceiver() {
     bondStateReceiver=new BroadcastReceiver() {
         @Override

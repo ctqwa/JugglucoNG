@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+
+import android.widget.RadioButton;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Build;
@@ -110,6 +112,12 @@ static public Locale getlocale() {
 	return lang2;
 
 	}
+
+public static  RadioButton getradiobutton(Context context, int res) {
+         var radio=new RadioButton(context);
+         radio.setText(res);
+         return radio;
+         }
 	/*
 static public String getlanguage(Context context) {
 	return context.getString(R.string.language);

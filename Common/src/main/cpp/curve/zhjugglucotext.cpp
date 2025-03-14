@@ -145,6 +145,7 @@ jugglucotext chiText {
         "再试一次"},
     .nolibre3 = {"FreeStyle Libre 3 传感器",
         "从 https://www.juggluco.nl/download.html 下载正确的版本"},
+.needsandroid8="Needs minimally Android 8"sv,
 
 #ifndef WEAROS
     .advancedstart = R"(<h1>修改过的设备</h1>

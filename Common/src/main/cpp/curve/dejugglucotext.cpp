@@ -159,6 +159,7 @@ detext.newamount,
 .unknownNFC={"Unerkannter NFC-Scanfehler", "Versuchen Sie es erneut"},
 
 .nolibre3={"FreeStyle Libre 3 Sensor","Holen Sie sich die richtige Version von https://www.juggluco.nl/download.html"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 .advancedstart= R"(<h1>Geändertes Gerät</h1>
 <p>Eine der von dieser Anwendung verwendeten Bibliotheken hat einen BUG, der sie zum Absturz bringt, wenn sie bestimmte Dateien erkennt. Ihr Gerät enthält einige dieser Dateien. Dieses Programm enthält einen Hack, um diesen BUG zu umgehen, aber es ist wahrscheinlich besser, diese Dateien auf andere Weise unauffindbar zu machen. Magisk hat beispielsweise die Möglichkeit, Root für bestimmte Anwendungen zu verbergen (Magiskhide oder Denylist) und den eigenen Namen zu ändern, beides wird benötigt. In Ihrem Fall hat es Probleme mit der folgenden Datei)",

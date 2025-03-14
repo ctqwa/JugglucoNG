@@ -417,18 +417,16 @@ static class ScrollListener extends GestureDetector.SimpleOnGestureListener {
       }
 };
 
-
+*/
 @Override
 public boolean onTouchEvent(MotionEvent event) {
    Log.i(LOG_ID,"onTouchEvent");
-    ((MainActivity) getContext()).mGestureDetector.onTouchEvent(event);
    return true;
    }
     @Override
     public boolean performClick() {
-        super.performClick();
         return true; //Otherwise touch end up in underlying View
-    } */
+    } 
 
     /*@Override
     public boolean performClick() {

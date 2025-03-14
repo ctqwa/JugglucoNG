@@ -208,7 +208,7 @@ if(true) {
       }
 
    if(!isWearable)
-      setDevice(Build.MANUFACTURER, Build.MODEL, RELEASE);
+      setDevice(Build.MANUFACTURER, Build.MODEL, Build.VERSION.SDK_INT);
 
     startsensors( );
    startmeals();

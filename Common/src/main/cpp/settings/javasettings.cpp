@@ -965,14 +965,19 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getkerfstokblack)(JNIEnv *env,
 extern "C" JNIEXPORT void  JNICALL   fromjava(setkerfstokblack)(JNIEnv *env, jclass cl,jboolean val) {
 	settings->data()->kerfstokblack=val;
 	}
-
+#ifndef WEAROS
 extern "C" JNIEXPORT void  JNICALL   fromjava(setlibrenum)(JNIEnv *env, jclass cl,jint night,jint index,jint kind, jfloat weight) {
 	if(index>=settings->getlabelcount())  {
 		return ;
 		}
 	(night?settings->data()->Nightnums:settings->data()->librenums)[index]={kind,weight};
+    if(night)
+        backup->sendNightNumbers();
+    else
+        backup->sendLibreNumbers();
 	return ;
 	}
+
 extern "C" JNIEXPORT jint  JNICALL   fromjava(getlibrenumkind)(JNIEnv *env, jclass cl,jint night,jint index) {
 	if(index>=settings->getlabelcount())  {
 		return 0;
@@ -986,6 +991,7 @@ extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getlibrefoodweight)(JNIEnv *env,
 	return (night?settings->data()->Nightnums:settings->data()->librenums)[index].weight;
 	}
 
+#endif
 extern "C" JNIEXPORT void  JNICALL   fromjava(setsaytreatments)(JNIEnv *env, jclass cl,jboolean val) {
 	settings->data()->saytreatments=val;
 	}
@@ -1610,15 +1616,17 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(gethealthConnect)(JNIEnv *env,
 	return settings->data()->healthConnect;
 	}
 
-
 static bool hasRapidInsulin() {
 	const int nr=settings->getlabelcount();
 	for(int i=0;i<nr;i++) {
-		if(settings->data()->Nightnums[i].kind==1)
+        if(settings->data()->insulintypes[i]!=Insulin::Not) {
+            LOGGER("hasRapidInsulin() type %d insulintype %d\n",i, settings->data()->insulintypes[i]);
 			return true;
+           }
 		}
 	return false;
 	}
+
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(setIOB)(JNIEnv *env, jclass cl,jboolean val) {
 	if(val) {
 		if(!hasRapidInsulin()) {
@@ -1632,8 +1640,47 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getIOB)(JNIEnv *env, jclass cl
 	return settings->data()->IOB;
 	}
 
-
 #ifndef WEAROS
+
+extern "C" JNIEXPORT void  JNICALL   fromjava(setInsulinType)(JNIEnv *env, jclass cl,jint index,jint type) {
+	if(index>=settings->getlabelcount())  {
+		return ;
+		}
+    LOGGER("setInsulinType(%d,%d)\n",index,type);
+      Insulin newtype=static_cast<Insulin>(type);
+      if(newtype!=settings->data()->insulintypes[index]) {
+            settings->data()->insulintypes[index]=newtype;
+            ++settings->data()->iobupdate;
+            }
+	return;
+	}
+extern "C" JNIEXPORT jint  JNICALL   fromjava(getInsulinType)(JNIEnv *env, jclass cl,jint index) {
+	if(index>=settings->getlabelcount())  {
+		return 0;
+		}
+	jint type=static_cast<uint8_t>(settings->data()->insulintypes[index]);
+    LOGGER("getInsulinType(%d)=%d\n",index,type);
+    return type;
+	}
+
+
+void Settings::setIOBtype() {
+    if(!data()->IOB)
+        return;
+    const int varnr=getlabelcount();
+    LOGGER("setIOBtype() varnr=%d\n",varnr);
+    bool update=false;
+    for(int i=0;i<varnr;++i) {
+         if(data()->Nightnums[i].kind==1) {
+                data()->insulintypes[i]=Insulin::Aspart;
+                update=true;
+                }
+        }
+    if(update) {
+         data()->iobupdate++;
+         }
+    LOGGER("end setIOBtype() update=%d\n",update);
+    }
 extern double getiob(uint32_t now);
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getIOBvalue)(JNIEnv *env, jclass cl,long time) {
 	if(!settings->data()->IOB)

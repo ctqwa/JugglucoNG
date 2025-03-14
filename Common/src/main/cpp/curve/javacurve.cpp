@@ -301,8 +301,9 @@ bool bluetoothEnabled() {
     return   getenv()->CallStaticBooleanMethod(JNIApplic,jbluetoothEnabled);
     }
 void telldoglucose(const char *name,int32_t mgdl,float glu,float rate,int alarm,int64_t mmsec,bool wasnoblue,int64_t startmsec,intptr_t sensorptr,int sensorgen) {
+   LOGGER("telldoglucose sensorptr=%p sensorgen=%d\n",sensorptr,sensorgen);
    jstring sname= getenv()->NewStringUTF(name);
-   getenv()->CallStaticVoidMethod(JNIApplic,jdoglucose,sname,mgdl,glu,rate,alarm,mmsec,wasnoblue,startmsec,sensorptr,sensorgen);
+   getenv()->CallStaticVoidMethod(JNIApplic,jdoglucose,sname,mgdl,glu,rate,alarm,mmsec,wasnoblue,startmsec,(jlong) sensorptr,sensorgen);
    getenv()->DeleteLocalRef(sname);
    }
 

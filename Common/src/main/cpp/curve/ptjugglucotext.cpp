@@ -166,6 +166,8 @@ jugglucotext pttext {
 .unknownNFC={"Unrecognized NFC scan Error", "Try again"},
 .nolibre3={"FreeStyle Libre 3 sensor",
 	"Download the correct version from https://www.juggluco.nl/download.html"},
+
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
         .advancedstart= R"(<h1>Dispositivo modificado</h1>
 <p>Uma das bibliotecas utilizadas por esta aplicação tem um BUG que faz

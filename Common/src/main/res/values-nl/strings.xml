@@ -205,6 +205,8 @@
  <string name="getaccountidmessage">De Account ID is noodzakelijk om Libre3 sensoren te gebruiken die geactiveerd zijn door Abbott\'s Libre3 app met dit Libreview account.</string>
  <string name="deleteconnection">Verwijder verbinding?</string>
  <string name="heartrate">Hartslag</string>
+<string name="sensorpermission">Sensors permission</string>
+<string name="sensorpermissionmessage">nodig om hartslag weer te geven. Stel het in via Device Settings, Apps, Permissions, Juggluco</string>
  <string name="xdripbroadcast">xDrip broadcast</string>
  <string name="floatglucose">Zwevende glucose</string>
 <string name="fontsize">Lettergrootte</string>
@@ -345,5 +347,6 @@
    <string name="useclose">Sluitknop</string> 
    <string name="filesize">Bestandsgrootte</string> 
    <string name="logging">Loggen</string> 
+    <string name="not">Niet</string>
 </resources>
 

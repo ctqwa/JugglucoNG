@@ -41,7 +41,7 @@
 #include <cstdint>
 #include <cinttypes>
 #include <charconv>
-
+#include <string>
 using namespace std::literals;
 //#include "glucose.hpp"
 //ScanData   *glucosenow=nullptr;
@@ -1989,7 +1989,7 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
        else {
            time_t starttime=hist->getstarttime();
            auto wait= nu-starttime;
-           const int warmup=hist->getWarmupMIN()+2; 
+           const int warmup=hist->getWarmupMIN(); 
            LOGGER("waited=%lu warmup=%d starttime=%lu %s",wait,warmup,starttime,ctime(&starttime));
            
           if(wait<(warmup*60)) {
@@ -2096,31 +2096,42 @@ LOGGER("showbluevalue %zd\n",used.size());
         nvgLineTo( genVG, xpos,dheight+dtop+dbottom);
         nvgStroke(genVG);
         #ifndef WEAROS
-        {
-        float down=0;
-
-        const float timex=xpos+nowLineStrokeWidth;
-        nvgTranslate(genVG, timex,down);
-        nvgRotate(genVG,-NVG_PI/2.0);
-//        constexpr int maxhead=54;
-        constexpr int maxhead=80;
-        char head[maxhead];
-
-    //    memcpy(head,usedtext->sensorends.data(),usedtext->sensorends.size());
-        memcpy(head,usedtext->sensorexpectedend.data(),usedtext->sensorexpectedend.size());
-
-
         if(const auto *sens=sensors->getSensorData()) {
             if(!(sens->isDexcom()||sens->isSibionics())||!sens->unused()) {
                 if(time_t enddate=sens->expectedEndTime()) {
+                    float down=0;
+
+                    const float timex=xpos+nowLineStrokeWidth;
+            //        constexpr int maxhead=54;
+                    constexpr int maxhead=80;
+                    char head[maxhead];
+
+                //    memcpy(head,usedtext->sensorends.data(),usedtext->sensorends.size());
+                    memcpy(head,usedtext->sensorexpectedend.data(),usedtext->sensorexpectedend.size());
                     const int tstart=usedtext->sensorexpectedend.size();
                     char *endstr=head+tstart;
                     int end= datestr(enddate,endstr); 
+                    nvgTranslate(genVG, timex,down);
+                    nvgRotate(genVG,-NVG_PI/2.0);
                     nvgTextAlign(genVG,NVG_ALIGN_CENTER|NVG_ALIGN_BOTTOM);
                     nvgText(genVG, -dheight/2+down-smallfontlineheight,dwidth-timex, std::begin(head), head+end+tstart);
+                    nvgResetTransform(genVG);
                     }
                 }
             }
+#else
+    if( settings->data()->IOB) {
+        float down=0;
+        const float timex=xpos+nowLineStrokeWidth;
+        nvgTranslate(genVG, timex,down);
+        nvgRotate(genVG,-NVG_PI/2.0);
+        double getiob(uint32_t);
+        int maxbuf=20;
+        char tbuf[maxbuf];
+        int len=snprintf(tbuf,maxbuf,"IOB: %.1f",getiob(nu));
+        nvgTextAlign(genVG,NVG_ALIGN_CENTER|NVG_ALIGN_BOTTOM);
+        //nvgText(genVG, -dheight/2+down-smallfontlineheight,dwidth-timex, tbuf,tbuf+len);
+        nvgText(genVG, -dheight*.40f+down-smallfontlineheight,dwidth*.984f-timex, tbuf,tbuf+len);
         nvgResetTransform(genVG);
         }
         #endif
@@ -2252,7 +2263,7 @@ if(timdis>0&&((duration/timdis)<grens)) {
         if(nu>=endtime) {
             daystr(endtime,tbuf);
             nvgTextAlign(genVG,NVG_ALIGN_RIGHT|NVG_ALIGN_TOP);
-         nvgText(genVG, dwidth+dleft,datehigh+statusbarheight, tbuf, NULL);
+            nvgText(genVG, dwidth+dleft,datehigh+statusbarheight, tbuf, NULL);
             }
 #endif
         }
@@ -2276,25 +2287,25 @@ static auto gettrans(uint32_t starttime,uint32_t endtime) {
     return make_pair(transx,transy);
     }
 void showlines(int gm,int gmax) {
-        uint32_t endtime=starttime+duration;
-        gmin=gm;
-        grange=gmax-gmin;
-        const auto [transx,transy]= gettrans(starttime, endtime);
-           displaytime disp=getdisplaytime(UINT_MAX,starttime,endtime, transx);
-        const float dlast=dleft+dwidth;
-        timelines(&disp,  transx,UINT32_MAX);
-        if(disp.tstep>(60*60))
-            epochlines(starttime,disp.last,transx);
-        glucoselines(dlast,smallfontlineheight,gmax,transy) ;
-        showunsaveredline(dlast,transy(settings->targetlow()));
-        int yhigh=transy(settings->targethigh());
-        nvgBeginPath(genVG);
-        nvgStrokeWidth(genVG, lowGlucoseStrokeWidth);
-        nvgStrokeColor(genVG, dooryellow);
-        nvgMoveTo(genVG, dleft,yhigh) ;
-        nvgLineTo( genVG,dwidth,yhigh);
-        nvgStroke(genVG);
-        }
+    uint32_t endtime=starttime+duration;
+    gmin=gm;
+    grange=gmax-gmin;
+    const auto [transx,transy]= gettrans(starttime, endtime);
+    displaytime disp=getdisplaytime(UINT_MAX,starttime,endtime, transx);
+    const float dlast=dleft+dwidth;
+    timelines(&disp,  transx,UINT32_MAX);
+    if(disp.tstep>(60*60))
+        epochlines(starttime,disp.last,transx);
+    glucoselines(dlast,smallfontlineheight,gmax,transy) ;
+    showunsaveredline(dlast,transy(settings->targetlow()));
+    int yhigh=transy(settings->targethigh());
+    nvgBeginPath(genVG);
+    nvgStrokeWidth(genVG, lowGlucoseStrokeWidth);
+    nvgStrokeColor(genVG, dooryellow);
+    nvgMoveTo(genVG, dleft,yhigh) ;
+    nvgLineTo( genVG,dwidth,yhigh);
+    nvgStroke(genVG);
+    }
         
 
 pair<const ScanData *,const ScanData*> *scanranges=nullptr;
@@ -2471,7 +2482,7 @@ static void endstep() {
 }
 
 bool restart=false;
-static bool showoldscan(NVGcontext* genVG,uint32_t ) ;
+static int showoldscan(NVGcontext* genVG,uint32_t ) ;
 
 static void defaulterror(NVGcontext* genVG,int scerror)   {
         char buf[50];
@@ -2484,64 +2495,71 @@ static bool errorpair(const errortype &error) {
     }
 int badscanMessage(int kind) {
     const uint32_t nu=time(nullptr);
-    if(!showoldscan(genVG,nu)) {
-        LOGGER("javabadscan    %d: \n",kind);
-        const int scerror= kind&0xff;
-        switch(scerror) {
-            case 0xFA: {
-//                showerror(genVG,"FreeStyle Libre 3, Scan error", "Try again");
-                errorpair(usedtext->libre3scanerror);
-                };
-                break;
-            case 0xFB:
-                errorpair(usedtext->libre3wrongID);
-                break;
-//                showerror(genVG,"Error, wrong account ID?","Specify in Settings->Libreview the same account used to activate the sensor");break;
-             case 0xFC: {
-                errorpair(usedtext->libre3scansuccess);
-//                showerror(genVG,"FreeStyle Libre 3 sensor", "Glucose values will now be received by Juggluco");
+    int res=1;
+    switch(showoldscan(genVG,nu)) {
+        case 0: {
+            LOGGER("javabadscan    %d: \n",kind);
+            const int scerror= kind&0xff;
+            switch(scerror) {
+                case 0xF9: {
+                    showerror(genVG,usedtext->nolibre3.first,usedtext->needsandroid8);
+                    };break;
+                case 0xFA: {
+    //                showerror(genVG,"FreeStyle Libre 3, Scan error", "Try again");
+                    errorpair(usedtext->libre3scanerror);
+                    };
+                    break;
+                case 0xFB:
+                    errorpair(usedtext->libre3wrongID);
+                    break;
+    //                showerror(genVG,"Error, wrong account ID?","Specify in Settings->Libreview the same account used to activate the sensor");break;
+                 case 0xFC: {
+                    errorpair(usedtext->libre3scansuccess);
+    //                showerror(genVG,"FreeStyle Libre 3 sensor", "Glucose values will now be received by Juggluco");
+                    };break;
+                case 0xFD: {
+                    errorpair(usedtext->unknownNFC);
+    //                showerror(genVG,"Unrecognized NFC scan Error", "Try again");
+                    };break;
+                case 0xFE: {
+                    errorpair(usedtext->nolibre3);
+    //                showerror(genVG,"FreeStyle Libre 3 sensor","Not supported by this version of Juggluco"  );
+                    };break;
+                case 0xFF: {
+                    scanwait(genVG);     
+                    return 2;
+                    };
+                case 5: {
+                    errortype *error=usedtext->scanerrors+scerror;
+                    const int bufsize=error->second.size()+5;
+                    char buf[bufsize];
+                    size_t len=snprintf(buf,bufsize,error->second.data(),kind>>8);
+                    showerror(genVG,error->first,{buf,len});
+                    LOGGER("%s\n",buf);
+                    };break;
+    /*                        case 7: {
+                    auto [first,second]=usedtext->scanerrors[scerror];
+                                    showerror(genVG,first,error,second);
+                                    };break; */
+                case 0:
+                case 15:
+                case 9: defaulterror(genVG,scerror);
+                    break;
+                case 12: restart=true;
+                default: 
+                 if(scerror>0x10) {
+                    defaulterror(genVG,scerror);
+                    }
+                else {
+                    errorpair(usedtext->scanerrors[scerror]);
+    //                errortype *error=usedtext->scanerrors+scerror; showerror(genVG,error->first,error->second);
+                    }
                 };break;
-            case 0xFD: {
-                errorpair(usedtext->unknownNFC);
-//                showerror(genVG,"Unrecognized NFC scan Error", "Try again");
-                };break;
-            case 0xFE: {
-                errorpair(usedtext->nolibre3);
-//                showerror(genVG,"FreeStyle Libre 3 sensor","Not supported by this version of Juggluco"  );
-                };break;
-            case 0xff: {
-                scanwait(genVG);     
-                return 2;
-                };
-            case 5: {
-                errortype *error=usedtext->scanerrors+scerror;
-                const int bufsize=error->second.size()+5;
-                char buf[bufsize];
-                size_t len=snprintf(buf,bufsize,error->second.data(),kind>>8);
-                showerror(genVG,error->first,{buf,len});
-                LOGGER("%s\n",buf);
-                };break;
-/*                        case 7: {
-                auto [first,second]=usedtext->scanerrors[scerror];
-                                showerror(genVG,first,error,second);
-                                };break; */
-            case 0:
-            case 15:
-            case 9: defaulterror(genVG,scerror);
-                break;
-            case 12: restart=true;
-            default: 
-             if(scerror>0x10) {
-                defaulterror(genVG,scerror);
-                }
-            else {
-                errorpair(usedtext->scanerrors[scerror]);
-//                errortype *error=usedtext->scanerrors+scerror; showerror(genVG,error->first,error->second);
-                }
             }
-        }
+        case -1: res=2;break;
+            };
     endstep();    
-    return 1;
+    return res;
     }
 static int nrmenu=0,selmenu=0;
 
@@ -2550,19 +2568,17 @@ static void showtext(NVGcontext* genVG ,time_t nu,int tapx) ;
 
 struct lastscan_t scantoshow={-1,nullptr}; 
 
-static bool showoldscan(NVGcontext* genVG,uint32_t nu) {
-    if(scantoshow.scan) {
-        if((nu-scantoshow.showtime)<60) {
-            numlist=0;
-              const SensorGlucoseData *hist=sensors->getSensorData(scantoshow.sensorindex);
-              showscanner(genVG,hist,scantoshow.scan-hist->beginscans(),nu) ;
-              return true;
-              }
-          else {
-            scantoshow={-1,nullptr}; 
-              }
-        }
-    return false;
+static int showoldscan(NVGcontext* genVG,uint32_t nu) {
+    if(!scantoshow.scan) 
+        return 0;
+    if((nu-scantoshow.showtime)>=60) {
+          scantoshow={-1,nullptr}; 
+          return -1;
+          }
+    numlist=0;
+    const SensorGlucoseData *hist=sensors->getSensorData(scantoshow.sensorindex);
+    showscanner(genVG,hist,scantoshow.scan-hist->beginscans(),nu) ;
+    return 1;
     }
 int getmenu(int tapx) ;
 #include "displayer.hpp"
@@ -2597,20 +2613,20 @@ extern void showpercentiles(NVGcontext* genVG) ;
 #endif
 void  calccurvegegs();
 void resetcurvestate() {
-#ifndef WEAROS
-   displayer.reset();
-  #endif
-  scantoshow={-1,nullptr}; 
+    #ifndef WEAROS
+    displayer.reset();
+    #endif
+    scantoshow={-1,nullptr}; 
     numlist=0;
-#ifndef WEAROS
+    #ifndef WEAROS
     showpers=false;
-#endif
- selshown=false;
-nrmenu=0;
- selmenu=0;
- emptytap=false;
- nrmenu=0,selmenu=0;
-  calccurvegegs();
+    #endif
+    selshown=false;
+    nrmenu=0;
+    selmenu=0;
+    emptytap=false;
+    nrmenu=0,selmenu=0;
+    calccurvegegs();
     }
 
 static void withredisplay(NVGcontext* genVG,uint32_t nu)  {
@@ -2675,7 +2691,7 @@ int onestep() {
     emptytap=false;
 
     void        shownumlist();
-    if(showoldscan(genVG,nu)) {
+    if(showoldscan(genVG,nu)>0) {
         ret=1;
         }
     else
@@ -2762,16 +2778,18 @@ void     processglucosevalue(int sendindex,int newstart) {
                      sensor *senso=sensors->getsensor(sendindex);
                      bool wasnoblue=settings->data()->nobluetooth;
                      int64_t startsensor=hist->getstarttime()*1000LL;
-                     LOGGER("processglucosevalue finished=%d,doglucose(%s,%d,%f,%f,%d,%lld,%d,%lld)\n", senso->finished,hist->shortsensorname()->data(),poll->g,glu,poll->ch,alarm,tim*1000LL,wasnoblue,startsensor);
+                     const intptr_t  sensorptr=dohealth(sendindex)?reinterpret_cast<intptr_t>(hist):0LL;
+                     const int sensorgen=hist->getSensorgen2();
+                     LOGGER("processglucosevalue finished=%d,doglucose(%s,%d,%f,%f,%d,%lld,%d,%lld,%p,%i)\n", senso->finished,hist->shortsensorname()->data(),poll->g,glu,poll->ch,alarm,tim*1000LL,wasnoblue,startsensor,sensorptr,sensorgen);
                      if(senso->finished) {
                          senso->finished=0;
                          backup->resensordata(sendindex);
                          }
                      settings->data()->nobluetooth=true;
                      float rate=poll->ch;
-extern void telldoglucose(const char *name,int32_t mgdl,float glu,float rate,int alarm,int64_t mmsec,bool wasnoblue,int64_t startsensor,intptr_t,int) ;
+extern void telldoglucose(const char *name,int32_t mgdl,float glu,float rate,int alarm,int64_t mmsec,bool wasnoblue,int64_t startmsec,intptr_t sensorptr,int sensorgen);
 
-                     telldoglucose(hist->shortsensorname()->data(),poll->g,glu,rate,alarm,tim*1000LL,wasnoblue,startsensor,dohealth(sendindex)?reinterpret_cast<intptr_t>(hist):0LL,hist->getSensorgen2());
+                     telldoglucose(hist->shortsensorname()->data(),poll->g,glu,rate,alarm,tim*1000LL,wasnoblue,startsensor,sensorptr,sensorgen);
 
                  //    wakeuploader();
 extern                void wakewithcurrent();
@@ -3170,20 +3188,19 @@ struct {
 
 void pressedback() {
     scantoshow={-1,nullptr}; 
-    LOGSTRING("true\n");
+    LOGAR("pressedback");
 
 #ifndef WEAROS
     displayer.reset();
 #endif
     }
 bool isbutton(float x,float y) {
-    LOGSTRING("isbutton ");
     if(!inbutton(x,y)) {
-        LOGSTRING("false\n");
+        LOGAR("isbutton false");
         return false;
         }
     if(restart) {
-        LOGSTRING("restart\n");
+        LOGAR("isbutton restart");
         exit(1);    
         }
     if(inbutton(prevtouch.x,prevtouch.y)) {
@@ -3192,7 +3209,7 @@ bool isbutton(float x,float y) {
                 return true;
             }
     scantoshow={-1,nullptr}; 
-    LOGSTRING("true\n");
+    LOGAR("isbutton true");
 #ifndef WEAROS
     displayer.reset();
 #endif

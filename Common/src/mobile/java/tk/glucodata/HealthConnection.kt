@@ -31,6 +31,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission.Companion.getWritePermission
 import androidx.health.connect.client.records.BloodGlucoseRecord
 import androidx.health.connect.client.records.metadata.Device
+import androidx.health.connect.client.records.metadata.Device.Companion.TYPE_UNKNOWN
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -47,14 +48,15 @@ class HealthConnection(private val client: HealthConnectClient) {
 
   private var scope = CoroutineScope(Dispatchers.IO+SupervisorJob())
 //TODO: test not already active
-private  fun writeAllIns(sensorptr:Long,sensorName:String) {
+@OptIn(ExperimentalStdlibApi::class)
+private  fun writeAllIns(sensorptr:Long, sensorName:String) {
     if (active.getAndSet(true)) {
         Log.i(LOG_ID, "writeAll already active");
         return
     }
     scope.launch {
         try {
-            Log.i(LOG_ID, "writeAll");
+            Log.i(LOG_ID, "writeAll 0x${sensorptr.toHexString()} $sensorName")
             if (!hasPermission) {
                 checkPermissionsAndRun(MainActivity.thisone)
                 if (!hasPermission) {
@@ -69,8 +71,8 @@ private  fun writeAllIns(sensorptr:Long,sensorName:String) {
            if(start==end)
                return@launch
             Log.i(LOG_ID,"endstart=$endstart start=$start end=$end len=${end-start}")
-                val meta = androidx.health.connect.client.records.metadata.Metadata(
-                    device=Device("Libre", sensorName)
+                  val meta=androidx.health.connect.client.records.metadata.Metadata.unknownRecordingMethod(device=Device(TYPE_UNKNOWN,"Libre", sensorName)
+//                val meta = androidx.health.connect.client.records.metadata.Metadata( device=Device("Libre", sensorName)
                 )
             while (start < end) {
                 val take = min(end - start, 500)

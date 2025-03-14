@@ -48,6 +48,11 @@ inline static constexpr void addar(char *&uitptr,const T (&array)[N]) {
         uitptr+=len;
         }
 
+inline static constexpr void addint(char *&uitptr,const int get) {
+        int len=sprintf(uitptr,"%d",get);
+        uitptr+=len;
+        }
+
 inline  void submsec(time_t *tim,int mil) {
 	if(mil>=500) {
 		--*tim;
@@ -98,7 +103,8 @@ inline int Tdatestringlocal(time_t tim,char *buf) {
 
 extern bool hour24clock;
 
-extern std::string_view dRELEASE;
+//extern std::string_view dRELEASE;
+extern int SDK_INT;
 extern std::string_view dMANUFACTURER;
 extern std::string_view dMODEL;
 

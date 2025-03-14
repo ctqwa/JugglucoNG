@@ -22,6 +22,8 @@
 package tk.glucodata;
 
 
+import static tk.glucodata.GlucoseCurve.STEPBACK;
+
 import android.opengl.GLSurfaceView;
 
 import javax.microedition.khronos.egl.EGLConfig;
@@ -33,31 +35,30 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         int badscan = 0;
 
         public void onDrawFrame(GL10 gl) {
-            if (badscan!=0) {
-			stepresult = Natives.badscan(badscan);
-                badscan = 0;
+            if(badscan!=0) {
+                if((stepresult = Natives.badscan(badscan))!=STEPBACK)
+                        badscan=0;
             } else
                 stepresult = Natives.step();
 
         }
 
 public static int widthdiff=0;
-        public void onSurfaceChanged(GL10 gl, int w, int h) {
-//	eglSurfaceAttrib(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW), EGL_SWAP_BEHAVIOR , EGL_BUFFER_PRESERVED);
-	if(Applic.Nativesloaded) {
+public void onSurfaceChanged(GL10 gl, int w, int h) {
+//    eglSurfaceAttrib(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW), EGL_SWAP_BEHAVIOR , EGL_BUFFER_PRESERVED);
+    if(Applic.Nativesloaded) {
            // Natives.resize(w, h-MainActivity.systembarBottom,Applic.initscreenwidth);
             Natives.resize(w, h,Applic.initscreenwidth);
-	    widthdiff=w-Applic.initscreenwidth;
-	    }
-	   GlucoseCurve.setgeo(w,h);
+            widthdiff=w-Applic.initscreenwidth;
+        }
+       GlucoseCurve.setgeo(w,h);
         }
 
    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-	if(Applic.Nativesloaded) {
-		    Natives.initopengl(started);
-		    started=true;
-		    }
-		    
+        if(Applic.Nativesloaded) {
+                Natives.initopengl(started);
+                started=true;
+                }
         }
     }
 

@@ -162,6 +162,7 @@ static jugglucotext ittext {
 .libre3scansuccess= {"FreeStyle Libre 3 sensor", "Glucose values will now be received by Juggluco"},
 .unknownNFC={"Unrecognized NFC scan Error", "Try again"},
 .nolibre3={"FreeStyle Libre 3 sensor","Not supported by this version of Juggluco"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 	.advancedstart=R"(<H1>Dispositivi modificati</H1>
 <P>Una delle librerie usate dall'applicazione Juggluco ha un BUG che

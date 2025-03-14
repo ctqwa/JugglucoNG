@@ -189,6 +189,7 @@ rutext.amount},
 			"Попробуйте еще"},
 .nolibre3={"FreeStyle Libre 3 датчик",
 	"Загрузите правильную версию с сайта https://www.juggluco.nl/download.html"},
+.needsandroid8="Needs minimally Android 8"sv,
 #ifndef WEAROS
 	.advancedstart= R"(<h1>Модифицированное устройство, телефон с ROOT</h1>
 <p>В одной из библиотек, используемых этим приложением, есть ошибка, которая приводит

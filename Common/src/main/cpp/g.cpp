@@ -416,6 +416,7 @@ extern "C" JNIEXPORT void JNICALL   fromjava(healthConnectReset)(JNIEnv *env, jc
 
     }
 extern "C" JNIEXPORT jint JNICALL   fromjava(healthConnectfromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr) {
+    LOGGER("healthConnectfromSensorptr(%p)\n",sensorptr);
     auto *info=reinterpret_cast<SensorGlucoseData*>(sensorptr)->getinfo();
     int start=info->healthconnectiter;
     if(!start) {

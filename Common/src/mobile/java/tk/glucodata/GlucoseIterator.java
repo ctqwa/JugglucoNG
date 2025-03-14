@@ -60,13 +60,13 @@ public class GlucoseIterator implements ListIterator<BloodGlucoseRecord> {
     }
 
 private    BloodGlucoseRecord getglucose(long time,double value) {
-        final ZoneOffset offset = null;
-        return new BloodGlucoseRecord(Instant.ofEpochSecond(time), offset, BloodGlucose.milligramsPerDeciliter(value),
-          SPECIMEN_SOURCE_INTERSTITIAL_FLUID,
-         MealType.MEAL_TYPE_UNKNOWN,
-         RELATION_TO_MEAL_UNKNOWN,
-         base.metadata);
+    final ZoneOffset offset = null;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        return new BloodGlucoseRecord(Instant.ofEpochSecond(time), offset,base.metadata, BloodGlucose.milligramsPerDeciliter(value),1,0,0);
     }
+    else
+            return null;
+}
 private    BloodGlucoseRecord getglucose() {
 	int pos=base.start+iter;
  	final long timevalue=Natives.streamfromSensorptr(base.sensorptr,pos);

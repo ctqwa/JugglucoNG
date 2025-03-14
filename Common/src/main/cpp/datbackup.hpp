@@ -118,17 +118,23 @@ struct updateone {
     int allindex;
     int startsensors;//vanwaaraf sensors.dat updaten
 //    char port[6];
+
     uint8_t backupupdated;
+    uint8_t reserved1;
+    uint16_t iobupdated;
     uint32_t updatesettings;
+
     int32_t firstsensor;
     uint32_t starttime;
     uint16_t starttimeindex;
     bool resetdevices;
-    bool dontuseopen;
+    bool RESERVED;
     bool sendnums;
     bool sendstream;
     bool sendscans;
-    bool restore:7;
+    bool restore:5;
+    bool sendNight:1;
+    bool sendLibre:1;
     bool sendjugglucoid:1;
     uint8_t passNotUsed[16];
     struct changednums nums[2];
@@ -178,7 +184,8 @@ int updatenums() ;
 int updatestreamu() ;
 int updatescansu() ;
 int update(); 
-
+int updateiob();
+int numbertypes();
     };
 
 #include "maxsendtohost.h"
@@ -244,7 +251,33 @@ bool getshouldaskfordata() {
     }
  
 bool shouldaskfordata;
+#ifndef WEAROS
+void sendLibreNumbers() {
+    const int len=getupdatedata()->hostnr;
+    for(int i=0;i<len;i++) {
+        passhost_t *ph= getupdatedata()->allhosts+i;
+        if(ph->wearos) {
+            int index=ph->index;
+            if(index>=0) {
+                getupdatedata()->tosend[index].sendLibre=true;
+                }
+            }
+        }
+    }
+void sendNightNumbers() {
+    const int len=getupdatedata()->hostnr;
+    for(int i=0;i<len;i++) {
+        passhost_t *ph= getupdatedata()->allhosts+i;
+        if(ph->wearos) {
+            int index=ph->index;
+            if(index>=0) {
+                getupdatedata()->tosend[index].sendNight=true;
+                }
+            }
+        }
+    }
 
+#endif
 void startactivereceivers() {
     const int len=getupdatedata()->hostnr;
     for(int i=0;i<len;i++) {
@@ -278,6 +311,18 @@ Backup(std::string_view base): mapdata(base,backupdat,sizeof(struct updatedata))
    for(int i=0;i<getupdatedata()->sendnr;i++) {
        sendsocks.push_back(-1);
        auto &host=getupdatedata()->tosend[i];
+       if(settings->data()->initVersion<31) { 
+          LOGGER("%d set sendjugglucoid=false\n",i);
+          host.sendjugglucoid=false;
+#ifndef WEAROS
+          if(getupdatedata()->allhosts[host.allindex].wearos) {
+              if(settings->data()->sendnumbers)
+                    host.sendLibre=true;
+              if(settings->data()->saytreatments ||settings->data()->postTreatments)
+                    host.sendNight=true;
+            }
+#endif
+          }
        if(getupdatedata()->allhosts[host.allindex].haspass()) {
            LOGGER("crypts[%d]=new crypt_t()\n",i);
            crypts.push_back(new crypt_t());
@@ -518,11 +563,15 @@ void clearhost(int index) {
     host.firstsensor=0;
     host.updatesettings=0;
     host.backupupdated=0;
+    host.iobupdated=0;
     host.starttime=0;
     host.starttimeindex=UINT16_MAX;
     host.resetdevices=false;
-    host.dontuseopen=false;
+//    host.dontuseopen=false;
     host.sendjugglucoid=false;
+
+    host.sendNight=false;
+    host.sendLibre=false;
 
     LOGAR("end clearhost");
     }

@@ -571,7 +571,7 @@ static boolean tocalendarapp=false;
          showsdialog=true;
         }
     if(!isWearable) {
-               if(SiBionics==1)  {
+       if(SiBionics==1)  {
             if(tocalendarapp) {
                 final String name=Natives.getUsedSensorName();
                 if(name!=null) {
@@ -727,8 +727,8 @@ void activateresult(boolean res) {
             }
         if(!Applic.Nativesloaded)
             return;
+        Natives.wakeuploader();
         if(!isWearable) {
-            Natives.wakeuploader();
             wakelibreview(20);
             if(Natives.getlibrelinkused()) {
                 final var     starttime= Natives.laststarttime();
@@ -745,22 +745,27 @@ void activateresult(boolean res) {
             }
 
         }
-    @Override
-    protected void onStop() {
-        Log.i(LOG_ID,"onStop");
-        super.onStop();
-        active=false;
-        if(!Applic.Nativesloaded)
-            return;
-        if(Natives.getfloatglucose( )&&Natives.gethidefloatinJuggluco())
-            Floating.makefloat();
-        Natives.setpaused(null);
-        if(curve != null)
-            curve.onPause();
-        }
+@Override
+protected void onStop() {
+    Log.i(LOG_ID,"onStop");
+    super.onStop();
+    active=false;
+    if(!Applic.Nativesloaded)
+        return;
+    if(Natives.getfloatglucose( )&&Natives.gethidefloatinJuggluco())
+        Floating.makefloat();
+    Natives.setpaused(null);
+    if(curve != null)
+        curve.onPause();
+    }
     @Override
     protected void onDestroy() {
        Log.i(LOG_ID,"onDestroy()");
+       final var alert=shownglucosealert;
+       if(alert!=null) {
+            alert.dismiss();
+            shownglucosealert=null;
+            }
        thisone=null;
        super.onDestroy();
     }
@@ -1330,14 +1335,15 @@ static public void clearonback() {
 boolean backinapp()  {
     Log.d(LOG_ID,"backinapp");
     if(curve!=null&&(curve.render.stepresult & STEPBACK) == STEPBACK) {
-       Log.d(LOG_ID,"backinapp natives");
+         Log.d(LOG_ID,"backinapp natives");
          Natives.pressedback();
          curve.render.stepresult = 0;
+         curve.render.badscan=0;
          hideSystemUI();
          if(Menus.on)
             Menus.show(this);
          else
-            curve.requestRender();
+            curve.requestRender(); 
          return true;
         } 
      else {
@@ -1410,8 +1416,8 @@ void showindialog(String message,boolean cancel) {
     if(cancel) {
         cancelglucosedialog();
         }
-     final AlertDialog.Builder builder = new AlertDialog.Builder(cont);
-     final var dialog=builder.setNegativeButton(R.string.cancel, (dia, id) -> {
+    final AlertDialog.Builder builder = new AlertDialog.Builder(cont);
+    final var dialog=builder.setNegativeButton(R.string.cancel, (dia, id) -> {
         if(cancel) {
             shownglucosealert=null;
             }
@@ -1436,7 +1442,8 @@ void showindialog(String message,boolean cancel) {
 //        negbut.setPadding((int)(dens*10),0,0,0);
         }    
             );
-        dialog.show();
+
+    dialog.show();
 
     if(cancel) shownglucosealert=dialog;
     }

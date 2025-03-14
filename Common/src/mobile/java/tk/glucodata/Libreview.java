@@ -631,7 +631,7 @@ private static void resendDateDialog(MainActivity context,View parent) {
       askclearlibreview(context,newtime[0],closeall);
       });
    cancel.setOnClickListener(v -> context.doonback());
-        context.addContentView(layout, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+   context.addContentView(layout, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
    }
 
 private static   void askclearlibreview(MainActivity context,long fromtime,Runnable r) {

@@ -663,6 +663,14 @@ static private void displaysettings(MainActivity context,Settings settings) {
     var langspin=languagespinner(context);
       Layout lay;
     if(isWearable)  {
+      var iob=getcheckbox(context,"IOB",Natives.getIOB());
+      iob.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+                if(!Natives.setIOB(isChecked)) {
+                    iob.setChecked(false);
+                    tk.glucodata.help.help(R.string.IOB,context);
+                    }
+                }
+            ); 
       if(!useclose)
           close.setVisibility(GONE);
         targetlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
@@ -690,10 +698,14 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
         lay = new Layout(context, (l, w, h) -> {
                   int[] ret={w,h};
                  return ret;
-               },new View[]{colbut},graphrow,targetrow,new View[] {hour12},new View[]{scalelabel}, new View[]{fixatex},new View[]{fixatey},new View[]{threslabel,threshold},new View[] {levelleft},new View[]{fixed},new View[]{Scans},new View[]{History},new View[]{Stream},new View[]{Amounts},new View[]{setuseclose},new View[]{close},new View[]{langspin});
+               },new View[]{colbut},graphrow,targetrow,new View[] {hour12},new View[]{scalelabel}, new View[]{fixatex},new View[]{fixatey},new View[]{threslabel,threshold},new View[] {levelleft},new View[]{fixed},new View[]{iob},new View[]{Scans},new View[]{History},new View[]{Stream},new View[]{Amounts},new View[]{setuseclose},new View[]{close},new View[]{langspin});
          }
       else {    
-      var iob=getcheckbox(context,"IOB",Natives.getIOB());
+//      var iob=getcheckbox(context,"IOB",Natives.getIOB());
+      var iob=getbutton(context,"IOB");
+      iob.setOnClickListener(v-> {
+        tk.glucodata.IOB.mkview(context);
+        });
         var dexfuture=getcheckbox(context,R.string.dexfuture,Natives.getdexcomPredict());
          dexfuture.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setdexcomPredict(isChecked) );
           CheckBox reverseorientation =getcheckbox(context,R.string.invertscreen,(Natives.getScreenOrientation()&SCREEN_ORIENTATION_REVERSE_LANDSCAPE)!=0);
@@ -705,7 +717,7 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
                   int[] ret={w,h};
                  return ret;
                },graphrow,new View[]{scalelabel,fixatex, fixatey},targetrow,new View[]{threslabel,threshold,dexfuture},new View[] {levelleft,reverseorientation},new View[] {hour12,langspin,iob,fixed},new View[]{colbut,help,close});
-
+/*
         iob.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
                 if(!Natives.setIOB(isChecked)) {
                     iob.setChecked(false);
@@ -713,7 +725,7 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
                     tk.glucodata.help.help(R.string.IOB,context,l->EnableControls(lay,true) );
                     }
                 }
-            );
+            ); */
          }
 
      lay.setBackgroundColor(Applic.backgroundcolor);
