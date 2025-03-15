@@ -241,7 +241,7 @@ LOGAR("no NEEDSPATH");
     asignal(SIGUSR2,namehandler);
     overwritename();
 #endif
-#ifndef WEAROS
+#ifndef DONTTALK
 extern bool speakout;
     speakout=settings->data()->talktouch;
 #endif

@@ -30,6 +30,7 @@ import static android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTIN
 import static android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM;
 import static android.view.View.GONE;
 import static androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener;
+import static tk.glucodata.Applic.DontTalk;
 import static tk.glucodata.Applic.RunOnUiThread;
 import static tk.glucodata.Applic.TargetSDK;
 import static tk.glucodata.Applic.app;
@@ -221,8 +222,10 @@ private void startdisplay() {
     if(!lang.equals(Applic.curlang)) {
         Natives.setlocale(lang);
         Applic.curlang=lang;
-        if(Talker.istalking())    
-            SuperGattCallback.newtalker(this);
+        if(!DontTalk) {
+            if(Talker.istalking())    
+                SuperGattCallback.newtalker(this);
+              }
         }
    }
 static int openglversion=0;

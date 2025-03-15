@@ -896,6 +896,11 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
     View[][] views;
     final String advhelp=isWearable?null:Natives.advanced();
     if(isWearable) {
+/*    if(!DontTalk) {
+            Button talk=getbutton(context,R.string.talk);
+            talk.setOnClickListener(v ->{
+            tk.glucodata.Talker.config(context);}); 
+            } */
         Button complications;
         if(BuildConfig.minSDK>=26) {
             complications = getbutton(context, R.string.complications);

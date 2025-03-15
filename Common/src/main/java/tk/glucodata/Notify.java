@@ -28,6 +28,7 @@ import static android.content.Context.VIBRATOR_SERVICE;
 import static android.graphics.Color.BLACK;
 import static android.graphics.Color.WHITE;
 import static java.lang.String.format;
+import static tk.glucodata.Applic.DontTalk;
 import static tk.glucodata.Applic.TargetSDK;
 import static tk.glucodata.Applic.app;
 import static tk.glucodata.Applic.isWearable;
@@ -370,7 +371,7 @@ static    void stoplossalarm(){
     private synchronized void playringhier(Ringtone ring,int duration,boolean sound,boolean flash,boolean vibrate,boolean disturb,int kind) {
         stopalarm();
 //        final int[] curfilter={-1};
-        if(!isWearable) {
+        if(!DontTalk) {
               if(kind<=1&&Natives.speakalarms()) {
                  final var  glu=SuperGattCallback.previousglucose;
                  if(glu!=null) {
@@ -430,7 +431,7 @@ static    void stoplossalarm(){
                 if(vibrate) {
                     stopvibratealarm();
                     }
-                if(!isWearable) {
+                if(!DontTalk) {
                     if(kind<=1&&Natives.speakalarms()) {
                         final var  glu=SuperGattCallback.previousglucose;
                         if(glu!=null) {

@@ -767,7 +767,7 @@ void toCalendar(const char *message) {
    } */
 
 
-#ifndef WEAROS
+#ifndef DONTTALK
 extern bool speakout;
 extern "C" JNIEXPORT void JNICALL fromjava(settouchtalk)(JNIEnv *env, jclass thiz,jboolean val) {
 

@@ -1,3 +1,6 @@
+
+//#define DONTTALK WEAROS
+
 /*#ifdef WEAROS
 #define NOCUTOFF 1
 #endif */
@@ -792,7 +795,7 @@ static bool glucosepointinfo(time_t tim,uint32_t value,   float posx, float posy
         sidenum(posx,posy,buf2,len,false);
         
     //    nvgText(genVG, posx,posy+cor*.92*2, buf, buf+len);
-#ifndef WEAROS
+#ifndef DONTTALK
         if(speakout) {
             speak(buf);
             }
@@ -1389,7 +1392,7 @@ static void    showscanner(NVGcontext* genVG,const SensorGlucoseData *hist,int s
         nvgLineTo( genVG, dleft,dheight);
         nvgStroke(genVG);
         }
-#ifndef WEAROS
+#ifndef DONTTALK
 
     if(settings->data()->speakmessages) {
         char value[300];
@@ -3242,7 +3245,7 @@ void lognum(const Num *num) {
 #endif    
 int numfrompos(const float x,const float y) ;
 vector<mealposition> mealpos;
-#ifndef WEAROS
+#ifndef DONTTALK
 static int verbosedate(time_t tim,char *buf,int maxbuf=256) {
     struct tm tmbuf;
     struct tm *stm=localtime_r(&tim,&tmbuf);
@@ -3296,7 +3299,7 @@ int64_t screentap(float x,float y) {
                 }
 
             }
-#ifndef WEAROS
+#ifndef DONTTALK
         if(speakout) {
             for(auto &el:shownglucose) {
                 LOGGER("x=%f [%f,%f] y=%f [%f,%f] trend=%d\n", x,el.glucosevaluex,
@@ -3329,7 +3332,7 @@ int64_t screentap(float x,float y) {
         }
 #endif
         }
-#ifndef WEAROS
+#ifndef DONTTALK
     if(speakout) {
          const float hgrens=menutextheight+statusbarheight;
         if(y<hgrens) {
@@ -3351,6 +3354,8 @@ int64_t screentap(float x,float y) {
                 }
             }
         }
+#endif
+#ifndef WEAROS 
     const float wgrens=density*10+statusbarleft;
     const float rgrens=dwidth-statusbarright-wgrens;
 
@@ -3472,12 +3477,12 @@ class histgegs:public Displayer {
    //const int sensorindex;
     const SensorGlucoseData *hist;
     time_t nu;
-#ifndef WEAROS
+#ifndef DONTTALK
 strconcat text;
 #endif
 public:
     histgegs(const SensorGlucoseData *hist): hist(hist)/*,glu(glu),tim(tim)*/,nu(time(nullptr))
-#ifndef WEAROS
+#ifndef DONTTALK
     ,text(getsensorhelp(usedtext->menustr0[3],": ","\n","\n"," "))
 #endif
     {
@@ -3506,14 +3511,16 @@ virtual int display() override {
     textbox("",text);
     return 1;
     }
-void speak() {
-    LOGGER("speak %s\n",text.data());
-    ::speak(text.data());
-   }
 #else
 virtual int display() override {
     return 1;
     }
+#endif
+#ifndef DONTTALK
+void speak() {
+    LOGGER("speak %s\n",text.data());
+    ::speak(text.data());
+   }
 #endif
 
 };
@@ -3534,6 +3541,10 @@ static void showhistory(const SensorGlucoseData *hist,const float tapx, const fl
 
 extern void callshowsensorinfo(const char *text);
                         callshowsensorinfo(gegs.getsensorhelp("","<h1>","</h1>","<br><br>","<br>","<br><br>").data());
+
+#ifndef DONTTALK
+                        if(speakout) gegs.speak();
+#endif
 #else
                         ::prevtouch.x=tapx;
                         ::prevtouch.y=tapy;
@@ -3567,7 +3578,7 @@ bool nearbyhistory( const float tapx,const float tapy,  const TX &transx,  const
 static bool  inmenu(float x,float y) ;
 
 
-#ifndef WEAROS
+#ifndef DONTTALK
     static bool speakmenutap(float x,float y) ;
 #endif
 
@@ -3614,7 +3625,7 @@ int64_t longpress(float x,float y) {
         return 0LL;
         }
 #endif
-#ifndef WEAROS
+#ifndef DONTTALK
     if(speakout) {
         if(speakmenutap(x,y))
             return 0LL;
@@ -4231,7 +4242,7 @@ static_assert(maxmenu==4);
 int getmenu(int tapx) {
     return tapx*maxmenu/dwidth;
     }
-#ifndef WEAROS
+#ifndef DONTTALK
 static bool speakmenutap(float x,float y) {
     if(x<menupos.left||x>=menupos.right) {
         return false;

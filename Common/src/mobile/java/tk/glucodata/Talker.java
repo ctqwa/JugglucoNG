@@ -23,6 +23,8 @@ package tk.glucodata;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+import static tk.glucodata.Applic.DontTalk;
+import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.getVoicePitch;
@@ -56,6 +58,7 @@ import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Space;
 import android.widget.Spinner;
@@ -79,6 +82,7 @@ static private Spinner spinner=null;
 static final private int minandroid=21; //21
 
 static void getvalues() {
+if(!DontTalk) {
     float speed=getVoiceSpeed( );
     if(speed!=0.0f) {
         voicepos=getVoiceTalker( );
@@ -87,10 +91,12 @@ static void getvalues() {
         curpitch=getVoicePitch( );
         SuperGattCallback.dotalk= Natives.getVoiceActive();
         }
+        }
     }
 
 static final private ArrayList<Voice> voiceChoice=new ArrayList<>();
 void setvalues() {
+if(!DontTalk) {
    var gine=engine;
     if(gine!=null) {
         var loc=getlocale();
@@ -98,8 +104,10 @@ void setvalues() {
         gine.setPitch( curpitch);
         gine.setSpeechRate( curspeed);
         }
+       }
     }
 void setvoice() {
+if(!DontTalk) {
     if(engine==null)
         return;
     if(voicepos>=0&& voicepos<voiceChoice.size()) {
@@ -111,15 +119,19 @@ void setvoice() {
         Log.i(LOG_ID,"setVoice out of range");
         voicepos=0;
         }
+      }
     }
 void destruct() {
+if(!DontTalk) {
     if(engine!=null) {
         engine.shutdown();
         engine=null;
         }
     voiceChoice.clear();
     }
+    }
  Talker(Context context) {
+if(!DontTalk) {
      engine=new TextToSpeech(Applic.app, new TextToSpeech.OnInitListener() {
        @Override
       public void onInit(int status) {
@@ -174,15 +186,19 @@ void destruct() {
           });
     if(android.os.Build.VERSION.SDK_INT >= minandroid)
         engine.setAudioAttributes(defaultAudioAttributes);
+        }
    }
 
 public void speak(String message) {
+if(!DontTalk) {
     engine.speak(message, TextToSpeech.QUEUE_FLUSH, null);
+    }
     }
 
 //private static final AudioAttributes defaultAudioAttributes = (new AudioAttributes.Builder()) .setLegacyStreamType(TextToSpeech.Engine.DEFAULT_STREAM) .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH) .build(); 
 private static final AudioAttributes defaultAudioAttributes = Notify.notification_audio;
 public void speak(String message, AudioAttributes attr) {
+if(!DontTalk) {
     if(android.os.Build.VERSION.SDK_INT >= minandroid) {
         if(attr!=defaultAudioAttributes) {
             engine.setAudioAttributes(attr);
@@ -194,27 +210,39 @@ public void speak(String message, AudioAttributes attr) {
         if(attr!=defaultAudioAttributes)
             engine.setAudioAttributes(defaultAudioAttributes);
          }
+         }
     }
 static long nexttime=0L;
 void selspeak(String message) {
-    var now=System.currentTimeMillis();    
-    if(now>nexttime) {
-        nexttime=now+cursep;
-        speak(message);
-        }
+    if(!DontTalk) {
+        var now=System.currentTimeMillis();    
+        if(now>nexttime) {
+            nexttime=now+cursep;
+            speak(message);
+            }
+          }
     }
 static private double base2=Math.log(2);
 static private double multiplyer=10000.0/base2;
 static int ratio2progress(float ratio) {
-    if(ratio<0.18)
+    if(DontTalk)
         return 0;
+     else {
+        if(ratio<0.18)
+            return 0;
         return (int)Math.round(Math.log(ratio)*multiplyer)+25000;
-        }
+          }
+    }
 static float progress2ratio(int progress) {
+    if(DontTalk)
+        return 0;
+     else {
         return (float)Math.exp((double)(progress-25000)/multiplyer);
         }
+    }
 
 private static View[] slider(MainActivity context,float init) {
+    if(!DontTalk) {
     var speed=new SeekBar(context);
 //    speed.setMin(-25000);
     speed.setMax(50000);
@@ -280,13 +308,23 @@ private static View[] slider(MainActivity context,float init) {
 
     return new View[] {speed,displayspeed};
     }
+    else return null;
+    }
 public static boolean shouldtalk() {
-    return  SuperGattCallback.dotalk||Natives.gettouchtalk()||Natives.speakmessages()||Natives.speakalarms();
+    if(!DontTalk) {
+        return  SuperGattCallback.dotalk||Natives.gettouchtalk()||Natives.speakmessages()||Natives.speakalarms();
+        }
+    else
+        return false;
     }
 public  static boolean istalking() {
-    return SuperGattCallback.talker!=null;
+    if(DontTalk)
+        return false;
+    else
+        return SuperGattCallback.talker!=null;
     }
 public static void config(MainActivity context) {
+    if(!DontTalk) {
     if(!istalking()) {
          SuperGattCallback.newtalker(context);
         }
@@ -336,6 +374,9 @@ public static void config(MainActivity context) {
     var spin= spinner!=null?spinner:((android.os.Build.VERSION.SDK_INT >= minandroid)? (spinner=new Spinner(context)):null);
 
     int[] spinpos={-1};
+    var touchtalk= getcheckbox(context,context.getString(R.string.talk_touch), Natives.gettouchtalk());
+    var speakmessages= getcheckbox(context,context.getString(R.string.speakmessages), Natives.speakmessages());
+    var speakalarms= getcheckbox(context,context.getString(R.string.speakalarms), Natives.speakalarms());
     View[]  firstrow;
     if(android.os.Build.VERSION.SDK_INT >= minandroid) { 
         spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -364,20 +405,30 @@ public static void config(MainActivity context) {
         space.setMinimumWidth((int)(width*0.4));
          firstrow=new View[]{active,seplabel,separation,space};
          }
-    var touchtalk= getcheckbox(context,context.getString(R.string.talk_touch), Natives.gettouchtalk());
-    var speakmessages= getcheckbox(context,context.getString(R.string.speakmessages), Natives.speakmessages());
-    var speakalarms= getcheckbox(context,context.getString(R.string.speakalarms), Natives.speakalarms());
     var secondrow=new View[]{touchtalk, speakmessages, speakalarms };
-    var layout=new Layout(context,(l,w,h)-> {
+    ViewGroup layout=isWearable?
+    new Layout(context,(l,w,h)-> {
+        return new int[] {w,h};
+        },firstrow,secondrow,new View[]{speedlabel},new View[]{speeds[1],speeds[0]},new View[]{pitchlabel},new View[]{pitchs[1],pitchs[0]}, new View[]{cancel,save,test}):
+    new Layout(context,(l,w,h)-> {
         return new int[] {w,h};
         },firstrow,secondrow,new View[]{speedlabel,speeds[1],speeds[0]},new View[]{pitchlabel,pitchs[1],pitchs[0]}, new View[]{cancel,helpview,test,save});
-
+     if(isWearable) {
+        var scroll=new ScrollView(context);
+        scroll.addView(layout);
+        scroll.setFillViewport(true);
+        scroll.setSmoothScrollingEnabled(false);
+       scroll.setScrollbarFadingEnabled(true);
+       scroll.setVerticalScrollBarEnabled(Applic.scrollbar);
+        layout=scroll;
+        }
+    final var lay=layout;
       //layout.setBackgroundResource(R.drawable.dialogbackground);
     layout.setBackgroundColor( Applic.backgroundcolor);
       context.lightBars(false);
-    context.setonback(()-> { 
+    MainActivity.setonback(()-> {
         tk.glucodata.help.hidekeyboard(context);
-        removeContentView(layout); 
+        removeContentView(lay);
         spinner=null;
         if(Menus.on)
             Menus.show(context);
@@ -465,12 +516,8 @@ public static void config(MainActivity context) {
     var laywidth=GlucoseCurve.getwidth()-left-MainActivity.systembarRight;
     layout.setX(left); */
     context.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
-
     }
-
-
-
-
+  }
 }
 /*
 TODO

@@ -75,5 +75,10 @@
 //#endif
 #ifndef WEAROS
 #define OLDEVERSENSE 1
+#else
+#define DONTTALK 1
 #endif
+
+//#define DONTTALK false 
+
 //#define ENCRYPTMESSAGES 1

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" 
 >
+<!--   <uses-sdk android:minSdkVersion="${minSDK}" android:targetSdkVersion="${targetSDK}"/>-->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -37,7 +38,11 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <!-- Needed only if your app communicates with already-paired Bluetooth devices.  -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
+<!--    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
+    </queries> -->
 <queries> <package android:name="com.google.android.apps.healthdata" /> </queries>
 
 

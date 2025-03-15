@@ -274,7 +274,7 @@ else {
       close.setOnClickListener(v->{
          MainActivity.doonback();
       });
-      Button noclose= act.findViewById(R.id.closeambi);
+/*      Button noclose= act.findViewById(R.id.closeambi);
        if(noclose!=null) {
          noclose.setVisibility(GONE);
         noclose.setText("");
@@ -282,5 +282,6 @@ else {
          nohelp.setText("");
          nohelp.setVisibility(GONE);
         }
+        */
       };
 }

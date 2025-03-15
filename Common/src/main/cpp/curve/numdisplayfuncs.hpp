@@ -129,7 +129,7 @@ static inline int mktmmin(const struct tm *tmptr) {
 	return tmptr->tm_min;
 	} */
 
-#ifdef WEAROS
+#ifdef DONTTALK
 const
 #endif
 bool speakout=false;
@@ -195,7 +195,7 @@ template <class TX,class TY> void NumDisplay::showNums(NVGcontext* vg, const TX 
 					else
 						nvgText(vg, xpos,ypos-(hit?2.4:2)*smallsize, buf, buf+buflen);
 
-#ifndef WEAROS
+#ifndef DONTTALK
 					if(speakout) {
 						sprintf(buf2,"\n%s\n%g",settings->getlabel(it->type).data(),it->value);
 						speak(buf);

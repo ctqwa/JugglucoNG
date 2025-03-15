@@ -24,7 +24,7 @@
     <string name="white_style_name">White Style</string>
 
     <string name="title_activity_watch_face_config">Configuration</string>
-
+    <string name="talkhelp" />
 
 
 </resources>

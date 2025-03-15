@@ -26,6 +26,7 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 import static java.lang.Float.isNaN;
 import static java.util.Collections.swap;
+import static tk.glucodata.Applic.DontTalk;
 import static tk.glucodata.Applic.backgroundcolor;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.startMain;
@@ -567,7 +568,7 @@ public boolean onTouchEvent(MotionEvent event) {
                 downstart=0;
                   } 
             else {
-                if(!isWearable)  {
+                if(!DontTalk)  {
                     long time=Natives.saylastglucose();
                     if(time>=0) {
                         var talker=SuperGattCallback.talker;

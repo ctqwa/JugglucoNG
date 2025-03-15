@@ -43,6 +43,7 @@ import static android.bluetooth.BluetoothProfile.STATE_CONNECTING;
 import static android.bluetooth.BluetoothProfile.STATE_DISCONNECTED;
 import static android.bluetooth.BluetoothProfile.STATE_DISCONNECTING;
 import static java.util.Objects.isNull;
+import static tk.glucodata.Applic.DontTalk;
 import static tk.glucodata.Applic.app;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.mgdLmult;
@@ -163,7 +164,7 @@ public static tk.glucodata.GlucoseAlarms glucosealarms=null;
 static notGlucose previousglucose=null;
 static void init(Application app) {
        if(glucosealarms==null) glucosealarms=new tk.glucodata.GlucoseAlarms(app);
-    if(!isWearable) {
+    if(!DontTalk) {
         Talker.getvalues();
         if(Talker.shouldtalk())
             newtalker(null);
@@ -173,14 +174,14 @@ static void init(Application app) {
 static Talker talker;
 static boolean dotalk=false;
 static void newtalker(Context context) {
-    if(!isWearable) {
+    if(!DontTalk) {
         if (talker != null)
             talker.destruct();
         talker = new Talker(context);
     }
     }
 static void endtalk() {
-    if(!isWearable) {
+    if(!DontTalk) {
         dotalk = false;
         if (talker != null) {
             talker.destruct();
@@ -218,7 +219,7 @@ static void endtalk() {
                     if (alarmtime) {
                         nextalarm[1] = tim + Natives.readalarmsuspension(1) * 60;
                         alarm |= 8;
-                        if(!isWearable) {
+                        if(!DontTalk) {
                             if((alarmspeak=Natives.speakalarms())) Talker.nexttime = 0L;
                         }
                     }
@@ -237,7 +238,7 @@ static void endtalk() {
                         nextalarm[0] = tim + Natives.readalarmsuspension(0) * 60;
                         Log.i(LOG_ID,"next alarm at "+ nextalarm[0] +" "+bluediag.datestr( nextalarm[0]*1000L ));
                         alarm |= 8;
-                        if(!isWearable) {
+                        if(!DontTalk) {
                             if((alarmspeak=Natives.speakalarms())) Talker.nexttime = 0L;
                         }
                     }
@@ -256,7 +257,7 @@ static void endtalk() {
         Log.v(LOG_ID, SerialNumber + " "+tim+" glucose=" + gl + " " + rate);
         Applic.updatescreen();
 
-        if(!isWearable) {
+        if(!DontTalk) {
             if(dotalk&&!alarmspeak)  {
                 talker.selspeak(sglucose.value);
                 }

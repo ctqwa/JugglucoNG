@@ -92,6 +92,8 @@ static final float mgdLmult= doLog?18.0182f:18.0f;
 public static boolean hour24=true;
 static public final int TargetSDK=BuildConfig.targetSDK;
 static public final boolean isWearable= BuildConfig.isWear==1;
+static final boolean DontTalk=isWearable;
+//static final boolean DontTalk=false;
 static public final boolean useZXing= BuildConfig.noZXing==0;
 //static public final boolean includeLib= isWearable;
 static public final boolean includeLib= true;
@@ -141,7 +143,7 @@ static public    void argToaster(Context context,int res,int duration) {
 }
 static public    void argToaster(Context context,String message,int duration) {
     Toast.makeText(context,message, duration).show();
-    if(!isWearable) {
+    if(!DontTalk) {
         if(initproccalled&&Natives.speakmessages()) 
             speak(message);
         }
@@ -774,7 +776,7 @@ static    void        talkbackoff() {
     }
 @Keep
 static public void speak(String message) {
-    if(!isWearable) {
+    if(!DontTalk) {
         var talker=SuperGattCallback.talker;
         if(talker==null) {
             SuperGattCallback.newtalker(null);
