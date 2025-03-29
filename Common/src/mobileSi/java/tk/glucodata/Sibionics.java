@@ -139,7 +139,7 @@ private static void selectType(long dataptr,MainActivity act,boolean freeptr) {
                int type=Natives.getLibreVersion(dataptr);
                Log.i(LOG_ID,"type="+type);
                if(type== 0x10) {
-                    selectType(dataptr,act,ptrptr[0]==0);
+                    selectType(dataptr,act,ptrptr[0]==0L);
                     }
                Applic.wakemirrors();
                return res;

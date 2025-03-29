@@ -1841,6 +1841,7 @@ float                getboxwidth(const float x) {
                     }
 
 //#define DOTEST 1
+        extern bool hasnetwork();
 static int showerrorvalue(const SensorGlucoseData *sens,const time_t nu,float getx,float gety,int index) {
  
     shownglucose[index].glucosevalue=0;
@@ -1851,7 +1852,6 @@ static int showerrorvalue(const SensorGlucoseData *sens,const time_t nu,float ge
     nvgFontSize(genVG,headsize/6 );
     if(settings->data()->nobluetooth) {
         LOGAR("nobluetooth");
-        extern bool hasnetwork();
         if(hasnetwork()) {
             return 1;
             }
@@ -1863,18 +1863,19 @@ static int showerrorvalue(const SensorGlucoseData *sens,const time_t nu,float ge
         LOGAR("!nobluetooth");
         {
             if(!bluetoothEnabled()) {
+                LOGAR("bluetooth not Enabled");
                 return 3;
                 } 
             else {
-           if((nu-sens->receivehistory)<60) {
-                    static char buf[256];
-                    auto past=usedtext->receivingpastvalues;
-                    memcpy(buf,past.data(),past.size());
-                    char *ptr=buf+past.size();
-                    ptr+=sprintf(ptr,": %d",sens->pollcount());
-                    nvgTextBox(genVG,  getx, gety, getboxwidth(getx),buf, ptr);
-                    shownglucose[index].errortext=buf;
-            }
+               if((nu-sens->receivehistory)<60) {
+                        static char buf[256];
+                        auto past=usedtext->receivingpastvalues;
+                        memcpy(buf,past.data(),past.size());
+                        char *ptr=buf+past.size();
+                        ptr+=sprintf(ptr,": %d",sens->pollcount());
+                        nvgTextBox(genVG,  getx, gety, getboxwidth(getx),buf, ptr);
+                        shownglucose[index].errortext=buf;
+                }
             else {
                 if(sens->sensorerror) {
                     const std::string_view sensorerror= sens->replacesensor?usedtext->streplacesensor: usedtext->stsensorerror;
@@ -1915,10 +1916,13 @@ static int showerrorvalue(const SensorGlucoseData *sens,const time_t nu,float ge
 int betweenviews=60*30;
 time_t nexttimeviewed=0;
 #endif
+
+extern int bluePermission();
 static void showlastsstream(const time_t nu,const float getx,std::vector<int> &used ) {
 //LOGGER("showlaststream %d\n",used.size());
     int success=false;
     bool neterror=false,usebluetoothoff=false,bluetoothoff=false,otherproblem=false;
+    int blueperm=2;
     static int failures=0;
     ++failures;
     const auto usedsize=used.size();
@@ -1976,8 +1980,15 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
                 switch(showerrorvalue(hist,nu,getx,gety,i)) {
                     case 1: neterror=true;break;
                     case 2: usebluetoothoff=true;break;
-                    case 3: bluetoothoff=true;break;
-                    default: otherproblem=true;
+                    case 3: 
+                    blueperm=bluePermission();
+                    bluetoothoff=true;
+                    break;
+                    default:  {
+                        blueperm=bluePermission();
+                        if(blueperm>1)
+                            otherproblem=true;
+                        }
                     };
                 LOGAR("AFgter showerrorvalue(hist,nu,getx,gety)) ");
                 }
@@ -1997,19 +2008,36 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
            time_t starttime=hist->getstarttime();
            auto wait= nu-starttime;
            const int warmup=hist->getWarmupMIN(); 
-           LOGGER("waited=%lu warmup=%d starttime=%lu %s",wait,warmup,starttime,ctime(&starttime));
-           
-          if(wait<(warmup*60)) {
+           blueperm=bluePermission();
+           LOGGER("waited=%lu warmup=%d starttime=%lu %s blueperm=%d\n",wait,warmup,starttime,ctime(&starttime),blueperm);
+           bool bluescanner=hist->isSibionics()||hist->isDexcom();
+           if(bluescanner&&blueperm<2&&!hasnetwork()) { 
+                 float usegetx=getx-headsize/3;
+                 nvgTextAlign(genVG,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+                 nvgFontSize(genVG,headsize/6 );
+                 getboxwidth(usegetx);
+                  const std::string_view perm=blueperm==1?usedtext->nolocationpermission:usedtext->nonearbydevicespermission;
+                 const auto *bufptr=perm.data();
+                 const auto ends= perm.size();
+                  otherproblem=true;
+                 nvgTextBox(genVG,  usegetx, gety, getboxwidth(usegetx), bufptr,bufptr+ends);
+                 shownglucose[i].errortext=bufptr;
+                 shownglucose[i].glucosevalue=0;
+                 shownglucose[i].glucosevaluex=usegetx;
+                 shownglucose[i].glucosevaluey=gety+headsize*.5;
+                 }
+        else {
+          if(wait<(warmup*60)&&((blueperm>0&&!settings->data()->nobluetooth&&bluetoothEnabled())||hasnetwork())) {
              float usegetx=getx-headsize/3;
              nvgTextAlign(genVG,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
              nvgFontSize(genVG,headsize/6 );
              getboxwidth(usegetx);
              const char *bufptr;
              int ends;
-             if(hist->isSibionics()||(hist->isDexcom()&&!hist->sensorerror)) {
-                const auto siwait=usedtext->waitingforconnection;
-                bufptr=siwait.data();
-                ends=siwait.size();
+             if((hist->isSibionics()||(hist->isDexcom()&&!hist->sensorerror))){
+                  const auto siwait=usedtext->waitingforconnection;
+                  bufptr=siwait.data();
+                  ends=siwait.size();
                 }
              else {
                 const bool isInitialised=(!hist->isLibre2())||sensors->getsensor(sensorindex)->initialized;
@@ -2035,10 +2063,12 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
                    };
                LOGAR("Afgter showerrorvalue(hist,nu,getx,gety)) ");
                }
+             }
             }
             }
 
         }
+
     if(!success&&!otherproblem) {
         int i=0;
         shownglucose.resize(1);
@@ -2049,13 +2079,11 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
         float gety=smallsize*.5f+dtop+dheight/2.0f;
         if(neterror) {
 //            nvgText(genVG,newgetx ,gety, usedtext->networkproblem.begin(), usedtext->networkproblem.end());
-            nvgTextBox(genVG,  newgetx, gety, getboxwidth(newgetx), usedtext->networkproblem.begin(), usedtext->networkproblem.end());
-                shownglucose[i].glucosevalue=0;
-                   shownglucose[i].glucosevaluex=newgetx;
-                       shownglucose[i].glucosevaluey=gety+headsize*.5;
-                shownglucose[i].errortext=usedtext->networkproblem.data();
-
-
+             nvgTextBox(genVG,  newgetx, gety, getboxwidth(newgetx), usedtext->networkproblem.begin(), usedtext->networkproblem.end());
+             shownglucose[i].glucosevalue=0;
+             shownglucose[i].glucosevaluex=newgetx;
+             shownglucose[i].glucosevaluey=gety+headsize*.5;
+             shownglucose[i].errortext=usedtext->networkproblem.data();
             }
         else { if(usebluetoothoff) {
            nvgTextBox(genVG,newgetx ,gety, getboxwidth(newgetx),usedtext->useBluetoothOff.begin(), usedtext->useBluetoothOff.end());
@@ -2065,13 +2093,24 @@ static void showlastsstream(const time_t nu,const float getx,std::vector<int> &u
             shownglucose[i].errortext=usedtext->useBluetoothOff.data();
            }
            else {
-               if(bluetoothoff) {
-                nvgTextBox(genVG,newgetx ,gety, getboxwidth(newgetx),usedtext->enablebluetooth.begin(), usedtext->enablebluetooth.end());
-                shownglucose[i].glucosevalue=0;
-                   shownglucose[i].glucosevaluex=newgetx;
-                       shownglucose[i].glucosevaluey=gety+headsize*.5;
-                shownglucose[i].errortext=usedtext->enablebluetooth.data();
-                }
+             LOGGER("blueperm=%d\n",blueperm);
+                if(blueperm<1) { 
+                    const std::string_view perm=blueperm==1?usedtext->nolocationpermission:usedtext->nonearbydevicespermission;
+                    nvgTextBox(genVG,newgetx ,gety, getboxwidth(newgetx),perm.begin(), perm.end());
+                    shownglucose[i].glucosevalue=0;
+                    shownglucose[i].glucosevaluex=newgetx;
+                    shownglucose[i].glucosevaluey=gety+headsize*.5;
+                    shownglucose[i].errortext=perm.data();
+                    }
+                else {
+                   if(bluetoothoff) {
+                        nvgTextBox(genVG,newgetx ,gety, getboxwidth(newgetx),usedtext->enablebluetooth.begin(), usedtext->enablebluetooth.end());
+                        shownglucose[i].glucosevalue=0;
+                        shownglucose[i].glucosevaluex=newgetx;
+                        shownglucose[i].glucosevaluey=gety+headsize*.5;
+                        shownglucose[i].errortext=usedtext->enablebluetooth.data();
+                        }
+                    }
                 }
                 }
         }

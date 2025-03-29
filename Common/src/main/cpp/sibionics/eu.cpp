@@ -135,9 +135,14 @@ extern "C" JNIEXPORT void JNICALL   fromjava(setSiSubtype)(JNIEnv *env, jclass c
        LOGAR("setSiSubtype usedhist==null");
        return;
        }
+   LOGGER("setSiSubtype %d\n",type);
    usedhist->getinfo()->siType=type;
+   LOGGER("after usedhist->getinfo()->siType %d\n",type);
    sendsiScan(usedhist);
+   LOGAR("sendsiScan(usedhist)");
    backup->wakebackup(Backup::wakeall);
+   LOGAR("wakebackup(Backup::wakeall)");
+
    }
 
 extern "C" JNIEXPORT jbyteArray JNICALL   fromjava(siAuthBytes)(JNIEnv *env, jclass cl,jlong dataptr) {
@@ -218,7 +223,7 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
   if(nritems<=0) {
      nritems=V120SpiltData(subenv,nullptr,0,(jbyteArray)data,(jintArray)jiar,(jbyteArray)jsonuit,false,(jbyteArray)bar2,datasize);
      }
-   int recorded=recordsprint;
+//   int recorded=recordsprint;
   recordsprint=-1;
    LOGGER("nritems=%d\n",nritems);
    LOGGER("%s\n",jsonuit.data->data());
@@ -241,7 +246,7 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
         const int maxid=sens->getSiIndex();
         int index=(int) basear[0];
         time_t eventTime=basear[10];
-            if(index!=maxid)   {
+         if(index!=maxid)   {
                 if(index<maxid)   {
                    LOGGER("SIprocess index=%d<maxid=%d\n",index,maxid);
                    return 3LL;
@@ -253,14 +258,15 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
                       return 3LL;
                       }
                    }
-              if(maxid<10) {
-                   auto starttime=makestarttime(index,eventTime);
+               }
+            const auto starttime=makestarttime(index,eventTime);
+            if(maxid<10||(abs((int)(sens->getinfo()->starttime-starttime))>60*60*4)) {
+                   LOGGER("set start time=%d\n",starttime);
                    sens->getinfo()->starttime=starttime;
                    sensor->starttime=starttime;
                    sensors->setindices();
                    backup->resendResetDevices(&updateone::sendstream);
                    }
-           }
             double temp=basear[1]/10.0;
             auto current= basear[2];
             double value=current/10.0;
@@ -295,28 +301,28 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
                             LOGGER("SIprocess finished=%d\n", sensor->finished);
                             backup->resensordata(sensorindex);
                             }
-                       auto res=glucoseback(mgdL,change,sens);
-                       if(!(index%5)) savejson(sens,sens->statefile,index,algcontext,getjson2);
-                        backup->wakebackup(Backup::wakestream);
-                      extern void wakewithcurrent();
-                         wakewithcurrent();
+                     auto res=glucoseback(mgdL,change,sens);
+                     if(!(index%5)) savejson(sens,sens->statefile,index,algcontext,getjson2);
+                     backup->wakebackup(Backup::wakestream);
+                     extern void wakewithcurrent();
+                     wakewithcurrent();
 
     #ifdef OLDEVERSENSE
-                            sendEverSenseold(sens,5);
+                      sendEverSenseold(sens,5);
     #endif
-                         return res;
-                        }
-                     else {
-                       if(!(index%500)) {
-                            savejson(sens,sens->statefile,index,algcontext,getjson2);
-                            backup->wakebackup(Backup::wakestream);
-                            }
-                          sens->receivehistory=nowsecs;
-                         }
-                      const int last=sens->pollcount()-1;
-                      if(last<sens->getbroadcastfrom()) sens->setbroadcastfrom(last);
-                   }
+                       return res;
+                      }
                else {
+                   if(!(index%500)) {
+                        savejson(sens,sens->statefile,index,algcontext,getjson2);
+                        backup->wakebackup(Backup::wakestream);
+                        }
+                      sens->receivehistory=nowsecs;
+                     }
+               const int last=sens->pollcount()-1;
+               if(last<sens->getbroadcastfrom()) sens->setbroadcastfrom(last);
+               }
+        else {
                 if(index==maxid) sens->setSiIndex(maxid+1);
                 LOGGER("SIprocess failed: index=%d temp=%f value=%f reindex=%d\n", index, temp, value,reindex);
                 if(!reindex&&!(index%5))  {

@@ -185,7 +185,11 @@ eller Denylist) och ändra sitt eget namn, båda behövs. I ditt fall
 .receivingdata="Receiving data",
 .unsupportedSibionics="Unsupported Sibionics Sensor"sv,
 .waitingforconnection="Waiting for connection"sv,
-.deleted="Deleted"sv
+.deleted="Deleted"sv,
+.nolocationpermission="Needs location permission"sv,
+.nonearbydevicespermission="Needs nearby devices permission"sv
+
+
 
 
 	};

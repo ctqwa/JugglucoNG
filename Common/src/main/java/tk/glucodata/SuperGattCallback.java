@@ -401,7 +401,7 @@ public void searchforDeviceAddress() {
             try {
                 tmpgatt.disconnect();
                 tmpgatt.close();
-            } catch (SecurityException se) {
+            } catch (Throwable se) {
                 var mess = se.getMessage();
                 mess = mess == null ? "" : mess;
                 String uit = ((Build.VERSION.SDK_INT > 30) ? Applic.getContext().getString(R.string.turn_on_nearby_devices_permission)  : mess) ;

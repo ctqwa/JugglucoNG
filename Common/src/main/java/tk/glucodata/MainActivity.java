@@ -1020,14 +1020,14 @@ public void onRequestPermissionsResult(int requestCode, String[] permissions, in
                 }
             } return; */
         case LOCATION_PERMISSION_REQUEST_CODE:
-            Log.i(LOG_ID,"LOCATION_PERMISSION_REQUEST_CODE");
+            Log.i(LOG_ID,"onRequestPermissionsResult(LOCATION_PERMISSION_REQUEST_CODE "+granted);
             if(granted) {
                 if(systemlocation())
                    hasLocationContinue();
             } else {
                 Log.i(LOG_ID,"denied");
-                 setbluetoothmain(false);
-                 Applic.argToaster(this,"No permission. Sensor via Bluetooth turned off", Toast.LENGTH_LONG);
+                //setbluetoothmain(false);
+                Applic.argToaster(this,"No permission. Sensor via Bluetooth turned off", Toast.LENGTH_LONG);
 
                 if(!gaverational) {
                     bluediag.returntoblue=false;

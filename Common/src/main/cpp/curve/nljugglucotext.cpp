@@ -185,7 +185,11 @@ volgende file)",
 .receivingdata="Gegevens worden ontvangen",
 .unsupportedSibionics="Niet-ondersteunde Sibionics-sensor"sv,
 .waitingforconnection="Wacht op verbinding"sv,
-.deleted="Verwijderd"sv
+.deleted="Verwijderd"sv,
+.nolocationpermission="Locatie toestemming nodig"sv,
+.nonearbydevicespermission="Apparaten in de buurt toestemming nodig"sv
+
+
 
 		}
 

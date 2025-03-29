@@ -29,7 +29,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_row="0"
-        android:layout_columnSpan="4"
+        android:layout_columnSpan="3"
         android:layout_column="7"
         android:text="@string/finish" />
 
@@ -38,8 +38,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_row="0"
-        android:layout_columnSpan="6"
-        android:layout_column="11"
+        android:layout_columnSpan="4"
+        android:layout_column="10"
         android:text="@string/streamhistory" />
 
       <CheckBox
@@ -47,8 +47,8 @@
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
           android:layout_row="0"
-          android:layout_columnSpan="6"
-          android:layout_column="11"
+          android:layout_columnSpan="4"
+          android:layout_column="10"
           android:visibility="gone"
           android:text="@string/alarmclock" />
     <Button
@@ -57,7 +57,7 @@
         android:layout_height="wrap_content"
         android:layout_row="0"
         android:layout_columnSpan="4"
-        android:layout_column="17"
+        android:layout_column="14"
         android:text="@string/scan_permission" />
 
 

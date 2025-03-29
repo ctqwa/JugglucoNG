@@ -828,7 +828,7 @@ typedef std::array<char,16>  longsensorname_t;
     return reinterpret_cast<const longsensorname_t *>(sensordir.data()+sensordir.length()-16);
     }
 [[nodiscard]] std::string_view showsensorname() const {
-    if(isSibionics()) 
+    if(isSibionics()&&getinfo()->siDeviceName[0]) 
           return std::string_view((char *)getinfo()->siDeviceName,getinfo()->siDeviceNamelen);
      else {
       if(isLibre3()) 
@@ -1054,8 +1054,11 @@ bool bluetoothback() {
 
 bool unused() const {
     const auto *info=getinfo();
-    if(info)
-        return (info->pollcount==0&&info->scancount==0&&info->endhistory==0);
+    if(info)  {
+        const int un=(info->pollcount==0&&info->scancount==0&&info->endhistory==0);
+        LOGGER("unused()=%d\n",un);
+        return un;
+        }
     LOGGER("unused %p->getinfo()==null\n",this);
     return false;
     }

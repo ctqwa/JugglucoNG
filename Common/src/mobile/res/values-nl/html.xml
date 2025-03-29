@@ -342,14 +342,36 @@ steeds nodig.</p>
 <font size="4" style="font-size: 14pt"><b>Juggluco</b></font> is een
 app voor het beheersen van bloed glucose door mensen met diabetes.
 Het kan Freestyle Libre (1 en 2) sensoren (via NFC) scannen en
-glucose waarden via Bluetooth ontvangen van Freestyle Libre 2 en 3
-sensoren.</p>
+glucose waarden via Bluetooth ontvangen van Freestyle Libre 2 en 3 end Dexcom G7/ONE+ sensoren.</p>
 <p style="line-height: 100%; margin-bottom: 0in">Nadat het programma
 is opgestart, kun je een Freestyle Libre 2 sensor scannen door het
 tegen de NFC sensor in je smartphone te houden. Hierna zal Juggluco
 proberen een Bluetooth verbinding met de sensor te vormen, waarna
 glucose waarden zonder te scannen elke minuut door de sensor naar
 Juggluco gezonden worden en daar weergegeven.</p>
+<p>Om een geactiveerde FreeStyle Libre 3- sensor over te nemen, moet je
+de Libreview-accountgegevens opgeven die je hebt gebruikt om de
+sensor te activeren in instellingen→ Deel gegevens -&gt;Libreview ,
+op &quot;Account-ID ophalen&quot; drukken en wachten tot de
+account-ID binnenkomt voordat je gaat scannen.</p> <p style="line-height: 100%; margin-bottom: 0in">Om verbinding te
+maken met Sibionics GS1Sb en Dexcom G7/ONE+ sensoren moet je hun
+datamatrix scannen met het linkermenu-&gt;Foto. Dexcom G7/ONE+
+sensoren worden gekoppeld via Bluetooth, wat je op de meeste
+telefoons moet accepteren. Akkoord gaan moet je heel snel doen,
+anders moet je nog eens 5 minuten wachten. Voorkom dus dat het scherm
+uitgaat. Op Samsung Galaxy Watch 4 en 7 hoeft je niet akkoord te gaan
+met koppelen. Gebruikte Dexcom G7/ONE+ sensoren blijven nog lang
+actief via Bluetooth nadat ze zijn gestopt met het registreren van
+glucosewaarden. Om te voorkomen dat Juggluco probeert te koppelen met
+de verkeerde sensor, moeten oude sensoren buiten het Bluetooth bereik
+van het apparaat waarop Juggluco draait zijn (bijvoorbeeld op 15
+meter afstand in de magnetron), vooral wanneer een oude sensor
+dezelfde pincode heeft als de nieuwe sensor. Schakel apps en
+apparaten uit (forceer stoppen of de-installeren) die eerder gebruikt
+zijn met de sensor.</p>
+
+
+
 <p style="line-height: 100%; margin-bottom: 0in">Het programma heeft
 vier menu\'s; door op een leeg gedeelte van het scherm te drukken kun
 je een van de menu\'s openen. In gedachte kun je het scherm in vier

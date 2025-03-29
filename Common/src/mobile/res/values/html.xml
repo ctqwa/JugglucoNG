@@ -329,9 +329,8 @@ is also used by Juggluco on Android 6, 7 and 7.1</p>
 is an applet for the control of blood glucose by people with
 diabetes. It can scan Freestyle Libre (0 and 2) sensors (via NFC) and
 receive (via Bluetooth) glucose values from </font><font color="#4f81bd"><i><b>Freestyle Libre 2</b></i></font><font color="#ffffff"> and </font><font color="#4f81bd"><i><b>3</b></i></font><font color="#ffffff">, </font><font color="#4f81bd"><b><i>Sibionics GS1Sb</b></i></font><font color="#ffffff"> and </font><b><i><font color="#4f81bd">Dexcom G7/ONE+</b></i></font><font color="#ffffff"> sensors.</font><font color="#ffffff"></p>
-<p style="line-height: 115%; margin-bottom: 0in"><font color="#ffffff">As
-the program is run for the first time, you can (after initialization)
-scan a Freestyle Libre </font><font color="#ffffff"><b>2</b></font><font color="#ffffff">
+<p style="line-height: 115%; margin-bottom: 0in"><font color="#ffffff">When
+the program is run for the first time, you can scan a Freestyle Libre </font><font color="#ffffff"><b>2</b></font><font color="#ffffff">
 sensor by holding it against the NFC sensor in your smartphone.
 Hereafter Juggluco will try to get a Bluetooth connection with
 Freestyle Libre 2 sensors and receive every minute a glucose value
@@ -340,11 +339,12 @@ sensor, you need to specify the Libreview Account information you
 used to activate the sensor in <a href="https://www.juggluco.nl/Jugglucohelp/libreview.html">settings-&gt;Exchange
 data-&gt;Libreview</a>, press <a href="https://www.juggluco.nl/Jugglucohelp/getaccountidhelp.html">&quot;Get
 Account ID&quot;</a> and wait for the Account ID to arrive before
-scanning. </font><font color="#ffffff">To connect to</font><font color="#ffffff">
+scanning. </font></p><p><font color="#ffffff">To connect to</font><font color="#ffffff">
 </font><font color="#4f81bd"><i><b>Sibionics
 GS1Sb</b></i></font><font color="#ffffff">  and </font><font color="#4f81bd"><b><i>Dexcom G7/ONE+</b></i></font><font color="#ffffff"> 
 sensors </font><font color="#ffffff">you need to scan their data
-matrix with left menu-&gt;Photo.</font></p>
+matrix with left menu-&gt;Photo.</font> Dexcom G7/ONE+ sensors are paired via Bluetooth, which you have to accept on most phones. Agreeing you have to do very fast otherwise you have to wait another 5 minutes. So prevent the screen from turning off. On Samsung Galaxy Watch 4 and 7 you don’t need to agree to pair. Used up Dexcom G7/ONE+ sensors remain active via Bluetooth for a long time after they stopped recording glucose values. To prevent Juggluco from trying to pair with the wrong sensor, keep old sensors out of Bluetooth reach (for example 15 meters away in the microwave), especially when an old sensor has the same pincode as the new sensor. Turn off (force stop or uninstall) apps and devices that previously connected with the sensor.</p
+
 <p style="line-height: 115%; margin-bottom: 0in"><font color="#ffffff"><span lang="en-US">The
 program contains four</span> <font color="#4f81bd"><font face="Cambria, serif"><font size="3" style="font-size: 13pt"><span lang="en-US"><b>menus</b></span></font></font></font><span lang="en-US">;
 by touching on an empty part of the display you can open a</span>

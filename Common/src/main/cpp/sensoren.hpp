@@ -753,8 +753,9 @@ vector<SensorGlucoseData *> inperiod(uint32_t starttime,uint32_t endtime) {
       return sens->pollcount() > 0;
    }
 void finishsensor(int ind) {
-   if(ind>=0&&ind<=last())
+   if(ind>=0&&ind<=last()) {
       sensorlist()[ind].finished=1;
+      }
    }
   void checkinfo(const int ind, uint32_t nu) {
      const SensorGlucoseData *thishist = getSensorData(ind);

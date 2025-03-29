@@ -188,7 +188,11 @@ requis. Dans votre cas le fichier suivant pose problème )",
 .receivingdata="Receiving data",
 .unsupportedSibionics="Unsupported Sibionics Sensor"sv,
 .waitingforconnection="Waiting for connection"sv,
-.deleted="Deleted"sv
+.deleted="Deleted"sv,
+.nolocationpermission="Needs location permission"sv,
+.nonearbydevicespermission="Needs nearby devices permission"sv
+
+
 
 
 		}

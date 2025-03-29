@@ -515,13 +515,16 @@ else
          }
         }
       }
-    if(data->good())
+    if(data->good()) {
+        LOGGER("getdataptr()=%p\n",data);
         return reinterpret_cast<jlong>(data);
+        }
     LOGSTRING("getdataptr(): !data->good()\n");
     delete data;
     return 0LL;
     }
 extern "C" JNIEXPORT void JNICALL   fromjava(freedataptr)(JNIEnv *envin, jclass cl,jlong dataptr) {
+    LOGGER("freedataptr(%p)",dataptr);
     streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
     delete sdata;
     }

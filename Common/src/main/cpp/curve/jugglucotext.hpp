@@ -104,6 +104,8 @@ std::string_view receivingdata;
 std::string_view unsupportedSibionics;
 std::string_view waitingforconnection;
 std::string_view deleted;
+std::string_view nolocationpermission;
+std::string_view nonearbydevicespermission;
 #ifndef DONTTALK
 std::string_view getTrendName(int type) const {
    if(type>=0&&type<6) {

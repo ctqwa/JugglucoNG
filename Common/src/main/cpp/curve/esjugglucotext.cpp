@@ -224,7 +224,10 @@ son necesarios. En tu caso tiene problemas con el siguiente archivo)",
 .receivingdata="Recibiendo datos"sv,
 .unsupportedSibionics="Sensor Sibionics no compatible"sv,
 .waitingforconnection="Esperando conexión"sv,
-.deleted="Deleted"sv
+.deleted="Deleted"sv,
+.nolocationpermission="Needs location permission"sv,
+.nonearbydevicespermission="Needs nearby devices permission"sv
+
 
 }
 

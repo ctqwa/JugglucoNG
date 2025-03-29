@@ -988,26 +988,13 @@ Menü-&gt;Einstellungen-&gt;Daten austauschen-&gt;<a href="https://www.juggluco.
 <string name="introhelp" >
 <![CDATA[
 <p><a href="https://www.juggluco.nl/Jugglucohelp/be/introhelp.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/introhelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/introhelp.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/introhelp.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/introhelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/introhelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/introhelp.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/introhelp.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/introhelp.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/introhelp.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/introhelp.html?lang=en">en</a>&emsp;&emsp;</p><p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; line-height: 0.19in; orphans: 2; widows: 2; margin-bottom: 0in">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt"><font face="Cambria, serif"><b>Juggluco</b></font>&nbsp;ist
-ein Applet zur Kontrolle des Blutzuckers bei Diabetikern.&nbsp;Es
-kann Freestyle-Libre-Sensoren (1 und 2) (über NFC) scannen und (über
-Bluetooth) Glukosewerte von&nbsp;<font face="Calibri, serif"><i><b>Freestyle-Libre-2</b></i></font>&nbsp;-
-Sensoren empfangen.</font></font></p>
+
 <p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; line-height: 0.19in; orphans: 2; widows: 2; margin-bottom: 0in; background: transparent">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Wenn
-das Programm zum ersten Mal ausgeführt wird, können Sie (nach der
-Initialisierung) einen Freestyle Libre&nbsp;<b>2</b>&nbsp;-Sensor
-scannen, indem Sie ihn an den NFC-Sensor Ihres Smartphones
-halten.&nbsp;Danach versucht Juggluco, eine Bluetooth-Verbindung mit
-Freestyle Libre 2-Sensoren herzustellen, und erhält jede Minute
-einen Glukosewert, ohne zu scannen.</font></font></p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; line-height: 0.19in; orphans: 2; widows: 2; margin-bottom: 0in; background: transparent">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Um
-einen aktivierten FreeStyle Libre&nbsp;<b>3</b>&nbsp;-Sensor zu
-übernehmen, müssen Sie die Libreview-Kontoinformationen angeben,
-die Sie zum Aktivieren des Sensors in Einstellungen-&gt;Daten austauschen-&gt;Libreview
-verwendet haben, auf „Get Account ID“ klicken und warten, bis die
-Konto-ID eintrifft, bevor Sie scannen.</font></font></p>
+<font face="Times New Roman"><font size="4" style="font-size: 14pt"><span lang="de-DE">
+  <strong>Juggluco</strong> ist ein Applet zur Kontrolle des Blutzuckers bei Diabetikern. Es kann Freestyle-Libre-Sensoren (1 und 2) (über NFC) scannen und (über Bluetooth) Glukosewerte von <i><strong>Freestyle Libre 2</strong></i> und <strong>3</strong>  und <i><strong>Dexcom G7/ONE+</strong></i> Sensoren empfangen.</p>
+  <p>Wenn das Programm zum ersten Mal ausgeführt wird, können Sie (nach der Initialisierung) einen Freestyle Libre <strong>2</strong> -Sensor scannen, indem Sie ihn an den NFC-Sensor Ihres Smartphones halten. Danach versucht Juggluco, eine Bluetooth-Verbindung mit Freestyle Libre 2-Sensoren herzustellen, und erhält jede Minute einen Glukosewert, ohne zu scannen.</p>
+  <p>Um einen aktivierten FreeStyle Libre <strong>3</strong> -Sensor zu übernehmen, müssen Sie die Libreview-Kontoinformationen angeben, die Sie zum Aktivieren des Sensors in Einstellungen-&gt;Daten austauschen-&gt;Libreview verwendet haben, auf "Get Account ID" klicken und warten, bis die Konto-ID eintrifft, bevor Sie scannen.</p>
+  <p>Um eine Verbindung zu <strong>Sibionics GS1Sb</strong> und <strong>Dexcom G7/ONE+</strong> Sensoren herzustellen, müssen Sie deren Datenmatrix mit dem linken Menü-&gt;Foto scannen. Dexcom G7/ONE+-Sensoren werden über Bluetooth gekoppelt, was Sie bei den meisten Telefonen akzeptieren müssen. Sie müssen sehr schnell zustimmen, sonst müssen Sie weitere 5 Minuten warten. Verhindern Sie daher, dass sich der Bildschirm ausschaltet. Bei der Samsung Galaxy Watch 4 und 7 müssen Sie der Kopplung nicht zustimmen. Verbrauchte Dexcom G7/ONE+-Sensoren bleiben noch lange Zeit über Bluetooth aktiv, nachdem sie die Aufzeichnung von Glukosewerten beendet haben. Um zu verhindern, dass Juggluco versucht, sich mit dem falschen Sensor zu koppeln, platzieren Sie alte Sensoren außerhalb der Bluetooth-Reichweite (z. B. 15 Meter entfernt in einer Mikrowelle), insbesondere wenn ein alter Sensor denselben PIN-Code wie der neue Sensor hat. Deaktivieren Sie Apps und Geräte, die zuvor mit dem Sensor verbunden waren (beenden Sie sie zwangsweise oder deinstallieren Sie sie).</p></font></font></span>
 <p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; line-height: 0.19in; orphans: 2; widows: 2; margin-bottom: 0in; background: transparent">
 <font face="Times New Roman"><font size="4" style="font-size: 14pt"><span lang="de-DE">Das
 Programm enthält vier&nbsp;</span><font face="Cambria, serif"><font size="3" style="font-size: 13pt"><span lang="de-DE"><b>Menüs</b></span></font></font>&nbsp;<span lang="de-DE">;&nbsp;Durch
@@ -1018,7 +1005,7 @@ Teils öffnet das zweite&nbsp;Menü und der rechte Teil der Mitte
 öffnet das dritte&nbsp;Menü&nbsp;und das rechte Viertel&nbsp;des
 Bildschirms das vierte Menü.</span></font></font></p>
 <p style="font-variant: normal; letter-spacing: normal; font-weight: normal; line-height: 0.17in; orphans: 2; widows: 2; margin-bottom: 0.08in; background: transparent">
-<font face="Times New Roman"><font size="3" style="font-size: 12pt"><i>Menü
+<font face="times new roman"><font size="3" style="font-size: 12pt"><i>menü
 4: Bewegung (rechts)</i></font></font></p>
 <table width="96" cellpadding="0" cellspacing="0">
 	<col width="96"/>

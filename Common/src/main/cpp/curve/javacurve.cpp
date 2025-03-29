@@ -98,7 +98,7 @@ static jmethodID summaryready=nullptr;
 #ifdef  WEAROS
 static jmethodID showsensorinfo=nullptr;
 #endif
-jmethodID  jdoglucose=nullptr, jupdateDevices=nullptr, jbluetoothEnabled=nullptr,jspeak=nullptr, jresetWearOS=nullptr;
+jmethodID  jdoglucose=nullptr, jupdateDevices=nullptr, jbluetoothEnabled=nullptr,jspeak=nullptr, jresetWearOS=nullptr, jbluePermission=nullptr;
 jclass JNIApplic,JNIString;
 #ifdef OLDEVERSENSE
 #ifndef  WEAROS
@@ -217,6 +217,9 @@ if(cl) {
       }
 
 #endif
+   if(!(jbluePermission=env->GetStaticMethodID(JNIApplic,"bluePermission","()I"))) {
+      LOGAR(R"(jbluePermission=env->GetStaticMethodID(JNIApplic,"bluePermission","()I") failed)" "");
+      }
       /*
    if(!(jtoCalendar=env->GetStaticMethodID(JNIApplic,"toCalendar","()V"))) {
       LOGAR(R"(jtoCalendar=env->GetStaticMethodID(JNIApplic,"toCalendar","(Ljava/lang/String;)V") failed)" "");
@@ -299,6 +302,9 @@ JNIEnv *getenv() {
    }
 bool bluetoothEnabled() {
     return   getenv()->CallStaticBooleanMethod(JNIApplic,jbluetoothEnabled);
+    }
+int bluePermission() {
+    return   getenv()->CallStaticIntMethod(JNIApplic,jbluePermission);
     }
 void telldoglucose(const char *name,int32_t mgdl,float glu,float rate,int alarm,int64_t mmsec,bool wasnoblue,int64_t startmsec,intptr_t sensorptr,int sensorgen) {
    LOGGER("telldoglucose sensorptr=%p sensorgen=%d\n",sensorptr,sensorgen);

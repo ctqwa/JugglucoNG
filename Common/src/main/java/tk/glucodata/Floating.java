@@ -524,6 +524,7 @@ public void    onScreenStateChanged(int state) {
     
     }
 private static float movethreshold=6.0f;
+private boolean startedMain=false;
 public boolean onTouchEvent(MotionEvent event) {
     if(Natives.turnoffalarm()) Notify.stopalarm();
         Log.i(LOG_ID,event.toString());
@@ -547,6 +548,7 @@ public boolean onTouchEvent(MotionEvent event) {
         else {
             if(startX< floatglucosex ) {
                 Log.i(LOG_ID,"<floatglucosex");
+                startedMain=true;
                 startMain();
                 }
             if((event.getEventTime()-downstart)<maxdoubletime) {
@@ -569,16 +571,21 @@ public boolean onTouchEvent(MotionEvent event) {
                   } 
             else {
                 if(!DontTalk)  {
-                    long time=Natives.saylastglucose();
-                    if(time>=0) {
-                        var talker=SuperGattCallback.talker;
-                        if(talker==null) {
-                            SuperGattCallback.newtalker(null);
-                            talker=SuperGattCallback.talker;
+                    if(!startedMain) {
+                        long time=Natives.saylastglucose();
+                        if(time>=0) {
+                            var talker=SuperGattCallback.talker;
+                            if(talker==null) {
+                                SuperGattCallback.newtalker(null);
+                                talker=SuperGattCallback.talker;
+                                }
+                            talker.speak(time==0L?getContext().getString(R.string.novalue):getContext().getString(R.string.nonewvalue) + timef.format(time));
                             }
-                        talker.speak(time==0L?getContext().getString(R.string.novalue):getContext().getString(R.string.nonewvalue) + timef.format(time));
                         }
+                    else
+                        startedMain=false;
                     }
+
                 }
             }
         else 

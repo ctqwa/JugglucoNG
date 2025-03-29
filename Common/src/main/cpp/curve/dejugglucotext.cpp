@@ -183,6 +183,10 @@ detext.newamount,
 .unsupportedSibionics="Nicht unterstützter Sibionics-Sensor"sv,
 .waitingforconnection="Wartet auf Verbindung"sv,
 .deleted="Gelöscht"sv
+,
+.nolocationpermission="Benötigt Standortberechtigung"sv,
+.nonearbydevicespermission="Benötigt Berechtigung für Geräte in der Nähe"sv
+
 		}
 
 

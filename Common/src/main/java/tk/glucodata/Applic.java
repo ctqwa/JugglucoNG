@@ -309,6 +309,18 @@ static boolean canBluetooth() {
        }
     return true;
     }
+@Keep
+static int bluePermission() {
+    if(Build.VERSION.SDK_INT > 23) {
+        if(Applic.hasPermissions(app, scanpermissions).length==0)
+               return 2;
+        if(Build.VERSION.SDK_INT > 30) {
+           return 0;
+           }
+        return 1;
+        }
+    return 2;
+    }
 public static void updateservice(Context context,boolean usebluetooth) {
         if(usebluetooth||Natives.backuphostNr( )>0) {
             if(keeprunning.start(context))
@@ -491,7 +503,12 @@ void domintime() {
     static final ScheduledExecutorService scheduler =Executors.newScheduledThreadPool(1);
 
 void setmintime() {
-  registerReceiver(minTimeReceiver, mintimefilter);   
+    try {
+         registerReceiver(minTimeReceiver, mintimefilter);   
+         }
+     catch(Throwable th) {
+        Log.stack(LOG_ID,"registerReceiver",th);
+        }
   }
 void cancelmintime() {
     try {
