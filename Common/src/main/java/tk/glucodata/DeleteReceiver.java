@@ -21,6 +21,7 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.stack;
 import static tk.glucodata.Notify.penmutable;
 
@@ -40,10 +41,10 @@ public class DeleteReceiver extends BroadcastReceiver {
         final String action = intent.getAction();
         try {
             if (action != null && action.equals(clearnotification)) {
-                Log.i(LOG_ID, clearnotification + " Stop Alarm");
+                {if(doLog) {Log.i(LOG_ID, clearnotification + " Stop Alarm");};};
                 Notify.stopalarm();
             } else
-                Log.i(LOG_ID, clearnotification);
+                {if(doLog) {Log.i(LOG_ID, clearnotification);};};
         } catch(Throwable th) {
                 stack(LOG_ID,"onReceive",th);
         }

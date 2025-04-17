@@ -1,2 +1,0 @@
-openat i.p.v. concat
-

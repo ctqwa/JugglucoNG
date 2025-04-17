@@ -106,7 +106,7 @@ extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const A
 extern data_t *fromjbyteArray(JNIEnv *env,jbyteArray jar,jint len=-1);
 
 extern "C" JNIEXPORT void JNICALL   fromjava(EverSenseClear)(JNIEnv *env, jclass cl,jlong dataptr) {
- 	reinterpret_cast<streamdata *>(dataptr)->hist->setbroadcastfrom(INT_MAX);
+ 	reinterpret_cast<streamdata *>(dataptr)->hist->setbroadcastfrom(INT16_MAX);
 	}
 extern "C" JNIEXPORT jlong JNICALL   fromjava(SIprocessData)(JNIEnv *envin, jclass cl,jlong dataptr, jbyteArray bluetoothdata,jlong mmsec) {
 if(!dataptr) {
@@ -243,6 +243,7 @@ algtype(v120RegisterKey) v120RegisterKey;
 algtype(V120ApplyAuthentication) V120ApplyAuthentication;
 algtype(V120RawData) V120RawData;
 algtype(V120Activation) V120Activation;
+algtype(V120Reset) V120Reset;
 algtype(V120IsecUpdate) V120IsecUpdate;
 static bool getDatahandle() {
 	std::string_view alglib=algDatahandleName;
@@ -283,6 +284,13 @@ static bool getDatahandle() {
 {	constexpr const char str[]=datahandlestr(V120Activation);
 	V120Activation= (algtype(V120Activation)) dlsym(handle,str);
 	 if(!V120Activation) {
+	 	LOGGER("dlsym %s failed: %s\n",str,dlerror());
+		return false;
+	 	}
+}
+{	constexpr const char str[]=datahandlestr(V120Reset);
+	V120Reset= (algtype(V120Reset)) dlsym(handle,str);
+	 if(!V120Reset) {
 	 	LOGGER("dlsym %s failed: %s\n",str,dlerror());
 		return false;
 	 	}

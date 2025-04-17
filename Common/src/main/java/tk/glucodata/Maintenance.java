@@ -37,12 +37,13 @@ import static android.app.AlarmManager.RTC_WAKEUP;
 import static android.app.PendingIntent.getBroadcast;
 import static android.content.Context.ALARM_SERVICE;
 import static android.os.SystemClock.elapsedRealtime;
+import static tk.glucodata.Log.doLog;
 
 public class Maintenance extends BroadcastReceiver {
 static final private String LOG_ID="Maintenance";
         @Override
         public void onReceive(Context context, Intent intent) {
-		 Log.i(LOG_ID,"onReceive");
+		 {if(doLog) {Log.i(LOG_ID,"onReceive");};};
 		if(Applic.initproccalled) 
 			Natives.maintenance();
 
@@ -50,7 +51,7 @@ static final private String LOG_ID="Maintenance";
 
 
 static    void setMaintenancealarm(Context context) {
-	 Log.i(LOG_ID,"setMaintenancealarm");
+	 {if(doLog) {Log.i(LOG_ID,"setMaintenancealarm");};};
         final int alarmrequest = 0;
         Intent alarmintent = new Intent(context, Maintenance.class);
 

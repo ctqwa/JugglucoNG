@@ -23,6 +23,7 @@ package tk.glucodata;
 
 import android.app.Application;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.hasalarmloss;
 
 public class GlucoseAlarms extends SuperGlucoseAlarms {
@@ -48,14 +49,14 @@ public GlucoseAlarms(Application context) {
 		else  {
 			final long afterwait = waitmmsec() + wastime;
 			if(afterwait > nu) {
-				Log.i(LOG_ID, "handlealarm notify");
+				{if(doLog) {Log.i(LOG_ID, "handlealarm notify");};};
 				Notify.onenot.oldnotification(wastime);
 				SuperGattCallback.previousglucose=null;
 				nexttime = (afterwait < tryagain)  ? afterwait : tryagain;
 		      LossOfSensorAlarm.setalarm(Applic.app, nexttime);
 			} else {
 				if(!saidloss) {
-					Log.i(LOG_ID, "handlealarm alarm");
+					{if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};};
 					long lasttime=Natives.lastglucosetime( );
 					if(lasttime!=0L)
 						wastime=lasttime;
@@ -94,13 +95,13 @@ public	void handlealarm() {
 		else  {
 			final long afterwait = waitmmsec() + wastime;
 			if(afterwait > nu) {
-				Log.i(LOG_ID, "handlealarm notify");
+				{if(doLog) {Log.i(LOG_ID, "handlealarm notify");};};
 				Notify.onenot.oldnotification(wastime);
 				SuperGattCallback.previousglucose=null;
 				nexttime = (afterwait < tryagain)  ? afterwait : tryagain;
 			} else {
 				if(!saidloss) {
-					Log.i(LOG_ID, "handlealarm alarm");
+					{if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};};
 					long lasttime=Natives.lastglucosetime( );
 					if(lasttime!=0L)
 						wastime=lasttime;

@@ -51,7 +51,7 @@ private static   String  tostring(Bundle bundle) {
     } 
         @Override
         public void onReceive(Context context, Intent intent) {
-           	Log.i(LOG_ID,"onReceive ");
+           	{if(doLog) {Log.i(LOG_ID,"onReceive ");};};
 		var extras=intent.getExtras();
 		if(doLog) Natives.log(tostring(extras));
 		var function=extras.getString("FUNCTION","");

@@ -23,6 +23,8 @@
 package tk.glucodata;
 
 
+import static tk.glucodata.Log.doLog;
+
 import android.graphics.PointF;
 import android.view.MotionEvent;
 import android.view.View;
@@ -42,7 +44,7 @@ public BackGesture(MainActivity act) {
 	}
 private boolean backed=false;
     public boolean onTouch(View view, MotionEvent event) {
-        Log.i(LOG_ID,event.toString());
+        {if(doLog) {Log.i(LOG_ID,event.toString());};};
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
 		case MotionEvent.ACTION_BUTTON_PRESS:
             case MotionEvent.ACTION_DOWN:

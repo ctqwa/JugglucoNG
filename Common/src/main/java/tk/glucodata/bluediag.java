@@ -77,6 +77,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.Specific.useclose;
 import static tk.glucodata.help.help;
@@ -155,7 +156,7 @@ private static void showsensormessage(String text,MainActivity act) {
         });
     usebluetooth.setOnCheckedChangeListener(
          (buttonView,  isChecked) -> {
-             Log.i(LOG_ID,"usebluetooth "+isChecked);
+             {if(doLog) {Log.i(LOG_ID,"usebluetooth "+isChecked);};};
              if(isChecked!=wasused) {
                  act.setbluetoothmain( isChecked);
                  act.requestRender();
@@ -253,7 +254,7 @@ void showinfo(final SuperGattCallback gatt,MainActivity act) {
     setrow(gatt.wrotepass,keytimes,keyinfo);
     setrow(gatt.charcha,glucosetimes,glucoseinfo);
 
-    Log.i(LOG_ID,"info.setVisibility(VISIBLE);");
+    {if(doLog) {Log.i(LOG_ID,"info.setVisibility(VISIBLE);");};};
     info.setVisibility(VISIBLE);
     info.setOnClickListener(v->  showsensorinfo(gatt.getinfo(),act));
     }
@@ -317,7 +318,7 @@ static void nosensors(MainActivity act) {
  var usebluetooth=getcheckbox(act, R.string.use_bluetooth,wasused);
     usebluetooth.setOnCheckedChangeListener(
          (buttonView,  isChecked) -> {
-             Log.i(LOG_ID,"usebluetooth "+isChecked);
+             {if(doLog) {Log.i(LOG_ID,"usebluetooth "+isChecked);};};
              if(isChecked!=wasused) {
                  act.setbluetoothmain( isChecked);
                  act.requestRender();
@@ -345,7 +346,7 @@ static void nosensors(MainActivity act) {
          });
    layout.setBackgroundResource(R.drawable.dialogbackground);
    int pads=(int)(GlucoseCurve.metrics.density*(isWearable?2:10));
-   Log.i(LOG_ID,"density="+GlucoseCurve.metrics.density);
+   {if(doLog) {Log.i(LOG_ID,"density="+GlucoseCurve.metrics.density);};};
 
       if(!isWearable)
           bluestate.setPadding(pads,0,0,0);
@@ -360,7 +361,7 @@ void nogatts(MainActivity act) {
  var usebluetooth=getcheckbox(act, R.string.use_bluetooth,wasused);
     usebluetooth.setOnCheckedChangeListener(
          (buttonView,  isChecked) -> {
-             Log.i(LOG_ID,"usebluetooth "+isChecked);
+             {if(doLog) {Log.i(LOG_ID,"usebluetooth "+isChecked);};};
              if(isChecked!=wasused) {
                  act.setbluetoothmain( isChecked);
                  act.requestRender();
@@ -388,7 +389,7 @@ void nogatts(MainActivity act) {
          });
       layout.setBackgroundResource(R.drawable.dialogbackground);
     int pads=(int)(GlucoseCurve.metrics.density*(isWearable?2:10));
-   Log.i(LOG_ID,"density="+GlucoseCurve.metrics.density);
+   {if(doLog) {Log.i(LOG_ID,"density="+GlucoseCurve.metrics.density);};};
 
       if(!isWearable)
           bluestate.setPadding(pads,0,0,0);
@@ -433,7 +434,7 @@ bluediag(MainActivity act,final ArrayList<SuperGattCallback> gatts) {
          android13.setOnCheckedChangeListener( (buttonView,  isChecked) -> { SensorBluetooth.setAutoconnect(isChecked); });
          }
     info=view.findViewById(R.id.info);
-    Log.i(LOG_ID,"info.setVisibility(INVISIBLE);");
+    {if(doLog) {Log.i(LOG_ID,"info.setVisibility(INVISIBLE);");};};
     info.setVisibility(INVISIBLE);
     int width2=GlucoseCurve.getwidth();
     HorizontalScrollView addscroll2=null;
@@ -445,7 +446,7 @@ bluediag(MainActivity act,final ArrayList<SuperGattCallback> gatts) {
       scroll.setScrollBarFadeDuration(0);
         int height=GlucoseCurve.getheight();
         scroll.setMinimumHeight(height);
-        Log.i(LOG_ID,"height="+height);
+        {if(doLog) {Log.i(LOG_ID,"height="+height);};};
         }
     else {
         measuredgrid grid=view.findViewById(R.id.grid);
@@ -481,7 +482,7 @@ if(!isWearable) {
         finish.setOnClickListener(v -> {
             if (gatts != null && gatts.size() > 0) {
                 if (gattselected >= gatts.size()) {
-                    Log.i(LOG_ID, "show: gattselected=" + gattselected);
+                    {if(doLog) {Log.i(LOG_ID, "show: gattselected=" + gattselected);};};
                     gattselected = 0;
                     return;
                 }
@@ -492,7 +493,7 @@ if(!isWearable) {
     }
     else {
 
-        Log.i(LOG_ID,"finish.setVisibility(GONE);");
+        {if(doLog) {Log.i(LOG_ID,"finish.setVisibility(GONE);");};};
         finish.setVisibility(GONE);
     }
 }
@@ -513,7 +514,7 @@ if(!isWearable) {
    
     usebluetooth.setOnCheckedChangeListener(
          (buttonView,  isChecked) -> {
-             Log.i(LOG_ID,"usebluetooth "+isChecked);
+             {if(doLog) {Log.i(LOG_ID,"usebluetooth "+isChecked);};};
              final boolean blueused = Natives.getusebluetooth();
              if (blueused != usebluetooth.isChecked()) {
                  act.setbluetoothmain( !blueused);
@@ -543,21 +544,21 @@ if(!isWearable) {
          );
         }
     else  {
-        Log.i(LOG_ID,"priority.setVisibility(INVISIBLE);");
+        {if(doLog) {Log.i(LOG_ID,"priority.setVisibility(INVISIBLE);");};};
        priority.setVisibility(INVISIBLE);
        }
     boolean hasperm=Build.VERSION.SDK_INT < 23||Applic.noPermissions(act).length==0;
     if(!isWearable)  {
         locationpermission=view.findViewById(R.id.locationpermission);
         if(hasperm)   {
-            Log.i(LOG_ID,"locationpermission.setVisibility(GONE);");
+            {if(doLog) {Log.i(LOG_ID,"locationpermission.setVisibility(GONE);");};};
             locationpermission.setVisibility(GONE);
             }
         else {
             locationpermission.setOnClickListener(v-> {
                 var noperm=Applic.noPermissions(act);
                 if(noperm.length==0) {
-                    Log.i(LOG_ID,"locationpermission.setVisibility(GONE);");
+                    {if(doLog) {Log.i(LOG_ID,"locationpermission.setVisibility(GONE);");};};
                     locationpermission.setVisibility(GONE);
                     }
 
@@ -576,7 +577,7 @@ if(!isWearable) {
     spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         @Override
         public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-            Log.i(LOG_ID,"onItemSelected");
+            {if(doLog) {Log.i(LOG_ID,"onItemSelected");};};
             try {
                 if (first[0]) {
                     first[0] = false;
@@ -586,7 +587,7 @@ if(!isWearable) {
                     
                 if (gatts != null && gatts.size() > position) {
                     gattselected = position;
-                    Log.i(LOG_ID, "onItemSelected: gattselected=" + gattselected);
+                    {if(doLog) {Log.i(LOG_ID, "onItemSelected: gattselected=" + gattselected);};};
                     SuperGattCallback gatt = gatts.get(gattselected);
                     showinfo(gatt, act);
                 }
@@ -613,7 +614,7 @@ if(!isWearable) {
             background.setOnClickListener(v-> Battery.batteryscreen(act,showview));
             }
         else  {
-        Log.i(LOG_ID,"background.setVisibility(GONE);");
+        {if(doLog) {Log.i(LOG_ID,"background.setVisibility(GONE);");};};
             background.setVisibility(GONE);
             }
         }
@@ -628,11 +629,11 @@ if(!isWearable) {
     show(act,showview);
     act.addContentView(showview, new ViewGroup.LayoutParams( WRAP_CONTENT, WRAP_CONTENT));
     var scheduled=Applic.scheduler.scheduleAtFixedRate( ()-> {
-       Log.i(LOG_ID,"scheduled");
+       {if(doLog) {Log.i(LOG_ID,"scheduled");};};
         act.runOnUiThread( ()-> { 
          if(gatts!=null&&gatts.size()>0) {
             if(gattselected>= gatts.size()) {
-               Log.i(LOG_ID,"show: gattselected="+ gattselected);
+               {if(doLog) {Log.i(LOG_ID,"show: gattselected="+ gattselected);};};
                gattselected=0;
                }
             showinfo(gatts.get(gattselected),act);
@@ -640,7 +641,7 @@ if(!isWearable) {
 
         });},29,29, TimeUnit.SECONDS);
     act.setonback(() -> {
-           Log.i(LOG_ID,"onback");
+           {if(doLog) {Log.i(LOG_ID,"onback");};};
             scheduled.cancel(false);
             act.setfineres(null);
             removeContentView(showview);
@@ -675,7 +676,7 @@ static class onkey implements Comparator<Pair> {
     }
 }
 private void showall() {
-Log.i(LOG_ID,"showall");
+{if(doLog) {Log.i(LOG_ID,"showall");};};
 //    test();
     SensorBluetooth  blue=SensorBluetooth.blueone;
     if(blue!=null&&blue.scantime!=0L) {
@@ -684,7 +685,7 @@ Log.i(LOG_ID,"showall");
          put(messages,blue.scantime,": Start search for sensors\n");
          final ArrayList<SuperGattCallback> gatts=SensorBluetooth.mygatts();
          if(gatts==null) {
-             Log.i(LOG_ID,"showall gatts==null");
+             {if(doLog) {Log.i(LOG_ID,"showall gatts==null");};};
              }
          else {
          for(SuperGattCallback gatt:gatts) {
@@ -711,20 +712,20 @@ Log.i(LOG_ID,"showall");
          
          builder.deleteCharAt(builder.length()-1);
          scanview.setText(builder);
-         Log.i(LOG_ID,"scanview.setVisibility(VISIBLE);");
+         {if(doLog) {Log.i(LOG_ID,"scanview.setVisibility(VISIBLE);");};};
          scanview.setVisibility(VISIBLE);
          }
       else
          scanview.setVisibility(GONE);
         }
     else  {
-        Log.i(LOG_ID,"scanview.setVisibility(GONE);");
+        {if(doLog) {Log.i(LOG_ID,"scanview.setVisibility(GONE);");};};
         scanview.setVisibility(GONE);
         }
     if(!isWearable) {
         activity.setfineres(()-> {
         if( Build.VERSION.SDK_INT < 23|| Applic.noPermissions(activity).length==0) {
-            Log.i(LOG_ID,"locationpermissin.setVisibility(GONE);");
+            {if(doLog) {Log.i(LOG_ID,"locationpermissin.setVisibility(GONE);");};};
             locationpermission.setVisibility(GONE);
             }
         });
@@ -735,11 +736,11 @@ Log.i(LOG_ID,"showall");
     streamhistory.setChecked(Natives.getStreamHistory( ));
     if(!isWearable) {
         if( Build.VERSION.SDK_INT < 23|| Applic.noPermissions(activity).length==0) {
-            Log.i(LOG_ID,"locationpermissin.setVisibility(GONE);");
+            {if(doLog) {Log.i(LOG_ID,"locationpermissin.setVisibility(GONE);");};};
             locationpermission.setVisibility(GONE);
             }
         }
-    Log.i(LOG_ID,"showall end");
+    {if(doLog) {Log.i(LOG_ID,"showall end");};};
     }
 
     
@@ -750,14 +751,14 @@ private void show(MainActivity act,View view) {
         setadapter(activity,gatts);
         if(gatts!=null&&gatts.size()>0) {
             if(gattselected>= gatts.size()) {
-                Log.i(LOG_ID,"show: gattselected="+ gattselected);
+                {if(doLog) {Log.i(LOG_ID,"show: gattselected="+ gattselected);};};
                 gattselected=0;
                 }
             avoidSpinnerDropdownFocus(spin);
             showinfo(gatts.get(gattselected),act);
             }
         }
-    Log.i(LOG_ID,"view.setVisibility(VISIBLE);");
+    {if(doLog) {Log.i(LOG_ID,"view.setVisibility(VISIBLE);");};};
     view.setVisibility(VISIBLE);
 
     showall();    

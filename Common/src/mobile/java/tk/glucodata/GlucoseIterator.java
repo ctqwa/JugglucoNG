@@ -27,6 +27,8 @@ import static android.health.connect.datatypes.BloodGlucoseRecord.SpecimenSource
 import static android.health.connect.datatypes.BloodGlucoseRecord.SpecimenSource.SPECIMEN_SOURCE_UNKNOWN;
 import static java.lang.Math.random;
 
+import static tk.glucodata.Log.doLog;
+
 import android.os.Build;
 
 import androidx.health.connect.client.records.BloodGlucoseRecord;
@@ -74,7 +76,7 @@ private    BloodGlucoseRecord getglucose() {
 	final int mgdL=(int)((timevalue>>32)&0xFFFF);
     final int nextpos=(int)((timevalue>>48)&0xFFFF);
     iter=nextpos-base.start;
-    Log.i(LOG_ID,"getglucose("+pos+") nextpos="+nextpos+" time="+time+" mgdL="+mgdL+" mmol="+mgdL/18.0f);
+    {if(doLog) {Log.i(LOG_ID,"getglucose("+pos+") nextpos="+nextpos+" time="+time+" mgdL="+mgdL+" mmol="+mgdL/18.0f);};};
 	return getglucose(time,mgdL);
     }
 
@@ -86,25 +88,25 @@ private    BloodGlucoseRecord getglucose() {
 
     @Override
     public boolean hasPrevious() {
-    	Log.i(LOG_ID,"hasPrevious() iter="+iter);
+    	{if(doLog) {Log.i(LOG_ID,"hasPrevious() iter="+iter);};};
         return iter>0;
     }
 
     @Override
     public BloodGlucoseRecord previous() {
-        Log.i(LOG_ID,"previous");
+        {if(doLog) {Log.i(LOG_ID,"previous");};};
         return null;
     }
 
     @Override
     public int nextIndex() {
-    	Log.i(LOG_ID,"nextIndex()="+iter);
+    	{if(doLog) {Log.i(LOG_ID,"nextIndex()="+iter);};};
         return iter;
     }
 
     @Override
     public int previousIndex() {
-    	Log.i(LOG_ID,"prevIndex()="+(iter-1));
+    	{if(doLog) {Log.i(LOG_ID,"prevIndex()="+(iter-1));};};
         return iter-1;
     }
 

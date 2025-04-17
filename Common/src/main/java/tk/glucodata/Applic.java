@@ -181,7 +181,7 @@ public Applic() {
     }
 void setnotify(boolean on) {
     Notify.alertwatch=on;
-    Log.i(LOG_ID,"setnotify="+on);
+    {if(doLog) {Log.i(LOG_ID,"setnotify="+on);};};
     }
 public void setunit(int unit)  {
     Natives.setunit(unit);
@@ -208,7 +208,7 @@ public static boolean systemtimeformat() {
 
 private static void setlanguage() {
         var lang=getlocale().getLanguage();
-        Log.i(LOG_ID,"Applic.setlangauge="+lang+" cur="+curlang);
+        {if(doLog) {Log.i(LOG_ID,"Applic.setlangauge="+lang+" cur="+curlang);};};
         if(!lang.equals(curlang)) {
             curlang=lang;
             if(!DontTalk) {
@@ -231,7 +231,7 @@ public void onConfigurationChanged(Configuration newConfig) {
 //        var new24 = DateFormat.is24HourFormat(this);
         hasSystemtimeformat=DateFormat.is24HourFormat(app)==hour24;
         Notify.timef = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT);
-        Log.i(LOG_ID,"Applic.onConfigurationChanged "+(Applic.hour24?" 24uur":" 12uur"));
+        {if(doLog) {Log.i(LOG_ID,"Applic.onConfigurationChanged "+(Applic.hour24?" 24uur":" 12uur"));};};
  //       was24=new24;
         setlanguage();
         }
@@ -273,7 +273,7 @@ static final String[] scanpermissions=( (Build.VERSION.SDK_INT >= 31)? (new Stri
 
 static String[] hasPermissions(Context context, String[] perms) {
     var over=new ArrayList<String>();
-    Log.i(LOG_ID,"hasPermissions: ");
+    {if(doLog) {Log.i(LOG_ID,"hasPermissions: ");};};
     for(var p:perms) {
         if(ContextCompat.checkSelfPermission(context, p)!= PackageManager.PERMISSION_GRANTED) {
             over.add(p);
@@ -284,15 +284,15 @@ static String[] hasPermissions(Context context, String[] perms) {
                 }
         }
     var uit=new String[over.size()];
-    Log.i(LOG_ID,"no perm="+over.size());
+    {if(doLog) {Log.i(LOG_ID,"no perm="+over.size());};};
     return over.toArray(uit);
     }
 static String[] noPermissions(Context context) {
     String[] noperms=  hasPermissions(context, scanpermissions) ;
     if(doLog) {
-        Log.i(LOG_ID,"nopermissions:");
+        {if(doLog) {Log.i(LOG_ID,"nopermissions:");};};
         for(var el:noperms) {
-            Log.i(LOG_ID,el);
+            {if(doLog) {Log.i(LOG_ID,el);};};
             }
         }
     return noperms;
@@ -324,16 +324,16 @@ static int bluePermission() {
 public static void updateservice(Context context,boolean usebluetooth) {
         if(usebluetooth||Natives.backuphostNr( )>0) {
             if(keeprunning.start(context))
-                Log.i(LOG_ID,"updateservice: keeprunning started");
+                {if(doLog) {Log.i(LOG_ID,"updateservice: keeprunning started");};}
             else
-                Log.i(LOG_ID,"updateservice keeprunning not started="+keeprunning.started);
+                {if(doLog) {Log.i(LOG_ID,"updateservice keeprunning not started="+keeprunning.started);};};
 
             }
         else
             keeprunning.stop();
         }
 private static void dontusebluetooth() {
-    Log.i(LOG_ID,"dontusebluetooth()");
+    {if(doLog) {Log.i(LOG_ID,"dontusebluetooth()");};};
     SensorBluetooth.destructor();
     if(Natives.backuphostNr( )<=0) {
         keeprunning.stop();
@@ -363,7 +363,7 @@ static     void explicit(Context context) {
     }
 void initbluetooth(boolean usebluetooth,Context context,boolean frommain) {
     usingbluetooth=usebluetooth;
-    Log.i(LOG_ID,"initbluetooth "+usebluetooth);
+    {if(doLog) {Log.i(LOG_ID,"initbluetooth "+usebluetooth);};};
 
     if(!isWearable) {
          if(Natives.getusegarmin()&&numdata.devices==null)
@@ -375,16 +375,16 @@ void initbluetooth(boolean usebluetooth,Context context,boolean frommain) {
     if(!keeprunning.started) {
         if(usebluetooth||Natives.backuphostNr( )>0) {
             if(keeprunning.start(context))
-                Log.i(LOG_ID,"keeprunning started");
+                {if(doLog) {Log.i(LOG_ID,"keeprunning started");};}
             else
-                Log.i(LOG_ID,"keeprunning not started="+keeprunning.started);
+                {if(doLog) {Log.i(LOG_ID,"keeprunning not started="+keeprunning.started);};};
             if(frommain)
                 ((MainActivity)context).askNotify();
             }
         }
     }
 static boolean possiblybluetooth(Context context) {
-    Log.i(LOG_ID,"possiblybluetooth");
+    {if(doLog) {Log.i(LOG_ID,"possiblybluetooth");};};
 //    boolean useblue=Natives.getusebluetooth()&& hasPermissions(context, Applic.scanpermissions).length==0;
     final boolean useblue=Natives.getusebluetooth();
     ((Applic)context.getApplicationContext()).initbluetooth(useblue,context,false);
@@ -398,9 +398,9 @@ public static boolean hasip() {
 private static boolean hasonAvailable=false;
 /*
 public static void sendsettings() {
-      Log.i(LOG_ID,"sendsettings");
+      {if(doLog) {Log.i(LOG_ID,"sendsettings");};};
          if(!MessageSender.cansend()) {
-                       Log.i(LOG_ID,"!cansend()");
+                       {if(doLog) {Log.i(LOG_ID,"!cansend()");};};
             return;
             }
         var sender=tk.glucodata.MessageSender.getMessageSender();
@@ -422,7 +422,7 @@ private void initialize() {
         @Override
         public void onAvailable(Network network) {
            hasonAvailable=true;
-           Log.i(LOG_ID, "network: onAvailable(" + network+")");
+           {if(doLog) {Log.i(LOG_ID, "network: onAvailable(" + network+")");};};
            if(useWearos()||hasip()) {
              Natives.networkpresent();
              MessageSender.reinit();
@@ -435,11 +435,11 @@ private void initialize() {
         }
         @Override
         public void onUnavailable () {
-            Log.i(LOG_ID,"network: onUnavailable()");
+            {if(doLog) {Log.i(LOG_ID,"network: onUnavailable()");};};
             }
         @Override
         public void onLosing (Network network, int maxMsToLive) {
-            Log.i(LOG_ID,"network: OnLosing("+network+","+maxMsToLive+")");
+            {if(doLog) {Log.i(LOG_ID,"network: OnLosing("+network+","+maxMsToLive+")");};};
             }
         @Override
         public void onCapabilitiesChanged (Network network, NetworkCapabilities networkCapabilities) {
@@ -451,15 +451,15 @@ private void initialize() {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 aware = networkCapabilities.hasTransport(TRANSPORT_WIFI_AWARE);
             }
-            Log.i(LOG_ID, "network: onCapabilitiesChanged(" + network+"downstream "+down+" Kbps up="+up+" Kbps "+(wifi?"":"no ")+" wifi, "+(blue?"":"no ")+" bluetooth, "+(aware?"":" no ")+"WIFI aware)");
+            {if(doLog) {Log.i(LOG_ID, "network: onCapabilitiesChanged(" + network+"downstream "+down+" Kbps up="+up+" Kbps "+(wifi?"":"no ")+" wifi, "+(blue?"":"no ")+" bluetooth, "+(aware?"":" no ")+"WIFI aware)");};};
             }
         @Override
         public void onLinkPropertiesChanged (Network network, LinkProperties linkProperties) {
-            Log.i(LOG_ID, "network: onLinkPropertiesChanged("+network+", LinkProperties linkProperties) ");
+            {if(doLog) {Log.i(LOG_ID, "network: onLinkPropertiesChanged("+network+", LinkProperties linkProperties) ");};};
             }
         @Override
         public void onLost(Network network) {
-              Log.i(LOG_ID, "onLost(" + network+")");
+              {if(doLog) {Log.i(LOG_ID, "onLost(" + network+")");};};
             Natives.networkabsent();
                  MessageSender.reinit();
 //           if(hasonAvailable) 
@@ -489,10 +489,10 @@ static private final BroadcastReceiver minTimeReceiver = new BroadcastReceiver()
         }
 };
 void domintime() {
-    Log.i(LOG_ID,"TICK");
+    {if(doLog) {Log.i(LOG_ID,"TICK");};};
     if (curve != null) {
         if((curve.render.stepresult & STEPBACK) == 0) {
-            Log.i(LOG_ID,"requestRender()");
+            {if(doLog) {Log.i(LOG_ID,"requestRender()");};};
             curve.requestRender();
             if (!isWearable) {
                 numdata.sendmessages();
@@ -529,9 +529,9 @@ static boolean initproccalled=false;
 static boolean initStarted=false;
 /*
 public static void initwearos(Context app) {
-    Log.i(LOG_ID,"before new MessageSender");
+    {if(doLog) {Log.i(LOG_ID,"before new MessageSender");};};
     messagesender=new MessageSender(app);
-    Log.i(LOG_ID,"before sendnetinfo");
+    {if(doLog) {Log.i(LOG_ID,"before sendnetinfo");};};
     MessageSender.sendnetinfo();
     }*/
 static boolean dataAtStart=false;
@@ -547,7 +547,7 @@ boolean initproc() {
             initwearos(this);
             }
         needsnatives();
-        Log.i("Applic","initproc width="+initscreenwidth);
+        {if(doLog) {Log.i("Applic","initproc width="+initscreenwidth);};};
         libre3init.init();
         SuperGattCallback.init(this);
         initialize();
@@ -578,7 +578,7 @@ boolean initproc() {
     }
 
 public static void setbluetooth(Context activity,boolean on) {
-    Log.i(LOG_ID,"setbluetooth(Context activity,"+on+")");
+    {if(doLog) {Log.i(LOG_ID,"setbluetooth(Context activity,"+on+")");};};
     Natives.setusebluetooth(on);
     if(on)  {
         Applic.app.initbluetooth(on,activity,activity instanceof MainActivity);
@@ -634,12 +634,12 @@ static float headfontsize;
 static float mediumfontsize;
   static public float largefontsize;
 boolean needsnatives() {
-  Log.i(LOG_ID,"needsnatives");
+  {if(doLog) {Log.i(LOG_ID,"needsnatives");};};
   final var res=getResources();
   var metrics=GlucoseCurve.metrics= res.getDisplayMetrics();
   MainActivity.screenheight= metrics.heightPixels; 
   MainActivity.screenwidth= metrics.widthPixels;
-  Log.i(LOG_ID,"heightPixels="+GlucoseCurve.metrics.heightPixels+" widthPixels="+GlucoseCurve.metrics.widthPixels);
+  {if(doLog) {Log.i(LOG_ID,"heightPixels="+GlucoseCurve.metrics.heightPixels+" widthPixels="+GlucoseCurve.metrics.widthPixels);};};
   var newinitscreenwidth= Math.max(GlucoseCurve.metrics.heightPixels,GlucoseCurve.metrics.widthPixels);
   boolean ret;
   final float menufontsize = res.getDimension(R.dimen.abc_text_size_menu_material);
@@ -656,9 +656,9 @@ boolean needsnatives() {
     else
        ret=false;
      initscreenwidth=newinitscreenwidth;
-     Log.i(LOG_ID,"initscreenwidth="+newinitscreenwidth);
-     Log.i(LOG_ID,"menufontsize="+menufontsize);
-     Log.i(LOG_ID,"screensize="+screensize);
+     {if(doLog) {Log.i(LOG_ID,"initscreenwidth="+newinitscreenwidth);};};
+     {if(doLog) {Log.i(LOG_ID,"menufontsize="+menufontsize);};};
+     {if(doLog) {Log.i(LOG_ID,"screensize="+screensize);};};
      headfontsize = res.getDimension(R.dimen.abc_text_size_display_4_material);
      Notify.glucosesize= headfontsize*.35f;
      smallfontsize = res.getDimension(R.dimen.abc_text_size_small_material);
@@ -681,7 +681,7 @@ static boolean bluetoothEnabled() {
 static final boolean usewakelock=true;
 @Keep
 static void doglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,boolean wasblueoff,long sensorstartmsec, long sensorptr,int sensorgen) {
-   Log.i(LOG_ID,"doglucose "+SerialNumber+" "+ mgdl+" "+ gl+" "+rate+" "+ alarm+" "+timmsec+" "+ wasblueoff+ " "+ sensorstartmsec +" sensorptr="+format("%x",sensorptr)+" "+ sensorgen);
+   {if(doLog) {Log.i(LOG_ID,"doglucose "+SerialNumber+" "+ mgdl+" "+ gl+" "+rate+" "+ alarm+" "+timmsec+" "+ wasblueoff+ " "+ sensorstartmsec +" sensorptr="+format("%x",sensorptr)+" "+ sensorgen);};};
 
     var wakelock=    usewakelock?(((PowerManager) app.getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Juggluco::Applic")):null;
     if(wakelock!=null)
@@ -692,7 +692,7 @@ static void doglucose(String SerialNumber, int mgdl, float gl, float rate, int a
     SuperGattCallback.dowithglucose( SerialNumber,  mgdl,  gl, rate,  alarm,  timmsec,sensorstartmsec,Notify.glucosetimeout,sensorgen);
     if(!isWearable) {
             if(sensorptr!=0L) {
-                Log.i(LOG_ID,"sensorptr="+format("%x",sensorptr));
+                {if(doLog) {Log.i(LOG_ID,"sensorptr="+format("%x",sensorptr));};};
                 if(Build.VERSION.SDK_INT >= 28) {
                     HealthConnection.Companion.writeAll(sensorptr,SerialNumber);
                     }
@@ -738,7 +738,7 @@ static boolean updateDevices() { //Rename to reset
     } */
 
 public static void wakemirrors() {
-    Log.i(LOG_ID,"wakemirrors");
+    {if(doLog) {Log.i(LOG_ID,"wakemirrors");};};
     MessageSender.sendwake();
     Natives.wakebackup();
     }
@@ -840,12 +840,12 @@ static public void startMain() {
     intent.setAction(Intent. ACTION_MAIN ) ;
     if(act!=null) {
        intent.setFlags(Intent. FLAG_ACTIVITY_CLEAR_TOP | Intent. FLAG_ACTIVITY_SINGLE_TOP );
-        Log.i(LOG_ID,"startActivityIfNeeded( new Intent(Applic.app,MainActivity)). ");
+        {if(doLog) {Log.i(LOG_ID,"startActivityIfNeeded( new Intent(Applic.app,MainActivity)). ");};};
         act.startActivityIfNeeded( intent,0);
         }
     else {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        Log.i(LOG_ID,"startActivity MainActivity.thisone==null");
+        {if(doLog) {Log.i(LOG_ID,"startActivity MainActivity.thisone==null");};};
         keeprunning.theservice.startActivity( intent);
         }
       }

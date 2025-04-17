@@ -83,3 +83,5 @@
 #define NOTCHINESE 1
 #define USE_PROCESS 1
 //#define ENCRYPTMESSAGES 1
+
+//#define ADD_ConnectDecodeResult

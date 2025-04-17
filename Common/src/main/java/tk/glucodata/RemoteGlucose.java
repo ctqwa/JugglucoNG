@@ -27,6 +27,7 @@ import static java.lang.Float.isNaN;
 import static java.lang.String.format;
 
 import static tk.glucodata.CommonCanvas.drawarrow;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getisalarm;
 import static tk.glucodata.Notify.penmutable;
 import static tk.glucodata.Notify.stopalarmrequest;
@@ -92,7 +93,7 @@ RemoteGlucose(float gl,float notwidth,float xper,int whiteonblack,boolean giveti
    glucoseBitmap = Bitmap.createBitmap((int)notwidth, (int)notheight, Bitmap.Config.ARGB_8888);
    canvas = new Canvas(glucoseBitmap);
 
-   Log.i(LOG_ID,"timesize="+timesize+" timeHeight="+timeHeight+" glucosesize="+glucosesize+" notwidth="+notwidth+" notheight="+notheight+"color="+ format("%x",glucosePaint.getColor()));
+   {if(doLog) {Log.i(LOG_ID,"timesize="+timesize+" timeHeight="+timeHeight+" glucosesize="+glucosesize+" notwidth="+notwidth+" notheight="+notheight+"color="+ format("%x",glucosePaint.getColor()));};};
    switch(whiteonblack) {
       case 1: 
       case 2: glucosePaint.setColor(WHITE);break;
@@ -139,7 +140,7 @@ final RemoteViews arrowremote(int kind, notGlucose glucose,final boolean alarm) 
       float weightrate=0.0f,arrowy;
        weightrate = (rate > 1.6 ? -1.0f : (rate < -1.6 ? 1.0f : (rate / -1.6f)));
        arrowy = gety - useglsize * .4f + weightrate * useglsize * .4f;
-      Log.i(LOG_ID, "weightrate=" + weightrate+" arrowy="+arrowy);
+      {if(doLog) {Log.i(LOG_ID, "weightrate=" + weightrate+" arrowy="+arrowy);};};
       drawarrow(canvas, glucosePaint, usedensity, rate, getx * .85f, arrowy);
    }
 
@@ -159,7 +160,7 @@ final RemoteViews arrowremote(int kind, notGlucose glucose,final boolean alarm) 
       var timestr= minhourstr(glucose.time);
       glucosePaint.setTextSize(timesize);
       canvas.drawText(timestr, usedensity*16, gety+timeHeight, glucosePaint);
-      Log.i(LOG_ID,"time: "+timestr);
+      {if(doLog) {Log.i(LOG_ID,"time: "+timestr);};};
       }
    canvas.setBitmap(glucoseBitmap);
    remoteViews.setImageViewBitmap(arrowandvalue, glucoseBitmap);

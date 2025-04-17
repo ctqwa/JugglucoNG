@@ -77,9 +77,9 @@ AlgorithmContext *vers(initAlgorithm)(const char *shortname) {
     LOGGER("getAlgorithmVersion()=%s\n",version);
     jobject jalg= vers(getAlgorithmContextFromNative)(subenv,nullptr);
     version = (char *)vers(getAlgorithmVersion)(subenv,nullptr);
-    LOGGER("getAlgorithmVersion()=%s\n",version);
+    LOGGER("getAlgorithmVersion()=%s  algcontext=%p\n",version,jalg);
     int res = vers(initAlgorithmContext)(subenv,nullptr,jalg, 0, reinterpret_cast<jstring>((char *)shortname));
-    if(res != 1) {
+    if(res != 1 ) {
         LOGGER("initAlgorithmContext(algcontext,0,%s)==%d\n",shortname,res);
         return nullptr;
     }
@@ -93,9 +93,25 @@ AlgorithmContext *vers(initAlgorithm)(SensorGlucoseData *sens, setjson_t setjson
     char *shortname=sens->getinfo()->siBlueToothNum;
     int res = vers(initAlgorithmContext)(subenv,nullptr,jalg, 0, reinterpret_cast<jstring>(shortname));
     if(res != 1) {
-        LOGGER("initAlgorithmContext(algcontext,0,%s)==%d\n",shortname,res);
-        return nullptr;
-    }
+        const char *shortname;
+        if(sens->notchinese()) {
+            const int sub=sens->siSubtype();
+            if(sub==1) {
+                 shortname="YMWD016F";
+                 }
+            else {
+                shortname="YEZ1450H";
+                }
+            }
+        else  {
+            shortname="GEPD802J";
+            }
+        res = vers(initAlgorithmContext)(subenv,nullptr,jalg, 0, reinterpret_cast<jstring>(const_cast<char *>(shortname)));
+        if(res!=1) {
+            LOGGER("initAlgorithmContext(algcontext,0,%s)==%d\n",shortname,res);
+            return nullptr;
+            }
+       }
     auto algcontext=reinterpret_cast<AlgorithmContext *>(jalg);
 //     loadjson(sens, sens->vers(statefile).data(),algcontext,setjson); 
      loadjson(sens, sens->statefile.data(),algcontext,setjson); 

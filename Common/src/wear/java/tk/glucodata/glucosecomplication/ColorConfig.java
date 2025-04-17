@@ -27,6 +27,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.Layout.getMargins;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getComplicationArrowColor;
 import static tk.glucodata.Natives.getComplicationBackgroundColor;
 import static tk.glucodata.Natives.getComplicationTextBorderColor;
@@ -192,7 +193,7 @@ static public void showcolors(MainActivity act,CheckBox def) {
       var width=GlucoseCurve.getwidth();
       final var preview=new ImageView(act);
       AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor, c-> {
-         Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));
+         {if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
          setcolor(coltype,c);
          def.setChecked(false);
 	  if(coltype==2) {
@@ -229,15 +230,15 @@ static public void showcolors(MainActivity act,CheckBox def) {
 			var newup=(float)(progress/1000.0);
 		//	GlucoseValue.upperboundfontsize =(newup>0.99f)?1000.0f:(newup*glview.fontsize);
             GlucoseValue.fontFraction=newup;
-			Log.i(LOG_ID,"onProgressChanged "+progress+" "+glview.fontFraction);
+			{if(doLog) {Log.i(LOG_ID,"onProgressChanged "+progress+" "+glview.fontFraction);};};
 			}
 		@Override
 		public void onStartTrackingTouch(SeekBar seekBar) {
-			Log.i(LOG_ID,"onStartTrackingTouch");
+			{if(doLog) {Log.i(LOG_ID,"onStartTrackingTouch");};};
 			}
 		@Override
 		public void onStopTrackingTouch(SeekBar seekBar) {
-			Log.i(LOG_ID,"onStopTrackingTouch");
+			{if(doLog) {Log.i(LOG_ID,"onStopTrackingTouch");};};
 			glview.clear();
 			preview.setImageBitmap(glview.previewbitmap());
 			}

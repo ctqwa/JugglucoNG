@@ -21,6 +21,7 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.info;
 import static tk.glucodata.Log.showbytes;
 
@@ -67,7 +68,7 @@ public boolean initECDH(byte[] op,int level) {
 
 public	boolean setPatchCertificate(byte[] input)  {
 	if(input==null) {
-		Log.i(LOG_ID,"setPatchCertificate input=null");
+		{if(doLog) {Log.i(LOG_ID,"setPatchCertificate input=null");};};
 		return false;
 		}
        showbytes(LOG_ID+"setPatchCertificate#"+input.length,input);

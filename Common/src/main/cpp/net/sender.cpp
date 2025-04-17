@@ -389,7 +389,7 @@ bool activate=true;
                      savemessage(pass,"connection has on %d ips\n",nr);
                      return -1;
                      }
-             if(nr>=maxip) {
+             if(nr>=passhost_t::maxip) {
                      pass->nr=0;
                      savemessage(pass,"connection has on %d ips\n",nr);
                      return -1;

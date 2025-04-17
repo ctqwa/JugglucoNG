@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -29,7 +31,7 @@ public class ConnectReceiver extends BroadcastReceiver {
 static final private String LOG_ID="ConnectReceiver";
         @Override
   public void onReceive(Context context, Intent intent) {
-      Log.i(LOG_ID,"onReceive ");
+      {if(doLog) {Log.i(LOG_ID,"onReceive ");};};
       var blue=SensorBluetooth.blueone;
       if(blue!=null) {
         String id=intent.getAction();

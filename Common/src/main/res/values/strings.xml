@@ -353,9 +353,14 @@
  <string name="hour12">12h</string>
 <string name="complications">Complications</string>
     <string name="colors_style_setting_description">Watchface color</string>
+
    <string name="glucosenumbercomplicationlabel">Glucose value</string>
    <string name="glucosearrowcomplicationlabel">Glucose arrow</string>
    <string name="glucosearrowvaluecomplicationlabel">Value + arrow</string>
+ <string name="glucosevalueiconcomplicationlabel">Glucose Value small</string>
+ <string name="glucosearrowiconcomplicationlabel">Glucose Arrow small</string>
+ <string name="glucoseshortcomplicationlabel">Value + arrow small</string>
+
    <string name="text">Text</string>
    <string name="arrow">Arrow</string>
    <string name="notalldata">WARNING: “Receive from” not set, without sending all data.</string>
@@ -382,5 +387,12 @@
     <string name="eusibionics">EU Sibionics - com.sisensing.sijoy</string>
     <string name="chsibionics">Chinese Sibionics - com.sisensing.sisensingcgm</string>
     <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
+    <string name="sibionics2">Sibionics2 - com.sisensing.eco</string>
+    <string name="datapresent">"Data present: "</string>
+    <string name="overwrite">Overwrite?</string>
+    <string name="autoqr">Auto QR</string>
+    <string name="autoqrmessage">
+Send data from this phone to another phone on your home network.
+Pressing OK will generate a connection on this phone and display a QR code that can be scanned by another Android device. Scanning the QR code with left menu→Photo on the other phone will generate a connection, by which it will receive all data from this phone.</string>
     
 </resources>

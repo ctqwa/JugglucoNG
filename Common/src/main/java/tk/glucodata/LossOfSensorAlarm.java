@@ -32,12 +32,13 @@ import android.os.Build;
 import static android.app.AlarmManager.RTC_WAKEUP;
 import static android.app.PendingIntent.getBroadcast;
 import static android.content.Context.ALARM_SERVICE;
+import static tk.glucodata.Log.doLog;
 
 public class LossOfSensorAlarm extends BroadcastReceiver {
 static final private String LOG_ID="LossOfSensorAlarm";
 @Override
 public void onReceive(Context context, Intent intent) {
-       Log.i(LOG_ID,"onReceive ");
+       {if(doLog) {Log.i(LOG_ID,"onReceive ");};};
        Applic app=(Applic) context.getApplicationContext();
        app.initproc();
        SuperGattCallback.init(app);
@@ -65,7 +66,7 @@ static    void setalarm(Context context, long alarmtime) {
     try {
         alarmtime+=20*1000;
         mkintents(context);
-        Log.i(LOG_ID,"setalarm "+alarmtime);
+        {if(doLog) {Log.i(LOG_ID,"setalarm "+alarmtime);};};
         final int type=RTC_WAKEUP;
 //        AlarmManager.ELAPSED_REALTIME_WAKEUP or AlarmManager.RTC_WAKEUP as the alarm type.
 
@@ -82,13 +83,13 @@ static    void setalarm(Context context, long alarmtime) {
            Log.stack(LOG_ID,"setalarm", e);
            }
     finally {
-        Log.i(LOG_ID,"after setalarm");
+        {if(doLog) {Log.i(LOG_ID,"after setalarm");};};
         }
     }
 
 static void cancelalarm() {
     if(onalarm!=null) {
-        Log.i(LOG_ID,"cancelalarm");
+        {if(doLog) {Log.i(LOG_ID,"cancelalarm");};};
         Notify.shownovalue();
         AlarmManager manager= (AlarmManager) Applic.app.getSystemService(ALARM_SERVICE);
         manager.cancel(onalarm);

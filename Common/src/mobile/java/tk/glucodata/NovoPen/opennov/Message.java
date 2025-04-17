@@ -1,5 +1,6 @@
 package tk.glucodata.NovoPen.opennov;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NovoPen.opennov.mt.Apdu.ApduType.AareApdu;
 import static tk.glucodata.NovoPen.opennov.mt.Apdu.ApduType.AarqApdu;
 import static tk.glucodata.NovoPen.opennov.mt.Apdu.ApduType.AbrtApdu;
@@ -162,9 +163,9 @@ private final static String LOG_ID="OpenNovMessage";
     }
 
     public byte[] getAResponse() {
-    	Log.i(LOG_ID,"getAResponse()");
+    	{if(doLog) {Log.i(LOG_ID,"getAResponse()");};};
         var apdu = Apdu.builder().at(Apdu.ApduType.AareApdu).choicePayload(new AResponse(context.aRequest).encode()).build();
-    	Log.i(LOG_ID,"getAResponse() return");
+    	{if(doLog) {Log.i(LOG_ID,"getAResponse() return");};};
         return apdu.encode();
     }
 

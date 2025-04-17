@@ -40,15 +40,15 @@
 #include "netstuff.hpp"
 extern bool testhostname(const char *hostname,const struct sockaddr *addr);
 extern bool sameaddress(const  struct sockaddr *addr, const struct sockaddr_in6  *known);
-constexpr const int maxip=4;
 
-//union { struct sockaddr_in6 ips[maxip];
-constexpr const int maxhostname=sizeof(sockaddr_in6)*(maxip-1)-sizeof(uint16_t);
-struct hostnamedata {
-	uint16_t port; //host byte order
-	char name[maxhostname];
-	};
+//union { struct sockaddr_in6 ips[passhost_t::maxip];
 struct passhost_t {
+inline static constexpr const int maxip=4;
+struct hostnamedata {
+    static constexpr const int maxhostname=sizeof(sockaddr_in6)*(passhost_t::maxip-1)-sizeof(uint16_t);
+    uint16_t port; //host byte order
+    char name[maxhostname];
+};
 inline static constexpr const int maxnamelen=16;
 	struct sockaddr_in6 ips[maxip];
 static_assert(sizeof(ips)==(sizeof(hostnamedata)+sizeof(sockaddr_in6)));
@@ -192,6 +192,7 @@ bool putip(const struct sockaddr *addrptr) {
 	return true;
 	};
 };
+
 #include <string_view>
 extern void startreceiver(const char *port, passhost_t *hosts,int &hostlen,int *socks) ;
 extern void stopreceiver() ;

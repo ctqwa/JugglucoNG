@@ -38,6 +38,7 @@ import static java.lang.String.format;
 
 import static tk.glucodata.CommonCanvas.drawarrow;
 import static tk.glucodata.CommonCanvas.drawarrowcircle;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Notify.unitlabel;
 import static tk.glucodata.glucosecomplication.ColorConfig.defcol;
 
@@ -104,7 +105,7 @@ GlucoseValue(int w,int h) {
    //     numoffy=mapwidth*0.1f;
       }
 
-   Log.i(LOG_ID,"fontsize="+fontsize+" timesize="+timesize);
+   {if(doLog) {Log.i(LOG_ID,"fontsize="+fontsize+" timesize="+timesize);};};
 
 
 	glucosePaint.setAntiAlias(true);
@@ -112,7 +113,7 @@ GlucoseValue(int w,int h) {
 	glucoseBitmap = Bitmap.createBitmap((int)mapwidth, (int)mapheight, Bitmap.Config.ARGB_8888);
 	canvas = new Canvas(glucoseBitmap);
 
-	Log.i(LOG_ID," mapwidth="+mapwidth+" mapheight="+mapheight+"color="+ format("%x",glucosePaint.getColor()));
+	{if(doLog) {Log.i(LOG_ID," mapwidth="+mapwidth+" mapheight="+mapheight+"color="+ format("%x",glucosePaint.getColor()));};};
 //   glucosePaint.setColor(WHITE);
    final var basistype=Typeface.SANS_SERIF;
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -154,7 +155,7 @@ float  drawcenter(String value) {
        glucosePaint.setTextSize(usefontsize);
        var des=glucosePaint.descent();
        var as=glucosePaint.ascent();
-       Log.i(LOG_ID,"descent()="+des+" ascent()="+as+" fontsize="+fontsize);
+       {if(doLog) {Log.i(LOG_ID,"descent()="+des+" ascent()="+as+" fontsize="+fontsize);};};
        var y = half - (des + as)*.5f;
        canvas.drawText(value,0,value.length(),half,y,glucosePaint);
        return fsize;
@@ -171,8 +172,16 @@ Bitmap getnovalue() {
     return glucoseBitmap;
     }
 
-void setNumberBitmap(String value,long time,int index) {
-      Log.i(LOG_ID,"setNumberBitmap "+value);
+    /*Bitmap getValueOnlyBitmap(String value,long time,int index) {
+        if(doLog) {Log.i(LOG_ID,"getValueOnlyBitmap "+value);};;
+        setbackground();
+        glucosePaint.setColor(getTextColor());
+        fontsize=drawcenter(value);
+        return glucoseBitmap;
+    }
+*/
+    void setNumberBitmap(String value,long time,int index) {
+      {if(doLog) {Log.i(LOG_ID,"setNumberBitmap "+value);};};
       if(index>=0) {
               glucosePaint.setTextSize(timesize);
              if(index!=0) {
@@ -200,9 +209,9 @@ Bitmap getNumberBitmap(String value,long time,int index,long now) {
 
 Bitmap getArrowBitmap(Float rate) {
    setbackground();
-	Log.i(LOG_ID,"getBitmap");
+	{if(doLog) {Log.i(LOG_ID,"getBitmap");};};
 	if(isNaN(rate)) {
-		Log.i(LOG_ID,"rate=nan");
+		{if(doLog) {Log.i(LOG_ID,"rate=nan");};};
       		mknovalue();
 	} else {
       glucosePaint.setColor(getArrowColor());
@@ -215,12 +224,12 @@ Bitmap getArrowBitmap(Float rate) {
 Bitmap getArrowBitmap() {
    var glucose = Natives.lastglucose();
    if(glucose==null) {
-     Log.d(LOG_ID,"lastglucose()==null");
+     {if(doLog) {Log.d(LOG_ID,"lastglucose()==null");};};
       return getnovalue();
       }
 
     if((System.currentTimeMillis()-(glucose.time*1000L))>=tk.glucodata.Notify.glucosetimeout) {
-         Log.d(LOG_ID,"oldvalue "+glucose.time);
+         {if(doLog) {Log.d(LOG_ID,"oldvalue "+glucose.time);};};
          return getnovalue();
          }
     return getArrowBitmap(glucose.rate);
@@ -259,6 +268,36 @@ Bitmap getArrowValueBitmap(String value,long time,int index,float rate) {
    setNumberBitmap(value,time, index);
    return glucoseBitmap;
    }
+Bitmap getArrowTimeBitmap(long time,float rate) {
+   final var now = System.currentTimeMillis();
+   if((now-time)>=tk.glucodata.Notify.glucosetimeout) {
+       return getnovalue();
+      }
+   setbackground();
+    if(doLog) 
+            Log.i(LOG_ID,"getArrowTimeBitmap($time,$rate)");
+    if(isNaN(rate)) {
+         if(doLog) {Log.i(LOG_ID,"rate=nan");}
+        mknovalue();
+       } 
+   else {
+      glucosePaint.setColor(getArrowColor());
+      drawarrowcircle(canvas,glucosePaint,density,rate);
+      final var timestr=tk.glucodata.NumberView.minhourstr(time);
+      final var len= timestr.length();
+      final var h=mapheight-timeoffy;
+      glucosePaint.setTextSize(timesize*1.8f);
+
+      glucosePaint.setTypeface(boldtype);
+      glucosePaint.setColor(getBackgroundColor( ));
+      canvas.drawText(timestr,0,len,half,h,glucosePaint);
+
+      glucosePaint.setColor(getTextColor());
+      glucosePaint.setTypeface(normaltype);
+      canvas.drawText(timestr,0,len,half,h,glucosePaint);
+      }
+ return glucoseBitmap;
+   }
 
 
 Bitmap previewbitmap() {
@@ -286,6 +325,9 @@ static public void updateall() {
 	ArrowValueDataSourceService.Companion.update();
 	NumberDataSourceService.Companion.update();
 	ArrowDataSourceService.Companion.update();
-     	}
+    IconValueDataSourceService.Companion.update();
+    IconArrowDataSourceService.Companion.update();
+    ShortArrowValueDataSourceService.Companion.update();
+    }
 
 }

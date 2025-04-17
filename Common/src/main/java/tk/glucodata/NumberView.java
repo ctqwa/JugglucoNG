@@ -73,6 +73,7 @@ import static java.lang.System.currentTimeMillis;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.systemtimeformat;
 import static tk.glucodata.GlucoseCurve.mktime;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.systembarLeft;
 import static tk.glucodata.MainActivity.systembarRight;
 import static tk.glucodata.RingTones.EnableControls;
@@ -283,7 +284,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
    layout=new Layout(context, (lay, w, h) -> {
         int wid=GlucoseCurve.getwidth()- systembarRight;
         if(!smallScreen) {
-            Log.i(LOG_ID,"no smallScreen");
+            {if(doLog) {Log.i(LOG_ID,"no smallScreen");};};
             int hei=GlucoseCurve.getheight();
                if(wid>hei) {
                   int minleft=systembarLeft*3/4;
@@ -324,7 +325,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
                 }
             }
         else {
-            Log.i(LOG_ID,"smallScreen");
+            {if(doLog) {Log.i(LOG_ID,"smallScreen");};};
             if(wid>w)
                 lay.setX((wid - w)/2);
               lay.setY(MainActivity.systembarTop*3/4);
@@ -517,7 +518,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
         datebutton.setTextColor( Color.YELLOW);
          newmealptr[0]=tmpmealptr;
         mealview[0]=null;
-        Log.i(LOG_ID,"onClick");
+        {if(doLog) {Log.i(LOG_ID,"onClick");};};
         menucall.onClick(mealbutton);
     //    setmealbutton(type,bron, tmpmealptr) ;
 
@@ -706,10 +707,10 @@ Layout getdateview(MainActivity activity) {
 
 
 public Layout getdateviewal(MainActivity activity, long date, Dater erdate) {
-Log.i(LOG_ID, "getdateviewal");
+{if(doLog) {Log.i(LOG_ID, "getdateviewal");};};
     dater=erdate;
     if(datepicker==null) {
-    Log.i(LOG_ID, " new");
+    {if(doLog) {Log.i(LOG_ID, " new");};};
     datepick =new DatePicker(activity);
     datepick.setCalendarViewShown(false);
         Button cancel=new Button(activity);
@@ -769,7 +770,7 @@ Log.i(LOG_ID, "getdateviewal");
        activity.addContentView(datepicker, new ViewGroup.LayoutParams(laypar,laypar));
     }
     else {
-    Log.i(LOG_ID, " old");
+    {if(doLog) {Log.i(LOG_ID, " old");};};
         datepicker.setVisibility(VISIBLE);
     datepicker.bringToFront();
     }
@@ -887,7 +888,7 @@ else {
                     else {
                         int x=(wid-w)/2;
                         lay.setX(x);
-                        Log.i(LOG_ID,"screen width="+wid+" w="+w+" x="+x);
+                        {if(doLog) {Log.i(LOG_ID,"screen width="+wid+" w="+w+" x="+x);};};
                         }
                     if(isWearable) {
                         int height = GlucoseCurve.getheight();
@@ -943,7 +944,7 @@ pick.setCurrentMinute(minin);
 LabelAdapter<String> numspinadapt;
 
 void setmealbutton(int labelsel,int bron,int mealptr) {
-       Log.i(LOG_ID,"bron="+bron+" mealptr="+mealptr);
+       {if(doLog) {Log.i(LOG_ID,"bron="+bron+" mealptr="+mealptr);};};
         if(labelsel==Natives.getmealvar() &&(bron==1|| mealptr>0)) {
         mealbutton.setVisibility(VISIBLE);
         source.setVisibility(GONE);
@@ -1018,7 +1019,7 @@ static View.OnTouchListener ontouchedit= new View.OnTouchListener() {
 
         @Override
         public boolean onTouch(View v, MotionEvent event) {
-    Log.v(LOG_ID,"ontouchedit");
+    {if(doLog) {Log.v(LOG_ID,"ontouchedit");};};
             v.onTouchEvent(event);
 //      EditText ed= (EditText)v; editfocus.setedit(ed.getText());
 
@@ -1107,10 +1108,10 @@ Layout getkeyboard(Context context) {
     if(curve!=null)  {
         hei=curve.getHeight();
         wid=curve.getWidth();
-        Log.i(LOG_ID,"height="+height+" hei="+hei);
+        {if(doLog) {Log.i(LOG_ID,"height="+height+" hei="+hei);};};
         }
     else {
-        Log.i(LOG_ID,"only height="+height);
+        {if(doLog) {Log.i(LOG_ID,"only height="+height);};};
         hei=height;
         wid=width;
         }*/
@@ -1185,7 +1186,7 @@ public static void avoidSpinnerDropdownFocus(Spinner spinner) {
         listPopupField.setAccessible(true);
         Object listPopup = listPopupField.get(spinner);
         if (listPopup instanceof ListPopupWindow) {
-    /*        Log.i("SPINNER","listpopupwin="+ ((ListPopupWindow) listPopup).getAnimationStyle());
+    /*        {if(doLog) {Log.i("SPINNER","listpopupwin="+ ((ListPopupWindow) listPopup).getAnimationStyle());};};
             ((ListPopupWindow) listPopup).setAnimationStyle(0);*/
             Field popupField = ListPopupWindow.class.getDeclaredField("mPopup");
             popupField.setAccessible(true);
@@ -1193,7 +1194,7 @@ public static void avoidSpinnerDropdownFocus(Spinner spinner) {
             if (popup instanceof PopupWindow) { {
           PopupWindow popupwin=(PopupWindow) popup;
                   popupwin.setFocusable(false);
-//          Log.i("SPINNER","popanim="+popupwin.getAnimationStyle());
+//          {if(doLog) {Log.i("SPINNER","popanim="+popupwin.getAnimationStyle());};};
         }
             }
         }

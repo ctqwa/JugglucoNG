@@ -47,11 +47,13 @@ import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.GlucoseCurve.getheight;
 import static tk.glucodata.GlucoseCurve.getwidth;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.systembarBottom;
 import static tk.glucodata.MainActivity.systembarLeft;
 import static tk.glucodata.MainActivity.systembarRight;
 import static tk.glucodata.MainActivity.systembarTop;
 import static tk.glucodata.Natives.canSendNumbers;
+import static tk.glucodata.Natives.dolog;
 import static tk.glucodata.Natives.setlibrenum;
 import static tk.glucodata.RingTones.EnableControls;
 import static tk.glucodata.help.hidekeyboard;
@@ -137,6 +139,7 @@ void sendoptions(View labelview,int pos) {
         }
     final int[] newid={wasid};
     group.setOnCheckedChangeListener( (gr,id)-> {
+           if(doLog)
                 tk.glucodata.Log.i(LOG_ID, "id="+id);
             save.setVisibility(VISIBLE);
                 if(foodid==id) {

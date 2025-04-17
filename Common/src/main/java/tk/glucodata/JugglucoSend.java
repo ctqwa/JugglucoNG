@@ -25,6 +25,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getxDripTrendName;
 
 public class JugglucoSend   {
@@ -55,14 +56,14 @@ public static  void setreceivers() {
 static void broadcastglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec) {
 	if(names==null)
 		return;
-	Log.i(LOG_ID,"broadcastglucose "+gl+" rate="+rate);
+	{if(doLog) {Log.i(LOG_ID,"broadcastglucose "+gl+" rate="+rate);};};
         final Context context=Applic.app;
         Intent intent = new Intent(ACTION);
 	intent.putExtras(mkGlucosebundle(SerialNumber, mgdl, gl, rate, alarm,timmsec));
 	intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 	for(var name:names) {
 		if(name!=null) {
-		      Log.i(LOG_ID,name);
+		      {if(doLog) {Log.i(LOG_ID,name);};};
 	      	      intent.setPackage(name);
 		      context.sendBroadcast(intent);
 		      }
@@ -70,7 +71,7 @@ static void broadcastglucose(String SerialNumber, int mgdl, float gl, float rate
 	}
 	/*
 static void broadcastglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec) {
-	Log.i(LOG_ID,"broadcastglucose "+gl+" rate="+rate);
+	{if(doLog) {Log.i(LOG_ID,"broadcastglucose "+gl+" rate="+rate);};};
         final Context context=Applic.app;
         Intent intent = new Intent(ACTION);
 	intent.putExtras(mkGlucosebundle(SerialNumber, mgdl, gl, rate, alarm,timmsec));
@@ -79,7 +80,7 @@ static void broadcastglucose(String SerialNumber, int mgdl, float gl, float rate
 	   for(var resolveInfo : receivers) {
 	   	String name=resolveInfo.activityInfo.packageName;
 		if(name!=null) {
-			Log.i(LOG_ID,name);
+			{if(doLog) {Log.i(LOG_ID,name);};};
 	      		intent.setPackage(name);
 		      context.sendBroadcast(intent);
 		      }

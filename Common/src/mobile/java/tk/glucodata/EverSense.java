@@ -22,6 +22,8 @@
 package tk.glucodata;
 
 //import androidx.annotation.Keep;
+import static tk.glucodata.Log.doLog;
+
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -44,7 +46,7 @@ public static  void setreceivers() {
 	for(var name:names) {
 		intent.setPackage(name);
 		context.sendBroadcast(intent);
-		Log.i(LOG_ID,"send to "+name);
+		{if(doLog) {Log.i(LOG_ID,"send to "+name);};};
 		}
     }
 

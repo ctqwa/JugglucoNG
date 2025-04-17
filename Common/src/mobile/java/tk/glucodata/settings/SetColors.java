@@ -42,6 +42,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.usedlocale;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.settings.Settings.removeContentView;
 
 public class SetColors {
@@ -65,7 +66,7 @@ static void show(MainActivity act) {
     int width=GlucoseCurve.getwidth();
     int height=GlucoseCurve.getheight();
     AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor,c-> {
-        Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));
+        {if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
             Natives.setlastcolor(c);
             tk.glucodata.Applic.app.redraw();
         }, v-> {
@@ -77,8 +78,8 @@ static void show(MainActivity act) {
      else {
         afx=afy=0;
          }
-     Log.i(LOG_ID, "Color systembarTop="+afy);
-     Log.i(LOG_ID, "Color systembarLeft="+afx);
+     {if(doLog) {Log.i(LOG_ID, "Color systembarTop="+afy);};};
+     {if(doLog) {Log.i(LOG_ID, "Color systembarLeft="+afx);};};
      if(isWearable) {
          int h=v.getMeasuredHeight();    
          int w=v.getMeasuredWidth();    
@@ -126,7 +127,7 @@ static void show(MainActivity act) {
 
 /*
 static void show(MainActivity act, int initialColor ) {
-    Log.i(LOG_ID,"show");
+    {if(doLog) {Log.i(LOG_ID,"show");};};
     String mess="Hallo";
         AlertDialog.Builder builder = new AlertDialog.Builder(act);
         builder.setTitle("Niets?").

@@ -299,7 +299,7 @@ static bool hasDirectWatchConnection(const passhost_t *wearhost) {
 0: don't change
 */
 
-extern        int getownips(struct sockaddr_in6 *outips,int max,bool &) ;
+template<typename OUTTYPE> int getownips(OUTTYPE *outips,int max,bool &) ;
 
 
 
@@ -336,6 +336,16 @@ static uLong crcs[maxallhosts]={};
 bool wearmessages[maxallhosts]={};
 #endif
 
+
+extern void makepass(char *pass,int len);
+void makepass(char *pass,int len) {
+             constexpr const auto mkchar=[](uint8_t get) { return get%95+32; };
+             uint8_t ran[len];
+             makerandom(ran,len);
+             for(int i=0;i<len;i++) {
+                pass[i]=mkchar(ran[i]);
+                }
+          }
 static bool sendpass=false;
 extern "C" JNIEXPORT  jbyteArray  JNICALL   fromjava(getmynetinfo)(JNIEnv *env, jclass cl,jstring jident,jboolean create,jint watchHasSensor,jboolean galaxy) {
 
@@ -367,7 +377,7 @@ extern "C" JNIEXPORT  jbyteArray  JNICALL   fromjava(getmynetinfo)(JNIEnv *env, 
     info.setpass=false;;
     if(usedversion) {
         bool haswlan;
-        info.nr=getownips(info.ips,maxip-1,haswlan);
+        info.nr=getownips(info.ips,passhost_t::maxip-1,haswlan);
 
         LOGGERTAG("send %d ips:\n",info.nr);
         for(int i=0;i<info.nr;i++) {
@@ -466,14 +476,17 @@ extern "C" JNIEXPORT  jbyteArray  JNICALL   fromjava(getmynetinfo)(JNIEnv *env, 
         setsendinfo(info,wearhost);
         if(usedversion>=4) {
             if(!wearhost->haspass()) {
+
                  char pass[17];
+                 /*
                  constexpr const auto mkchar=[](uint8_t get) { return get%95+32; };
                  uint8_t ran[16];
                  makerandom(ran,16);
                  for(int i=0;i<16;i++) {
                     pass[i]=mkchar(ran[i]);
                     }
-                    
+                  */  
+                 makepass(pass,16);
 //                 makerandom(info.pass.data(),info.pass.size());
 //                 strcpy((char *)info.pass.data(),pass);
                  LOGGER("create pass %s\n",pass);

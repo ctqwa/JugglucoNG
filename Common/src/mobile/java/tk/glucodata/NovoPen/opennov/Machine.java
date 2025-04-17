@@ -1,5 +1,6 @@
 package tk.glucodata.NovoPen.opennov;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NovoPen.opennov.BaseMessage.d;
 import static tk.glucodata.NovoPen.opennov.FSA.Action.WRITE_READ;
 import static tk.glucodata.Natives.oldnovopenvalue;
@@ -33,13 +34,13 @@ public class Machine {
 
         public State next() {
             var newState = values[(this.ordinal() + 1) % values.length];
-            Log.d(TAG, "Asking for next state " + this + " -> " + newState);
+            {if(doLog) {Log.d(TAG, "Asking for next state " + this + " -> " + newState);};};
             return newState;
         }
     }
 
     FSA processPayload(final byte[] payload) {
-        if (d) Log.d(TAG, "state: " + state + " processing payload: " + HexDump.dumpHexString(payload));
+        if (d) {if(doLog) {Log.d(TAG, "state: " + state + " processing payload: " + HexDump.dumpHexString(payload));};};
         if (payload != null) {
             var msg = Message.parse(context, payload);
             if (!msg.getContext().isError()) {
@@ -53,9 +54,9 @@ public class Machine {
     }
 
     FSA processState(final Message msg) {
-        Log.d(TAG, "Processing state: " + state);
+        {if(doLog) {Log.d(TAG, "Processing state: " + state);};};
         if (msg.getContext().wantsRelease()) {
-            Log.d(TAG, "Remote end requests release");
+            {if(doLog) {Log.d(TAG, "Remote end requests release");};};
             return doCloseDown(msg);
         }
         switch (state) {
@@ -74,44 +75,44 @@ public class Machine {
                     state = state.next();
                     return new FSA(WRITE_READ, msg.getAcceptConfig());
                 } else {
-                    Log.d(TAG, "Configuration not as expected");
+                    {if(doLog) {Log.d(TAG, "Configuration not as expected");};};
                 }
             } else {
-                Log.d(TAG, "Configuration not found");
+                {if(doLog) {Log.d(TAG, "Configuration not found");};};
             }
             break;
         case ASK_INFORMATION: 
-            Log.d(TAG, "Ask information");
+            {if(doLog) {Log.d(TAG, "Ask information");};};
             state = state.next();
             return new FSA(WRITE_READ, msg.getAskInformation());
         case AWAIT_INFORMATION: 
-            Log.d(TAG, "Await information");
+            {if(doLog) {Log.d(TAG, "Await information");};};
             if (context.specification == null) {
-                Log.d(TAG, "Failed to acquire specification - trying again");
+                {if(doLog) {Log.d(TAG, "Failed to acquire specification - trying again");};};
                 return new FSA(WRITE_READ, msg.getAskInformation());
             }
 //            lastSuccessCache = wasLastReadSuccess();
             state = state.next();
             return new FSA(WRITE_READ, msg.getConfirmedAction());
         case AWAIT_STORAGE_INFO: 
-            Log.d(TAG, "Await storage information");
+            {if(doLog) {Log.d(TAG, "Await storage information");};};
             return handleNextSegment(msg);
         case AWAIT_XFER_CONFIRM: 
-            Log.d(TAG, "Await transfer information");
+            {if(doLog) {Log.d(TAG, "Await transfer information");};};
             if (msg.getLength() != 0) {
                 if (context.trigSegmDataXfer != null && context.trigSegmDataXfer.isOkay()) {
                     context.trigSegmDataXfer = null; // clear for next
                     state = state.next();
                 } else {
-                    Log.d(TAG, "Transfer information not right - trying again");
+                    {if(doLog) {Log.d(TAG, "Transfer information not right - trying again");};};
                     return handleNextSegment(msg);
                 }
             } else {
-                Log.d(TAG, "Didn\'t get anything - trying again in state: " + state);
+                {if(doLog) {Log.d(TAG, "Didn\'t get anything - trying again in state: " + state);};};
             }
             return FSA.writeNull();
         case AWAIT_LOG_DATA: 
-            Log.d(TAG, "Await Log data: msize:" + msg.getLength());
+            {if(doLog) {Log.d(TAG, "Await Log data: msize:" + msg.getLength());};};
             if (msg.getLength() == 0) return FSA.writeNull();
             if (context.eventReport.count > 0) {
                 setLastReadSuccess(false); // started receiving data
@@ -123,17 +124,17 @@ public class Machine {
             var  doses=opcontext.doses;
             OpContext.Doses dose;
             if(opcontext.specification != null && (serial = opcontext.specification.getSerial())!= null && serial.length() > 3 && (er.count == 0 || (doses.size()>0&&(dose=doses.get(doses.size()-1))!=null&&oldnovopenvalue(dose.referencetime,serial,dose.rawdoses)))) {
-                Log.d(TAG, "No new data so requesting close");
+                {if(doLog) {Log.d(TAG, "No new data so requesting close");};};
                 setLastReadSuccess(true); // completed receiving data
                 return doCloseDown(msg);
             }
         }
             var tsil = msg.getContext().segmentInfoList;
             if (currentSegmentCount == (er.index + er.count)) {
-                Log.d(TAG, "Segment " + er.instance + " complete @ " + currentSegmentCount);
+                {if(doLog) {Log.d(TAG, "Segment " + er.instance + " complete @ " + currentSegmentCount);};};
                 tsil.markProcessed(er.instance);
                 if (!tsil.hasUnprocessed()) {
-                    Log.d(TAG, "All segments processed");
+                    {if(doLog) {Log.d(TAG, "All segments processed");};};
                     setLastReadSuccess(true); // completed receiving data
                 } else {
                     Log.e(TAG, "Segments remain unprocessed");
@@ -145,7 +146,7 @@ public class Machine {
 
         case AWAIT_CLOSE_DOWN: 
             if (msg.isClosed()) {
-                Log.d(TAG, "Closed down successfully");
+                {if(doLog) {Log.d(TAG, "Closed down successfully");};};
                 return FSA.empty();
             } else {
                 Log.e(TAG, "Didn\'t close down this time");
@@ -172,12 +173,12 @@ public class Machine {
                 currentSegment = sil.getNextUnprocessedId();
                 state = State.AWAIT_XFER_CONFIRM;
                 if (currentSegment >= 0) {
-                    Log.d(TAG, "Requesting next segment: " + currentSegment);
+                    {if(doLog) {Log.d(TAG, "Requesting next segment: " + currentSegment);};};
                     currentSegmentCount = sil.getNextUnprocessedCount();
                     return FSA.writeRead(msg.getXferAction(currentSegment));
                 } else {
                     // no more segments
-                    Log.d(TAG, "No more segments");
+                    {if(doLog) {Log.d(TAG, "No more segments");};};
                     return doCloseDown(msg);
                 }
             } else {
@@ -189,7 +190,7 @@ public class Machine {
 
 
     private void setLastReadSuccess(final boolean result) {
-            Log.i(TAG,"setLastReadSuccess("+result+")");
+            {if(doLog) {Log.i(TAG,"setLastReadSuccess("+result+")");};};
     }
 
 

@@ -27,6 +27,7 @@ import android.content.IntentFilter;
 import android.os.BatteryManager;
 import android.os.Bundle;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getxDripTrendName;
 
 public class SendLikexDrip   {
@@ -50,7 +51,7 @@ private static int getBatteryLevel() {
                 return 50;
             }
             int perc= (int) (((float) level / (float) scale) * 100.0f);
-        Log.i(LOG_ID,"BatteryLevel="+perc);
+        {if(doLog) {Log.i(LOG_ID,"BatteryLevel="+perc);};};
         return perc;
         } catch (Throwable error) {
             String mess=error!=null?error.getMessage():null;
@@ -87,7 +88,8 @@ public static  void setreceivers() {
 static void broadcastglucose(double glucose,float rate,long timmsec,long sensorStartmsec,int sensorgen) {
     if(names==null)
         return;
-    Log.i(LOG_ID,"broadcastglucose "+glucose);
+    {
+    if(doLog) {Log.i(LOG_ID,"broadcastglucose "+glucose);};};
     final Context context=Applic.app;
     Intent intent = new Intent(ACTION);
     intent.putExtras(mkGlucosebundle(glucose,rate,timmsec,sensorStartmsec,sensorgen));
@@ -96,7 +98,7 @@ static void broadcastglucose(double glucose,float rate,long timmsec,long sensorS
         if(name!=null) {
             intent.setPackage(name);
             context.sendBroadcast(intent);
-            Log.i(LOG_ID,name);
+            {if(doLog) {Log.i(LOG_ID,name);};};
             }
        }
     }

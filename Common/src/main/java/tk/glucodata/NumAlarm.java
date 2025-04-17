@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import static android.app.AlarmManager.RTC_WAKEUP;
 import static android.app.PendingIntent.getBroadcast;
 import static android.content.Context.ALARM_SERVICE;
+import static tk.glucodata.Log.doLog;
 
 public class NumAlarm extends BroadcastReceiver {
 static final private String LOG_ID="NumAlarm";
@@ -43,19 +44,19 @@ static final private String LOG_ID="NumAlarm";
 	   String action=intent.getAction();
            Applic app=(Applic) context.getApplicationContext();
           app.initproc();
-	   Log.i(LOG_ID,"onReceive "+((action!=null)?action:" null"));
+	   {if(doLog) {Log.i(LOG_ID,"onReceive "+((action!=null)?action:" null"));};};
 	   handlealarm(app);
 	   if(action!=null) {
 	   	if(Notify.closename.equals(action)) {
 				if( ((KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE)).isKeyguardLocked()) {
-					Log.i(LOG_ID,"Don't kill myself in locked state");
+					{if(doLog) {Log.i(LOG_ID,"Don't kill myself in locked state");};};
 				}else {
 					killprogram(0);
 					}
 			}
          else {
              if(Notify.stopalarm.equals(action)) {
-                Log.i(LOG_ID,"Stop Alarm");
+                {if(doLog) {Log.i(LOG_ID,"Stop Alarm");};};
 	        Notify.stopalarm();
                 }
             }

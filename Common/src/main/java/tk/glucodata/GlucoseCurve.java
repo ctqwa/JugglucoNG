@@ -64,6 +64,7 @@ import static java.lang.System.currentTimeMillis;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.BuildConfig.SiBionics;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.systembarBottom;
 import static tk.glucodata.MainActivity.systembarLeft;
 import static tk.glucodata.MainActivity.systembarRight;
@@ -82,12 +83,12 @@ boolean statspresent=false;
 @Keep
 void summaryready() {
     statspresent=true;
-    Log.i(LOG_ID,"summaryready");
+    {if(doLog) {Log.i(LOG_ID,"summaryready");};};
     Applic.RunOnUiThread(()-> {
         Button tmp= summarybutton;
         summarybutton=null;
         if(tmp!=null) {
-            Log.i(LOG_ID,"set Visible");
+            {if(doLog) {Log.i(LOG_ID,"set Visible");};};
             tmp.setVisibility(VISIBLE);
             tmp.bringToFront();
             }
@@ -173,7 +174,7 @@ void setminheight(View[] views,int minheight) {
     }
 //void getnumcontrol(MainActivity activity,int width,int height) {
 void getnumcontrol(MainActivity activity) {
-   Log.i(LOG_ID,"getnumcontrol start");
+   {if(doLog) {Log.i(LOG_ID,"getnumcontrol start");};};
 
    final int height=getHeight();
     if(numcontrol==null||numcontrol.getHeight()!=(height-systembarTop)) {
@@ -294,7 +295,7 @@ void getnumcontrol(MainActivity activity) {
         else
              requestRender();
          });
-   Log.i(LOG_ID,"getnumcontrol end");
+   {if(doLog) {Log.i(LOG_ID,"getnumcontrol end");};};
     }
 
     void showkeyboard(Activity context) {
@@ -308,7 +309,7 @@ void getnumcontrol(MainActivity activity) {
         @Override
         public void handleOnBackPressed() {
             if ((render.stepresult & STEPBACK) == STEPBACK) {
-                Log.d(LOG_ID,"GlucoseCurve: back");
+                {if(doLog) {Log.d(LOG_ID,"GlucoseCurve: back");};};
                 render.stepresult = 0;
 //                ((MainActivity)getContext()).hideSystem=true;
                 ((MainActivity)getContext()).hideSystemUI();
@@ -327,7 +328,7 @@ static public float getDensity() {
     }
 public GlucoseCurve(MainActivity context) {
     super(context);
-    Log.i(LOG_ID,"GlucoseCurve "+MainActivity.openglversion);
+    {if(doLog) {Log.i(LOG_ID,"GlucoseCurve "+MainActivity.openglversion);};};
     mScaleDetector = new ScaleGestureDetector(context, mScaleListener);
     final  GestureListener gestureListener = new GestureListener();
     mGestureDetector = new GestureDetector(context, gestureListener);
@@ -401,7 +402,7 @@ final    private ScaleGestureDetector.SimpleOnScaleGestureListener mScaleListene
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
             float scalex = detector.getCurrentSpanX() / detector.getPreviousSpanX();
-      Log.i(LOG_ID,"onScale SpanX="+detector.getCurrentSpanX()+" PreviousSpanX="+ detector.getPreviousSpanX()+" scalex="+scalex);
+      {if(doLog) {Log.i(LOG_ID,"onScale SpanX="+detector.getCurrentSpanX()+" PreviousSpanX="+ detector.getPreviousSpanX()+" scalex="+scalex);};};
             Natives.xscale(scalex, focusx);
             requestRender();
             down = false;
@@ -447,7 +448,7 @@ void startlibrelink(String lang) {
         @UiThread
         @Override
         public boolean onSingleTapUp(MotionEvent event) {
-            Log.d(LOG_ID,"onSingleTapUp");
+            {if(doLog) {Log.d(LOG_ID,"onSingleTapUp");};};
             if (down ) {
         final float x=event.getX();
         final float y=event.getY();
@@ -457,7 +458,7 @@ void startlibrelink(String lang) {
                 if(choice!=-1L) {
                     int menu = (int) (choice & 0xf);
                     int item = (int) (choice >> 4);
-            Log.i(LOG_ID,"menu="+menu+" item="+item);
+            {if(doLog) {Log.i(LOG_ID,"menu="+menu+" item="+item);};};
                     switch (menu) {
                         case 0:
                             switch (item) {
@@ -541,7 +542,7 @@ void startlibrelink(String lang) {
                 MainActivity act = (MainActivity) getContext();
                                int pos=(int)(choice>>16);
                             int base =(int)((choice>>8)&0xF);
-                            Log.i(LOG_ID,"tap pos="+pos+" base="+base);
+                            {if(doLog) {Log.i(LOG_ID,"tap pos="+pos+" base="+base);};};
                 if(numcontrol!=null) hidesave(numcontrol);
                 numberview.addnumberview(act, base, pos) ;
                 if(!Natives.staticnum()) {
@@ -563,7 +564,7 @@ void startlibrelink(String lang) {
 
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-//          Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);
+//          {if(doLog) {Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);};};
         if(down) {
             if((render.stepresult&STEPBACK)==0)
                 if(Natives.translate(distanceX, distanceY, e1.getRawY(), e2.getRawY())!=0)
@@ -576,7 +577,7 @@ void startlibrelink(String lang) {
 
         @Override
         public void onLongPress(MotionEvent event) {
-            Log.d(LOG_ID,"OnLongPress" + (down?"":" not") + " down");
+            {if(doLog) {Log.d(LOG_ID,"OnLongPress" + (down?"":" not") + " down");};};
         if(down) {
         long nutime=System.currentTimeMillis();
         if((nutime-multitime)<1000)
@@ -639,8 +640,8 @@ void startlibrelink(String lang) {
         }
 */
         @Override
-        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {Log.d(LOG_ID,"onFling");
-            // Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);
+        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {{if(doLog) {Log.d(LOG_ID,"onFling");};};
+            // {if(doLog) {Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);};};
             if(down) {
                 float absx=abs(velocityX);
                 if(absx>2000.0&&absx>abs(velocityY)) {
@@ -913,7 +914,7 @@ void glucoselisten(CompoundButton one) {
          //   spinner.setVisibility(VISIBLE);
 
         }
-//        but.setChecked(!but.isChecked()); Log.d(LOG_ID,"now "+ but.isChecked());
+//        but.setChecked(!but.isChecked()); {if(doLog) {Log.d(LOG_ID,"now "+ but.isChecked());};};
     });
 }
 Spinner searchspinner;
@@ -940,7 +941,7 @@ if(searchspinner==null) {
     searchspinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         @Override
         public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-       Log.i(LOG_ID,"onItemSelected "+position);
+       {if(doLog) {Log.i(LOG_ID,"onItemSelected "+position);};};
             if(position!=(searchspinner.getCount()-1)) {
                 selectnumbers();
         if(position==Natives.getmealvar()) {
@@ -987,7 +988,7 @@ void mkmealsearch(MainActivity act) {
                     || actionId == EditorInfo.IME_ACTION_DONE) {
                 act.hideSystemUI();
                  tk.glucodata.help.hidekeyboard(act);
-                 Log.i(LOG_ID,"onEditorAction");
+                 {if(doLog) {Log.i(LOG_ID,"onEditorAction");};};
 // hidekeyboard();
                 return true;
                }
@@ -1126,7 +1127,7 @@ if(!smallScreen) {
                 else
                 numberview.noroom=false;
                 lay.setX(posx);
-               Log.i(LOG_ID,"search h="+h+" height="+height+" w="+w+" width="+width+" posx="+posx);
+               {if(doLog) {Log.i(LOG_ID,"search h="+h+" height="+height+" w="+w+" width="+width+" posx="+posx);};};
                 }
             else {
 
@@ -1136,7 +1137,7 @@ if(!smallScreen) {
                 lay.setX(xpos);
                 lay.setY(half - h-af);
 
-         Log.i(LOG_ID,"search h="+h+" height="+height+" w="+w+" width="+width+" posx="+xpos);
+         {if(doLog) {Log.i(LOG_ID,"search h="+h+" height="+height+" w="+w+" width="+width+" posx="+xpos);};};
             }
         }
     else {
@@ -1150,7 +1151,7 @@ if(!smallScreen) {
         lay.setY(ypos);
       final var xpos=width>w?(width - w)/2:0;
         lay.setX(xpos);
-      Log.i(LOG_ID,"smallScreen search h="+h+" height="+height+" w="+w+" width="+width+" posx="+xpos+" posy="+ypos);
+      {if(doLog) {Log.i(LOG_ID,"smallScreen search h="+h+" height="+height+" w="+w+" width="+width+" posx="+xpos+" posy="+ypos);};};
         }
         return new int[] {w,h};
         },buttonline,glucoseline, timeline,goline);
@@ -1180,7 +1181,7 @@ if(!smallScreen) {
 
 @Override
 public void onResume() {
-    Log.i(LOG_ID,"onResume()");
+    {if(doLog) {Log.i(LOG_ID,"onResume()");};};
     super.onResume();
     Applic app = Applic.app;
 
@@ -1190,7 +1191,7 @@ public void onResume() {
 
 @Override
 public void onPause() {
-    Log.i(LOG_ID,"onPause()");
+    {if(doLog) {Log.i(LOG_ID,"onPause()");};};
      Applic app = Applic.app;
      app.cancelmintime();
      app.setcurve(null);
@@ -1198,17 +1199,17 @@ public void onPause() {
     }
 @Override
 public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-    Log.i(LOG_ID,"surfaceChanged format="+format+", width="+w+", height="+h);
+    {if(doLog) {Log.i(LOG_ID,"surfaceChanged format="+format+", width="+w+", height="+h);};};
     super.surfaceChanged(holder,format,w,h);
     }
 @Override
 public void surfaceCreated(SurfaceHolder holder) {
-    Log.i(LOG_ID,"surfaceCreated(SurfaceHolder holder)");
+    {if(doLog) {Log.i(LOG_ID,"surfaceCreated(SurfaceHolder holder)");};};
     super.surfaceCreated(holder);
     }
 @Override
 public void surfaceDestroyed(SurfaceHolder holder) {
-   Log.i(LOG_ID,"surfaceDestroyed(SurfaceHolder holder)");
+   {if(doLog) {Log.i(LOG_ID,"surfaceDestroyed(SurfaceHolder holder)");};};
    super.surfaceDestroyed(holder);
     }
 static public void    doabout(MainActivity activity) {

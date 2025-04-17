@@ -38,6 +38,8 @@ import java.util.Locale;
 import static android.text.Html.TO_HTML_PARAGRAPH_LINES_CONSECUTIVE;
 import static android.text.Html.fromHtml;
 
+import static tk.glucodata.Log.doLog;
+
 import androidx.appcompat.app.AppCompatDelegate;
 
 public class util {
@@ -104,11 +106,11 @@ static public Locale getlocale() {
 	if(locales.isEmpty())  {
 //		final var lang=Locale.getDefault();
 		final var lang=getReslocale();
-		Log.i("getlocale","Locale.getDefault()="+lang);
+		{if(doLog) {Log.i("getlocale","Locale.getDefault()="+lang);};};
 		return lang;
 		}
 	final var lang2=locales.get(0);
-	Log.i("getlocale" ,"getApplicationLocales()="+lang2);
+	{if(doLog) {Log.i("getlocale" ,"getApplicationLocales()="+lang2);};};
 	return lang2;
 
 	}

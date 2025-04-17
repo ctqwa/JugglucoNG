@@ -31,6 +31,7 @@ import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.Floating.rewritefloating;
 import static tk.glucodata.Layout.getMargins;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.settings.Settings.editoptions;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
@@ -62,7 +63,7 @@ private static final String LOG_ID="FloatingConfig";
 //   AmbilWarnaDialog(Context context, int color, boolean supportsAlpha, OnAmbilWarnaListener listener)
 static private boolean background=true;
 static public void	setcolor(int c) {
-		Log.i(LOG_ID,"setcolor("+(c&0xFFFFFFFF)+")");
+		{if(doLog) {Log.i(LOG_ID,"setcolor("+(c&0xFFFFFFFF)+")");};};
 		if(background) { 
 			Floating.setbackgroundcolor(c);
 			}
@@ -82,7 +83,7 @@ static public void show(MainActivity act,View parent) {
 	int height=GlucoseCurve.getheight();
 	int width=GlucoseCurve.getwidth();
     AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor,c-> {
-	Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));
+	{if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
 		setcolor(c);
 		//rewritefloating(act);
 		Floating.invalidatefloat();
@@ -121,7 +122,7 @@ static public void show(MainActivity act,View parent) {
 			}
 		@Override
 		public void onStartTrackingTouch(SeekBar seekBar) {
-			Log.i(LOG_ID,"onStartTrackingTouch");
+			{if(doLog) {Log.i(LOG_ID,"onStartTrackingTouch");};};
 			}
 		@Override
 		public void onStopTrackingTouch(SeekBar seekBar) {
@@ -142,7 +143,7 @@ static public void show(MainActivity act,View parent) {
                     @Override
                     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                     if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER || actionId == EditorInfo.IME_ACTION_DONE) {
-                                 Log.i(LOG_ID,"onEditorAction");
+                                 {if(doLog) {Log.i(LOG_ID,"onEditorAction");};};
 				 try {
 					var siz=Integer.parseInt(String.valueOf(v.getText()));
 					int maxfont=height*7/10;
@@ -226,6 +227,7 @@ static public void show(MainActivity act,View parent) {
 	view.setLayoutParams( new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
    final var density= tk.glucodata.GlucoseCurve.metrics.density;
    view.setPadding(0,MainActivity.systembarTop+ (int)(density*10) ,0,0);
+   getMargins(close).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
    leftlayout.setPadding(0,MainActivity.systembarTop/2+ (int)(density*5) ,0,0);
 	 layout=new Layout(act,(l,w,h)-> { return new int[] {w,h}; }, new View[]{view,leftlayout});
 
@@ -252,7 +254,7 @@ static public void show(MainActivity act,View parent) {
 
 
         foregroundbutton.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-            Log.i(LOG_ID,"foregroundbutton "+isChecked);
+            {if(doLog) {Log.i(LOG_ID,"foregroundbutton "+isChecked);};};
             backgroundbutton.setChecked(!isChecked);
             background=!isChecked;
             removeContentView(layout);
@@ -261,7 +263,7 @@ static public void show(MainActivity act,View parent) {
             });
 
         backgroundbutton.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-            Log.i(LOG_ID,"backgroundbutton "+isChecked);
+            {if(doLog) {Log.i(LOG_ID,"backgroundbutton "+isChecked);};};
             foregroundbutton.setChecked(!isChecked);
             });
 

@@ -3,5 +3,5 @@ package tk.glucodata;
 
 class ZXing {
     static void scanZXing(Object act) { }
-    static boolean zXingResult(int resultCode, Object data,Object act) { return false;}
+    static void zXingResult(int resultCode, Object data,Object act) { }
 }

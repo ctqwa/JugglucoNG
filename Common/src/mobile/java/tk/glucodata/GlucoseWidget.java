@@ -21,6 +21,7 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Notify.glucosetimeout;
 import static tk.glucodata.Notify.penmutable;
 import static tk.glucodata.Notify.timef;
@@ -53,7 +54,7 @@ private static void setWidth(int widthdip) {
 @Override
 public void onAppWidgetOptionsChanged(Context context, AppWidgetManager appWidgetManager, int appWidgetId, Bundle widgetInfo) {
    var widthdip=widgetInfo.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
-   Log.i(LOG_ID,"onAppWidgetOptionsChanged widthdip="+widthdip);
+   {if(doLog) {Log.i(LOG_ID,"onAppWidgetOptionsChanged widthdip="+widthdip);};};
    used=true;
    if(widthdip!=0&&widthdip!=width) {
        setWidth(widthdip);
@@ -76,7 +77,7 @@ static private void showviews(RemoteViews views,int rId,AppWidgetManager appWidg
 static private void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
    var widgetInfo=appWidgetManager.getAppWidgetOptions(appWidgetId);
    for(var key : widgetInfo.keySet()) {
-        Log.d(LOG_ID, key + " = " + widgetInfo.get(key));
+        {if(doLog) {Log.d(LOG_ID, key + " = " + widgetInfo.get(key));};};
         }
    var widthdip=widgetInfo.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
    if(widthdip==0) {
@@ -113,7 +114,7 @@ static private void updateAppWidget(Context context, AppWidgetManager appWidgetM
 
 static private void updateall(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
    if(appWidgetIds==null|| appWidgetIds.length == 0) {
-      Log.i(LOG_ID,"updateall zero");
+      {if(doLog) {Log.i(LOG_ID,"updateall zero");};};
       return;
       }
    used=true;
@@ -126,7 +127,7 @@ static boolean used=true;
 final    private static String LOG_ID="GlucoseWidget";
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        Log.i(LOG_ID,"onUpdate");
+        {if(doLog) {Log.i(LOG_ID,"onUpdate");};};
        updateall(context, appWidgetManager,  appWidgetIds);
     }
 
@@ -146,7 +147,7 @@ public static void oldvalue(long time) {
    final var manage= AppWidgetManager.getInstance(Applic.app);
    int ids[] = manage.getAppWidgetIds(new ComponentName(Applic.app, cl));
    if(ids.length>0) {
-      Log.i(LOG_ID,"oldvalue widgets");
+      {if(doLog) {Log.i(LOG_ID,"oldvalue widgets");};};
       final String tformat= timef.format(time);
       String message = Applic.getContext().getString(R.string.nonewvalue) + tformat;
       var views=remoteMessage(message);
@@ -155,7 +156,7 @@ public static void oldvalue(long time) {
          }
       }
    else {
-      Log.i(LOG_ID,"oldvalue no widgets");
+      {if(doLog) {Log.i(LOG_ID,"oldvalue no widgets");};};
       }
 
    }

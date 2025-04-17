@@ -55,10 +55,10 @@ const char *const * const sendptr=sendmessagestrbase+1;
 	bool sendnums=false;
 	bool sendstream=false;
 	bool sendscans=false;
-   if(host.nr>maxip) 
+   if(host.nr>passhost_t::maxip) 
       host.nr=0;
 	const int len=host.nr;
-	char ips[maxip*46+1]="";
+	char ips[passhost_t::maxip*46+1]="";
 	char *ipsptr=ips;
 	if(host.hashostname() ) {
 		const char *name=host.gethostname();

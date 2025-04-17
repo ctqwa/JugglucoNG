@@ -27,14 +27,11 @@ import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.useZXing;
 import static tk.glucodata.InsulinTypeHolder.getradiobutton;
 import static tk.glucodata.Log.doLog;
-import static tk.glucodata.MainActivity.REQUEST_BARCODE;
 import static tk.glucodata.ZXing.scanZXing;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-import android.app.Activity;
-import android.content.Intent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RadioGroup;
@@ -45,7 +42,6 @@ import android.widget.Toast;
 //import com.google.mlkit.vision.barcode.common.Barcode;
 //import com.google.mlkit.vision.barcode.common.Barcode;
 
-import java.util.Locale;
 //import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions;
 //import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
 
@@ -83,19 +79,29 @@ longserialnumber
 (21) 231108 GEPD802J PP76
 
 0106972831640165112312091724120810LT41231108C21231108GEPD802JPP76 
+^]0106972831641483112411201726051910LT46241155C^]21P22411J6EP
 0106972831640165112312091724120810LT41231108C21231108 GEPD 802J PP76 
 */
 //LT2309GEPD
+/*
+Sibionics2:
+*/
 
+private static void selectType(long dataptr,MainActivity act) {
+    int subtype=Natives.getSiSubtype(dataptr);
+    if(subtype==3) {
+        Natives.freedataptr(dataptr);
+        return;
+        }
 
-private static void selectType(long dataptr,MainActivity act,boolean freeptr) {
     var group=new RadioGroup(act);
     int id=0;
     group.addView(getradiobutton(act,R.string.eusibionics,id++));
     group.addView(getradiobutton(act,R.string.hematonix,id++));
     group.addView(getradiobutton(act,R.string.chsibionics,id));
+//    group.addView(getradiobutton(act,R.string.sibionics2,id));
 
-    group.check(Natives.getSiSubtype(dataptr));
+    group.check(subtype);
 
     group.setOnCheckedChangeListener( (g,i)-> {
         Natives.setSiSubtype(dataptr,i);
@@ -114,9 +120,7 @@ private static void selectType(long dataptr,MainActivity act,boolean freeptr) {
    layout.setPadding(0,0,0,rand);
    MainActivity.setonback(() -> {
       removeContentView(layout);
-      if(freeptr) {
-        Natives.freedataptr(dataptr);
-        }
+      Natives.freedataptr(dataptr);
       });
    ok.setOnClickListener(v-> {
         MainActivity.doonback();
@@ -126,36 +130,39 @@ private static void selectType(long dataptr,MainActivity act,boolean freeptr) {
     }
 
 
-  private static boolean    connectdevice(String scantag,MainActivity act) {
+static void connectSensor(final String scantag,MainActivity act)  {
      if(!isWearable) {
-            String name=Natives.addSIscangetName(scantag);
-            if(name!=null)  {
-               MainActivity.tocalendarapp=true;
-               long[] ptrptr={0L};
-               var res=SensorBluetooth.resetDevicePtr(name,ptrptr);
-               long dataptr=ptrptr[0];
-               if(dataptr==0L)
-                    dataptr=Natives.getdataptr(name);
-               int type=Natives.getLibreVersion(dataptr);
-               Log.i(LOG_ID,"type="+type);
-               if(type== 0x10) {
-                    selectType(dataptr,act,ptrptr[0]==0L);
-                    }
-               Applic.wakemirrors();
-               return res;
-               }
-            }
+            if(scantag.endsWith("MirrorJuggluco")) {
+                MirrorString.makeMirror(scantag,act);
+                return;
+                }
+             else {
+                String name=Natives.addSIscangetName(scantag);
+                if(name!=null)  {
+                   MainActivity.tocalendarapp=true;
+                   var dataptr= Natives.getdataptr(name);
+                   int type=Natives.getLibreVersion(dataptr);
+                   {if(doLog) {Log.i(LOG_ID,"type="+type);};};
+                   if(type== 0x10) {
+                        selectType(dataptr,act);
+                        }
+                   else
+                        Natives.freedataptr(dataptr);
+                   var res=SensorBluetooth.updateDevices();
+                   Applic.wakemirrors();
+                   if(res) {
+                        act.finepermission(); 
+                        }
+                      else
+                        act.systemlocation();
+                   return;
+                   }
+                }
+             }
           wrongtag(); 
-          return false;
          }
 
 
-static boolean connectSensor(final String scantag,MainActivity act) {
-     if(!isWearable) {
-        return connectdevice(scantag,act);
-        }
-    return false;
-    }
 
 
 
@@ -169,31 +176,27 @@ public static void scan(MainActivity act) {
       }
 private static void scanGoogle(MainActivity act) {
      if(!isWearable) {
-         Log.i(LOG_ID, "before scan");
+         {if(doLog) {Log.i(LOG_ID, "before scan");};};
         final var options =  new com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions.Builder().setBarcodeFormats( com.google.mlkit.vision.barcode.common.Barcode.FORMAT_DATA_MATRIX, com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE).build();
         final var scanner =  com.google.mlkit.vision.codescanner.GmsBarcodeScanning.getClient(act, options);
         scanner.startScan().addOnSuccessListener(
            barcode -> {
                var rawValue = barcode.getRawValue();
                var message="Scanned: "+rawValue;
-               Log.i(LOG_ID,message);
-               if(connectSensor(rawValue,act)) {
-                    act.finepermission(); 
-                    }
-                  else
-                    act.systemlocation();
-                   })
+               if(doLog) {Log.i(LOG_ID,message);};
+               connectSensor(rawValue,act);
+               })
            .addOnCanceledListener(
                () -> {
                     var message="Scan cancelled";
-                    Log.i(LOG_ID,message);
+                    if(doLog) {Log.i(LOG_ID,message);};
                     Toast.makeText(act, message, Toast.LENGTH_LONG).show();
                      // Task canceled
                    })
        .addOnFailureListener(
            e -> {
             var message=e.getMessage();
-            Log.i(LOG_ID,message);
+            if(doLog) {Log.i(LOG_ID,message);};
             Toast.makeText(act, message, Toast.LENGTH_SHORT).show();  
             if(useZXing) {
                 Toast.makeText(act, "Move to zXing", Toast.LENGTH_SHORT).show();

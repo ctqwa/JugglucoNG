@@ -59,7 +59,7 @@ public List<T>  getarray() {
 
 @Override
 public View getDropDownView(int position, View convertView, ViewGroup parent) {
-      //Log.i(LOG_ID,"getDropDownView "+position);
+      //{if(doLog) {Log.i(LOG_ID,"getDropDownView "+position);};};
         if (convertView == null) {
             convertView = mInflater.inflate(android.R.layout.simple_spinner_dropdown_item, parent, false);
            //  convertView.setBackgroundColor(Applic.backgroundcolor);

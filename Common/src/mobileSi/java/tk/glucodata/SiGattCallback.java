@@ -48,7 +48,7 @@ public class SiGattCallback extends SuperGattCallback {
 static int siNR=0;
     public SiGattCallback(String SerialNumber, long dataptr) {
        super(SerialNumber, dataptr, 0x10);
-       Log.d(LOG_ID, SerialNumber+" SiGattCallback(..)");
+       {if(doLog) {Log.d(LOG_ID, SerialNumber+" SiGattCallback(..)");};};
        ++siNR;
     }
 
@@ -83,13 +83,13 @@ static int siNR=0;
     @Override
     public void onConnectionStateChange(BluetoothGatt bluetoothGatt, int status, int newState) {
 		if(stop) {
-			Log.i(LOG_ID,"onConnectionStateChange stop==true");
+			{if(doLog) {Log.i(LOG_ID,"onConnectionStateChange stop==true");};};
 			return;
 			}
 		long tim = System.currentTimeMillis();
         if (doLog) {
             final String[] state = {"DISCONNECTED", "CONNECTING", "CONNECTED", "DISCONNECTING"};
-            Log.i(LOG_ID, SerialNumber + " onConnectionStateChange, status:" + status + ", state: " + (newState < state.length ? state[newState] : newState));
+            {if(doLog) {Log.i(LOG_ID, SerialNumber + " onConnectionStateChange, status:" + status + ", state: " + (newState < state.length ? state[newState] : newState));};};
         }
         if(newState == BluetoothProfile.STATE_CONNECTED) {
 				constatchange[0] = tim;
@@ -132,11 +132,11 @@ static int siNR=0;
     private BluetoothGattCharacteristic service1, service2;
 
     private boolean discover(BluetoothGatt bluetoothGatt) {
-       Log.i(LOG_ID,"discover");
+       {if(doLog) {Log.i(LOG_ID,"discover");};};
            BluetoothGattService service = bluetoothGatt.getService(serviceUUID);
            if (service == null) {
                var mess="getService(serviceUUID)==null";
-               Log.i(LOG_ID, mess);
+               {if(doLog) {Log.i(LOG_ID, mess);};};
             handshake = mess;
                wrotepass[1] = System.currentTimeMillis();
                return false;
@@ -146,7 +146,7 @@ static int siNR=0;
            service2 = service.getCharacteristic(serviceChar2UUID);
            if (service1 == null || service2 == null) {
                var mess=(service1 == null ? "service1==null " : "") + (service2 == null ? "service2==null" : "");
-               Log.i(LOG_ID, mess);
+               {if(doLog) {Log.i(LOG_ID, mess);};};
                wrotepass[1] =  System.currentTimeMillis();
                return false;
            }
@@ -155,13 +155,13 @@ static int siNR=0;
         return enablenotifications(bluetoothGatt);
     }
     private boolean enablenotifications(BluetoothGatt bluetoothGatt) {
-      Log.i(LOG_ID,"enablenotifications");
+      {if(doLog) {Log.i(LOG_ID,"enablenotifications");};};
 
         var des = service1.getDescriptor(mCharacteristicConfigDescriptor);
         if (des == null) {
 		      final		var tim = System.currentTimeMillis();
             var mes="service1.getDescriptor(descriptor)==null";
-            Log.i(LOG_ID,mes);
+            {if(doLog) {Log.i(LOG_ID,mes);};};
 				handshake = mes;
 				wrotepass[1] = tim;
             return false;
@@ -180,7 +180,7 @@ static int siNR=0;
                wrotepass[1] = System.currentTimeMillis();
                return false;
                }
-          Log.i(LOG_ID,"writeDescriptor="+writeDescriptor);
+          {if(doLog) {Log.i(LOG_ID,"writeDescriptor="+writeDescriptor);};};
           }
         else {
          var mess="setCharacteristicNotification(service1,true) failed";
@@ -189,14 +189,14 @@ static int siNR=0;
             wrotepass[1] = System.currentTimeMillis();
             return false;
          }
-         Log.i(LOG_ID,"enablenotifications succeeded");
+         {if(doLog) {Log.i(LOG_ID,"enablenotifications succeeded");};};
        return true;
         }
 //private static final UUID l = UUID.fromString("00002A05-0000-1000-8000-00805f9b34fb");
 
 	@Override // android.bluetooth.BluetoothGattCallback
 	public void onServicesDiscovered(BluetoothGatt bluetoothGatt, int status) {
-		Log.i(LOG_ID, "BLE onServicesDiscovered invoked, status: " + status);
+		{if(doLog) {Log.i(LOG_ID, "BLE onServicesDiscovered invoked, status: " + status);};};
 		if(status != GATT_SUCCESS||!discover(bluetoothGatt)) {
 			disconnect();
 			}
@@ -222,7 +222,7 @@ private void		askvalues(BluetoothGatt bluetoothGatt) {
 	@Override
 	public void onCharacteristicWrite(BluetoothGatt bluetoothGatt, BluetoothGattCharacteristic bluetoothGattCharacteristic, int status) {
       if(Log.doLog) {
-         Log.d(LOG_ID, bluetoothGatt.getDevice().getAddress() + " onCharacteristicWrite, status:" + status + " UUID:" + bluetoothGattCharacteristic.getUuid().toString());
+         {if(doLog) {Log.d(LOG_ID, bluetoothGatt.getDevice().getAddress() + " onCharacteristicWrite, status:" + status + " UUID:" + bluetoothGattCharacteristic.getUuid().toString());};};
          }
 	}
 
@@ -254,6 +254,10 @@ private void   authenticate() {
 private void   activate() {
    if(hasNotChinese)
       write2(Natives.getSIActivation( ));
+   }
+private void   writeReset() {
+   if(hasNotChinese)
+      write2(Natives.getSIResetBytes());
    }
 
 private boolean novalue=false;
@@ -317,6 +321,10 @@ private void   processchanged(byte[] value) {
          activate();
          return;
          }
+    if(res==10L) {
+         writeReset();
+         return;
+         }
     if(res==7L) {
         var blue=mBluetoothGatt;
         if(blue!=null)
@@ -348,7 +356,7 @@ public void onCharacteristicChanged(BluetoothGatt bluetoothGatt, BluetoothGattCh
 
 @Override
 public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status)  {
-	Log.i(LOG_ID,"onReadRemoteRssi(BluetoothGatt,"+ rssi+","+status+(status==GATT_SUCCESS?" SUCCESS":" FAILURE"));
+	{if(doLog) {Log.i(LOG_ID,"onReadRemoteRssi(BluetoothGatt,"+ rssi+","+status+(status==GATT_SUCCESS?" SUCCESS":" FAILURE"));};};
 	if(status==GATT_SUCCESS) {
 		readrssi=rssi;
 		}

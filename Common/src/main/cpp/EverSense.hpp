@@ -14,7 +14,7 @@ inline void sendEverSenseold( SensorGlucoseData *sens,int modulo) {
 	    if(endpos>startpos) {
 	       std::thread EverSensethread(sendEverSenseoldthread,sens,startpos,endpos,modulo);
 	       EverSensethread.detach();
-	       sens->setbroadcastfrom(INT_MAX);
+	       sens->setbroadcastfrom(INT16_MAX);
 	       }
 	   }
 	}

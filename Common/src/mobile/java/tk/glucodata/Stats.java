@@ -29,6 +29,7 @@ import android.widget.Toast;
 
 import static android.view.View.INVISIBLE;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.stack;
 import static tk.glucodata.NumberView.geteditview;
 import static tk.glucodata.NumberView.geteditwearos;
@@ -144,7 +145,7 @@ final Runnable closeonback=()-> {
 			act.curve.summarybutton=null;
 			removeContentView(layout);
 			Natives.endstats();
-			Log.i(LOG_ID,"closeonback");
+			{if(doLog) {Log.i(LOG_ID,"closeonback");};};
 
 			if(Menus.on)  {
 				Menus.show(act);

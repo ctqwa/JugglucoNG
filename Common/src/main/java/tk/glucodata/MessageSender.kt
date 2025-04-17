@@ -35,6 +35,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import tk.glucodata.Applic.JUGGLUCOIDENT;
 import tk.glucodata.Applic.isWearable
+import tk.glucodata.Log.doLog
 import java.util.concurrent.TimeUnit
 
 //import tk.glucodata.Applic.messagesender
@@ -208,7 +209,7 @@ private fun nodeSendmessage(node:Node,path:String,data:ByteArray) {
         sendbool(BLUETOOTH_PATH,node.id,on)
      }
     private fun sendOnmessages( node:String,on:Boolean) {
-        Log.i(LOG_ID,"sendNameMessageOn($node,$on)");
+        if(doLog) {Log.i(LOG_ID,"sendNameMessageOn($node,$on)");}
         sendbool(MESSAGES_PATH,node,on)
         }
      /*
@@ -298,9 +299,9 @@ companion object {
     @JvmStatic
     public fun sendDatawithName(ident: String, data: ByteArray): Boolean {
         val sender = messagesender ?: return false
-    Log.i(LOG_ID,"start sendDatawithName $ident");
+    if(doLog) {Log.i(LOG_ID,"start sendDatawithName $ident");}
         val res=sender.nameSendMessageResult(ident, DATA_PATH, data)
-    Log.i(LOG_ID,"end sendDatawithName $ident");
+    if(doLog) {Log.i(LOG_ID,"end sendDatawithName $ident");}
     return res;
     }
 
@@ -377,9 +378,9 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
 
     @JvmStatic
     public fun initwearos(app: Context) {
-        Log.i(LOG_ID, "before new MessageSender");
+        if(doLog) {Log.i(LOG_ID, "before new MessageSender");}
         messagesender = MessageSender(app)
-//    Log.i(LOG_ID,"before sendnetinfo");
+//    {if(doLog) {Log.i(LOG_ID,"before sendnetinfo");};};
 //    sendnetinfo();
     }
 
@@ -401,7 +402,7 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
     private const val netwait = (1000).toLong()
 
     private fun inargsendnetinfo(id: String) {
-        Log.i(LOG_ID,"sendnetinfo($id)");
+        if(doLog) {Log.i(LOG_ID,"sendnetinfo($id)");}
         if(!cansend()) {
             Log.i(LOG_ID, "!cansend()")
                 return
@@ -452,7 +453,7 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
                 Log.e(LOG_ID,"netinfo=null")
                 return
                 }
-            Log.i(LOG_ID, "sender.sendnetinfo($id, netinfo)");
+            if(doLog) {Log.i(LOG_ID, "sender.sendnetinfo($id, netinfo)");};
             sender.sendnetinfo(id, netinfo)
             times[it] = nu + netwait
         }

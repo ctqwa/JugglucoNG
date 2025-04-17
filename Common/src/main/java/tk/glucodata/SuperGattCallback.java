@@ -47,6 +47,7 @@ import static tk.glucodata.Applic.DontTalk;
 import static tk.glucodata.Applic.app;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.mgdLmult;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.showbytes;
 import static tk.glucodata.Natives.thresholdchange;
 import static tk.glucodata.SensorBluetooth.blueone;
@@ -101,22 +102,22 @@ protected    SuperGattCallback(String SerialNumber,long dataptr,int gen) {
     mActiveDeviceAddress = Natives.getDeviceAddress(dataptr,true);
     sensorstartmsec=Natives.getSensorStartmsec(dataptr);
     sensorgen=gen;
-    Log.i(LOG_ID, "new SuperGattCallback " + SerialNumber + " " + ((mActiveDeviceAddress != null) ? mActiveDeviceAddress : "null"));
+    {if(doLog) {Log.i(LOG_ID, "new SuperGattCallback " + SerialNumber + " " + ((mActiveDeviceAddress != null) ? mActiveDeviceAddress : "null"));};};
     }
 public void disconnect() {
     final var thegatt= mBluetoothGatt;
     if(thegatt!=null) {
-        Log.i(LOG_ID,"Disconnect");
+        {if(doLog) {Log.i(LOG_ID,"Disconnect");};};
         thegatt.disconnect();
         }
      else  {
-        Log.i(LOG_ID,"Disconnect mBluetoothGatt==null");
+        {if(doLog) {Log.i(LOG_ID,"Disconnect mBluetoothGatt==null");};};
       }
     }
 public boolean reconnect(long now) {
     final var old=now-showtime+20;
     if(charcha[1]<old&&connectTime<(now-60*1000))  {
-        Log.i(LOG_ID,"reconnect "+SerialNumber);
+        {if(doLog) {Log.i(LOG_ID,"reconnect "+SerialNumber);};};
         final var thegatt= mBluetoothGatt;
         if(thegatt!=null) 
             thegatt.disconnect();
@@ -236,7 +237,7 @@ static void endtalk() {
                     Notify.onenot.lowglucose(sglucose,gl, rate,alarmtime);
                     if (alarmtime) {
                         nextalarm[0] = tim + Natives.readalarmsuspension(0) * 60;
-                        Log.i(LOG_ID,"next alarm at "+ nextalarm[0] +" "+bluediag.datestr( nextalarm[0]*1000L ));
+                        {if(doLog) {Log.i(LOG_ID,"next alarm at "+ nextalarm[0] +" "+bluediag.datestr( nextalarm[0]*1000L ));};};
                         alarm |= 8;
                         if(!DontTalk) {
                             if((alarmspeak=Natives.speakalarms())) Talker.nexttime = 0L;
@@ -254,7 +255,7 @@ static void endtalk() {
         } catch (Throwable e) {
             Log.stack(LOG_ID,SerialNumber, e);
         }
-        Log.v(LOG_ID, SerialNumber + " "+tim+" glucose=" + gl + " " + rate);
+        {if(doLog) {Log.v(LOG_ID, SerialNumber + " "+tim+" glucose=" + gl + " " + rate);};};
         Applic.updatescreen();
 
         if(!DontTalk) {
@@ -319,7 +320,7 @@ protected void handleGlucoseResult(long res,long timmsec) {
         int glumgdl = (int) (res & 0xFFFFFFFFL);
         if (glumgdl != 0) {
             int alarm = (int) ((res >> 48) & 0xFFL);
-            Log.i(LOG_ID, SerialNumber + " alarm=" + alarm);
+            {if(doLog) {Log.i(LOG_ID, SerialNumber + " alarm=" + alarm);};};
             float gl = Applic.unit == 1 ? glumgdl / mgdLmult : glumgdl;
             short ratein = (short) ((res >> 32) & 0xFFFFL);
             float rate = ratein / 1000.0f;
@@ -337,12 +338,12 @@ protected void handleGlucoseResult(long res,long timmsec) {
                 }
             SensorBluetooth.othersworking(this,timmsec);
         } else {
-            Log.i(LOG_ID, SerialNumber + " onCharacteristicChanged: Glucose failed");
+            {if(doLog) {Log.i(LOG_ID, SerialNumber + " onCharacteristicChanged: Glucose failed");};};
             charcha[1] = timmsec;
         }
     }
 public void searchforDeviceAddress() {
-    Log.i(LOG_ID,SerialNumber+" searchforDeviceAddress()");
+    {if(doLog) {Log.i(LOG_ID,SerialNumber+" searchforDeviceAddress()");};};
     //setDeviceAddress(null);
     foundtime=0L;
     mActiveDeviceAddress = null;
@@ -366,23 +367,23 @@ public void searchforDeviceAddress() {
         mActiveBluetoothDevice = device;
         if(device!=null) {
             String address=device.getAddress();
-            Log.i(LOG_ID,SerialNumber+" setDevice("+address+")");
+            {if(doLog) {Log.i(LOG_ID,SerialNumber+" setDevice("+address+")");};};
             setDeviceAddress(address);
             }
         else  {
-            Log.i(LOG_ID, SerialNumber +" setDevice(null)");
+            {if(doLog) {Log.i(LOG_ID, SerialNumber +" setDevice(null)");};};
             setDeviceAddress(null);
             }
     }
 
     public void setDeviceAddress(String address) {
-        Log.i(LOG_ID, SerialNumber +" "+"setDeviceAddress("+ address+")");
+        {if(doLog) {Log.i(LOG_ID, SerialNumber +" "+"setDeviceAddress("+ address+")");};};
         mActiveDeviceAddress = address;
         Natives.setDeviceAddress(dataptr, address);
     }
     void free() {
         stop=true;
-        Log.i(LOG_ID,"free "+SerialNumber);
+        {if(doLog) {Log.i(LOG_ID,"free "+SerialNumber);};};
         close();
         Natives.freedataptr(dataptr);
         dataptr = 0L;
@@ -395,7 +396,7 @@ public void searchforDeviceAddress() {
         Natives.finishSensor(dataptr);
         }
     public void close() {
-        Log.i(LOG_ID,"close "+SerialNumber);
+        {if(doLog) {Log.i(LOG_ID,"close "+SerialNumber);};};
         var tmpgatt=mBluetoothGatt ;
         if (tmpgatt != null) {
             try {
@@ -413,7 +414,7 @@ public void searchforDeviceAddress() {
             }
         }
     else {
-        Log.i(LOG_ID,"mBluetoothGatt==null");
+        {if(doLog) {Log.i(LOG_ID,"mBluetoothGatt==null");};};
         }
 
     }
@@ -421,12 +422,12 @@ public void searchforDeviceAddress() {
         var cb = this;
         close();
         if(cb.mActiveDeviceAddress ==null|| cb.mActiveBluetoothDevice == null) {
-            Log.i(LOG_ID, SerialNumber +" "+"cb.mActiveBluetoothDevice == null");
+            {if(doLog) {Log.i(LOG_ID, SerialNumber +" "+"cb.mActiveBluetoothDevice == null");};};
             foundtime = 0L;
             return null;
         }
         return () -> {
-            Log.i(LOG_ID,"getConnectDevice Runnable "+ SerialNumber);
+            {if(doLog) {Log.i(LOG_ID,"getConnectDevice Runnable "+ SerialNumber);};};
             var device= cb.mActiveBluetoothDevice;
             var sensorbluetooth= blueone;
             if(sensorbluetooth==null) {
@@ -443,14 +444,14 @@ public void searchforDeviceAddress() {
                 }
         
             if (cb.mBluetoothGatt != null) {
-                Log.d(LOG_ID, SerialNumber + " cb.mBluetoothGatt!=null");
+                {if(doLog) {Log.d(LOG_ID, SerialNumber + " cb.mBluetoothGatt!=null");};};
                 return;
                 } 
             var devname=device.getName();
             if(devname!=null)
                 mDeviceName=devname;
-                if (tk.glucodata.Log.doLog) {
-                    Log.d(LOG_ID, SerialNumber + " Try connection to " + device.getAddress()+ " "+devname+" autoconnect="+autoconnect);
+                if (doLog) {
+                    {if(doLog) {Log.d(LOG_ID, SerialNumber + " Try connection to " + device.getAddress()+ " "+devname+" autoconnect="+autoconnect);};};
                     }
                 try {
                     if(isWearable)  {
@@ -466,7 +467,7 @@ public void searchforDeviceAddress() {
                         }
 
                     setpriority(cb.mBluetoothGatt);
-                Log.i(LOG_ID,SerialNumber+" after connectGatt");
+                {if(doLog) {Log.i(LOG_ID,SerialNumber+" after connectGatt");};};
             connectTime= System.currentTimeMillis();
                 } catch (SecurityException se) {
                     var mess = se.getMessage();
@@ -483,7 +484,7 @@ public void searchforDeviceAddress() {
     }
 
  public boolean connectDevice(long delayMillis) {
-    Log.i(LOG_ID,"connectDevice("+delayMillis+") "+ SerialNumber);
+    {if(doLog) {Log.i(LOG_ID,"connectDevice("+delayMillis+") "+ SerialNumber);};};
     Runnable connect=getConnectDevice(delayMillis);
     if(connect==null) 
         return false;
@@ -501,13 +502,13 @@ private boolean used_priority=false;
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 if(Natives.getpriority()) {
                    bluegatt.requestConnectionPriority(use_priority);
-                   Log.i(LOG_ID,"requestConnectionPriority HIGH");
+                   {if(doLog) {Log.i(LOG_ID,"requestConnectionPriority HIGH");};};
                    used_priority=true;
                }
                 else {
                if(used_priority) {
                   bluegatt.requestConnectionPriority(CONNECTION_PRIORITY_BALANCED);
-                  Log.i(LOG_ID,"requestConnectionPriority LOW");
+                  {if(doLog) {Log.i(LOG_ID,"requestConnectionPriority LOW");};};
                   used_priority=false;
                   }
                }
@@ -600,10 +601,10 @@ public String mygetDeviceName() {
     }
 
 public void setGattOptions(BluetoothGatt gatt) {
-        Log.i(LOG_ID,"setGattOptions(BluetoothGatt gatt) empty");
+        {if(doLog) {Log.i(LOG_ID,"setGattOptions(BluetoothGatt gatt) empty");};};
     }
 @Override 
 public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
-    Log.i(LOG_ID,"onPhyUpdate txPhy="+txPhy+" rxPhy="+rxPhy+" status="+status);
+    {if(doLog) {Log.i(LOG_ID,"onPhyUpdate txPhy="+txPhy+" rxPhy="+rxPhy+" status="+status);};};
     }
 }

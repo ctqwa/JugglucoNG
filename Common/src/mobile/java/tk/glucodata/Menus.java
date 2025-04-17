@@ -66,6 +66,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.getshowscans;
 import static tk.glucodata.Natives.getsystemui;
@@ -89,7 +90,7 @@ static public void show(MainActivity act) {
       act.lightBars(false);
 	act.setonback(() -> {
    		act.lightBars(!getInvertColors( ));
-			   Log.i(LOG_ID,"onback");
+			   {if(doLog) {Log.i(LOG_ID,"onback");};};
 			   on=false;
 			removeContentView(view);
 				act.requestRender();
@@ -148,7 +149,7 @@ static public void show(MainActivity act) {
         var exportview=view.findViewById(R.id.export);exportview.setOnClickListener(v ->{
 		var c=Applic.app.curve;
 		  if(c!=null) {
-			  Log.i(LOG_ID,"EXPORT");
+			  {if(doLog) {Log.i(LOG_ID,"EXPORT");};};
    		   act.lightBars(!getInvertColors( ));
 		     removeContentView(view);
 		     c.dialogs.showexport(act,c.getWidth(),c.getHeight(),null); 

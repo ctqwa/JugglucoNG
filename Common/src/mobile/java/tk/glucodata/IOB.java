@@ -25,6 +25,7 @@ package tk.glucodata;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Layout.getMargins;
 import static tk.glucodata.Natives.getInsulinType;
 import static tk.glucodata.Natives.setInsulinType;
 import static tk.glucodata.RingTones.EnableControls;
@@ -109,7 +110,9 @@ public static void mkview(MainActivity act) {
          return new int[] {w,h};
            },new View[]{recycle},new View[]{help,iob,ok});
    lay.setBackgroundColor(Applic.backgroundcolor);
-   lay.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop,MainActivity.systembarRight,MainActivity.systembarBottom);
+   final var density= tk.glucodata.GlucoseCurve.metrics.density;
+   getMargins(help).leftMargin=getMargins(ok).rightMargin=(int)(0.15f*GlucoseCurve.getwidth());
+   lay.setPadding(MainActivity.systembarLeft+(int)(density*10.0f),MainActivity.systembarTop,MainActivity.systembarRight+(int)(density*10.0f),MainActivity.systembarBottom);
     iob.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
             if(!Natives.setIOB(isChecked)) {
                 iob.setChecked(false);

@@ -242,6 +242,44 @@ jobject newAlgContext(va_list) {
     LOGAR("newAlgContext(va_list)");
     return reinterpret_cast<jobject>(new AlgorithmContext()); 
     }
+
+#ifdef ADD_ConnectDecodeResult
+struct ConnectDecodeResult {
+    int result;
+    std::string BatchNum;
+    std::string SerialNum;
+    std::string Sens;
+    };
+jobject newConnectDecodeResult(va_list) {
+    LOGAR("newConnectDecodeResult(va_list)");
+    return reinterpret_cast<jobject>(new ConnectDecodeResult()); 
+    }
+
+void decodeSetResult(jobject obj,  va_list args) {
+    auto *condec=reinterpret_cast<ConnectDecodeResult*>(obj);
+    const jint res=va_arg(args, jint);
+    subLOGGER("ConnectDecodeResult.setResult(%d)\n",res);
+    condec->result= res;
+    }
+void decodeSetBatchNum(jobject obj,  va_list args) {
+    const char *str=va_arg(args, char *);
+    subLOGGER("ConnectDecodeResult.setBatchNum(%s)\n",str);
+    auto *condec=reinterpret_cast<ConnectDecodeResult*>(obj);
+    condec->BatchNum=str;
+    }
+void decodeSetSerialNum(jobject obj,  va_list args) {
+    const char *str=va_arg(args, char *);
+    subLOGGER("ConnectDecodeResult.setSerialNum(%s)\n",str);
+    auto *condec=reinterpret_cast<ConnectDecodeResult*>(obj);
+    condec->SerialNum=str;
+    }
+void decodeSetSens(jobject obj,  va_list args) {
+    const char *str=va_arg(args, char *);
+    subLOGGER("ConnectDecodeResult.setSens(%s)\n",str);
+    auto *condec=reinterpret_cast<ConnectDecodeResult*>(obj);
+    condec->Sens=str;
+    }
+#endif
 #endif
 
 
@@ -521,6 +559,17 @@ jclasser AlgContext{"AlgorithmContext",{{"<init>","()V",function(newAlgContext)}
 {"temperatureWarning","I",valueptr(temperatureWarningField)},
 {"ig_trend","I",valueptr(ig_trendField)}}};
 //s/^.*AlgorithmContext,\([^,]*\),\([^)]*\)).*$/{"\1","\2",function(\1Field)},
+
+#ifdef ADD_ConnectDecodeResult
+jclasser ConnectDecodeResult{"ConnectDecodeResult",{{"<init>","()V",function(newConnectDecodeResult)},
+{"setBatchNum","(Ljava/lang/String;)V",function(decodeSetBatchNum)},
+{"setResult","(I)V",function(decodeSetResult)},
+{"setSens","(Ljava/lang/String;)V",function(decodeSetSens)},
+{"setSerialNum","(Ljava/lang/String;)V",function(decodeSetSerialNum)}}};
+
+#endif
+//s/^.*AlgorithmContext,\([^,]*\),\([^)]*\)).*$/{"\1","\2",function(\1Field)},
+
 
 #endif
 jclasser classen[] {

@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import tk.glucodata.*
+import tk.glucodata.Log.doLog
 import tk.glucodata.MainActivity.SENSOR_PERMISSION_REQUEST_CODE
 import tk.glucodata.databinding.ActivityWatchFaceConfigBinding
 import tk.glucodata.watchface.utils.*
@@ -158,7 +159,7 @@ override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<Str
         }
 
         else -> {
-        Log.i(LOG_ID, "On known permission $requestCode");
+        {if(doLog) {Log.i(LOG_ID, "On known permission $requestCode");};};
         }
     }
 }

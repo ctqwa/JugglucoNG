@@ -1,6 +1,7 @@
 package tk.glucodata.NovoPen.opennov.ll;
 
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NovoPen.opennov.BaseMessage.d;
 
 import android.nfc.TagLostException;
@@ -54,10 +55,10 @@ public class T4Transceiver extends MyByteBuffer {
         if (bytes == null) return null;
         try {
 	    byte[] res=tag.transceive(bytes);
-	     Log.i(TAG,"transceive(" +HexDump.toHexString(bytes)+")="+HexDump.toHexString(res));
+	     {if(doLog) {Log.i(TAG,"transceive(" +HexDump.toHexString(bytes)+")="+HexDump.toHexString(res));};};
             return T4Reply.parse(res, reply);
         } catch (TagLostException e) {
-            Log.d(TAG, "Tag was lost");
+            {if(doLog) {Log.d(TAG, "Tag was lost");};};
             try {
                 tag.close();
             } catch (IOException ioException) {
@@ -77,10 +78,10 @@ public class T4Transceiver extends MyByteBuffer {
         var result = t4Transceive(bytes);
         var okay = result != null && result.isOkay();
         if (!okay) {
-            Log.d(TAG, failureMsg);
+            {if(doLog) {Log.d(TAG, failureMsg);};};
         }
 	else {
-		Log.i(TAG,"transceiveOkay");
+		{if(doLog) {Log.i(TAG,"transceiveOkay");};};
 		}
         return okay;
     }
@@ -140,7 +141,7 @@ static    public byte[] T4Updateencode(byte[] bytes,int offset,boolean firstFrag
 
     public void writeToLinkLayer(final byte[] bytes) {
         if (!tag.isConnected()) {
-            Log.d(TAG, "Tag lost (write)");
+            {if(doLog) {Log.d(TAG, "Tag lost (write)");};};
             return;
         }
 //        var packets = T4Update.builder().bytes(bytes).build().encodeForMtu(mlcMax);
@@ -173,7 +174,7 @@ static   private byte[] getT4read(int offset, int len) {
             thisOffset += thisRead;
             thisLength -= thisRead;
         }
-        Log.i(TAG,"arlen="+arlen+" blist.size()="+blist.size());
+        {if(doLog) {Log.i(TAG,"arlen="+arlen+" blist.size()="+blist.size());};};
         return blist;
     }
 
@@ -181,23 +182,23 @@ static   private byte[] getT4read(int offset, int len) {
        var readLength = getT4read(0,2);
         for (int i = 0; i < MAX_RETRY; i++) {
             if (!tag.isConnected()) {
-                Log.d(TAG, "Tag lost");
+                {if(doLog) {Log.d(TAG, "Tag lost");};};
                 return null;
             } else {
                 tag.setTimeout(3000);
             }
                var lengthResult = t4Transceive(readLength);
                if (lengthResult == null) {
-                   Log.d(TAG, "Failed to transceive when reading length");
+                   {if(doLog) {Log.d(TAG, "Failed to transceive when reading length");};};
                    return null;
                }
                if (!lengthResult.isOkay()) {
-                   Log.d(TAG, "Invalid response when reading length");
+                   {if(doLog) {Log.d(TAG, "Invalid response when reading length");};};
                    continue;
                }
 
                 var readLen = lengthResult.asInteger();
-               Log.d(TAG, "Reading data of length: " + readLen);
+               {if(doLog) {Log.d(TAG, "Reading data of length: " + readLen);};};
 
             /*var read = new T4Read(2,readLen);
             var reads = read.encodeForMtu(Math.min(MAX_READ_SIZE_PARAMETER, mleMax)); */
@@ -208,7 +209,7 @@ static   private byte[] getT4read(int offset, int len) {
                 for (int retry = 0; retry < MAX_RETRY; retry++) {
                     reply = t4Transceive(readCmd, reply);
                     if (reply == null) {
-                        Log.d(TAG, "Read transceive fully failed");
+                        {if(doLog) {Log.d(TAG, "Read transceive fully failed");};};
                         continue;
                         }
                     if (reply.isOkay())
@@ -217,7 +218,7 @@ static   private byte[] getT4read(int offset, int len) {
                         Thread.sleep(RETRY_PAUSE); //TODO: called RETRY, but result is added to reply
                     } catch (InterruptedException e) {
                         //
-                        Log.i(TAG,"Interupted");
+                        {if(doLog) {Log.i(TAG,"Interupted");};};
                         }
                     }
             }
@@ -225,7 +226,7 @@ static   private byte[] getT4read(int offset, int len) {
             if (reply != null && reply.isOkay()) {
                 var blen = reply.bytes.length; //bytes of failed attempt also added
                 if (blen == readLen) {
-                    Log.d(TAG, "Successfully read: " + blen + " bytes");
+                    {if(doLog) {Log.d(TAG, "Successfully read: " + blen + " bytes");};};
                     return reply.bytes;
                 } else {
                     Log.e(TAG, "Read length mismatch " + blen + " vs " + readLen);
@@ -240,24 +241,24 @@ static   private byte[] getT4read(int offset, int len) {
         var containerSize = 15;
         var reply = t4Transceive(getT4read(0,containerSize));
         if (reply == null) {
-            Log.d(TAG, "Failed to read container data (null reply)");
+            {if(doLog) {Log.d(TAG, "Failed to read container data (null reply)");};};
             return false;
         }
         if (!reply.isOkay()) {
-            Log.d(TAG, "Failed to read container data (not okay)");
+            {if(doLog) {Log.d(TAG, "Failed to read container data (not okay)");};};
             return false;
         }
         var data = reply.bytes;
-        if (d) Log.d(TAG, "Container data: " + HexDump.dumpHexString(data));
+        if (d) {if(doLog) {Log.d(TAG, "Container data: " + HexDump.dumpHexString(data));};};
 
         if (data.length == containerSize) {
             var b = ByteBuffer.wrap(data);
             var cclen = getUnsignedShort(b);
             var mapping = getUnsignedByte(b);
             mleMax = getUnsignedShort(b);
-            Log.d(TAG, "mleMax: " + mleMax);
+            {if(doLog) {Log.d(TAG, "mleMax: " + mleMax);};};
             mlcMax = getUnsignedShort(b);
-            Log.d(TAG, "mlcMax: " + mlcMax);
+            {if(doLog) {Log.d(TAG, "mlcMax: " + mlcMax);};};
             var t = getUnsignedByte(b);
             var l = getUnsignedByte(b);
             var ident = getUnsignedShort(b);

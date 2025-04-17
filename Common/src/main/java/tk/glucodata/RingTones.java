@@ -117,7 +117,7 @@ static private	View.AccessibilityDelegate  accessDeli=
 		public void onInitializeAccessibilityNodeInfo( View host,
 													  AccessibilityNodeInfo info) {
 
-			Log.i(LOG_ID,"onInitializeAccessibilityNodeInfo");
+			{if(doLog) {Log.i(LOG_ID,"onInitializeAccessibilityNodeInfo");};};
 		}
 
 

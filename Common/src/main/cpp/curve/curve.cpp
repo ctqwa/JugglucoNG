@@ -1235,6 +1235,13 @@ static void startstep(const NVGcolor &col);
 struct {
 float left,top,right,bottom;
 } menupos;
+#ifndef NOLOG
+void logmenupos() {
+    LOGGER("left=%.1f top=%.1f right=%.1f bottom=%.1f\n",menupos.left,menupos.top,menupos.right,menupos.bottom);
+    }
+#else
+#define logmenupos() 
+#endif
 void showok(bool good,bool up) {
     nvgFontSize(genVG,headsize/4 );
     nvgTextAlign(genVG,NVG_ALIGN_RIGHT|(up?NVG_ALIGN_TOP:NVG_ALIGN_BOTTOM));
@@ -2923,6 +2930,7 @@ extern void setusefr();
 extern void setusept() ;
 extern void setuseiw() ;
 extern void setuseeng() ;
+extern void setusetr();
 extern std::string_view localestr;
 extern bool hour24clock;
 char localestrbuf[10];
@@ -3003,6 +3011,10 @@ void  setlocale(const char *localestrbuf,const size_t len) {
         case mklanguagenum("UK"):
         case mklanguagenum("uk"):
             setuseuk();
+            break;
+        case mklanguagenum("TR"):
+        case mklanguagenum("tr"):
+            setusetr();
             break;
         case mklanguagenum("SV"):
         case mklanguagenum("sv"):
@@ -3652,7 +3664,7 @@ void speaknum(const Num *num) {
     speak(buf);
     }
 int64_t longpress(float x,float y) {
-    LOGSTRING("longpress\n");
+    LOGGER("longpress x=%.1f y=%.1f\n",x,y);
 #ifndef WEAROS
     if(showpers)
         return 0LL;
@@ -4392,6 +4404,7 @@ LOGAR("showtext");
          x+=xrand;
      #endif
      menupos={ x-xrand, starty-yrand,x-xrand+ mwidth, height+yrand};
+     logmenupos();
      nvgRect(genVG, x-xrand, starty-yrand, mwidth, height-starty+2*yrand);
     nvgFill(genVG);
 #ifdef WEAROS

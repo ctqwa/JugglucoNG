@@ -50,6 +50,7 @@ import static android.text.InputType.TYPE_NULL;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getkerfstokblack;
 import static tk.glucodata.Natives.setkerfstokblack;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
@@ -207,7 +208,7 @@ class GarminStatus {
 		spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 			@Override
 			public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-				Log.i(LOG_ID, "onItemSelected");
+				{if(doLog) {Log.i(LOG_ID, "onItemSelected");};};
 				if (alldata.devices != null) {
 					alldata.devused = position;
 					long oldident = numio.getident();
@@ -330,7 +331,7 @@ class GarminStatus {
 				builder.append(timestring(alldata.receivedmessage));
 			}
 			String alltext=builder.toString();
-			Log.i(LOG_ID,"setText "+alltext);
+			{if(doLog) {Log.i(LOG_ID,"setText "+alltext);};};
 			restview.setText(alltext);
 			int vis = alldata.usewatch ? VISIBLE : GONE;
 			glucose.setChecked(alldata.sendtowatch);

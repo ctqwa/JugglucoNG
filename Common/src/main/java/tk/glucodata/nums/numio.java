@@ -118,10 +118,10 @@ if(true) {
              return false;
              }
             else
-             Log.i(LOG_ID,"mkdirs "+filespath+" succeeded");
+             {if(doLog) {Log.i(LOG_ID,"mkdirs "+filespath+" succeeded");};};
       }
        else
-          Log.i(LOG_ID,filespath+" is a directory");
+          {if(doLog) {Log.i(LOG_ID,filespath+" is a directory");};};
       }
       }
    int ret=130;
@@ -204,7 +204,7 @@ if(true) {
    build.append('\n');
       Natives.log(build.toString());
        final String version= BuildConfig.VERSION_CODE+" "+ BuildConfig.VERSION_NAME +" "+ BuildConfig.BUILD_TIME+"\n";
-      Log.i(LOG_ID,version+locstr+" "+country+" nativeDir="+nativedir);
+      {if(doLog) {Log.i(LOG_ID,version+locstr+" "+country+" nativeDir="+nativedir);};};
       }
 
    if(!isWearable)
@@ -213,12 +213,12 @@ if(true) {
     startsensors( );
    startmeals();
    Natives.startthreads();
-   Log.i(LOG_ID,"after startthreads");
+   {if(doLog) {Log.i(LOG_ID,"after startthreads");};};
    numptrs[1]=Natives.openNums("here",0L);
    newhit=Natives.newhit();
    numptrs[0]=Natives.openNums(datadir,-1L); //order important!!
    Natives.calccurvegegs();
-   Log.i(LOG_ID,"end setlibrary");
+   {if(doLog) {Log.i(LOG_ID,"end setlibrary");};};
    Applic.stopprogram=0;
    return true;
    }
@@ -237,7 +237,7 @@ public static void setident(long ident) {
    }
 
 static void open(String base,long ident) {
-         Log.d(LOG_ID,"open("+base+","+ident+")");
+         {if(doLog) {Log.d(LOG_ID,"open("+base+","+ident+")");};};
     if(numio.numptrs[0]!=0L) {
        if(ident==-1L||getident()==ident) 
          return;
@@ -265,7 +265,7 @@ static void writeAr(int base,int pos, List<Number> dat)  {
    }
 
 private static item readitem(int base,int pos) {
-//   Log.i(LOG_ID,"readitem("+base+","+pos+")={"+uit.time+","+uit.value+","+uit.label+"}");
+//   {if(doLog) {Log.i(LOG_ID,"readitem("+base+","+pos+")={"+uit.time+","+uit.value+","+uit.label+"}");};};
    return Natives.getNumitem(numio.numptrs[base], pos);
     }
 static List<Number>  readAr(int base,int pos)  {
@@ -296,6 +296,10 @@ public static int getlastnum(int base) {
    long ptr=numio.numptrs[base];
    return Natives.getlastNum(ptr); 
    }
+
+public static boolean hasNumdata() {
+    return getlastnum(0)>0||getlastnum(1)>0;
+    }
 public static void setlastnum(int base,int last) {
    long ptr=numio.numptrs[base];
    Natives.setlastNum(ptr,last);
@@ -308,7 +312,7 @@ public static int getlastpollednum(int base) {
 public static boolean didreceivebackup(int base) {
    long ptr=numio.numptrs[base];
    var res=Natives.receivedbackup(ptr); 
-   Log.i(LOG_ID,"didreceivebackup("+base+")="+res);
+   {if(doLog) {Log.i(LOG_ID,"didreceivebackup("+base+")="+res);};};
    return res;
    }
    

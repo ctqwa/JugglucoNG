@@ -61,6 +61,7 @@ import tk.glucodata.Applic.removescreenupdater
 import tk.glucodata.Applic.setscreenupdater
 import tk.glucodata.CommonCanvas
 import tk.glucodata.Log
+import tk.glucodata.Log.doLog
 import tk.glucodata.Natives
 import tk.glucodata.strGlucose
 import tk.glucodata.watchface.data.watchface.ColorStyleIdAndResourceIds
@@ -292,8 +293,8 @@ private fun watchtime(canvas:Canvas,localtime: LocalTime) {
 private var rendertime:Long=0L
 
 override fun render(canvas: Canvas, bounds: Rect, zonedDateTime: ZonedDateTime,sharedAssets:InnerAssets) {
-   registersensor(Applic.getHeartRate())
-    Log.i(LOG_ID, "render");
+       registersensor(Applic.getHeartRate())
+        if(doLog) {Log.i(LOG_ID, "render");}
         canvas.drawColor(BLACK)
         drawComplications(canvas, zonedDateTime)
         if(renderParameters.watchFaceLayers.contains(WatchFaceLayer.COMPLICATIONS_OVERLAY)) {

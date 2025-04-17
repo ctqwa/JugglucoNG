@@ -1,4 +1,5 @@
-add #ifndef NOLOG around log only data
+Talk->Test on WearOS is terrible slow
+Kijk naar logs Sibionics 2
 Als iemand een oude sensor met zelfde pin heeft liggen leidt dit tot problemen.
 Die sensor kan geaccepteerd worden. Daarna neemt Juggluco nog alleen maar die sensor. Als het niet zo was zouden data door elkaar raken.
 Oplossingen:

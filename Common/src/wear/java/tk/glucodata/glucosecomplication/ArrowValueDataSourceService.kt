@@ -76,8 +76,8 @@ fun getview(type: ComplicationType):GlucoseValue {
 
 	    val icon=Icon.createWithBitmap( getview(type).previewbitmap())
         return when (type) {
-        /*
-         MONOCHROMATIC_IMAGE -> {
+        
+/*         MONOCHROMATIC_IMAGE -> {
             Log.i(LOG_ID,"MonochromaticImage")
             MonochromaticImageComplicationData.Builder(
                 MonochromaticImage.Builder (Icon.createWithBitmap(
@@ -89,7 +89,7 @@ fun getview(type: ComplicationType):GlucoseValue {
                         )
                     )).build(), contentDescription = PlainComplicationText.Builder("Glucose+arrow").build()
                 ).setTapAction(null).build()
-			    } */
+			    }  */
             PHOTO_IMAGE -> {
                 Log.i(LOG_ID,"getPreviewData PHOTO_IMAGE")
                 PhotoImageComplicationData.Builder(photoImage = icon, contentDescription = PlainComplicationText.Builder("Glucose+arrow").build()
@@ -129,24 +129,16 @@ fun getview(type: ComplicationType):GlucoseValue {
 
 	val image=Icon.createWithBitmap(bitmap)
     return when (type) {
-        /* MONOCHROMATIC_IMAGE -> {
-            Log.i(LOG_ID,"MonochromaticImage")
-            MonochromaticImageComplicationData.Builder(
-                    MonochromaticImage.Builder(Icon.createWithBitmap(glview.getArrowValueBitmap(glucose.value,glucose.time*1000L,glucose.index,glucose.rate))).build(), contentDescription = PlainComplicationText.Builder("Glucose Number").build()).setTapAction(complicationPendingIntent).build()
-			    } */
          PHOTO_IMAGE -> {
          Log.i(LOG_ID,"PHOTO_IMAGE")
                 PhotoImageComplicationData.Builder( image , contentDescription = PlainComplicationText.Builder("Glucose Arrow+Value").build()).setTapAction(complicationPendingIntent).build()
 			    }
-           SMALL_IMAGE -> {
-         Log.i(LOG_ID,"SMALL_IMAGE")
+
+           else -> {
+             Log.i(LOG_ID,"SMALL_IMAGE")
                 SmallImageComplicationData.Builder( SmallImage.Builder( image, SmallImageType.PHOTO).build(), contentDescription = PlainComplicationText.Builder("Glucose Arrow+Value").build()).setTapAction(complicationPendingIntent).build()
 //		setAmbientImage(Icon ambientImage) ??
 			    }
-            else -> {
-                Log.w(LOG_ID, "Unexpected complication type $type")
-                null
-            }
             }
 
     }

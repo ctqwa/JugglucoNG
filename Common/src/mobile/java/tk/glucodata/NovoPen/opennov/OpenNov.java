@@ -4,6 +4,7 @@ https://github.com/NightscoutFoundation/xDrip
 */
 package tk.glucodata.NovoPen.opennov;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NovoPen.opennov.BaseMessage.d;
 import static tk.glucodata.NovoPen.opennov.BaseMessage.log;
 
@@ -46,7 +47,7 @@ public class OpenNov extends MyByteBuffer {
             isoDep.setTimeout(1000);
 
             if (ts.doNeededSelection()) {
-                Log.d(TAG, "Selection okay");
+                {if(doLog) {Log.d(TAG, "Selection okay");};};
 
                 int errors = 0;
                 int transactions = 0;
@@ -61,7 +62,7 @@ public class OpenNov extends MyByteBuffer {
                     var payload = ph.extractInnerPacket(res, true);
                     if (payload != null) {
                         fsa = machine.processPayload(payload);
-                        Log.d(TAG, "Got fsa action: " + fsa.action);
+                        {if(doLog) {Log.d(TAG, "Got fsa action: " + fsa.action);};};
                         switch (fsa.action) {
 
                             case WRITE_READ:
@@ -76,12 +77,12 @@ public class OpenNov extends MyByteBuffer {
                         }
                     } else {
                         errors++;
-                        Log.d(TAG, "Read cycle got null errors @ " + errors);
+                        {if(doLog) {Log.d(TAG, "Read cycle got null errors @ " + errors);};};
                     } // if payload
                 } // end while
 
                 if (fsa.doRead()) {
-                    Log.d(TAG, "Overall failure to read");
+                    {if(doLog) {Log.d(TAG, "Overall failure to read");};};
                     isoDep.close();
                     return null;
                 }
@@ -91,7 +92,7 @@ public class OpenNov extends MyByteBuffer {
             }
             isoDep.close();
         } catch (IOException e) {
-            Log.d(TAG, "Could not connect: " + e);
+            {if(doLog) {Log.d(TAG, "Could not connect: " + e);};};
         } catch (Exception e) {
             Log.stack(TAG, "Got crash in handler: " , e);
         }

@@ -26,6 +26,7 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Backup.getedit;
 import static tk.glucodata.Layout.getMargins;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.stackline;
 import static tk.glucodata.Natives.setNightUploader;
 import static tk.glucodata.RingTones.EnableControls;
@@ -118,7 +119,7 @@ static private String uploadstatus=nothing;
 static public boolean deleteUrl(String urlstring,String secret) {
     patch();
     uploadtime=System.currentTimeMillis();
-    Log.i(LOG_ID,"deleteUrl "+urlstring+" "+ secret);
+    {if(doLog) {Log.i(LOG_ID,"deleteUrl "+urlstring+" "+ secret);};};
     try {
         URL url = new URL(urlstring);
         if(url==null)  {
@@ -139,7 +140,7 @@ static public boolean deleteUrl(String urlstring,String secret) {
         final int code=urlConnection.getResponseCode();
         String res=getstring(urlConnection);
         if(code==HTTP_OK) {
-            Log.i(LOG_ID,"deleteUrl success "+res);
+            {if(doLog) {Log.i(LOG_ID,"deleteUrl success "+res);};};
             uploadstatus=success;
             return true;
             }
@@ -222,7 +223,7 @@ private static long uploadtime=System.currentTimeMillis();
 static public int upload(String httpurl,byte[] postdata,String secret,boolean put) {
     patch();
     uploadtime=System.currentTimeMillis();
-    Log.i(LOG_ID,"upload("+httpurl+",#"+postdata.length+","+ secret+","+(put?"PUT":"POST")+")");
+    {if(doLog) {Log.i(LOG_ID,"upload("+httpurl+",#"+postdata.length+","+ secret+","+(put?"PUT":"POST")+")");};};
     try {
 
       uploadstatus="start upload "+httpurl;
@@ -252,7 +253,7 @@ static public int upload(String httpurl,byte[] postdata,String secret,boolean pu
             }
         else {
             uploadstatus=success;
-            Log.i(LOG_ID,resstr);
+            {if(doLog) {Log.i(LOG_ID,resstr);};};
             }
         return code;
          }

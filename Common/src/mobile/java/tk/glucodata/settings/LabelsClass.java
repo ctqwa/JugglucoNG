@@ -27,6 +27,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.getscreenwidth;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
@@ -176,16 +177,16 @@ void mkchangelabel(MainActivity context,Runnable onsave,View parent) {
 
 private void	dodeletelast(Spinner spinner,	LabelAdapter<String> numspinadapt,Button addnew, int nr) {
 	Natives.setnrlabel(nr);
-	Log.i(LOG_ID,"voor remove labels.size()="+labels.size());
+	{if(doLog) {Log.i(LOG_ID,"voor remove labels.size()="+labels.size());};};
 	labels.remove(nr); //USE
-	Log.i(LOG_ID,"na remove labels.size()="+labels.size());
+	{if(doLog) {Log.i(LOG_ID,"na remove labels.size()="+labels.size());};};
 	adapt.notifyDataSetChanged();
 	numspinadapt.setarray(Natives.getLabels());
 	spinner.setAdapter(numspinadapt);
 	spinner.setSelection(Natives.getmealvar());
 
 	if((labels.size()-1)<40) {
-		Log.i(LOG_ID,"addnew.setVisibility(VISIBLE)");
+		{if(doLog) {Log.i(LOG_ID,"addnew.setVisibility(VISIBLE)");};};
 		addnew.setVisibility(VISIBLE);
 		}
 	}
@@ -245,15 +246,16 @@ void    mklabellayout(View parent ) {
 	TextView menulabel=getlabel(context,context.getString(R.string.meal));
 //	spinner.clearAnimation();
 	spinner.setSelection(Natives.getmealvar());
-        Button help=new Button(context);
-        help.setOnClickListener(v->{help(R.string.labelhelp,context); });
-        help.setText(R.string.helpname);
+    Layout.getMargins(spinner).rightMargin=(int)(tk.glucodata.GlucoseCurve.metrics.density*8.0);
+    Button help=new Button(context);
+    help.setOnClickListener(v->{help(R.string.labelhelp,context); });
+    help.setText(R.string.helpname);
 	Layout butlay=new Layout(context,new View[]{menulabel,spinner},new View[] {delete},new View[]{help},new View[]{addnew},new View[]{ok});
 	butlay.setLayoutParams(new ViewGroup.LayoutParams(   ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		recycle.setLayoutParams(new ViewGroup.LayoutParams(   ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-      butlay.setPadding(0,MainActivity.systembarTop/2,MainActivity.systembarRight,MainActivity.systembarBottom);
-      recycle.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop,0,MainActivity.systembarBottom);
+    butlay.setPadding(0,MainActivity.systembarTop/2,MainActivity.systembarRight,MainActivity.systembarBottom);
+    recycle.setPadding(MainActivity.systembarLeft+(int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),MainActivity.systembarTop,0,MainActivity.systembarBottom);
     final ViewGroup  labellayout=new Layout(context,(x,w,h)->{
     			hideSystemUI();
 			return new int[] {w,h};
@@ -281,7 +283,7 @@ void    mklabellayout(View parent ) {
 
 		delete.setOnClickListener(v -> {
 			int nr = labels.size() - 2; //USE
-			Log.d(LOG_ID, "delete " + nr);
+			{if(doLog) {Log.d(LOG_ID, "delete " + nr);};};
 			if (nr >= 0) {
 				askdeletelast(spinner,numspinadapt,addnew, nr);
 				}

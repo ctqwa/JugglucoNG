@@ -50,7 +50,7 @@ public	void handlealarm() {
 		boolean shouldwake = Natives.shouldwakesender();
 		final long tryagain = nu + showtime;
 		if(afterwait > nu) {
-			Log.i(LOG_ID, "handlealarm notify");
+			{if(doLog) {Log.i(LOG_ID, "handlealarm notify");};};
 			Notify.onenot.oldnotification(wastime);
 			long nexttime = (!shouldwake || (afterwait < tryagain && hasalarmloss())) ? afterwait : tryagain;
 			LossOfSensorAlarm.setalarm(Applic.app, nexttime);
@@ -58,7 +58,7 @@ public	void handlealarm() {
 			if (shouldwake)
 				LossOfSensorAlarm.setalarm(Applic.app, tryagain);
 			if (!saidloss) {
-				Log.i(LOG_ID, "handlealarm alarm");
+				{if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};};
 				long lasttime=Natives.lastglucosetime( );
 				if(lasttime!=0L)
 					wastime=lasttime;

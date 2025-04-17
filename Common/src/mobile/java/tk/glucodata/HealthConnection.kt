@@ -38,6 +38,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import tk.glucodata.Log.doLog
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
@@ -51,7 +52,7 @@ class HealthConnection(private val client: HealthConnectClient) {
 @OptIn(ExperimentalStdlibApi::class)
 private  fun writeAllIns(sensorptr:Long, sensorName:String) {
     if (active.getAndSet(true)) {
-        Log.i(LOG_ID, "writeAll already active");
+        if(doLog) {Log.i(LOG_ID, "writeAll already active");}
         return
     }
     scope.launch {
@@ -60,7 +61,7 @@ private  fun writeAllIns(sensorptr:Long, sensorName:String) {
             if (!hasPermission) {
                 checkPermissionsAndRun(MainActivity.thisone)
                 if (!hasPermission) {
-                    Log.i(LOG_ID, "No permission");
+                    if(doLog) {Log.i(LOG_ID, "No permission");}
                     return@launch
                 }
             }

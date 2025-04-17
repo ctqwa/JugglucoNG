@@ -35,9 +35,11 @@
 #include <net/if.h>
 #include <dlfcn.h>
 #include <linux/if.h>
+#include <new>
 
 #define lerrortag(...) lerror("netstuff: " __VA_ARGS__)
 #define LOGGERTAG(...) LOGGER("netstuff: " __VA_ARGS__)
+#define LOGARTAG(...) LOGAR("netstuff: " __VA_ARGS__)
 #define LOGSTRINGTAG(...) LOGSTRING("netstuff: " __VA_ARGS__)
 #define flerrortag(...) flerror("netstuff: " __VA_ARGS__)
 
@@ -242,8 +244,14 @@ struct ifconf  {
 };
 */
 
-int oldgetownips(struct sockaddr_in6 *outips,int max,bool &haswlan) { 
-LOGSTRINGTAG("oldgetownips\n");
+inline bool putip(const struct sockaddr *addrptr,namehost   *outip) {
+    new(outip) namehost(addrptr);
+    return true;
+    }
+
+template <typename OUTTYPE>
+int oldgetownips(OUTTYPE *outips,int max,bool &haswlan) { 
+LOGARTAG("oldgetownips");
 haswlan=false;
   int  socketfd = socket(AF_INET6, SOCK_DGRAM, 0);
   if(socketfd<0) {
@@ -275,12 +283,13 @@ haswlan=false;
 }
 //#define OLDOWNIPS 1
 #ifdef OLDOWNIPS
-int getownips(struct sockaddr_in6 *outips,int max,bool &haswlan) {
+template <typename OUTTYPE>
+int getownips(OUTTYPE *outips,int max,bool &haswlan) {
       return oldgetownips(outips,max,haswlan);
       }
 #else
-
-int getownips(struct sockaddr_in6 *outips,int max,bool &haswlan) {
+template <typename OUTTYPE>
+int getownips(OUTTYPE *outips,int max,bool &haswlan) {
    LOGSTRINGTAG("getownips\n");
     struct ifaddrs *ifaddr;
    typedef int (*getifaddrs_t)(struct ifaddrs **ifap);
@@ -354,7 +363,8 @@ int getownips(struct sockaddr_in6 *outips,int max,bool &haswlan) {
  //   return oldgetownips(outips,max,haswlan);
    }
 #endif
-
+template  int getownips<struct sockaddr_in6> ( struct sockaddr_in6 *outips,int max,bool &) ;
+template  int getownips<namehost> ( namehost *outips,int max,bool &) ;
 #ifdef MAIN2
 int main(int argc,char **argv) {
 

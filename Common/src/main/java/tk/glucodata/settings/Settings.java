@@ -422,6 +422,8 @@ new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View
       View[] lostrow={lossalarm,losswait,min,ringlossalarm};
         View[] row6={usealarm,isvalue, ringisvalue};
         View[] rowshow={help,Cancel,Save};
+
+        getMargins(help).leftMargin=getMargins(Save).rightMargin=(int)(GlucoseCurve.getwidth()*.15f);
       /*
       var seekbar=new SeekBar(context);
       seekbar.setMax(100);
@@ -441,8 +443,10 @@ new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View
       final int sidepad=(int)(GlucoseCurve.metrics.density*5);
        layout.setPadding((int)(GlucoseCurve.metrics.density*8), sidepad,(int)(GlucoseCurve.metrics.density*12),sidepad);
        }
-     else
-        layout.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop*2/3,MainActivity.systembarRight,MainActivity.systembarBottom*9/10);
+     else {
+        final int sidepad=(int)(GlucoseCurve.metrics.density*8);
+        layout.setPadding(MainActivity.systembarLeft+sidepad,MainActivity.systembarTop*2/3,sidepad+MainActivity.systembarRight,sidepad+MainActivity.systembarBottom*9/10);
+        }
     var scroll=new ScrollView(context);    
     scroll.addView(layout);
     scroll.setFillViewport(true);
@@ -523,7 +527,7 @@ final private static String  codestr=String.valueOf(BuildConfig.VERSION_CODE);
 //static private final List<String> supportedlanguages= Arrays.asList("Language","be","de","en","fr","it","nl","pl","pt","sv","uk","zh");
 //  static private final List<String> supportedlanguages= Arrays.asList("Language","be","de","en","fr","it","nl","pl","pt","sv","uk");
 //static private final List<String> supportedlanguages= Arrays.asList("Language","be","de","en","fr","it","nl","pl","pt");
-static private final List<String> supportedlanguages= SPANISH?Arrays.asList("Language","be","de","en","es","fr","it","nl","pl","pt","ru","sv","uk","zh"):Arrays.asList("Language","be","de","en","fr","it","nl","pl","pt","ru","sv","uk","zh");
+static private final List<String> supportedlanguages= SPANISH?Arrays.asList("Language","be","de","en","es","fr","it","nl","pl","pt","ru","sv","tr","uk","zh"):Arrays.asList("Language","be","de","en","fr","it","nl","pl","pt","ru","sv","tr","uk","zh");
 
 //static private final List<String> supportedlanguages= IWRU?Arrays.asList("Language","be","de","en","es","fr","it","iw","nl","pl","pt","ru","sv","uk"):Arrays.asList("Language","be","de","en","es","fr","it","nl","pl","pt","sv","uk");
 static public Spinner getGenSpin(Activity context) {
@@ -667,16 +671,16 @@ static private void displaysettings(MainActivity context,Settings settings) {
       iob.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
                 if(!Natives.setIOB(isChecked)) {
                     iob.setChecked(false);
-                    tk.glucodata.help.help(R.string.IOB,context);
+                    tk.glucodata.help.help(R.string.IOBhelp,context);
                     }
                 }
             ); 
-      if(!useclose)
+    if(!useclose)
           close.setVisibility(GONE);
-        targetlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
-        graphlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
-        //colbut.setPadding(0,0,0,0);
-        threslabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*7.0),0,0,0);
+    targetlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
+    graphlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
+    //colbut.setPadding(0,0,0,0);
+    threslabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*7.0),0,0,0);
    //      Button display=getbutton(context,context.getString(R.string.display));
      var Scans=getcheckbox(context,R.string.scansname,getshowscans()) ;
      var History=getcheckbox(context,R.string.historyname,getshowhistories()) ;
@@ -713,6 +717,7 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
                 int ori= (isChecked?SCREEN_ORIENTATION_REVERSE_LANDSCAPE:SCREEN_ORIENTATION_LANDSCAPE);
                 Natives.setScreenOrientation(ori);
                 });
+        Layout.getMargins(colbut).leftMargin=Layout.getMargins(close).rightMargin=(int)( .15f*GlucoseCurve.getwidth());
         lay = new Layout(context, (l, w, h) -> {
                   int[] ret={w,h};
                  return ret;
@@ -777,7 +782,7 @@ Runnable closerun= () -> {
    }
        /*graphrange.setLabelFormatter(f->{
             var str= Settings.float2string(f);
-          Log.i(LOG_ID,"setLabelformatter "+str);
+          {if(doLog) {Log.i(LOG_ID,"setLabelformatter "+str);};};
           return str;}); */
 //       graphrange.setLabelBehavior(LabelFormatter.LABEL_WITHIN_BOUNDS);
 //       graphrange.setLabelBehavior(LabelFormatter.LABEL_FLOATING);
@@ -785,8 +790,6 @@ Runnable closerun= () -> {
 private    void mksettings(MainActivity context,boolean[] issaved) {
 
     if(settinglayout==null) {
-            TextView unitlabel = new TextView(context);
-        unitlabel.setText(R.string.unit);
         mmolL = new RadioButton(context);
 
         mmolL.setOnClickListener(v-> {
@@ -809,8 +812,8 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
         mgdl.setPadding(0,0,padmg,0);
         mgdl.setPadding(0,0,0,0);
         mmolL.setPadding(0,0,0,0);
-         var leftspace=new Space(context);
-        View[] row0 = isWearable?new View[]{leftspace,mmolL, mgdl,new Space(context)}:new View[]{unitlabel, mmolL, mgdl};
+        var leftspace=new Space(context);
+       View[] row0;
 
         Button changelabels=new Button(context);
         Button help =new Button(context);
@@ -818,6 +821,19 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
         help.setOnClickListener(v->{help(R.string.settinghelp,(MainActivity)(v.getContext())); });
 
       var close=getbutton(context,R.string.closename);
+        if(isWearable) {
+             row0=new View[]{leftspace,mmolL, mgdl,new Space(context)};
+            }
+        else {
+            TextView unitlabel = new TextView(context);
+            unitlabel.setText(R.string.unit);
+            getMargins(unitlabel).leftMargin=(int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
+            getMargins(mgdl).rightMargin=(int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
+             row0 = new View[]{unitlabel, mmolL, mgdl};
+            getMargins(help).leftMargin=(int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
+            getMargins(close).rightMargin=(int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
+             }
+
 
       if(!useclose)
      close.setVisibility(GONE);
@@ -899,8 +915,9 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
         Button talk;
         if(!tk.glucodata.Applic.DontTalk) {
                 talk=getbutton(context,R.string.talk);
-                talk.setOnClickListener(v ->{
-                tk.glucodata.Talker.config(context);});
+                talk.setOnClickListener(v ->{tk.glucodata.Talker.config(context);});
+                getMargins(talk).bottomMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*4.0);
+
                 }
         else talk=null;
         Button complications;
@@ -1093,9 +1110,6 @@ static private void exchanges(MainActivity context,View parent) {
     if (isWearable) {
         var uploader = getbutton(context, R.string.upload);
         uploader.setOnClickListener(v -> tk.glucodata.NightPost.config(context, thelayout[0]));
-//        uploader.setMinimumWidth(0); uploader.setMinWidth(0);
-        //        var uppad=(int)(tk.glucodata.GlucoseCurve.metrics.density*9.0);
-//          uploader.setPadding(uppad,alarmbut.getPaddingTop(),uppad,alarmbut.getPaddingBottom());
 
         lay = new Layout(context, (l, w, h) -> {
             int[] ret = {w, h};
@@ -1141,12 +1155,6 @@ static private void exchanges(MainActivity context,View parent) {
             }
         }
         var webserver = getbutton(context, R.string.webserver);
-    /*
-        final View[] librerow=
-         (Build.VERSION.SDK_INT >= 28)? 
-            new View[]{glucosenotify,healthconnect,libreview}
-            :
-            new View[]{glucosenotify,libreview}; */
         webserver.setOnClickListener(v -> tk.glucodata.Nightscout.show(context, thelayout[0]));
         uploader.setOnClickListener(v -> tk.glucodata.NightPost.config(context, thelayout[0]));
         final boolean[] donothing = {false};
@@ -1180,8 +1188,9 @@ static private void exchanges(MainActivity context,View parent) {
         var help = getbutton(context, R.string.helpname);
       help.setOnClickListener(v->{help(R.string.exchangehelp,context); });
       var exportview=getbutton(context,R.string.export);
-      getMargins(help).leftMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*10.0);
+      getMargins(help).leftMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
       getMargins(webserver).leftMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*2.0);
+      getMargins(ok).rightMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
 
 
         lay = new Layout(context, (l, w, h) -> {

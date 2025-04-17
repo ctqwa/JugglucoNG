@@ -55,6 +55,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.doonback;
 import static tk.glucodata.MainActivity.setonback;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
@@ -218,7 +219,7 @@ static Layout menuview(final NumberView numb, MainActivity act, int mealptr, Obj
          act.hideSystemUI();
          if(mealptrar[0]!=0) {
            if(numb.currentnum!=0&&numb.currentnum!= numio.newhit) {
-                Log.i(LOG_ID,"repeat");
+                {if(doLog) {Log.i(LOG_ID,"repeat");};};
             Natives.hitsetmealptr(numb.currentnum,mealptrar[0]);
             }    
             int ptrcp=Natives.cpmeal(mealptrar[0]);
@@ -625,7 +626,7 @@ static void    defineingredient(MainActivity act ,IngredientViewAdapter  foodada
                     || actionId == EditorInfo.IME_ACTION_DONE) {
         //        act.hideSystemUI();
                  tk.glucodata.help.hidekeyboard(act);
-                 Log.i(LOG_ID,"onEditorAction");
+                 {if(doLog) {Log.i(LOG_ID,"onEditorAction");};};
 // hidekeyboard();
                 return true;
                }

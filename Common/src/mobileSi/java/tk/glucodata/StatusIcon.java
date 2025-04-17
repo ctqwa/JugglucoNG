@@ -56,7 +56,7 @@ StatusIcon() {
 	iconBitmap = Bitmap.createBitmap((int)mapwidth, (int)mapheight, Bitmap.Config.ARGB_8888);
 	canvas = new Canvas(iconBitmap);
 
-	//Log.i(LOG_ID," mapwidth="+mapwidth+" mapheight="+mapheight+"color="+ format("%x",iconPaint.getColor()));
+	//{if(doLog) {Log.i(LOG_ID," mapwidth="+mapwidth+" mapheight="+mapheight+"color="+ format("%x",iconPaint.getColor()));};};
 //   iconPaint.setTypeface(Typeface.defaultFromStyle(BOLD));
 //      Typeface normaltype=Typeface.create("Arial",Typeface.NORMAL);
     Typeface basistype=
@@ -83,7 +83,7 @@ float  drawcenter(String value) {
         iconPaint.setTextSize(fontsize);
         iconPaint.getTextBounds(value, 0, value.length(),  bounds);
    float fsize;
-   //Log.i(LOG_ID,"bounds: "+bounds);
+   //{if(doLog) {Log.i(LOG_ID,"bounds: "+bounds);};};
 
         var h= bounds.bottom-bounds.top;
         var w=bounds.right-bounds.left;
@@ -95,7 +95,7 @@ float  drawcenter(String value) {
         iconPaint.setTextSize(fsize);
         var des=iconPaint.descent();
         var as=iconPaint.ascent();
-        //Log.i(LOG_ID,"descent()="+des+" ascent()="+as+" fontsize="+fontsize);
+        //{if(doLog) {Log.i(LOG_ID,"descent()="+des+" ascent()="+as+" fontsize="+fontsize);};};
         var y = half - (des + as)*.5f-0.01f*fsize;
        canvas.drawText(value,0,value.length(),half-0.005f*fsize,y,iconPaint);
        return fsize;

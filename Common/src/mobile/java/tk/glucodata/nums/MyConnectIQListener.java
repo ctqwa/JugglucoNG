@@ -36,6 +36,7 @@ import tk.glucodata.Natives;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
 import static android.content.pm.PackageManager.DONT_KILL_APP;
+import static tk.glucodata.Log.doLog;
 
 public class MyConnectIQListener implements ConnectIQ.ConnectIQListener {
     private  final String LOG_ID = "MyConnectIQListener";
@@ -54,7 +55,7 @@ public class MyConnectIQListener implements ConnectIQ.ConnectIQListener {
 	
 	    setdata();
             init_error=tk.glucodata.R.string.garmin_initialization_error + errStatus.name();
-            Log.v(LOG_ID, init_error);
+            {if(doLog) {Log.v(LOG_ID, init_error);};};
 
             mSdkReady = false;
             String message;
@@ -67,13 +68,13 @@ public class MyConnectIQListener implements ConnectIQ.ConnectIQListener {
 			break;
 			}
 		else
-	    		Log.i(LOG_ID,"GCM_NOT_INSTALLED");
+	    		{if(doLog) {Log.i(LOG_ID,"GCM_NOT_INSTALLED");};};
 			return;
                 case GCM_UPGRADE_NEEDED: message="Garmin Connect Mobile needs to be upgraded";break;
                 case SERVICE_ERROR: message="Service Error";break;
                 default: message="Some Error";
             };
-	    Log.i(LOG_ID,message);
+	    {if(doLog) {Log.i(LOG_ID,message);};};
             AlertDialog.Builder dialog = new AlertDialog.Builder(context);
             dialog.setTitle(errStatus.name());
             dialog.setMessage(message);
@@ -88,7 +89,7 @@ public class MyConnectIQListener implements ConnectIQ.ConnectIQListener {
         @Override
         public void onSdkReady() {
 	     Natives.sethasgarmin(true);
-            Log.v(LOG_ID, "ConnectIQ Ready");
+            {if(doLog) {Log.v(LOG_ID, "ConnectIQ Ready");};};
 /*        	PackageManager manage = context.getPackageManager();
 		manage.setComponentEnabledSetting(new ComponentName(context.getApplicationContext(), "tk.glucodata.garmin"), COMPONENT_ENABLED_STATE_ENABLED, DONT_KILL_APP);
 
@@ -99,7 +100,7 @@ public class MyConnectIQListener implements ConnectIQ.ConnectIQListener {
 
         @Override
         public void onSdkShutDown() {
-            Log.v(LOG_ID, "ConnectIQ ShutDown");
+            {if(doLog) {Log.v(LOG_ID, "ConnectIQ ShutDown");};};
             mSdkReady = false;
         }
 

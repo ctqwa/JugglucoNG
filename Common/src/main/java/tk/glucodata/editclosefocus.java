@@ -22,6 +22,8 @@
 package tk.glucodata;
 
 
+import static tk.glucodata.Log.doLog;
+
 import android.text.Editable;
 
 import android.view.View;
@@ -32,7 +34,7 @@ class editclosefocus implements View.OnFocusChangeListener {
 @Override
 public void onFocusChange(View v, boolean hasFocus) {
     EditText ed= (EditText)v;
-    Log.v("editclosefocus","onfocuschange "+hasFocus);
+    {if(doLog) {Log.v("editclosefocus","onfocuschange "+hasFocus);};};
     if(hasFocus) {
         NumberView.closekeyboard(ed);
         MainActivity act= (MainActivity) ed.getContext();

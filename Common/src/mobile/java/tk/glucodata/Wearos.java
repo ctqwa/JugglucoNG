@@ -47,6 +47,7 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.View.GONE;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MessageSender.isGalaxy;
 import static tk.glucodata.Natives.setBlueMessage;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
@@ -109,7 +110,7 @@ static	ArrayList<Node> nodeslist=null;
 	spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 		@Override
 		public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-			Log.i(LOG_ID,"onItemSelected");
+			{if(doLog) {Log.i(LOG_ID,"onItemSelected");};};
 			try {
 			if(nodeslist!=null&&nodeslist.size()>position) {
 				nodenum=position;
@@ -181,7 +182,7 @@ static void sendinitwatchapp(Node nod) {
          Log.e(LOG_ID,"sendintwatchapp getMessageSender()==null");
          return;
          }
-      Log.i(LOG_ID,"Init watch app");
+      {if(doLog) {Log.i(LOG_ID,"Init watch app");};};
       var nodeName= makenodename(nod);
       Natives.resetbylabel(nodeName,isGalaxy(nod));
       sender.startWearOSActivity(nodeName);
@@ -242,7 +243,7 @@ static public void show(MainActivity context,View parent) {
 					String name=makenodename(nod);
 					Runnable setdef=()-> {
 						sender.toDefaults(nod);
-						Log.i(LOG_ID,"set to default "+name);
+						{if(doLog) {Log.i(LOG_ID,"set to default "+name);};};
 						Natives.setWearosdefaults(name,isGalaxy(nod));
 						var main=MainActivity.thisone;
 						Applic.setbluetooth(main==null?Applic.app:main,true);
@@ -266,7 +267,7 @@ static public void show(MainActivity context,View parent) {
 					if(nodenum>=0) {
 						var node=nodeslist.get(nodenum);
 						var name=makenodename(node);
-						Log.i(LOG_ID,"Direct sensor watch connection "+name+" "+isChecked);
+						{if(doLog) {Log.i(LOG_ID,"Direct sensor watch connection "+name+" "+isChecked);};};
 						byte[] netinfo=Natives.getmynetinfo(name,true,isChecked?1:-1,isGalaxy(node));
 						if(netinfo!=null) {
 							var sender=tk.glucodata.MessageSender.getMessageSender();
@@ -281,14 +282,14 @@ static public void show(MainActivity context,View parent) {
 							}
 						}
 					else {
-						Log.i(LOG_ID,"nodenum="+nodenum);
+						{if(doLog) {Log.i(LOG_ID,"nodenum="+nodenum);};};
 						}
 					directactive[0]=false;
 					direct.setChecked(!isChecked);
 					directactive[0]=true;
 					}
 				else {
-					Log.i(LOG_ID,"directactive[0]=false");
+					{if(doLog) {Log.i(LOG_ID,"directactive[0]=false");};};
 					}
 				return;
 				}

@@ -59,6 +59,7 @@ import static android.widget.Spinner.MODE_DIALOG;
 import static android.widget.Spinner.MODE_DROPDOWN;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.usedlocale;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.getNumAlarm;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
@@ -81,19 +82,19 @@ public static boolean issaved;
 /*class ScrollListener extends GestureDetector.SimpleOnGestureListener {
 @Override
    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-      Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);
+      {if(doLog) {Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);};};
       return false;
       }
 @Override
       public boolean onFling (MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-      Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);
+      {if(doLog) {Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);};};
       return false;
       }
 };*/
 @SuppressLint("ClickableViewAccessibility")
 public void mkviews(MainActivity act, View set) {
 issaved=false;
-Log.i(LOG_ID,"mkviews");
+{if(doLog) {Log.i(LOG_ID,"mkviews");};};
 set.setVisibility(GONE);
 if(genlayout==null) {
     Button ok=getbutton(act,R.string.closename);
@@ -337,7 +338,7 @@ void dodelete(View parent,int alarmpos) {
     	int nr=Natives.getNumAlarmCount();
     	Natives.delNumAlarm(alarmpos);
     	if(nr>0&&alarmpos<nr) { 
-    		Log.i(LOG_ID,"alarmpos="+alarmpos+ " nr="+nr+" new nr="+Natives.getNumAlarmCount());
+    		{if(doLog) {Log.i(LOG_ID,"alarmpos="+alarmpos+ " nr="+nr+" new nr="+Natives.getNumAlarmCount());};};
     		numadapt.notifyItemRemoved(alarmpos);
     		numadapt.notifyDataSetChanged();
     		}
@@ -500,7 +501,7 @@ void  mkitemlayout(Activity act,View parent) {
          val=Float.parseFloat(value.getText().toString());
          }
          catch(Exception e) {
-         Log.i(LOG_ID,"parsefloat exception "+value.getText().toString());
+         {if(doLog) {Log.i(LOG_ID,"parsefloat exception "+value.getText().toString());};};
          return;
          };
       if(minutes[0]==minutes[1])
@@ -510,7 +511,7 @@ void  mkitemlayout(Activity act,View parent) {
          alarmpos=-1;
          }
       
-      Log.i(LOG_ID,"save "+labelsel+" "+val+" "+tstring(minutes[0])+ " "+tstring(minutes[1]));
+      {if(doLog) {Log.i(LOG_ID,"save "+labelsel+" "+val+" "+tstring(minutes[0])+ " "+tstring(minutes[1]));};};
       Natives.setNumAlarm( labelsel,val,minutes[0],minutes[1]);
 
       numadapt.notifyDataSetChanged();
@@ -561,7 +562,8 @@ void emptyitemlayout() {
     settime(alarmbut,0);
     alarmpos=-1;
     spinner.setSelection(0);
-    Delete.setVisibility(isWearable?GONE:INVISIBLE); 
+    //Delete.setVisibility(isWearable?GONE:INVISIBLE); 
+    Delete.setVisibility(INVISIBLE); 
     }
 void fillitemlayout(int pos) {
     Object[] alarmobj=getNumAlarm(pos);

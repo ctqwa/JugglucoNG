@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import static android.view.View.VISIBLE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static android.os.Build.CPU_ABI;
+import static tk.glucodata.Log.doLog;
 
 class rightlib {
 	static private final String LOG_ID="rightlib";
@@ -61,7 +62,7 @@ else {
 static int runonce(String[] args,String[] env) {
 	Process test ;
 		try {
-		    Log.i(LOG_ID,env[0]+" "+args[0]+ " "+args[1]);
+		    {if(doLog) {Log.i(LOG_ID,env[0]+" "+args[0]+ " "+args[1]);};};
 		    test=Runtime.getRuntime().exec(args,env,null);
 	     } catch(Throwable e) {
 			Log.stack(LOG_ID,e);
@@ -74,10 +75,10 @@ static int runonce(String[] args,String[] env) {
 				if(((ret=test.exitValue())&0xD0)==0xD0) {
 					return ret;
 					}
-				Log.i(LOG_ID,"returned "+ret);
+				{if(doLog) {Log.i(LOG_ID,"returned "+ret);};};
 			 }
 			  else {
-			  	Log.i(LOG_ID,"Time out, destroy");
+			  	{if(doLog) {Log.i(LOG_ID,"Time out, destroy");};};
 			   test.destroy();
 				return 0;
 			 }
@@ -95,20 +96,20 @@ static int runonce(String[] args,String[] env) {
  	String[] args={testname,context.getFilesDir().toString()};
 	String[] env={"LD_LIBRARY_PATH="+appinfo.nativeLibraryDir};
 		int ret=0;
-		Log.i(LOG_ID,"debug");
+		{if(doLog) {Log.i(LOG_ID,"debug");};};
 		if((ret=runonce(args,env))!=0)
 			return ret;
  	String[] args2={testname,context.getFilesDir().toString(),"again"};
- 	Log.i(LOG_ID,"Try next run");
+ 	{if(doLog) {Log.i(LOG_ID,"Try next run");};};
 		return runonce(args2,env);
 	    }
 	public static int testrightlib(Context context, File cali) {
 		int ret=rightlib(context);
-		Log.i(LOG_ID,"rightlib "+ret);
+		{if(doLog) {Log.i(LOG_ID,"rightlib "+ret);};};
 		if(ret!=0) {
 			try {
 			if(!cali.setReadOnly()) {
-				Log.i(LOG_ID,"setReadOnly failed");
+				{if(doLog) {Log.i(LOG_ID,"setReadOnly failed");};};
 				}
 			} catch(Throwable e) {
 				Log.stack(LOG_ID,"setReadonly",e);

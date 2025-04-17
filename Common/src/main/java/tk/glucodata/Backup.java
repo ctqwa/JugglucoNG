@@ -84,6 +84,7 @@ import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getBlueMessage;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.getWifi;
+import static tk.glucodata.Natives.getbackJson;
 import static tk.glucodata.Natives.getbackupHasHostname;
 import static tk.glucodata.Natives.isWearOS;
 import static tk.glucodata.Natives.mirrorStatus;
@@ -285,6 +286,21 @@ public class Backup {
                }
            }).show().setCanceledOnTouchOutside(false);
       }
+
+
+static public String changehostError(MainActivity act,int pos) {
+            String mess= switch (pos) {
+               case -1 : yield act.getString(R.string.portrange);
+               case -2 : yield act.getString(R.string.parseip);
+               case -3 : yield act.getString(R.string.toomanyhosts);
+               case -4 : yield act.getString(R.string.senthosts);
+               case -5 : yield "Hostname too long";
+               case -6 : yield "Database busy, try again";
+               default : yield "Error";
+            };
+            return mess;
+            }
+
    private void resentconfirmation(MainActivity act,int hostindex) {
            AlertDialog.Builder builder = new AlertDialog.Builder(act);
            builder.setTitle(act.getString(R.string.resenddata)+"?").
@@ -462,16 +478,16 @@ public class Backup {
             visible.setVisibility(vis);
             });
        Password.setChecked(false); 
-      save.setOnClickListener(v->{ 
+       IntSupplier saver= ()-> { 
          final boolean sender= Amounts.isChecked()|| Stream.isChecked()|| Scans.isChecked();
          final boolean receiver=receive.isChecked();
          if(!sender&&!receiver) {
             Applic.argToaster(act, R.string.specifyreceiveordata,Toast.LENGTH_SHORT);
-            return;
+            return -15;
             }
          if(receiver&& Amounts.isChecked()&& Stream.isChecked()&& Scans.isChecked()) {
             Applic.argToaster(act,R.string.allsentnoreceive ,Toast.LENGTH_LONG);
-            return;
+            return -15;
             }        
          hidekeyboard(act); //USE
          int hostnr=Natives.backuphostNr( );
@@ -493,7 +509,7 @@ public class Backup {
          if((testip.isChecked()&&!dodetect)||activeonly.isChecked()) {
             if(struse==0) {
                Applic.argToaster(act, R.string.specifyip,Toast.LENGTH_SHORT);
-               return ;
+               return -15;
                }
             }
 
@@ -502,17 +518,9 @@ public class Backup {
          int pos=Natives.changebackuphost(hostindex,names,struse,dodetect,portedit.getText().toString(), Amounts.isChecked(),Stream.isChecked(),Scans.isChecked(),restore.isChecked(),receiver,activeonly.isChecked(),passiveonly.isChecked(),Password.isChecked()?editpass.getText().toString():null,starttime,haslabel.isChecked()?label.getText().toString():null,testip.isChecked(),checkhostname.isChecked());
 
          if(pos<0) {
-            String mess= switch (pos) {
-               case -1 : yield act.getString(R.string.portrange);
-               case -2 : yield act.getString(R.string.parseip);
-               case -3 : yield act.getString(R.string.toomanyhosts);
-               case -4 : yield act.getString(R.string.senthosts);
-               case -5 : yield "Hostname too long";
-               case -6 : yield "Database busy, try again";
-               default : yield "Error";
-            };
+            String mess=changehostError(act, pos);
             Applic.argToaster(act,mess,Toast.LENGTH_SHORT);
-            return ;
+            return pos;
             }    
 
          if(!receiver&& !(Amounts.isChecked()&& Stream.isChecked()&& Scans.isChecked())) {
@@ -526,9 +534,13 @@ public class Backup {
          else
             hostadapt.notifyItemChanged(pos);
    //         hostview.setVisibility(GONE);
-          act.doonback();
          //alarms.setEnabled( Natives.isreceiving( ));
-         }); 
+         return pos;
+         };
+      save.setOnClickListener(v->{
+           if(saver.getAsInt()>=0)
+              act.doonback();
+        }); 
       delete.setOnClickListener(v->{ 
          deleteconfirmation(act) ;
          //alarms.setEnabled( Natives.isreceiving( ));
@@ -577,16 +589,33 @@ public class Backup {
       layout.setPadding((int)(GlucoseCurve.metrics.density*4.0),0,(int)(GlucoseCurve.metrics.density*10.0),(int)(GlucoseCurve.metrics.density*4));
          }
       else {
+         Button qr;
+         if(BuildConfig.minSDK>=20) {
+            qr=getbutton(act,"QR");
+            qr.setOnClickListener(v->  {
+                  final int pos=saver.getAsInt();
+                  if(pos>=0) {
+                    String jsonstr=getbackJson(pos);
+                    QRmake.show(act,jsonstr);
+                    }
+                 });
+                 }
+           else {
+               qr=null;
+                }
+         getMargins(delete).leftMargin=getMargins(save).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
+        var withqr=BuildConfig.minSDK>=20?new View[]{qr,Password, editpass, visible}:new View[]{Password, editpass, visible};
          layout = new Layout(act, (l, w, h) -> {
             hideSystemUI(act);
             final int[] ret = {w, h};
             return ret;
 
          }, new View[]{Portlabel, portedit, checkhostname,IPslabel, detect}, editIPs, new View[]{testip, haslabel, label},
-               new View[]{passiveonly, activeonly, both}, new View[]{receive, Sendlabel, Amounts, Scans, Stream, restore}, fromrow, new View[]{Password, editpass, visible}, new View[]{delete, Close, reset, Help, save});
+               new View[]{passiveonly, activeonly, both}, new View[]{receive, Sendlabel, Amounts, Scans, Stream, restore}, fromrow, withqr, new View[]{delete, Close, reset, Help, save});
 
           // layout.setPadding(0, MainActivity.systembarTop/2,0,0);
-         layout.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop/2,MainActivity.systembarRight,MainActivity.systembarBottom);
+         var sidepad=(int)(GlucoseCurve.metrics.density*8.0);
+         layout.setPadding(MainActivity.systembarLeft+sidepad,MainActivity.systembarTop/2,sidepad+MainActivity.systembarRight,MainActivity.systembarBottom);
 
          }
       Close.setOnClickListener(v-> act.doonback());
@@ -661,7 +690,7 @@ public class Backup {
                both.setChecked(true);
             }
          boolean iswearos=isWearOS(index);
-         Log.i(LOG_ID,(labelstr!=null?labelstr:"")+" Iswearos("+index+")="+iswearos);
+         {if(doLog) {Log.i(LOG_ID,(labelstr!=null?labelstr:"")+" Iswearos("+index+")="+iswearos);};};
 
          checkhostname.setChecked(hasHostname);
          }
@@ -822,7 +851,7 @@ public class Backup {
 
 
    HostViewAdapter hostadapt;
-   Button alarms;
+//   Button alarms;
    public  void mkbackupview(MainActivity act) {
       act.lightBars(false);
       act.showui=true;
@@ -862,8 +891,8 @@ public class Backup {
       MessageSender.reinit();
       }
       );
-     boolean[] issaved={false};
-      alarms=getbutton(act,R.string.alarms);
+//     boolean[] issaved={false};
+      //alarms=getbutton(act,R.string.alarms);
    //      if(!Natives.isreceiving( )) { alarms.setEnabled(false); }
 
      final Button battery = new Button(act);
@@ -904,14 +933,14 @@ public class Backup {
                UseWifi.stopusewifi();
             });
          if(!useclose) Cancel.setVisibility(INVISIBLE);
-         var space1=new Space(act);
-         var space2=new Space(act);
          final var width=GlucoseCurve.getwidth();
          getMargins(labport).leftMargin=(int)(width*0.12);
          getMargins(Save).rightMargin=(int)(width*0.12);
+         var margIP=getMargins(ip);
+         margIP.leftMargin=(int)(width*0.01);
    //      if(doLog) ip.setText("2a01:59f:a075:b0d1:a4ef:afff:fec4:59f2");
          //final Layout layout=new Layout(act, new View[]{getlabel(act,act.getString(R.string.thishost))},new View[]{blpan},new View[]{p2p},new View[]{ip},new View[]{new Space(act),labport,portview,Save,new Space(act)},new View[]{recycle},new View[] {hosts},new View[]{staticnum},new View[]{Sync,reinit},new View[]{space1,wifi,alarms,space2},errorrow,new View[]{Cancel});
-         final Layout layout=new Layout(act, new View[]{getlabel(act,act.getString(R.string.thishost))},new View[]{labport,portview,Save},new View[]{ip},new View[]{blpan},new View[]{p2p},new View[]{recycle},new View[] {hosts},new View[]{staticnum},new View[]{Sync,reinit},new View[]{space1,wifi,alarms,space2},errorrow,new View[]{Cancel});
+         final Layout layout=new Layout(act, new View[]{getlabel(act,act.getString(R.string.thishost))},new View[]{labport,portview,Save},new View[]{ip},new View[]{blpan},new View[]{p2p},new View[]{recycle},new View[] {hosts},new View[]{staticnum},new View[]{Sync,reinit},new View[]{wifi},errorrow,new View[]{Cancel});
    //        var hori=new NestedScrollView(act);
          var hori=new ScrollView(act);
          hori.setFillViewport(true);
@@ -928,13 +957,37 @@ public class Backup {
          layout.setPadding((int)(GlucoseCurve.metrics.density*6),pad,(int)(GlucoseCurve.metrics.density*9),pad);
          }
       else {
-         var layout=new Layout(act, new View[]{ip,blpan,p2p,labport,portview,Save},new View[]{recycle},new View[] {battery,Help,alarms,staticnum},errorrow,new View[]{Sync,reinit,hosts,Cancel});
+        Button autoqr;
+         if(BuildConfig.minSDK>=20) {
+             autoqr=getbutton(act,R.string.autoqr);
+             autoqr.setOnClickListener(v-> {
+            Confirm.ask(act,act.getString(R.string.autoqr),act.getString(R.string.autoqrmessage),()-> {
+                int pos=Natives.makeHomeCopy();
+                if(pos<0) {
+                        var mess= changehostError(act,pos);
+                         Applic.argToaster(act,mess,Toast.LENGTH_SHORT);
+                        }
+                  else {
+                        hostadapt.notifyItemInserted(pos);
+                        var jsonstr= getbackJson(pos);
+                        QRmake.show(act,jsonstr);
+                        }
+
+                });
+                });
+            }
+         else {
+            autoqr=null;
+            }
+         getMargins(Sync).leftMargin=getMargins(Cancel).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
+         var withqr=BuildConfig.minSDK>=20?new View[]{Help,autoqr,hosts,Cancel}:new View[]{Help,hosts,Cancel};
+         var layout=new Layout(act, new View[]{ip,blpan,p2p,labport,portview,Save},new View[]{recycle},new View[] {battery,Sync,reinit,staticnum},errorrow,withqr);
 
        var density=GlucoseCurve.metrics.density;
       layout.setPadding(MainActivity.systembarLeft+(int)(density*10),MainActivity.systembarTop/2,MainActivity.systembarRight+(int)(density*10),MainActivity.systembarBottom+(int)(density*3));
        //  layout.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop/2,MainActivity.systembarRight,MainActivity.systembarBottom);
 
-          Log.i(LOG_ID,"density="+GlucoseCurve.metrics.density+" systembarTop="+ MainActivity.systembarTop+" systembarLeft="+ MainActivity.systembarLeft);
+          {if(doLog) {Log.i(LOG_ID,"density="+GlucoseCurve.metrics.density+" systembarTop="+ MainActivity.systembarTop+" systembarLeft="+ MainActivity.systembarLeft);};};
       //    layout.setPadding(pad,MainActivity.systembarTop,MainActivity.systembarRight,MainActivity.systembarBottom);
          lay=layout;
          }
@@ -945,7 +998,7 @@ public class Backup {
          hidekeyboard(act);
       });
 
-         alarms.setOnClickListener(v-> tk.glucodata.settings.Settings.alarmsettings(act,lay,issaved));
+         //alarms.setOnClickListener(v-> tk.glucodata.settings.Settings.alarmsettings(act,lay,issaved));
          hosts.setOnClickListener(v-> addhostview(act,lay));
       hostadapt = new HostViewAdapter(lay); //USE
       recycle.setAdapter(hostadapt);

@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
+
 import android.content.Context;
 import android.os.Environment;
 import android.os.StatFs;
@@ -48,7 +50,7 @@ static boolean check(Context context) {
 		sta=new StatFs(filespath);
 		}
 	var available=sta.getAvailableBytes();
-	Log.i("Available:",""+available);
+	{if(doLog) {Log.i("Available:",""+available);};};
 	return available>(6*1024*1024L);
 //	return false;
 	}

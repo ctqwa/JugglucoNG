@@ -97,16 +97,16 @@ static Ringtone getringtone(Context context, int res) {
 
 static            boolean mayEnablestreaming(Tag tag,byte[] uid,byte[] info) {
     if(!Natives.streamingAllowed()) {
-        Log.d(LOG_ID,"!Natives.streamingAllowed()");
+        {if(doLog) {Log.d(LOG_ID,"!Natives.streamingAllowed()");};};
         return false;
         }
     if(!AlgNfcV.enableStreaming(tag, info)) {
-        Log.d(LOG_ID, "Enable streaming failed");
+        {if(doLog) {Log.d(LOG_ID, "Enable streaming failed");};};
         return false;
         } 
 
     String sensorident = Natives.getserial(uid, info);
-    Log.d(LOG_ID, "Streaming enabled, resetDevice " + sensorident);
+    {if(doLog) {Log.d(LOG_ID, "Streaming enabled, resetDevice " + sensorident);};};
     if(SensorBluetooth.resetDevice(sensorident))
         askpermission=true;
     return true;
@@ -182,7 +182,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                 for(var e:uid) {
                     sensid=String.format("%02X",(0xFF&e))+sensid;
                     }
-                Log.i(LOG_ID,"TAG::sensid="+sensid);
+                {if(doLog) {Log.i(LOG_ID,"TAG::sensid="+sensid);};};
                 }
 
         if(uid.length==8&&uid[6]!=7) {
@@ -191,7 +191,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                 streamptr=libre3NFC(tag);
                 vibrator.cancel();
                 if(streamptr==2L) {
-                    Log.i(LOG_ID,"streamptr==2");
+                    {if(doLog) {Log.i(LOG_ID,"streamptr==2");};};
                     ret= 0xFD;
                     }
                 else {
@@ -199,22 +199,22 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                         if(streamptr>=0L&&streamptr<7L) {
                         switch((int)(streamptr&0xFFFFFFF)) {
                             case 1: {
-                                Log.i(LOG_ID,"streamptr==1");
+                                {if(doLog) {Log.i(LOG_ID,"streamptr==1");};};
                                 ret=0xFB;
                                 };break;
                             case 5: {
-                                Log.i(LOG_ID,"terminated");
+                                {if(doLog) {Log.i(LOG_ID,"terminated");};};
                                 ret=13;
                                 break;
                                 }
                             case 6: {
-                                Log.i(LOG_ID,"ended");
+                                {if(doLog) {Log.i(LOG_ID,"ended");};};
                                 ret=4;
                                 break;
                                 }
                             default: {
                                  if(streamptr>=0L&&streamptr<4L) {
-                                    Log.i(LOG_ID,"p<streamptr<4");
+                                    {if(doLog) {Log.i(LOG_ID,"p<streamptr<4");};};
                                       ret=0xFA;
                                       }
                                 }
@@ -223,12 +223,12 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                      else {
                          var name = Natives.getSensorName(streamptr);
                          if(name==null){
-                            Log.i(LOG_ID,"name==null");
+                            {if(doLog) {Log.i(LOG_ID,"name==null");};};
                             ret=0xFA;
                             Natives.freedataptr(streamptr);
                             }
                          else{
-                            Log.i(LOG_ID,"scanned "+name);
+                            {if(doLog) {Log.i(LOG_ID,"scanned "+name);};};
                             if(SensorBluetooth.resetDeviceOrFree(streamptr, name))
                                 askpermission = true;
                             ret = 0xFC;
@@ -239,7 +239,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                         }
                         }
                     else {
-                        Log.i(LOG_ID,"libreVersion!=3");
+                        {if(doLog) {Log.i(LOG_ID,"libreVersion!=3");};};
                         ret = 0xFE;
                         }
                 }
@@ -248,7 +248,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                     failure(vibrator);
                    }
                else  {
-                      Log.i(LOG_ID,"No Libre 3 Android <8");
+                      {if(doLog) {Log.i(LOG_ID,"No Libre 3 Android <8");};};
                       ret=0xF9;
                       }
                    }
@@ -256,7 +256,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                 byte[] info = AlgNfcV.nfcinfo(tag);
                 if(info==null) {
                     ret=17;
-                    Log.i(LOG_ID,"Read Tag Info Error");
+                    {if(doLog) {Log.i(LOG_ID,"Read Tag Info Error");};};
                     vibrator.cancel();
                     }
                 else  {
@@ -265,7 +265,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                     if((data = AlgNfcV.readNfcTag(tag,uid,info)) != null) {
                         curve.render.badscan =0xff;
                         curve.requestRender();
-                        Log.d(LOG_ID,"Read Tag");
+                        {if(doLog) {Log.d(LOG_ID,"Read Tag");};};
                         /*showbytes("uid",uid);
                         showbytes("info",info);
                         showbytes("data",data); */
@@ -280,7 +280,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                                 newdevice=null;
                                 }
                             }
-                        Log.d(LOG_ID,"Badscan "+ret);
+                        {if(doLog) {Log.d(LOG_ID,"Badscan "+ret);};};
                         vibrator.cancel();
                         switch(ret&0xFF) {
                             case 8: {
@@ -290,7 +290,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                                 }
                             case 9: {
                                 String sensorident = Natives.getserial(uid, info);
-                                Log.d(LOG_ID, "Streaming enabled, resetDevice " + sensorident);
+                                {if(doLog) {Log.d(LOG_ID, "Streaming enabled, resetDevice " + sensorident);};};
                                 if(SensorBluetooth.resetDevice(sensorident))
                                     askpermission=true;
                                 }
@@ -354,7 +354,7 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                    else  {
                     ret=18;
                     vibrator.cancel();
-                    Log.i(LOG_ID,"Read Tag Data Error");
+                    {if(doLog) {Log.i(LOG_ID,"Read Tag Data Error");};};
                     if(getversion(info)==2&&!Natives.switchgen2()) {
                             Openfile.reinstall=true;
                             Natives.closedynlib();
@@ -403,7 +403,7 @@ static private void newsensor(Activity act,String text,String name) {
     var metrics= act.getResources().getDisplayMetrics();
     int width= metrics.widthPixels;
     int pad=width/30;
-    Log.i(LOG_ID,"newsensor "+name);
+    {if(doLog) {Log.i(LOG_ID,"newsensor "+name);};};
     act.runOnUiThread(() -> {
        TextView tv=getlabel(act,text);
        if(!isWearable)
@@ -469,7 +469,7 @@ private static void insertcalendar(Activity act,String name,long endtime) {
         .setData(CalendarContract.Events.CONTENT_URI)
         .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, endtime)
         .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endtime+1000L);
-        Log.i(LOG_ID,"start calendar app");
+        {if(doLog) {Log.i(LOG_ID,"start calendar app");};};
         act.startActivity(intent);
         askcalendar=false;
         } 

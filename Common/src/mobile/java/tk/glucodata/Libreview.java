@@ -56,6 +56,7 @@ import java.util.UUID;
 import androidx.annotation.Keep;
 import tk.glucodata.settings.LibreNumbers;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NightPost.readJSONObject;
 import static android.view.View.GONE;
 import static android.view.View.INVISIBLE;
@@ -125,7 +126,7 @@ static JSONObject  readJSONObject(HttpURLConnection urlConnection)  throws IOExc
    byte[] buf=new byte[10*4096];
    int len=getalldata(urlConnection,buf);
    String ant=new String(getSlice(buf, 0, len));
-   Log.i(LOG_ID,"readJSONObject len="len+" "+ant);
+   {if(doLog) {Log.i(LOG_ID,"readJSONObject len="len+" "+ant);};};
     return new JSONObject(ant);
    }*/
 
@@ -198,7 +199,7 @@ static String getlibregateway(boolean libre3) {
 static private boolean gettermversion(String lang) {
    try {
       if(termsofuseversionurl==null) {
-            Log.d(LOG_ID, "termsofuseversionurl==null");
+            {if(doLog) {Log.d(LOG_ID, "termsofuseversionurl==null");};};
             return false;
          }
       String rep=termsofuseversionurl.replace("<locale>",lang);
@@ -208,7 +209,7 @@ static private boolean gettermversion(String lang) {
       urlConnection.setRequestMethod("GET");
       final int code=urlConnection.getResponseCode();
       if(code==HTTP_OK) {
-         Log.i(LOG_ID,"gettermversion  success");
+         {if(doLog) {Log.i(LOG_ID,"gettermversion  success");};};
          return true;
          }
       else {
@@ -230,7 +231,7 @@ static boolean postgetauth(boolean libre3) {
    String password=getlibrepass();
 
    String login=getlibreemail();
-   Log.i(LOG_ID,"postgetauth "+login+" "+password);
+   {if(doLog) {Log.i(LOG_ID,"postgetauth "+login+" "+password);};};
 
    var loc= Locale.getDefault();
    String language=loc.getLanguage()+'-'+loc.getCountry();
@@ -274,17 +275,17 @@ static boolean postgetauth(boolean libre3) {
 
          }
       byte[] textbytes=getauthtext.getBytes();
-      Log.i(LOG_ID,"postauth: "+getauthtext);
+      {if(doLog) {Log.i(LOG_ID,"postauth: "+getauthtext);};};
           urlConnection.setRequestProperty( "Content-Length", Integer.toString( textbytes.length ));
 
-   //   Log.i(LOG_ID,getauthtext);
+   //   {if(doLog) {Log.i(LOG_ID,getauthtext);};};
       OutputStream outputPost = new BufferedOutputStream(urlConnection.getOutputStream());
       outputPost.write(textbytes);
       outputPost.flush();
       outputPost.close();
       final int code=urlConnection.getResponseCode();
       
-      Log.i(LOG_ID,"ResponseCode="+code);
+      {if(doLog) {Log.i(LOG_ID,"ResponseCode="+code);};};
       if(code==HTTP_OK) {
          JSONObject object = readJSONObject(urlConnection);
          int status=object.getInt("status");
@@ -301,7 +302,7 @@ static boolean postgetauth(boolean libre3) {
             librestatus=poststatus;
             return false;
             }
-         Log.i(LOG_ID,"getauth Success");
+         {if(doLog) {Log.i(LOG_ID,"getauth Success");};};
          JSONObject result=object.getJSONObject("result");
          String usertoken=result.getString("UserToken");
          Natives.setlibreUserToken(libre3,usertoken);
@@ -330,14 +331,14 @@ static boolean postgetauth(boolean libre3) {
             urlConnection2.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             String notneeded="{\"UserToken\":\""+usertoken+"\",\"Domain\":\"Libreview\",\"GatewayType\":\"FSLibreLink.Android\"}";
             byte[] notneedbytes=notneeded.getBytes();
-            Log.i(LOG_ID,"postauth: "+notneeded);
+            {if(doLog) {Log.i(LOG_ID,"postauth: "+notneeded);};};
                 urlConnection2.setRequestProperty( "Content-Length", Integer.toString( notneedbytes.length ));
             OutputStream outputPost2 = new BufferedOutputStream(urlConnection2.getOutputStream());
             outputPost2.write(notneedbytes);
             outputPost2.flush();
             outputPost2.close();
             final int code2=urlConnection2.getResponseCode();
-            Log.i(LOG_ID,"ResponseCode="+code2);
+            {if(doLog) {Log.i(LOG_ID,"ResponseCode="+code2);};};
             if(code2!=HTTP_OK) {
                   librestatus="getAccountInfo: getResponseCode()="+code2;
                   }
@@ -437,7 +438,7 @@ static boolean postmeasurements(boolean libre3,byte[] measurementdata) {
          }
       else {
          librestatus="postmeasurements ResponseCode="+code;
-         Log.i(LOG_ID,librestatus);
+         {if(doLog) {Log.i(LOG_ID,librestatus);};};
          return false;
          }
          }
@@ -499,14 +500,14 @@ private static String  libre3getconfigURL() {
    /*
 public static void testlibre3() { 
    String url=libre3getconfigURL();
-   Log.i(LOG_ID,"libre3getconfigURL()="+(url==null?"null":url));
+   {if(doLog) {Log.i(LOG_ID,"libre3getconfigURL()="+(url==null?"null":url));};};
    }*/
 //https://fsll.freestyleserver.com/Payloads/Mobile/Android/FSLibreLink/Config/FreeStyleLibreLink_Android_2.3_DE_config.json
 @Keep
 public static boolean libreconfig(boolean libre3,boolean restart){
    if(restart||librestatus==nothing||librestatus==success)
       librestatus=datestr(System.currentTimeMillis())+" libreconfig";
-   Log.i(LOG_ID,librestatus);
+   {if(doLog) {Log.i(LOG_ID,librestatus);};};
      try {
         ProviderInstaller.installIfNeeded(Applic.app);
      }
@@ -623,7 +624,7 @@ private static void resendDateDialog(MainActivity context,View parent) {
    Runnable closeall= () -> { 
       removeContentView(layout);
       EnableControls(parent,true);
-      Log.i(LOG_ID,"resendDateDialog back");
+      {if(doLog) {Log.i(LOG_ID,"resendDateDialog back");};};
       };
    context.setonback(closeall);
    ok.setOnClickListener(v -> {
@@ -640,7 +641,7 @@ private static   void askclearlibreview(MainActivity context,long fromtime,Runna
     setMessage(R.string.resendmessage).
            setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-               Log.i(LOG_ID,"askclearlibreview Click");
+               {if(doLog) {Log.i(LOG_ID,"askclearlibreview Click");};};
                Natives.clearlibreFromMSec(fromtime);
                r.run();
                }

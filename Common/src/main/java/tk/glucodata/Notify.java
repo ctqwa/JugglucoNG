@@ -28,9 +28,7 @@ import static android.content.Context.VIBRATOR_SERVICE;
 import static android.graphics.Color.BLACK;
 import static android.graphics.Color.WHITE;
 import static android.media.AudioAttributes.USAGE_NOTIFICATION;
-import static android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE;
-import static android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT;
-import static android.media.AudioAttributes.USAGE_UNKNOWN;
+import static android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION;
 import static java.lang.String.format;
 import static tk.glucodata.Applic.DontTalk;
 import static tk.glucodata.Applic.TargetSDK;
@@ -44,7 +42,7 @@ import static tk.glucodata.Natives.getisalarm;
 import static tk.glucodata.Natives.setisalarm;
 import static tk.glucodata.R.id.arrowandvalue;
 import static tk.glucodata.ScanNfcV.vibrates;
-
+import static tk.glucodata.Talker.notifyfocus;
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -54,6 +52,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -111,7 +111,7 @@ Ringtone setring(String uristr, int res) {
     Uri uri=Uri.parse(uristr);
     Ringtone ring = RingtoneManager.getRingtone(Applic.app, uri);
     if(ring==null) {
-        Log.i(LOG_ID,"ring==null default");
+        {if(doLog) {Log.i(LOG_ID,"ring==null default");};};
         uristr= "android.resource://" + Applic.app.getPackageName() + "/" + res;
         uri=Uri.parse(uristr);
         ring = RingtoneManager.getRingtone(Applic.app, uri);
@@ -126,12 +126,51 @@ Ringtone setring(String uristr, int res) {
     }
 static final private int[] defaults ={ R.raw.siren, R.raw.classic, R.raw.ghost, R.raw.nudge,R.raw.elves};
 
-static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable?USAGE_UNKNOWN:USAGE_NOTIFICATION) .build():null;
+//static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable?USAGE_UNKNOWN:USAGE_NOTIFICATION) .build():null;
+//static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_ASSISTANCE_SONIFICATION: AudioAttributes.USAGE_NOTIFICATION) .build():null;
+static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage( USAGE_ASSISTANCE_SONIFICATION) .build():null;
+//static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(USAGE_NOTIFICATION) .build():null;
+
+
+static private AudioManager audioManager = (android.os.Build.VERSION.SDK_INT <26)?null:(AudioManager) Applic.getContext().getSystemService(Context.AUDIO_SERVICE);
+static private boolean turnfocusoff=false;
+        static void doTurnFocusoff() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                final var wasturnoff=turnfocusoff;
+                turnfocusoff=false;
+                if(wasturnoff) {
+                    audioManager.abandonAudioFocusRequest(audiofocusrequest);
+                }
+            }
+        }
+
+        static void doTurnFocuson() {
+            if(android.os.Build.VERSION.SDK_INT >= 26) {
+                if(!turnfocusoff) {
+                    switch(audioManager.requestAudioFocus(audiofocusrequest)) {
+                        case AudioManager.AUDIOFOCUS_REQUEST_FAILED:
+                            Log.i(LOG_ID,"REQUEST_FAILED");
+                            break;
+
+                        case AudioManager.AUDIOFOCUS_REQUEST_GRANTED:
+                            turnfocusoff=true;
+                            Log.i(LOG_ID,"REQUEST_GRANTED");
+                            break;
+                        case AudioManager.AUDIOFOCUS_REQUEST_DELAYED:
+                            Log.i(LOG_ID,"REQUEST_DELAYED");
+                            break;
+                    };
+                }
+            }
+        }
+
+
+
 public static Ringtone getring(int kind) {
     return    mkrings(Natives.readring(kind),kind);
     }
 Ringtone mkring(String uristr,int kind) {
-    Log.i(LOG_ID,"ringtone "+kind+" "+uristr);
+    {if(doLog) {Log.i(LOG_ID,"ringtone "+kind+" "+uristr);};};
     var ring=setring(uristr,defaults[kind]);
     if(android.os.Build.VERSION.SDK_INT >= 21)  {
           try {
@@ -159,7 +198,7 @@ static RemoteGlucose arrowNotify;
     static void mkpaint() {
         if(!isWearable) {
             DisplayMetrics metrics= Applic.app.getResources().getDisplayMetrics();
-            Log.i(LOG_ID,"metrics.density="+ metrics.density+ " width="+metrics.widthPixels+" height="+metrics.heightPixels);
+            {if(doLog) {Log.i(LOG_ID,"metrics.density="+ metrics.density+ " width="+metrics.widthPixels+" height="+metrics.heightPixels);};};
             var notwidth=Math.min(metrics.widthPixels,metrics.heightPixels);
             arrowNotify=new RemoteGlucose(glucosesize,notwidth,0.12f,whiteonblack?1:0,false);
         }
@@ -167,7 +206,7 @@ static RemoteGlucose arrowNotify;
 
     Notify(Context cont) {
         showalways=Natives.getshowalways();
-        Log.i(LOG_ID,"showalways="+showalways);
+        {if(doLog) {Log.i(LOG_ID,"showalways="+showalways);};};
         alertseparate=Natives.getSeparate( );
         mkunitstr(cont,Natives.getunit());
         notificationManager =(NotificationManager) Applic.app.getSystemService(NOTIFICATION_SERVICE);
@@ -267,12 +306,12 @@ void overwriteglucose() {
         var act=MainActivity.thisone;
         if(act!=null)
             act.cancelglucosedialog();
-        Log.i(LOG_ID,"normalglucose waiting="+waiting);
+        {if(doLog) {Log.i(LOG_ID,"normalglucose waiting="+waiting);};};
         if(waiting)
             arrowglucosealarm(2,gl, format(usedlocale,glucoseformat, gl), strgl,GLUCOSENOTIFICATION ,true);
 
         else if(!isWearable){
-            Log.i(LOG_ID,"arrowglucosenotification  alertwatch="+alertwatch+" showalways="+showalways);
+            {if(doLog) {Log.i(LOG_ID,"arrowglucosenotification  alertwatch="+alertwatch+" showalways="+showalways);};};
             if(showalways||alertwatch) {
                 var message= format(usedlocale,glucoseformat,gl);
                 if(alertwatch)
@@ -305,10 +344,10 @@ void overwriteglucose() {
         }
     static public void stopalarmnotsend(boolean send) {
         if(!getisalarm()) {
-            Log.d(LOG_ID,"stopalarm not is alarm");
+            {if(doLog) {Log.d(LOG_ID,"stopalarm not is alarm");};};
             return;
         }
-        Log.d(LOG_ID,"stopalarm is alarm");
+        {if(doLog) {Log.d(LOG_ID,"stopalarm is alarm");};};
         final var stopper=stopschedule;
         if(stopper!=null) {
             stopper.cancel(false);
@@ -359,7 +398,7 @@ private    void vibratealarm(int kind) {
             }
 
         }
-        Log.i(LOG_ID,"vibratealarm "+kind);
+        {if(doLog) {Log.i(LOG_ID,"vibratealarm "+kind);};};
         }
     void stopvibratealarm() {
         vibrator.cancel();
@@ -372,7 +411,11 @@ static    void stoplossalarm(){
         stopalarm();
         }
     }
+
+static AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <26)?null:new AudioFocusRequest.Builder( AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes( notification_audio ).build();
     private synchronized void playringhier(Ringtone ring,int duration,boolean sound,boolean flash,boolean vibrate,boolean disturb,int kind) {
+        notifyfocus=true;
+        doTurnFocuson();
         stopalarm();
 //        final int[] curfilter={-1};
         if(!DontTalk) {
@@ -389,7 +432,7 @@ static    void stoplossalarm(){
             if(disturb) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     int filt=notificationManager.getCurrentInterruptionFilter();
-                    Log.i(LOG_ID,"getCurrentInterruptionFilter()="+filt);
+                    {if(doLog) {Log.i(LOG_ID,"getCurrentInterruptionFilter()="+filt);};};
 
                     if(filt!=NotificationManager.INTERRUPTION_FILTER_ALL) {
                             if(notificationManager.isNotificationPolicyAccessGranted()) {
@@ -400,10 +443,11 @@ static    void stoplossalarm(){
                     }
                 }
             if(doLog) {
-                Log.d(LOG_ID,"play "+ring.getTitle(app));
+                {if(doLog) {Log.d(LOG_ID,"play "+ring.getTitle(app));};};
             }
-            if(doplaysound[0])
+            if(doplaysound[0]) {
                 ring.play();
+                }
         }
         if(!isWearable) {
             if(flash) Flash.start(app);
@@ -412,14 +456,15 @@ static    void stoplossalarm(){
             vibratealarm(kind);
         }
         runstopalarm= () -> {
+            notifyfocus=false;
             lastalarm=-1;
             if(getisalarm()) {
-                Log.d(LOG_ID,"runstopalarm  isalarm");
+                {if(doLog) {Log.d(LOG_ID,"runstopalarm  isalarm");};};
                 if(sound) {
                     if(doplaysound[0])  {
                         try {
                             if(doLog) {
-                                Log.d(LOG_ID,"stop sound "+ring.getTitle(app));
+                                {if(doLog) {Log.d(LOG_ID,"stop sound "+ring.getTitle(app));};};
                                 }
                             ring.stop();
                             }
@@ -442,22 +487,29 @@ static    void stoplossalarm(){
                             Applic.scheduler.schedule(
                             () -> SuperGattCallback.talker.speak(glu.value, getUSEALARM()?ScanNfcV.audioattributes:notification_audio), 300, TimeUnit.MILLISECONDS);
                             }
+                         else
+                                doTurnFocusoff();
                         }
-                if(kind<2) overwriteglucose(kind);
+                    else
+                        doTurnFocusoff();
                   //overwriteglucose();
                     }
+                else
+                    doTurnFocusoff();
+
+                if(kind<2) overwriteglucose(kind);
                 setisalarm(false);
 
                 }
             else  {
                 if(doLog) {
-                    Log.d(LOG_ID,"runstopalarm not isalarm "+ring.getTitle(app));
+                    {if(doLog) {Log.d(LOG_ID,"runstopalarm not isalarm "+ring.getTitle(app));};};
                 }
             }
         };
     lastalarm=kind;
     setisalarm(true);
-    Log.d(LOG_ID,"schedule stop");
+    {if(doLog) {Log.d(LOG_ID,"schedule stop");};};
     stopschedule=Applic.scheduler.schedule(runstopalarm, duration, TimeUnit.SECONDS);
 
     }
@@ -475,7 +527,7 @@ static    void stoplossalarm(){
 
 
 private static void setmessage(String message,Boolean cancel) {
-    Log.i(LOG_ID,"setmessage "+message+" "+cancel);
+    {if(doLog) {Log.i(LOG_ID,"setmessage "+message+" "+cancel);};};
     if(cancel) {
         MainActivity.showmessage=message;
         }
@@ -488,7 +540,7 @@ private static void showpopupalarm(String message,Boolean cancel) {
     if(act!=null&&act.active) {
         if(cancel)
             MainActivity.showmessage=null;
-        Log.i(LOG_ID,"showpopupalarm direct "+message);
+        {if(doLog) {Log.i(LOG_ID,"showpopupalarm direct "+message);};};
         act.runOnUiThread(() ->  {
             if(act.isFinishing()||act.isDestroyed()||!act.active) {
                 setmessage(message,cancel);
@@ -504,7 +556,7 @@ private static void showpopupalarm(String message,Boolean cancel) {
     }
     private void soundalarm(int kind,int draw,String message,String type,boolean alarm) {
         if(alarm) {
-            Log.d(LOG_ID,"soundalarm "+kind);
+            {if(doLog) {Log.d(LOG_ID,"soundalarm "+kind);};};
             mksound(kind);
         }
         placelargenotification(draw,message,type,!alarm);
@@ -528,7 +580,7 @@ void overwriteglucose(int kind) {
         wasvalue=glvalue;
          wasmessage=message;wastype=type;
             makeseparatenotification(glvalue,message, sglucose,type);
-            Log.d(LOG_ID,"arrowsoundalarm "+kind);
+            {if(doLog) {Log.d(LOG_ID,"arrowsoundalarm "+kind);};};
             mksound(kind);
         }
         arrowplacelargenotification(kind,glvalue,message,sglucose,type,!alarm);
@@ -536,7 +588,7 @@ void overwriteglucose(int kind) {
 
 
     private void lossofsignalalarm(int kind,int draw,String message,String type,boolean alarm) {
-        Log.i(LOG_ID,"glucose alarm kind="+kind+" "+message+" alarm="+alarm);
+        {if(doLog) {Log.i(LOG_ID,"glucose alarm kind="+kind+" "+message+" alarm="+alarm);};};
         if(alarm) {
             if(kind!=2)
                 showpopupalarm(message,true);
@@ -544,10 +596,10 @@ void overwriteglucose(int kind) {
         else {
             final var act=MainActivity.thisone;
             if(act!=null) {
-                Log.i(LOG_ID,"act!=null");
+                {if(doLog) {Log.i(LOG_ID,"act!=null");};};
                 act.replaceDialogMessage(message);
                 }
-            Log.i(LOG_ID,"act==null");
+            {if(doLog) {Log.i(LOG_ID,"act==null");};};
             if(MainActivity.showmessage!=null)
                 MainActivity.showmessage=message;
             }
@@ -557,7 +609,7 @@ void overwriteglucose(int kind) {
             soundalarm(kind,draw,message,type,alarm);
     }
     private void arrowglucosealarm(int kind,float glvalue,String message,notGlucose strglucose,String type,boolean alarm) {
-        Log.i(LOG_ID,"arrowglucosealarm kind="+kind+" "+ message+" alarm="+alarm);
+        {if(doLog) {Log.i(LOG_ID,"arrowglucosealarm kind="+kind+" "+ message+" alarm="+alarm);};};
         if(alarm) {
             if(kind!=2)
                 showpopupalarm(message,true);
@@ -565,16 +617,16 @@ void overwriteglucose(int kind) {
         else {
             final var act=MainActivity.thisone;
             if(act!=null) {
-                Log.i(LOG_ID,"act!=null");
+                {if(doLog) {Log.i(LOG_ID,"act!=null");};};
                 act.replaceDialogMessage(message);
                 }
             if(MainActivity.showmessage!=null) {
-                Log.i(LOG_ID,"MainActivity.showmessage="+message);
+                {if(doLog) {Log.i(LOG_ID,"MainActivity.showmessage="+message);};};
                 MainActivity.showmessage=message;
                 }
             }
         if(!alarm&&alertwatch) {
-            Log.i(LOG_ID,"arrowglucosealarm alertwatch="+alertwatch);
+            {if(doLog) {Log.i(LOG_ID,"arrowglucosealarm alertwatch="+alertwatch);};};
             arrowglucosenotification(kind,glvalue,message,strglucose,GLUCOSENOTIFICATION ,false);
         }
         else
@@ -649,7 +701,7 @@ private void  makeseparatenotification(float glvalue,String message,notGlucose g
             var intent =mkpending();
             var GluNotBuilder=mkbuilderintent(type,intent);
             GluNotBuilder.setDeleteIntent(DeleteReceiver.getDeleteIntent());
-            Log.i(LOG_ID,"makeseparatenotification "+glucose.value);
+            {if(doLog) {Log.i(LOG_ID,"makeseparatenotification "+glucose.value);};};
 
            setIcon(GluNotBuilder,glvalue,glucose.sensorgen2);
             GluNotBuilder.setShowWhen(true).setContentTitle(message);
@@ -680,7 +732,7 @@ static public boolean alertseparate=false;
         if(!alertseparate) {
             GluNotBuilder.setDeleteIntent(DeleteReceiver.getDeleteIntent());
             }
-        Log.i(LOG_ID,"makearrownotification setOnlyAlertOnce("+once+") "+glucose.value);
+        {if(doLog) {Log.i(LOG_ID,"makearrownotification setOnlyAlertOnce("+once+") "+glucose.value);};};
 
         //var draw= GlucoseDraw.getgludraw(glvalue);
 
@@ -727,7 +779,7 @@ static public boolean alertseparate=false;
         }
     }
 
-     Log.i(LOG_ID,(once?"":"not ")+"only once");
+     {if(doLog) {Log.i(LOG_ID,(once?"":"not ")+"only once");};};
 
      Notification notif= GluNotBuilder.build();
     notif.when= glucose.time;
@@ -737,7 +789,7 @@ static public boolean alertseparate=false;
 @SuppressWarnings({"deprecation"})
 
 static public PendingIntent mkpending() {
-   Log.i(LOG_ID,"mkpending");
+   {if(doLog) {Log.i(LOG_ID,"mkpending");};};
     Intent notifyIntent = new Intent(Applic.app,MainActivity.class);
     notifyIntent.putExtra(fromnotification,true);
     notifyIntent.addCategory(Intent. CATEGORY_LAUNCHER ) ;
@@ -781,7 +833,7 @@ private Notification.Builder   mkbuilder(String type) {
 
 
 void fornotify(Notification notif) {
-    Log.i(LOG_ID, "fornotify ");
+    {if(doLog) {Log.i(LOG_ID, "fornotify ");};};
     if(isWearable) {
               notificationManager.notify(glucosealarmid,notif);
         }
@@ -802,7 +854,7 @@ void fornotify(Notification notif) {
     @SuppressWarnings("deprecation")
 void oldnotification(long time) {
     String message= Applic.app.getString(R.string.nonewvalue)+ timef.format(time);
-    Log.i(LOG_ID,"oldnotification "+message);
+    {if(doLog) {Log.i(LOG_ID,"oldnotification "+message);};};
     var GluNotBuilder=mkbuilder(GLUCOSENOTIFICATION);
     if (Build.VERSION.SDK_INT < 31) {
             GluNotBuilder.setStyle(new Notification.DecoratedCustomViewStyle());
@@ -818,7 +870,7 @@ void oldnotification(long time) {
 //    GluNotBuilder.setContent(remoteViews);
     Notification notif= GluNotBuilder.build();
     fornotify(notif);
-    Log.i(LOG_ID,"end oldnotification");
+    {if(doLog) {Log.i(LOG_ID,"end oldnotification");};};
     }
 */
 void oldnotification(long time) {
@@ -835,7 +887,7 @@ private Notification  makenotification(int draw,String message,String type,boole
             GluNotBuilder.setStyle(new Notification.DecoratedCustomViewStyle());
         }
         }
-    Log.i(LOG_ID,"makenotification "+message);
+    {if(doLog) {Log.i(LOG_ID,"makenotification "+message);};};
 
         GluNotBuilder.setSmallIcon(draw).setOnlyAlertOnce(once).setContentTitle(message).setShowWhen(true);
 
@@ -867,7 +919,7 @@ private Notification  makenotification(int draw,String message,String type,boole
         }
     }
 
-     Log.i(LOG_ID,(once?"":"not ")+"only once");
+     {if(doLog) {Log.i(LOG_ID,(once?"":"not ")+"only once");};};
 
      Notification notif= GluNotBuilder.build();
      notif.when = System.currentTimeMillis();
@@ -890,7 +942,7 @@ static public void shownovalue() {
     onenot.novalue();
     }
 private void novalue() {
-    Log.i(LOG_ID,"novalue");
+    {if(doLog) {Log.i(LOG_ID,"novalue");};};
 
     fornotify(getforgroundnotification());
 //    notificationManager.notify(glucosenotificationid,getforgroundnotification());
@@ -898,7 +950,7 @@ private void novalue() {
 public void foregroundno(Service service) {
     Notification not=getforgroundnotification();
     service.startForeground(glucosenotificationid, not);
-    Log.i(LOG_ID,"startforeground");
+    {if(doLog) {Log.i(LOG_ID,"startforeground");};};
     }
 static public void foregroundnot(Service service) {
 //    Application app=service.getApplication();
@@ -936,11 +988,11 @@ static void test2() {
 
     }
  public void  lossofsensornotification(int draw,String message,String type,boolean once) {
-     Log.i(LOG_ID,"notify "+message);
+     {if(doLog) {Log.i(LOG_ID,"notify "+message);};};
     fornotify(makenotification(draw,message,type,once));
     }
  public void  arrowglucosenotification(int kind,float glvalue,String message,notGlucose glucose,String type,boolean once) {
-     Log.i(LOG_ID,"notify "+message);
+     {if(doLog) {Log.i(LOG_ID,"notify "+message);};};
     fornotify(makearrownotification( kind,glvalue, message, glucose, type, once)) ;
     }
 
@@ -1002,7 +1054,7 @@ setDeleteIntent(DeleteReceiver.getDeleteIntent()) .setContentTitle(message);
     }
 //final private     int lossalarmid=77332;
  public void  lossalarm(long time) {
-     Log.i(LOG_ID,"lossalarm");
+     {if(doLog) {Log.i(LOG_ID,"lossalarm");};};
     final String tformat= timef.format(time);
     final String message= "***  "+Applic.getContext().getString(R.string.nonewvalue)+tformat+" ***";
 

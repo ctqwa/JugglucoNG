@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
+
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
@@ -65,7 +67,7 @@ static private final String LOG_ID="Flash";
         }
        @SuppressWarnings("deprecation")
         public void on() {
-            Log.i(LOG_ID,"Flash on");
+            {if(doLog) {Log.i(LOG_ID,"Flash on");};};
 		if(mCamera==null)
 			return;
             try {
@@ -84,7 +86,7 @@ static private final String LOG_ID="Flash";
         public void off() {
 		if(mCamera==null)
 			return;
-            Log.i(LOG_ID,"Flash off");
+            {if(doLog) {Log.i(LOG_ID,"Flash off");};};
             try {
                 //noinspection deprecation
                 parameters = mCamera.getParameters();
@@ -131,11 +133,11 @@ static    class flash23 implements Flasher {
                             }
                         }
                         if (cameraId == null) {
-                            Log.i(LOG_ID, "No cameraId=");
+                            {if(doLog) {Log.i(LOG_ID, "No cameraId=");};};
                             cameraId = camas[0];
                         }
 
-                        Log.i(LOG_ID, "cameraId=" + cameraId);
+                        {if(doLog) {Log.i(LOG_ID, "cameraId=" + cameraId);};};
                     }
 
                 }
@@ -147,11 +149,11 @@ static    class flash23 implements Flasher {
         void set(boolean val) {
             try {
                 if(cameraId!=null) {
-            	    Log.i(LOG_ID,"set("+val+")");
+            	    {if(doLog) {Log.i(LOG_ID,"set("+val+")");};};
                     camManager.setTorchMode(cameraId, val);
 		    }
 		 else {
-            	    Log.i(LOG_ID,"cameraID==null");
+            	    {if(doLog) {Log.i(LOG_ID,"cameraID==null");};};
 		 	}
             }
             catch(Throwable e) {
@@ -173,10 +175,10 @@ static public boolean hasFlash(Context context) {
         if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)&& context.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_CAMERA_FLASH)) {
             // this device has a camera
-            Log.i(LOG_ID,"Can Flash");
+            {if(doLog) {Log.i(LOG_ID,"Can Flash");};};
             return true;
         } else {
-            Log.i(LOG_ID,"Can not Flash");
+            {if(doLog) {Log.i(LOG_ID,"Can not Flash");};};
             // no camera on this device
             return false;
         }
@@ -216,15 +218,15 @@ static void start(Context context) {
 	stopflash=false;
 	flashschedule  = scheduler.scheduleAtFixedRate(flashmore, 0,150 , TimeUnit.MILLISECONDS);
 	}
-static synchronized void stop() {
-	Log.i(LOG_ID,"stop");
+static private synchronized void dostop() {
+	if(doLog) {Log.i(LOG_ID,"stop");};
 	stopflash=true;
 	onflag=true;
     if(flashschedule !=null)  {
             flashschedule.cancel(true);
 	    flashschedule=null;
 	    onflag=true;
- 	//    Log.i(LOG_ID,"cancel");
+ 	//    {if(doLog) {Log.i(LOG_ID,"cancel");};};
 	    }
     if(flash!=null) {
 //tk.glucodata.Applic.RunOnUiThread(()-> {
@@ -232,8 +234,12 @@ static synchronized void stop() {
         flash.end();
         flash=null;
 //	});
- 	Log.i(LOG_ID,"endstop");
+ 	{if(doLog) {Log.i(LOG_ID,"endstop");};};
 	}
 	}
 
+static  void stop() {
+     Applic.scheduler.schedule(Flash::dostop, 0, TimeUnit.MILLISECONDS);
+     }
 }
+

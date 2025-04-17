@@ -85,6 +85,7 @@ import static consts.consts.START;
 import static consts.consts.STOP;
 import static consts.consts.STRING;
 import static consts.consts.maxstorage;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.nums.numio.didreceivebackup;
 
 //public class AllData extends AndroidViewModel {
@@ -137,7 +138,7 @@ private List<Object> glucosemess=null;
 
 private static boolean gotgotglucose=false;
 public void sendglucose(String ident,long tim,float glu,float rate,int off) {
-List<Object> uit = Arrays.asList(ident,tim,glu,rate,off,Applic.unit==1?1:0);
+   List<Object> uit = Arrays.asList(ident,tim,glu,rate,off,Applic.unit==1?1:0);
    if(!sendtowatch||isSending()) 
       glucosemess=uit;
    else  {
@@ -148,7 +149,7 @@ List<Object> uit = Arrays.asList(ident,tim,glu,rate,off,Applic.unit==1?1:0);
     }
 
 void realsendendnum(int base) {
-   Log.i(LOG_ID, "realsendendnum "+base);
+   {if(doLog) {Log.i(LOG_ID, "realsendendnum "+base);};};
    sendends[base]=false;
    int end= numio.getlastnum( base) ;
    realsendmessage(Arrays.asList(SETENDNUM,base,end));
@@ -218,7 +219,7 @@ private void setSendlast(int base) {
     long ptr=numio.numptrs[base];
 	int last=Natives.getlastNum(ptr); 
     int back=Math.max(0,last-20);
-    Log.i(LOG_ID,base+" setSendlast last="+last+" back="+back);
+    {if(doLog) {Log.i(LOG_ID,base+" setSendlast last="+last+" back="+back);};};
     Natives.setchangedNum(ptr,back);
     }
 private void givebase0nums() {
@@ -245,7 +246,7 @@ public void sync() {
 
    if(Natives.shouldsendlabels()) 
       sendlabels();
-   Log.i(LOG_ID,"sync");
+   {if(doLog) {Log.i(LOG_ID,"sync");};};
 
    getnums(0); 
    askendnum(0);
@@ -327,11 +328,11 @@ class IQlisten implements IQApplicationEventListener {
 @Override
 public void onMessageReceived(IQDevice device, IQApp app, List<Object> message, IQMessageStatus status) {
     if (status != IQMessageStatus.SUCCESS) {
-   Log.i(LOG_ID,"onMessageReceived failt");
+   {if(doLog) {Log.i(LOG_ID,"onMessageReceived failt");};};
    return;
     }
     if (message.size() == 0) {
-   Log.i(LOG_ID,"onMessageReceived size==0");
+   {if(doLog) {Log.i(LOG_ID,"onMessageReceived size==0");};};
    return;
     }
 
@@ -358,7 +359,7 @@ public void onMessageReceived(IQDevice device, IQApp app, List<Object> message, 
               case GOTGLUCOSE:gotgotglucose=true;break;
               case RECEIVEDCUTS: Natives.setsendcuts(false);break;
 /*              case RECEIVEDUNITS: 
-                 Log.i(LOG_ID,"RECEIVEDUNITS");
+                 {if(doLog) {Log.i(LOG_ID,"RECEIVEDUNITS");};};
                  setSending(false);
                  sync();
                  return; */
@@ -484,7 +485,7 @@ public void onMessageReceived(IQDevice device, IQApp app, List<Object> message, 
 
 }
 static final private void log(String str) {
-   Log.i(LOG_ID,str);
+   {if(doLog) {Log.i(LOG_ID,str);};};
    }
    /*
 public void allback(int base) {
@@ -514,14 +515,14 @@ public void changedback(int base) {
       return;
 
     if(!isSending()) {
-      Log.i(LOG_ID,"changedback "+base);
+      {if(doLog) {Log.i(LOG_ID,"changedback "+base);};};
       setSending(true);
       if(!realchangedback(base)) {
          nextmessage();
          }
       }
    else {
-      Log.i(LOG_ID,"backchanged "+base+" = true");
+      {if(doLog) {Log.i(LOG_ID,"backchanged "+base+" = true");};};
       backchanged[base]=true;
        } 
 }
@@ -562,7 +563,7 @@ private void putnums(int base,int beg, int end) {
    }
 private Object getputnums(int base,int begin, int end) {
    int last = numio.getlastnum(base);
-   Log.i(LOG_ID,"getputnums base="+base+" begin="+begin+" end="+end+" last="+last);
+   {if(doLog) {Log.i(LOG_ID,"getputnums base="+base+" begin="+begin+" end="+end+" last="+last);};};
    if(last < end) {
        end = last;
        if(begin>=end)
@@ -572,7 +573,7 @@ private Object getputnums(int base,int begin, int end) {
     if(len > sendchunk) {
        sendgoal[base] = end;
        end = begin + sendchunk;
-       Log.i(LOG_ID,"getputnums len="+len+" > "+sendchunk+" sendgoal="+sendgoal[base]);
+       {if(doLog) {Log.i(LOG_ID,"getputnums len="+len+" > "+sendchunk+" sendgoal="+sendgoal[base]);};};
        }
     List<List<Number>> ar = new ArrayList<>();
     try  {
@@ -606,7 +607,7 @@ private boolean deletelater(int base) {
 public void deletelast(int base,int pos,int end ) {
  if(!usewatch)
       return;
-  Log.i(LOG_ID,"delete "+base+" "+pos+"-"+end);
+  {if(doLog) {Log.i(LOG_ID,"delete "+base+" "+pos+"-"+end);};};
   dodelete[base][0]=pos;
   if(end>dodelete[base][1]) 
        dodelete[base][1]=end;
@@ -672,7 +673,7 @@ public boolean waiting() {
    }
 boolean sendoldglucose() {
    if(sendtowatch&&glucosemess!=null) {
-      Log.i(LOG_ID,"sendoldglucose");
+      {if(doLog) {Log.i(LOG_ID,"sendoldglucose");};};
             long nu   =System.currentTimeMillis()/1000;
       long glutime=(long)glucosemess.get(1);
       List<Object> tmp=glucosemess;
@@ -688,13 +689,13 @@ boolean sendoldglucose() {
    return false;
    }
 public void nextmessage() {
-   Log.i(LOG_ID,"nextmessage");
+   {if(doLog) {Log.i(LOG_ID,"nextmessage");};};
    setSending(true);
    if(sendoldglucose())
       return;
    Object obj=mqueue.poll();
    if(obj!=null) {
-      Log.i(LOG_ID,"from queue");
+      {if(doLog) {Log.i(LOG_ID,"from queue");};};
       realsendmessage(obj);
       return;
       }
@@ -748,7 +749,7 @@ public void sync() {
 
    if(Natives.shouldsendlabels()) 
       sendlabels();
-   Log.i(LOG_ID,"sync");
+   {if(doLog) {Log.i(LOG_ID,"sync");};};
 
    getnums(0); 
    askendnum(0);
@@ -771,14 +772,14 @@ public long statustime=0L,sendtime=0L;
 private volatile long nexttime=0L;
 public boolean realsendmessage(Object message) {
      if(mConnectIQ==null) {
-        Log.d(LOG_ID,"realsendmessage mConnectIQ==null");
+        {if(doLog) {Log.d(LOG_ID,"realsendmessage mConnectIQ==null");};};
         return false;
       }
    if(devices==null) {
-        Log.d(LOG_ID,"realsendmessage devices==null");
+        {if(doLog) {Log.d(LOG_ID,"realsendmessage devices==null");};};
       return false;
       }
-   Log.i(LOG_ID,"realsendmessage "+message);
+   {if(doLog) {Log.i(LOG_ID,"realsendmessage "+message);};};
          sendtime=System.currentTimeMillis();
 //TODO: remove
 //if(!isRelease) nexttime=sendtime+waittime;
@@ -861,7 +862,7 @@ private void getnums(int base) {
      if(didreceivebackup(base))
       return;
    if(isSending())  {
-      Log.i(LOG_ID,"asknums "+base);
+      {if(doLog) {Log.i(LOG_ID,"asknums "+base);};};
       askednums[base]=true;
       }
    else {
@@ -871,7 +872,7 @@ private void getnums(int base) {
     }
 
 void realgetnums(int base) {
-   Log.i(LOG_ID,"realgetnums "+base);
+   {if(doLog) {Log.i(LOG_ID,"realgetnums "+base);};};
    askednums[base]=false;
    realsendmessage(Arrays.asList(NUMS, base, numio.getlastpollednum(base)));
    }
@@ -888,7 +889,7 @@ void realgetnums(int base) {
 
 */
 public void stopalarm() {
-   Log.i(LOG_ID,"send stopalarm");
+   {if(doLog) {Log.i(LOG_ID,"send stopalarm");};};
     sendmessage(Arrays.asList(STOPALARM ));
     }
 void      testapppresent() {
@@ -897,7 +898,7 @@ void      testapppresent() {
     private IQDeviceEventListener mDeviceEventListener = new IQDeviceEventListener() {
        @Override
        public void onDeviceStatusChanged(IQDevice device, IQDeviceStatus status) {
-          Log.i(LOG_ID,"onDeviceStatusChanged("+device.toString()+","+status.toString()+")");
+          {if(doLog) {Log.i(LOG_ID,"onDeviceStatusChanged("+device.toString()+","+status.toString()+")");};};
       if(status==IQDeviceStatus.CONNECTED) {
          setSending(false);
          if(wasglucose)
@@ -922,7 +923,7 @@ void      testapppresent() {
 
     };
 public void loadDevices(Context context) {
-   Log.i(LOG_ID,"loadDevices");
+   {if(doLog) {Log.i(LOG_ID,"loadDevices");};};
         // Retrieve the list of known devices
    try {
        long wasident=numio.getident();
@@ -934,7 +935,7 @@ public void loadDevices(Context context) {
              if(wasident==-1L||wasident==ident) {
                 if(wasident==-1L)
                    numio.setident(ident);
-                Log.d(LOG_ID,"registerForDeviceEvents");
+                {if(doLog) {Log.d(LOG_ID,"registerForDeviceEvents");};};
                               mConnectIQ.registerForDeviceEvents(device, mDeviceEventListener);
                 devused=i;
                 break;
@@ -947,7 +948,7 @@ public void loadDevices(Context context) {
           register(context);
           }
        else {
-           Log.v(LOG_ID, "LoadDevices: devices==null");
+           {if(doLog) {Log.v(LOG_ID, "LoadDevices: devices==null");};};
            }
         } 
    catch (InvalidStateException e) {
@@ -968,7 +969,7 @@ public static int appmissing=0;
 void register(Context context) {
 
    if(devices!=null&&devices.size()>0) {
-       Log.v(LOG_ID, "register: devices.size()>0");
+       {if(doLog) {Log.v(LOG_ID, "register: devices.size()>0");};};
             try {
 
                 mConnectIQ.getApplicationInfo(Natives.getgarminid(), devices.get(devused), new IQApplicationInfoListener() {
@@ -976,7 +977,7 @@ void register(Context context) {
                     @Override
                     public void onApplicationInfoReceived(IQApp app) {
          appmissing=-1;
-         Log.i(LOG_ID,"onApplicationInfoReceived");
+         {if(doLog) {Log.i(LOG_ID,"onApplicationInfoReceived");};};
                         try {
                             Applic.argToaster(getApplication(), "Opening  Kerfstok...", Toast.LENGTH_SHORT);
                             mConnectIQ.openApplication(devices.get(devused), app, mOpenAppListener);
@@ -992,7 +993,7 @@ void register(Context context) {
                     public void onApplicationNotInstalled(String applicationId) {
                         //Kerfstok not installed on watch
          appmissing=1;
-         Log.i(LOG_ID,"onApplicationNotInstalled");
+         {if(doLog) {Log.i(LOG_ID,"onApplicationNotInstalled");};};
          /*
          try {
                             Applic.argToaster(context, "Garmin watch app Kerfstok missing", Toast.LENGTH_SHORT);
@@ -1025,7 +1026,7 @@ void register(Context context) {
             }
             // Let's register to receive messages from our Applic.app on the device.
             try {
-               Log.d(LOG_ID,"registerForAppEvents");
+               {if(doLog) {Log.d(LOG_ID,"registerForAppEvents");};};
                mConnectIQ.registerForAppEvents(devices.get(devused), mMyApp, IQlistener);
                usewatch=true;
             } catch (InvalidStateException e) {
@@ -1040,9 +1041,9 @@ void unregister() {
       try {
       if(devices!=null&&devices.size()>0) {
             mConnectIQ.unregisterAllForEvents();
-           Log.d(LOG_ID,"unregisterAllForEvents");
+           {if(doLog) {Log.d(LOG_ID,"unregisterAllForEvents");};};
          if (mMyApp != null) {
-            Log.d(LOG_ID,"unregisterForApplicationEvents");
+            {if(doLog) {Log.d(LOG_ID,"unregisterForApplicationEvents");};};
              mConnectIQ.unregisterForApplicationEvents(devices.get(devused), mMyApp);
          }
          }
@@ -1082,7 +1083,7 @@ public void initIQ(Context context) {
 try {
       mMyApp = new IQApp(Natives.getgarminid());
      mConnectIQ = ConnectIQ.getInstance(getApplication(), IQConnectType.WIRELESS);
-Log.v(LOG_ID,"initIQ");
+{if(doLog) {Log.v(LOG_ID,"initIQ");};};
     mListener = new MyConnectIQListener(context);
     mConnectIQ.initialize(getApplication(), false, mListener);
     }

@@ -43,6 +43,7 @@ import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static tk.glucodata.Applic.backgroundcolor;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.help.sethelpbutton;
 
 class Openfile {
@@ -64,10 +65,10 @@ Layout lay=null;
     if(lay!=null) {
 	lay.setVisibility(VISIBLE);
 	lay.bringToFront();
-       Log.v(LOG_ID,"showchoice lay!=null");
+       {if(doLog) {Log.v(LOG_ID,"showchoice lay!=null");};};
     	return;
 	}
-    Log.v(LOG_ID,"showchoice "+mess);
+    {if(doLog) {Log.v(LOG_ID,"showchoice "+mess);};};
     	help.hide();
 	Button Open=new Button(context);Open.setText(R.string.open);
 //	Button Urls=new Button(context);Urls.setText("Urls");
@@ -117,10 +118,10 @@ Layout lay=null;
         @Override
         public void onActivityResult(ActivityResult res) {
             if (res.getResultCode() != Activity.RESULT_OK) {
-		Log.i(LOG_ID,"onActivityResult on Ok");
+		{if(doLog) {Log.i(LOG_ID,"onActivityResult on Ok");};};
                 return;
 		}
-	Log.i(LOG_ID,"onActivityResult Ok");
+	{if(doLog) {Log.i(LOG_ID,"onActivityResult Ok");};};
             Intent intent = res.getData();
 	    getlib(intent);
         }
@@ -143,7 +144,7 @@ static	boolean	reinstall=false;
 			}
 		else {
 			if(rightlib.testrightlib(context,cali)!=0)  {
-				 Log.i(LOG_ID,"The right library");
+				 {if(doLog) {Log.i(LOG_ID,"The right library");};};
 				 if(context.openfile!=null) {
 					if(context.openfile.lay!=null) {
 						context.openfile.lay.setVisibility(GONE);
@@ -168,7 +169,7 @@ static	boolean	reinstall=false;
 			}
 
 			Applic.Toaster(mess);
-			Log.i(LOG_ID,mess);
+			{if(doLog) {Log.i(LOG_ID,mess);};};
 			return;
 	    } catch (Exception e) {
 			Log.stack(LOG_ID,uri!=null?uri.toString():"",e);
@@ -183,7 +184,7 @@ static	boolean	reinstall=false;
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
        // mStartForResult.launch(intent);
-       Log.v(LOG_ID,"openlib");
+       {if(doLog) {Log.v(LOG_ID,"openlib");};};
 	context.startActivityForResult(intent,MainActivity.REQUEST_LIB);
     }
     }

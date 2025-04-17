@@ -50,6 +50,7 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.getscreenwidth;
 import static tk.glucodata.help.hidekeyboard;
 import static tk.glucodata.settings.Settings.editoptions;
@@ -106,7 +107,7 @@ void mkshortlist(Context act) {
 
 	shortcuts= Natives.getShortcuts();
 	 int len=shortcuts.size();
-	 Log.i(LOG_ID,"mkshortlist "+len);
+	 {if(doLog) {Log.i(LOG_ID,"mkshortlist "+len);};};
 	 shortlist= new Layout(act,(l, w, h)->{
 
 			return new int[] {w,h};

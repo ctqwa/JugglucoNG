@@ -30,6 +30,7 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.Floating.rewritefloating;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.screenheight;
 import static tk.glucodata.Specific.useclose;
 import static tk.glucodata.settings.Settings.editoptions;
@@ -65,7 +66,7 @@ static private boolean background=true;
 
 
 static public void    setcolor(int c) {
-        Log.i(LOG_ID,"setcolor("+(c&0xFFFFFFFF)+")");
+        {if(doLog) {Log.i(LOG_ID,"setcolor("+(c&0xFFFFFFFF)+")");};};
         if(background) { 
             Floating.setbackgroundcolor(c);
             }
@@ -109,7 +110,7 @@ static public void show(MainActivity act,View view) {
           }
         @Override
         public void onStartTrackingTouch(SeekBar seekBar) {
-            Log.i(LOG_ID,"onStartTrackingTouch");
+            {if(doLog) {Log.i(LOG_ID,"onStartTrackingTouch");};};
             }
         @Override
         public void onStopTrackingTouch(SeekBar seekBar) {
@@ -127,7 +128,7 @@ static public void show(MainActivity act,View view) {
                     @Override
                     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                     if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER || actionId == EditorInfo.IME_ACTION_DONE) {
-                                 Log.i(LOG_ID,"onEditorAction");
+                                 {if(doLog) {Log.i(LOG_ID,"onEditorAction");};};
                  try {
                     var siz=Integer.parseInt(String.valueOf(v.getText()));
                     if(siz>maxfont) {
@@ -259,7 +260,7 @@ static public void showcolors(MainActivity act) {
     int height=GlucoseCurve.getheight();
     var width=GlucoseCurve.getwidth();
     AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor,c-> {
-    Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));
+    {if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
         setcolor(c);
         Floating.invalidatefloat();
     }, v-> {

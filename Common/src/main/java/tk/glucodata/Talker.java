@@ -36,6 +36,7 @@ import static tk.glucodata.Natives.getVoiceSpeed;
 import static tk.glucodata.Natives.getVoiceTalker;
 import static tk.glucodata.Natives.lastglucose;
 import static tk.glucodata.Natives.settouchtalk;
+import static tk.glucodata.Notify.notification_audio;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
 import static tk.glucodata.settings.Settings.editoptions;
@@ -46,10 +47,14 @@ import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
 import static tk.glucodata.util.getlabel;
 import static tk.glucodata.util.getlocale;
-
+import static tk.glucodata.Notify.doTurnFocuson;
+import static tk.glucodata.Notify.doTurnFocusoff;
+import static tk.glucodata.Notify.audiofocusrequest;
 import android.app.Activity;
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.os.Build;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -118,10 +123,10 @@ if(!DontTalk) {
     if(voicepos>=0&& voicepos<voiceChoice.size()) {
         var vo= voiceChoice.get(voicepos);
         engine.setVoice(voiceChoice.get(voicepos));
-        Log.i(LOG_ID,"after setVoice "+vo.getName());
+        {if(doLog) {Log.i(LOG_ID,"after setVoice "+vo.getName());};};
         }
     else {
-        Log.i(LOG_ID,"setVoice out of range");
+        {if(doLog) {Log.i(LOG_ID,"setVoice out of range");};};
         voicepos=0;
         }
       }
@@ -135,8 +140,10 @@ if(!DontTalk) {
     voiceChoice.clear();
     }
     }
+
  Talker(Context cont) {
 if(!DontTalk) {
+
 //    var context=cont==null?Applic.getContext():cont;
     var context=Applic.app;
      engine=new TextToSpeech(context, new TextToSpeech.OnInitListener() {
@@ -154,13 +161,13 @@ if(!DontTalk) {
             if (android.os.Build.VERSION.SDK_INT >= minandroid) {
                 Set<Voice> voices=gine.getVoices();
                 if(voices==null) {
-                    Log.i(LOG_ID,"voices==null");
+                    {if(doLog) {Log.i(LOG_ID,"voices==null");};};
                     }
                 else {
                     var loc=getlocale();
    //                    var lang=(context!=null)?context.getString(R.string.language):loc.getLanguage();
                     var lang=loc.getLanguage();
-                    Log.i(LOG_ID,"lang="+lang);
+                    {if(doLog) {Log.i(LOG_ID,"lang="+lang);};};
 
                     voiceChoice.clear();
                     for(var voice:voices) {
@@ -170,7 +177,7 @@ if(!DontTalk) {
                         }
                     var spin=spinner;
                     if(spin!=null) {
-                        Log.i(LOG_ID,"Talker spinner!=null");
+                        {if(doLog) {Log.i(LOG_ID,"Talker spinner!=null");};};
                           Applic.RunOnUiThread(() -> {
                             spin.setAdapter(new RangeAdapter<Voice>(voiceChoice, Applic.app, voice -> {
                                     return voice.getName();
@@ -190,7 +197,7 @@ if(!DontTalk) {
          else {
              Log.e(LOG_ID,"status = TextToSpeech.ERROR ");
              }
-         Log.i(LOG_ID,"after onInit");
+         {if(doLog) {Log.i(LOG_ID,"after onInit");};};
           }
        catch(Throwable th) {
          Log.stack(LOG_ID,"Talker.onInit",th);
@@ -198,25 +205,31 @@ if(!DontTalk) {
             }
           });
     engine.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+
+ //  AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <26)?null:new AudioFocusRequest.Builder( AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes( defaultAudioAttributes ).build();
         @Override
         public void onDone(String utteranceId) {
-            Log.i(LOG_ID,"onDone "+utteranceId);
-
+            if(doLog) {Log.i(LOG_ID,"onDone "+utteranceId);};
+            if(!notifyfocus)
+                doTurnFocusoff();
         }
 
         @Override
         public void onError(String utteranceId) {
-            Log.i(LOG_ID,"onError "+utteranceId);
+            if(doLog) {Log.i(LOG_ID,"onError "+utteranceId);};
+            if(!notifyfocus)
+                doTurnFocusoff();
 
-        }
-
+            }
         @Override
         public void onStart(String utteranceId) {
-            Log.i(LOG_ID,"onStart "+utteranceId);
+            if(doLog) {Log.i(LOG_ID,"onStart "+utteranceId);};
+            if(!notifyfocus)
+                doTurnFocuson() ;
+            }
 
-        }
     });
-    Log.i(LOG_ID,"after new TextToSpeech");
+    if(doLog) {Log.i(LOG_ID,"after new TextToSpeech");};
     if(android.os.Build.VERSION.SDK_INT >= minandroid)
         engine.setAudioAttributes(defaultAudioAttributes);
         }
@@ -225,7 +238,7 @@ if(!DontTalk) {
 public void speak(String message) {
     if(!DontTalk) {
 
-//        if(engine.speak(message, TextToSpeech.QUEUE_FLUSH, null)==TextToSpeech.SUCCESS) {
+
         if(
                 ((android.os.Build.VERSION.SDK_INT >= 21)?
                 engine.speak(message, TextToSpeech.QUEUE_FLUSH, null,message):
@@ -233,16 +246,17 @@ public void speak(String message) {
 
 
         {
-            Log.i(LOG_ID,"success speak "+message);
+            if(doLog) {Log.i(LOG_ID,"success speak "+message);}
             }
          else {
             Log.e(LOG_ID,"failed speak "+message);
             }
         }
     }
-
+static boolean notifyfocus=false;
 //private static final AudioAttributes defaultAudioAttributes = (new AudioAttributes.Builder()) .setLegacyStreamType(TextToSpeech.Engine.DEFAULT_STREAM) .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH) .build(); 
-private static final AudioAttributes defaultAudioAttributes =(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_VOICE_COMMUNICATION:USAGE_NOTIFICATION ) .build():null;
+//private static final AudioAttributes defaultAudioAttributes =(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_ASSISTANCE_SONIFICATION:USAGE_NOTIFICATION ) .build():null;
+private static final AudioAttributes defaultAudioAttributes = notification_audio;
 public void speak(String message, AudioAttributes attr) {
 if(!DontTalk) {
     if(android.os.Build.VERSION.SDK_INT >= minandroid) {
@@ -310,15 +324,15 @@ private static View[] slider(MainActivity context,float init) {
                 float num=progress2ratio(progress);
                 String form=String.format(Locale.US, "%.2f",num);
                 displayspeed.setText( form);
-                Log.i(LOG_ID,"onProgressChanged "+form);
+                {if(doLog) {Log.i(LOG_ID,"onProgressChanged "+form);};};
                 }
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                Log.i(LOG_ID,"onStartTrackingTouch");
+                {if(doLog) {Log.i(LOG_ID,"onStartTrackingTouch");};};
                 }
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                Log.i(LOG_ID,"onStopTrackingTouch");
+                {if(doLog) {Log.i(LOG_ID,"onStopTrackingTouch");};};
                 }
             });
 
@@ -326,12 +340,12 @@ private static View[] slider(MainActivity context,float init) {
                 @Override
                 public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER || actionId == EditorInfo.IME_ACTION_DONE) {
-                     Log.i(LOG_ID,"onEditorAction");
+                     {if(doLog) {Log.i(LOG_ID,"onEditorAction");};};
                     var speedstr=v.getText().toString();
                     if(speedstr != null) {
                         float    curspeed = str2float(speedstr);
                         speed.setProgress(ratio2progress(curspeed));
-                        Log.i(LOG_ID,"onEditorAction: "+speedstr+" "+curspeed);
+                        {if(doLog) {Log.i(LOG_ID,"onEditorAction: "+speedstr+" "+curspeed);};};
                          tk.glucodata.help.hidekeyboard(context);
                         }
                     return true;
@@ -345,7 +359,7 @@ private static View[] slider(MainActivity context,float init) {
                 if(speedstr != null) {
                     float    curspeed = str2float(speedstr);
                     speed.setProgress(ratio2progress(curspeed));
-                    Log.i(LOG_ID,"afterTextChanged: "+speedstr+" "+curspeed);
+                    {if(doLog) {Log.i(LOG_ID,"afterTextChanged: "+speedstr+" "+curspeed);};};
                     }
 
                            }
@@ -406,7 +420,7 @@ public static void config(MainActivity context) {
 
         var test=getbutton(context,context.getString(R.string.test));
         if(spinner!=null) {
-                Log.i(LOG_ID, "Talker.config spinner=!null");
+                {if(doLog) {Log.i(LOG_ID, "Talker.config spinner=!null");};};
                 try {
                 ViewGroup par = (ViewGroup) spinner.getParent();
                 if (par != null)
@@ -428,7 +442,7 @@ public static void config(MainActivity context) {
             spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-                    Log.i(LOG_ID,"onItemSelected "+position);
+                    {if(doLog) {Log.i(LOG_ID,"onItemSelected "+position);};};
                     
                     spinpos[0]=position;
                     }
@@ -440,7 +454,7 @@ public static void config(MainActivity context) {
             spin.setAdapter(new RangeAdapter<Voice>(voiceChoice, context, voice -> {
                     return voice.getName();
                     }));
-            Log.i(LOG_ID,"voicepos="+voicepos);
+            {if(doLog) {Log.i(LOG_ID,"voicepos="+voicepos);};};
             if(voicepos>=0&&voicepos<voiceChoice.size())
                 spin.setSelection(voicepos);
             spinpos[0]=-1;
@@ -481,6 +495,7 @@ public static void config(MainActivity context) {
                 firstrow=new View[]{active,seplabel,separation,space};
               }
             var secondrow=new View[]{touchtalk, speakmessages, speakalarms };
+            Layout.getMargins(cancel).leftMargin=Layout.getMargins(save).rightMargin=(int)(width*.1f);
             layout= new Layout(context,(l,w,h)-> {
                 return new int[] {w,h};
                 },firstrow,secondrow,new View[]{speedlabel,speeds[1],speeds[0]},new View[]{pitchlabel,pitchs[1],pitchs[0]}, new View[]{cancel,helpview,test,save});
@@ -519,12 +534,12 @@ public static void config(MainActivity context) {
                 var speedstr=((EditText)speeds[1]).getText().toString();
                 if(speedstr != null) {
                     curspeed = str2float(speedstr);
-                    Log.i(LOG_ID,"speedstr: "+speedstr+" "+curspeed);
+                    {if(doLog) {Log.i(LOG_ID,"speedstr: "+speedstr+" "+curspeed);};};
                     }
                 var pitchstr=((EditText)pitchs[1]).getText().toString();
                 if(pitchstr != null) {
                     curpitch = str2float(pitchstr);
-                    Log.i(LOG_ID,"pitchstr: "+pitchstr+" "+curpitch);
+                    {if(doLog) {Log.i(LOG_ID,"pitchstr: "+pitchstr+" "+curpitch);};};
                     }
     ;
                 } catch(Throwable th) {

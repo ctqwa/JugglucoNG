@@ -58,7 +58,7 @@ extern "C" JNIEXPORT jobjectArray  JNICALL   fromjava(getbackupIPs)(JNIEnv *env,
     passhost_t &host=backup->getupdatedata()->allhosts[pos];
     LOGGER("%s pos=%d nr=%d index=%d\n",host.getnameif(),pos,host.nr,host.index);
     int len=host.nr;
-    if(len<0||len>maxip) {
+    if(len<0||len>passhost_t::maxip) {
         LOGGER("host.nr==%d\n",len);
         host.nr=len=0;
         }
@@ -132,12 +132,12 @@ bool resetbylabel(const char *label,bool galaxy) {
     const passhost_t &host=backup->getupdatedata()->allhosts[pos];
     const int nr=host.nr;
     if(nr>0) {
-        struct sockaddr_in6 ips[maxip];
+        struct sockaddr_in6 ips[passhost_t::maxip];
         memcpy(ips,host.ips,sizeof(ips));
 
         passhost_t *newhost=getwearoshost(true,label,galaxy,true);
         memcpy(newhost->ips,ips,sizeof(ips));
-        newhost->nr=std::min(nr,maxip);
+        newhost->nr=std::min(nr,passhost_t::maxip);
         }
     else {
         backup->deletehost(pos);
@@ -417,3 +417,150 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(getHostDeactivated)(JNIEnv *env
 extern "C" JNIEXPORT void JNICALL   fromjava(setHostDeactivated)(JNIEnv *envin, jclass cl,jint pos,jboolean val) {
     backup->deactivateHost(pos,val);
     }
+
+
+
+#if !defined(WEAROS)&& __NDK_MAJOR__ >= 26
+template <typename OUTTYPE> int getownips(OUTTYPE *outips,int max,bool &haswlan);
+
+template <typename OutputIt>
+OutputIt insertbool( OutputIt inserter, std::string_view name,bool value) {
+        return std::format_to( inserter,R"(,"{}":{})",name,value);
+        }
+
+
+
+static std::string escape(std::string_view input) {
+    std::string out;
+    out.reserve(input.size()+2);
+    auto inserter=std::back_inserter(out);
+    const char *end=input.end();
+    const constexpr std::string_view zoek=R"("\/)";
+    for(auto *iter=input.data();;) {
+        auto *hit=std::find_first_of(iter,end,std::begin(zoek),std::end(zoek));
+        std::copy(iter,hit,inserter);
+        if(hit==end)
+            return out;
+       *inserter++='\\';
+       *inserter++=*hit++;
+       iter=hit;
+       } 
+    }
+
+
+std::string mkbackjson(int pos) {
+    struct updatedata &back=*backup->getupdatedata();
+    if(pos<0||pos>= back.hostnr) {
+        return ""s;
+        }
+    std::string uit;
+    uit.reserve(1024);
+    auto inserter=std::back_inserter(uit);
+    const passhost_t &host=back.allhosts[pos];
+    if(!host.hashostname()) {
+        const int maxi=passhost_t::maxip-host.hasname;
+        alignas (namehost) uint8_t buf[maxi*sizeof(namehost)];
+        namehost *ips=reinterpret_cast<namehost*>(buf); //skip constructor
+        bool haswlan;
+        int ipnr=getownips(ips,maxi,haswlan);
+        inserter=std::format_to( inserter,R"({{"nr":{},"names":[)",ipnr);
+        if(ipnr>0) {
+            for(int i=0;;) {
+                const char *start=ips[i].data();
+                inserter=std::format_to( inserter,R"("{}")",start);
+                if(++i>=ipnr) 
+                    break;
+                *inserter++=',';
+                }
+            }
+        if(ipnr||host.getActive()) {
+            char detect[]=R"(],"detect":false)";
+            inserter=std::copy(std::begin(detect),std::end(detect)-1,inserter);
+            }
+        else {
+            char detect[]=R"(],"detect":true)";
+            inserter=std::copy(std::begin(detect),std::end(detect)-1,inserter);
+            }
+//        inserter=insertbool(inserter, "hasname",false);
+        }
+     else {
+          char empty[]=R"({"nr":0,"names":[],"detect":true)";
+          inserter=std::copy(std::begin(empty),std::end(empty)-1,inserter);
+          inserter=insertbool(inserter, "hasname",true);
+        }
+    inserter=std::format_to( inserter,R"(,"port":{})",(char *)back.port);
+    if(host.receivedatafrom()) {
+        int sendindex=host.index;
+        if(sendindex>=0) {
+            updateone &send=back.tosend[sendindex];
+            inserter=insertbool(inserter, "nums",!send.sendnums);
+            inserter=insertbool(inserter, "scans",!send.sendscans);
+            inserter=insertbool(inserter, "stream",!send.sendstream);
+            const bool receives=!(send.sendnums&& send.sendscans&&send.sendstream);
+            inserter=insertbool(inserter, "receive",receives);
+            }
+        else {
+            inserter=insertbool(inserter, "nums",true);
+            inserter=insertbool(inserter, "scans",true);
+            inserter=insertbool(inserter, "stream",true);
+//            inserter=insertbool(inserter, "receive",false);
+             }
+         }
+     else {
+/*            inserter=insertbool(inserter, "nums",false);
+            inserter=insertbool(inserter, "scans",false);
+            inserter=insertbool(inserter, "stream",false); */
+
+            inserter=insertbool(inserter, "receive",true);
+            } 
+        
+        LOGGER("getActive=%d getPassive=%d\n",host.getActive(),host.getPassive());
+        inserter=insertbool(inserter,"activeonly",!host.getActive()&&host.getPassive());
+        inserter=insertbool(inserter,"passiveonly",host.getActive());
+        if(host.haspass()) 
+            inserter=std::format_to( inserter,R"(,"pass":"{}")", escape(Backup::passback(host.pass).data()));
+        else {
+    //       const char passw[]=R"(,"pass":NULL)";
+     //       inserter=std::copy(std::begin(passw),std::end(passw)-1,inserter);
+            }
+        if(host.hasname) {
+            inserter=std::format_to( inserter,R"(,"label":"{}")",escape(host.getname()));
+           // inserter=insertbool(inserter, "testip",false);
+            }
+        else {
+      //     const char noname[]=R"(,"label":NULL)";
+       //   inserter=std::copy(std::begin(noname),std::end(noname)-1,inserter);
+            inserter=insertbool(inserter, "testip",true);
+            }
+   const char mirrorJuggluco[]=R"(} MirrorJuggluco)";
+   inserter=std::copy(std::begin(mirrorJuggluco),std::end(mirrorJuggluco)-1,inserter);
+   *inserter='\0';
+    LOGGERN(uit.data(),uit.size());
+    LOGGER("size=%d\n",uit.size());
+    return uit;
+    }
+
+extern "C" JNIEXPORT jstring JNICALL   fromjava(getbackJson)(JNIEnv *envin, jclass cl,jint pos) {
+    auto jsonstr=mkbackjson(pos);
+    return myNewStringUTF(envin,jsonstr.data());
+    }
+
+extern void makepass(char *pass,int len);
+
+extern "C" JNIEXPORT jint JNICALL   fromjava(makeHomeCopy)(JNIEnv *envin, jclass cl) {
+    int pos=-1;
+    bool nums=true,scans=true,stream=true;
+    bool activeonly=false,passiveonly=true;
+    const int passlen=16;
+    char passstr[passlen+1];
+    makepass(passstr,passlen);
+    passstr[passlen]='\0';
+    uint32_t  starttime=0L;
+    bool testip=true,hashostname=false;
+    char label[10]="auto";
+    makepass(label+4,5);
+    constexpr const bool detect=true;
+     jint res=backup->changehost(pos,nullptr,nullptr,0,detect,std::string_view(nullptr,0),nums,stream,scans,false,false,activeonly,std::string_view(passstr,passlen),starttime,passiveonly,label,testip,true,hashostname);
+     return res;
+     }
+#endif

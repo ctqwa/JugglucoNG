@@ -33,6 +33,7 @@ import android.widget.TextView;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+import static tk.glucodata.Log.doLog;
 
 public class Layout extends ViewGroup {
 static View.AccessibilityDelegate  accessDeli=new View.AccessibilityDelegate () {
@@ -41,11 +42,11 @@ static View.AccessibilityDelegate  accessDeli=new View.AccessibilityDelegate () 
             String message=(host  instanceof TextView)? ((TextView)host).getText().toString() :host.toString();
 
             if(host.isEnabled()&&host.getVisibility()==View.VISIBLE) {
-                Log.i(LOG_ID,"SHOW onInitializeAccessibilityNodeInfo "+message);
+                {if(doLog) {Log.i(LOG_ID,"SHOW onInitializeAccessibilityNodeInfo "+message);};};
                 super.onInitializeAccessibilityNodeInfo(host, info);
                 }
             else {
-                Log.i(LOG_ID,"HIDE onInitializeAccessibilityNodeInfo "+message);
+                {if(doLog) {Log.i(LOG_ID,"HIDE onInitializeAccessibilityNodeInfo "+message);};};
                 }
         }
 
@@ -226,7 +227,7 @@ protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 
 
    totHeight =  getPaddingTop() + getPaddingBottom();
-    // Log.i(LOG_ID,"heightpadding="+totHeight);
+    // {if(doLog) {Log.i(LOG_ID,"heightpadding="+totHeight);};};
     maxHeight=0; 
     rowmax=-1;
    for(int i=0,start=0;i<rownr;i++) {
@@ -248,12 +249,12 @@ protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     if(totHeight< getSuggestedMinimumHeight())
         totHeight = getSuggestedMinimumHeight();
     maxWidth = Math.max(maxWidth, getSuggestedMinimumWidth());
-    // Log.i(LOG_ID,"maxWidth="+maxWidth);
+    // {if(doLog) {Log.i(LOG_ID,"maxWidth="+maxWidth);};};
    int    prevrw = resolveSizeAndState(maxWidth, widthMeasureSpec, 0);
-    // Log.i(LOG_ID,"Width="+prevrw);
+    // {if(doLog) {Log.i(LOG_ID,"Width="+prevrw);};};
 
      int prevrh=resolveSizeAndState(totHeight, heightMeasureSpec, 0);
-     // Log.i(LOG_ID,"totHeight="+totHeight+" prevrh="+prevrh);
+     // {if(doLog) {Log.i(LOG_ID,"totHeight="+totHeight+" prevrh="+prevrh);};};
         int[] make=placer.place(this,prevrw,prevrh);
     if(make!=null&&make.length==2)
         setMeasuredDimension(make[0],make[1]);
@@ -275,7 +276,7 @@ int getwidth(int topin,int maxheight) {
    if(!round)
       return width;
    var top=topin+maxheight*.3; 
-   Log.i(LOG_ID,"y="+top);
+   {if(doLog) {Log.i(LOG_ID,"y="+top);};};
    var half=width*.5;
    if(top>=half)
       return width;
@@ -407,12 +408,12 @@ public ViewGroup.MarginLayoutParams generateDefaultLayoutParams() {
 static class ScrollListener extends GestureDetector.SimpleOnGestureListener {
 @Override
    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-      Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);
+      {if(doLog) {Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);};};
       return false;
       }
 @Override
       public boolean onFling (MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-      Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);
+      {if(doLog) {Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);};};
       return false;
       }
 };
@@ -420,7 +421,7 @@ static class ScrollListener extends GestureDetector.SimpleOnGestureListener {
 */
 @Override
 public boolean onTouchEvent(MotionEvent event) {
-   Log.i(LOG_ID,"onTouchEvent");
+   {if(doLog) {Log.i(LOG_ID,"onTouchEvent");};};
    return true;
    }
     @Override

@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
+
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
@@ -37,7 +39,7 @@ private static UseWifi thisone=null;
 private	final ConnectivityManager connectivityManager = (ConnectivityManager) Applic.app.getSystemService(Context.CONNECTIVITY_SERVICE);
 private ScheduledFuture<?> wifinotused=null;
 private void disusewifi() {
-	Log.i(LOG_ID,"disusewifi");
+	{if(doLog) {Log.i(LOG_ID,"disusewifi");};};
     try {
         connectivityManager.bindProcessToNetwork(null);
         connectivityManager.unregisterNetworkCallback(WiFiCallback);
@@ -50,7 +52,7 @@ private	final ConnectivityManager.NetworkCallback WiFiCallback = new Connectivit
 		public void onAvailable(Network network) {
 			super.onAvailable(network);
    			Natives.resetnetwork();
-			Log.i(LOG_ID," WiFiCallback onAvailable(network) ");
+			{if(doLog) {Log.i(LOG_ID," WiFiCallback onAvailable(network) ");};};
 			if(wifinotused!=null) {
 				wifinotused.cancel(false);
 				wifinotused=null;
@@ -62,14 +64,14 @@ private	final ConnectivityManager.NetworkCallback WiFiCallback = new Connectivit
 
 		public void onLost(Network network) {
 			super.onLost(network);
-			Log.i(LOG_ID," WiFiCallback onLost(network) ");
+			{if(doLog) {Log.i(LOG_ID," WiFiCallback onLost(network) ");};};
 		}
 	};
 
 
 private void wifinotstarted() {
 	wifinotused=null;
-	Log.i(LOG_ID,"start network settings");
+	{if(doLog) {Log.i(LOG_ID,"start network settings");};};
 	var main=MainActivity.thisone;
 	if( main!=null) {
 		try {
@@ -82,7 +84,7 @@ private void wifinotstarted() {
 		wifinotused=Applic.scheduler.schedule(()-> { wifinotstarted(); }, 4, TimeUnit.SECONDS);
 	}
 private void startusewifi() {
-	Log.i(LOG_ID,"usewifi");
+	{if(doLog) {Log.i(LOG_ID,"usewifi");};};
 	if(wifinotused==null) {
 		try {
 			connectivityManager.requestNetwork(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(), WiFiCallback);

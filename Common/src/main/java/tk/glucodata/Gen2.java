@@ -31,6 +31,7 @@ import tk.glucodata.AlgNfcV;
 import static java.util.Arrays.copyOfRange;
 import static tk.glucodata.AlgNfcV.goodnfc;
 import static tk.glucodata.AlgNfcV.issuenfc;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.V1;
 import static tk.glucodata.Natives.V2;
 import static tk.glucodata.Natives.USenabledStreaming;
@@ -43,7 +44,7 @@ static      private byte[] lastv2(int i, int i2, int i3, byte[] bArr) {
         return V2(6520, i, new byte[]{(byte) i2, (byte) i3}, bArr);
     }
 static    private byte[] readscanend(NfcV nfc,int start, int len,int extra) {
-	Log.i(LOG_ID,"readscanend "+start+" "+len+" "+extra);
+	{if(doLog) {Log.i(LOG_ID,"readscanend "+start+" "+len+" "+extra);};};
         int startinblocks = start / 8;
         int startblock = start % 8;
         int totlen = len + startblock;
@@ -153,15 +154,15 @@ static private final int scanner(NfcV nfc, byte[] uid, byte b, byte[] uitar) {
 	    }
          byte[] a = issuenfc(nfc, new byte[]{2, -95, always7, 32});
         if(goodnfc(a)) {
-	        Log.d(LOG_ID,"scanner goodnfc");
+	        {if(doLog) {Log.d(LOG_ID,"scanner goodnfc");};};
         	byte[] result = copyOfRange(a, 1, a.length);
         	return v1v2addcommand(b, numb,uid, result, uitar);
 	        }
 	    else {
 			if(a==null)
-				Log.d(LOG_ID,"issuenfc returned null");
+				{if(doLog) {Log.d(LOG_ID,"issuenfc returned null");};}
 			else
-				Log.d(LOG_ID,"issuenfc returned "+a.toString());
+				{if(doLog) {Log.d(LOG_ID,"issuenfc returned "+a.toString());};};
 			return -1;
 		}
 
@@ -179,7 +180,7 @@ static private final int scanner(NfcV nfc, byte[] uid, byte b, byte[] uitar) {
         return V1(37400, i, null, null);
     }
 static    private int v1v2addcommand(int i, int numb,byte[] bArr, byte[] bArr2, byte[] bArrout) {
-	Log.d(LOG_ID, "v1v2addcommand("+i+" ...)");
+	{if(doLog) {Log.d(LOG_ID, "v1v2addcommand("+i+" ...)");};};
         byte[] bArr4 = new byte[2];
         int resP1 = V1(28960, numb, bArr, null);
         if (resP1 < 0) {
@@ -236,7 +237,7 @@ static final int getversion(byte[] info) {
 /*
 static final void testgen() {
 	byte[] info={0x0,0x0,0x0,0x0,0x0,0x0};
-	Log.i(LOG_ID,"Test generations");
+	{if(doLog) {Log.i(LOG_ID,"Test generations");};};
 	for(int i=0;i<=0xFF;i++) {
 		info[2]=(byte)i;
 		getversion(info);
@@ -265,7 +266,7 @@ static private boolean lastenaable(int i, byte[] bArr, byte[] bArr2, byte[] bArr
 		if (P2res == null) {
 		    return false;
 		     }
-		Log.i(LOG_ID,"P2res.length="+P2res.length);
+		{if(doLog) {Log.i(LOG_ID,"P2res.length="+P2res.length);};};
 		System.arraycopy(bArr4, 0, bArr3, 0, 6);
 
 		var begin=P2res.length-2;
@@ -291,7 +292,7 @@ static private boolean lastenaable(int i, byte[] bArr, byte[] bArr2, byte[] bArr
 private  static boolean inactivate(NfcV nfc,byte[] uid) {
         byte[] outarv2=new  byte[0x13];
         byte value=27;
-        Log.d(LOG_ID,"activate");
+        {if(doLog) {Log.d(LOG_ID,"activate");};};
         int resv1=scanner(nfc,uid, value, outarv2);
       if(resv1<0)	return false;
       final byte[] resp1=issuenfc(nfc,outarv2);      
@@ -321,9 +322,9 @@ static boolean activate(final Tag tag) {
 private static boolean gen2enablestreaming(NfcV nfc,byte[] uid) {
 	byte[] outarv2=new  byte[0x13];
 	byte value=0x1e;
-	Log.d(LOG_ID,"gen2enablestreaming");
+	{if(doLog) {Log.d(LOG_ID,"gen2enablestreaming");};};
 	int resv1=scanner(nfc,uid, value, outarv2); 
-	Log.d(LOG_ID,"scanner="+resv1);
+	{if(doLog) {Log.d(LOG_ID,"scanner="+resv1);};};
 	if(resv1>=0) {
 		    byte[] resp1=issuenfc(nfc,outarv2);      
  

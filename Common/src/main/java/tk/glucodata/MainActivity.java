@@ -45,6 +45,7 @@ import static tk.glucodata.BuildConfig.SiBionics;
 import static tk.glucodata.Floating.setfloatglucose;
 import static tk.glucodata.Floating.shoulduseadb;
 import static tk.glucodata.GlucoseCurve.STEPBACK;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.showbytes;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.hasData;
@@ -129,7 +130,7 @@ public MainActivity() {
     private NfcAdapter mNfcAdapter=null;
 private boolean started=false;
 private void startall() {
-     Log.d(LOG_ID, "startall");
+     {if(doLog) {Log.d(LOG_ID, "startall");};};
      if(!started) {
         startdisplay();
         netinitstep();
@@ -148,7 +149,7 @@ boolean askNotify() {
       if(Build.VERSION.SDK_INT >=33)  {
         var perm= Manifest.permission.POST_NOTIFICATIONS;
         if(ContextCompat.checkSelfPermission(this, perm)!= PackageManager.PERMISSION_GRANTED)  {
-            Log.i(LOG_ID,"askNotify");
+            {if(doLog) {Log.i(LOG_ID,"askNotify");};};
             var permar=new String[]{perm};
             if(shouldShowRequestPermissionRationale(perm) ) {
                  help.help(R.string.notificationpermission,this,l-> {
@@ -170,21 +171,21 @@ public static int systembarLeft=0;
 public static int systembarRight=0;
 //public static int navigationbarLeft=0;
 private void startdisplay() {
-   Log.i(LOG_ID,"startdisplay");
+   {if(doLog) {Log.i(LOG_ID,"startdisplay");};};
    Applic app=    (Applic)getApplication();
     app.setbackgroundcolor(this) ;
     if(Applic.Nativesloaded)
         app.needsnatives() ;
 
     curve = new GlucoseCurve(this);
-   Log.i(LOG_ID,"After curve = new GlucoseCurve(this);");
+   {if(doLog) {Log.i(LOG_ID,"After curve = new GlucoseCurve(this);");};};
    if(!isWearable) {
       if(Build.VERSION.SDK_INT >= 30) {
          setOnApplyWindowInsetsListener(curve,(v, windowInsets) -> {
          setsizes(this);
          if(screenwidth>= screenheight) {
              Insets  insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-             Log.i(LOG_ID, "systemBars: left="+insets.left+ " right="+insets.right+ " bottom="+insets.bottom+ " top="+insets.top);
+             {if(doLog) {Log.i(LOG_ID, "systemBars: left="+insets.left+ " right="+insets.right+ " bottom="+insets.bottom+ " top="+insets.top);};};
              Natives.systembar(insets.left, insets.top, insets.right, insets.bottom);
 
             systembarLeft=insets.left;
@@ -218,7 +219,7 @@ private void startdisplay() {
     getlibrary.getlibrary(this);//after setfilesdir for settings
     handleIntent(getIntent());
     var lang=getString(R.string.language);
-    Log.i(LOG_ID,"curlang="+Applic.curlang+" newlang="+lang+" locale="+util.getlocale().getLanguage());
+    {if(doLog) {Log.i(LOG_ID,"curlang="+Applic.curlang+" newlang="+lang+" locale="+util.getlocale().getLanguage());};};
     if(!lang.equals(Applic.curlang)) {
         Natives.setlocale(lang);
         Applic.curlang=lang;
@@ -235,7 +236,7 @@ boolean glversion() {
         ConfigurationInfo configurationInfo = activityManager.getDeviceConfigurationInfo();
         openglversion=Natives.openglversion();
         try {
-        Log.i(LOG_ID,"OpenGl "+Double.parseDouble(configurationInfo.getGlEsVersion()));
+        {if(doLog) {Log.i(LOG_ID,"OpenGl "+Double.parseDouble(configurationInfo.getGlEsVersion()));};};
         if(( configurationInfo.reqGlEsVersion>>16)<openglversion) {
             help.help("This program requires OpenGL ES "+openglversion+".0 or higher. This device has OpenGL ES "+ Double.parseDouble(configurationInfo.getGlEsVersion())+" so can't be used.\n\n\n\n\n",this,l->finish());
             return false;
@@ -257,10 +258,10 @@ static void alarmsExact(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AlarmManager manager= (AlarmManager) context.getSystemService(ALARM_SERVICE);
                 if(manager.canScheduleExactAlarms()){
-                   Log.d(LOG_ID, "canScheduleExactAlarms");
+                   {if(doLog) {Log.d(LOG_ID, "canScheduleExactAlarms");};};
                    }
                 else {
-                   Log.d(LOG_ID, "not canScheduleExactAlarms");
+                   {if(doLog) {Log.d(LOG_ID, "not canScheduleExactAlarms");};};
                    try {
                        Intent intent=new Intent();
                        intent.setAction(ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
@@ -295,8 +296,8 @@ public void lightBars(boolean light) {
          windowInsetsController.setAppearanceLightNavigationBars(light);
     // win.setNavigationBarColor(Color.TRANSPARENT);
 //     win.setNavigationBarColor(BLUE);
-//   Log.i(LOG_ID,"getNavigationBarColor()="+win.getNavigationBarColor());
- //  Log.i(LOG_ID,"isNavigationBarContrastEnforced() "+win.isNavigationBarContrastEnforced());
+//   {if(doLog) {Log.i(LOG_ID,"getNavigationBarColor()="+win.getNavigationBarColor());};};
+ //  {if(doLog) {Log.i(LOG_ID,"isNavigationBarContrastEnforced() "+win.isNavigationBarContrastEnforced());};};
       }
 
    }
@@ -322,7 +323,7 @@ void showSystemBarsAppearance() {
         }
         ;
         ;
-        Log.i(LOG_ID, message);
+        {if(doLog) {Log.i(LOG_ID, message);};};
     }
    } */
     @Override
@@ -354,7 +355,7 @@ void showSystemBarsAppearance() {
       DisplayMetrics metrics= this.getResources().getDisplayMetrics();
       screenheight= metrics.heightPixels;
       screenwidth= metrics.widthPixels;
-      Log.i(LOG_ID,"onCreate start target="+ TargetSDK);
+      {if(doLog) {Log.i(LOG_ID,"onCreate start target="+ TargetSDK);};};
       if(TargetSDK>30) {
          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             alarmsExact(this);
@@ -364,12 +365,12 @@ void showSystemBarsAppearance() {
       if(!glversion())
          return;
       startall();
-      Log.i(LOG_ID,"onCreate end");
+      {if(doLog) {Log.i(LOG_ID,"onCreate end");};};
        if(Menus.on)
            Menus.show(this);
 
 //        var gestureListener= new Layout.ScrollListener(); mGestureDetector = new GestureDetector(this, gestureListener);
-        Log.i(LOG_ID,"onCreate end");
+        {if(doLog) {Log.i(LOG_ID,"onCreate end");};};
     }
 
 //GestureDetector mGestureDetector;
@@ -379,12 +380,12 @@ void handleIntent(Intent intent) {
     final Bundle extras = intent.getExtras();
     if(extras!=null)  {
         if(extras.getBoolean(Notify.fromnotification, false)) {
-            Log.i(LOG_ID,"fromnotification");
+            {if(doLog) {Log.i(LOG_ID,"fromnotification");};};
             Notify.stopalarm();
             return;
             }
         else   {
-            Log.i(LOG_ID,"not fromnotification");
+            {if(doLog) {Log.i(LOG_ID,"not fromnotification");};};
             if(extras.containsKey(setbluetoothon)) {
                 Applic.setbluetooth(this,extras.getBoolean(setbluetoothon,false) );
                 return;
@@ -392,7 +393,7 @@ void handleIntent(Intent intent) {
             var message=extras.getString("alarmMessage");
                 if(message!=null) {
                 var cancel=extras.getBoolean("Cancel",false);
-                Log.i(LOG_ID,"alarmMessage "+message+" cancel="+cancel);
+                {if(doLog) {Log.i(LOG_ID,"alarmMessage "+message+" cancel="+cancel);};};
                 showindialog(message,cancel);
                 return;
                 }
@@ -402,7 +403,7 @@ void handleIntent(Intent intent) {
 
        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0&&"android.nfc.action.TECH_DISCOVERED".intern()==action) {
            curve.waitnfc=true;
-           Log.d(LOG_ID,"TECH_DISCOVERED");
+           {if(doLog) {Log.d(LOG_ID,"TECH_DISCOVERED");};};
            try {
                Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
                startnfc(tag);
@@ -430,7 +431,7 @@ void handleIntent(Intent intent) {
                           help.help(R.string.nearbypermission, this);
                   case "android.permission-group.CAMERA" ->
                           help.help(R.string.camerapermission, this);
-                  default -> Log.i(LOG_ID, "EXTRA_PERMISSION_GROUP_NAME=" + groupname);
+                  default -> {if(doLog) {Log.i(LOG_ID, "EXTRA_PERMISSION_GROUP_NAME=" + groupname);};}
               }
               ;
               }
@@ -444,7 +445,7 @@ static final String setbluetoothon="setbluetoothon";
 
     @Override
     protected void onNewIntent(Intent intent) {
-        Log.d(LOG_ID,"onNewIntent");
+        {if(doLog) {Log.d(LOG_ID,"onNewIntent");};};
         super.onNewIntent(intent);
     handleIntent(intent);
     }
@@ -463,7 +464,7 @@ try {
     if(mNfcAdapter == null) {
         if(!isWearable) {
          if(askNFC) {
-            Log.i(LOG_ID, "No NFC adapter found!");
+            {if(doLog) {Log.i(LOG_ID, "No NFC adapter found!");};};
             Applic.argToaster(this, getResources().getString(R.string.error_nfc_device_not_supported), Toast.LENGTH_SHORT);
             askNFC=false;
             return;
@@ -525,21 +526,21 @@ private static int resumenr=isRelease?10:2;
 static boolean tocalendarapp=false;
     @Override
     protected void onResume() {
-      Log.i(LOG_ID,"onResume");
+      {if(doLog) {Log.i(LOG_ID,"onResume");};};
         super.onResume();
         if(curve!=null) {
             if(!curve.waitnfc) {
-                Log.d(LOG_ID,"onResume setnfc");
+                {if(doLog) {Log.d(LOG_ID,"onResume setnfc");};};
                 setnfc();
                 } 
             else
-                Log.d(LOG_ID,"onResume no setnfc");
+                {if(doLog) {Log.d(LOG_ID,"onResume no setnfc");};};
             }
         }
     @Override
     protected void onStart() {
       super.onStart();
-      Log.i(LOG_ID,"onStart");
+      {if(doLog) {Log.i(LOG_ID,"onStart");};};
     if(Applic.stopprogram>0)
         return;
     if(!DiskSpace.check(this)) {
@@ -641,7 +642,7 @@ synchronized void   startnfc(Tag tag) {
             all+=t;
             all+=" ";
             }
-        Log.i(LOG_ID,all);
+        {if(doLog) {Log.i(LOG_ID,all);};};
 
         if(!isWearable) {
             if(techs.length>0) {
@@ -655,7 +656,7 @@ synchronized void   startnfc(Tag tag) {
             }
         }
     else
-        Log.i(LOG_ID,all);
+        {if(doLog) {Log.i(LOG_ID,all);};};
     if(Thread.currentThread().equals( Looper.getMainLooper().getThread() )) {
         new Thread(()->
                 ScanNfcV.scan(curve,tag)
@@ -718,7 +719,7 @@ void activateresult(boolean res) {
     }
     @Override
     protected void onPause() {
-        Log.i(LOG_ID,"onPause");
+        {if(doLog) {Log.i(LOG_ID,"onPause");};};
         super.onPause();
         if (mNfcAdapter != null) {
            try {
@@ -746,7 +747,7 @@ void activateresult(boolean res) {
             }
         else {
             if(Natives.stopWifi()) {
-                Log.i(LOG_ID,"stopWifi");
+                {if(doLog) {Log.i(LOG_ID,"stopWifi");};};
                 UseWifi.stopusewifi();
                 }
             }
@@ -754,7 +755,7 @@ void activateresult(boolean res) {
         }
 @Override
 protected void onStop() {
-    Log.i(LOG_ID,"onStop");
+    {if(doLog) {Log.i(LOG_ID,"onStop");};};
     super.onStop();
     active=false;
     if(!Applic.Nativesloaded)
@@ -767,7 +768,7 @@ protected void onStop() {
     }
     @Override
     protected void onDestroy() {
-       Log.i(LOG_ID,"onDestroy()");
+       {if(doLog) {Log.i(LOG_ID,"onDestroy()");};};
        final var alert=shownglucosealert;
        if(alert!=null) {
             alert.dismiss();
@@ -779,7 +780,7 @@ protected void onStop() {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        Log.d(LOG_ID,"onWindowFocusChanged(hasFocus="+hasFocus+")");
+        {if(doLog) {Log.d(LOG_ID,"onWindowFocusChanged(hasFocus="+hasFocus+")");};};
 //        if (hasFocus&&hideSystem) 
         if (hasFocus) {
         hideSystemUI();
@@ -819,7 +820,7 @@ void selectionSystemUI() {
         // For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
         // Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 public   void  hideSystemUI() {
-    Log.d(LOG_ID,"hideSystemUI");
+    {if(doLog) {Log.d(LOG_ID,"hideSystemUI");};};
     if(!(Natives.getsystemUI()||showui))
         setSystemUI(false) ;
     }
@@ -860,7 +861,7 @@ public static int getscreenwidth(Context context) {
 @Override
 public void onConfigurationChanged(Configuration newConfig) {
     super.onConfigurationChanged(newConfig);
-    Log.i(LOG_ID,"onConfigurationChanged height=" +newConfig.screenHeightDp+" width=" +newConfig.screenWidthDp + " sw="+newConfig.smallestScreenWidthDp);
+    {if(doLog) {Log.i(LOG_ID,"onConfigurationChanged height=" +newConfig.screenHeightDp+" width=" +newConfig.screenWidthDp + " sw="+newConfig.smallestScreenWidthDp);};};
 
 
     screenwidth=0;
@@ -912,7 +913,7 @@ private boolean gaverational=false;
 
 boolean finepermission() {
     MainActivity act=this;
-    Log.i(LOG_ID,"finepermission");
+    {if(doLog) {Log.i(LOG_ID,"finepermission");};};
     if(Build.VERSION.SDK_INT >= 23) {
         var noperm=Applic.hasPermissions( act, scanpermissions);
         if(noperm.length==0) {
@@ -1000,32 +1001,32 @@ public void onRequestPermissionsResult(int requestCode, String[] permissions, in
     switch (requestCode) {
          case NOTIFICATION_PERMISSION_REQUEST_CODE: {
             if (granted) {
-                Log.i(LOG_ID,"Required Notification permission");
+                {if(doLog) {Log.i(LOG_ID,"Required Notification permission");};};
                 keeprunning.start(this);
                 }
             else {
-                Log.i(LOG_ID,"Required NO Notification permission");
+                {if(doLog) {Log.i(LOG_ID,"Required NO Notification permission");};};
                 }
 
             explicit(this);    
              };break;
 /*
             case FLASH_PERMISSION_REQUEST_CODE: {
-            Log.i(LOG_ID,"FLASH_PERMISSION_REQUEST_CODE");
+            {if(doLog) {Log.i(LOG_ID,"FLASH_PERMISSION_REQUEST_CODE");};};
             if (granted) {
                 useflash(true);
             } else {
-                Log.i(LOG_ID,"Flash denied");
+                {if(doLog) {Log.i(LOG_ID,"Flash denied");};};
                 useflash(false);
                 }
             } return; */
         case LOCATION_PERMISSION_REQUEST_CODE:
-            Log.i(LOG_ID,"onRequestPermissionsResult(LOCATION_PERMISSION_REQUEST_CODE "+granted);
+            {if(doLog) {Log.i(LOG_ID,"onRequestPermissionsResult(LOCATION_PERMISSION_REQUEST_CODE "+granted);};};
             if(granted) {
                 if(systemlocation())
                    hasLocationContinue();
             } else {
-                Log.i(LOG_ID,"denied");
+                {if(doLog) {Log.i(LOG_ID,"denied");};};
                 //setbluetoothmain(false);
                 Applic.argToaster(this,"No permission. Sensor via Bluetooth turned off", Toast.LENGTH_LONG);
 
@@ -1102,7 +1103,7 @@ private void    savekey(FileInputStream input,String outkeystr) {
     finally {
         try {
             input.close();
-            Log.i(LOG_ID, "wrote " + total + " to " + outkeystr);
+            {if(doLog) {Log.i(LOG_ID, "wrote " + total + " to " + outkeystr);};};
             if (total < 50) {
                 outkey.delete();
             }
@@ -1121,18 +1122,18 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
              switch (resultCode) {
                  case Activity.RESULT_OK:
                      // All required changes were successfully made
-                     Log.i(LOG_ID,"REQUEST_CHECK_SETTINGS OK");
+                     {if(doLog) {Log.i(LOG_ID,"REQUEST_CHECK_SETTINGS OK");};};
                      hasLocationContinue();
                      break;
                  case Activity.RESULT_CANCELED:
                      // The user was asked to change settings, but chose not to
-                     Log.i(LOG_ID,"REQUEST_CHECK_SETTINGS CANCELLED");
+                     {if(doLog) {Log.i(LOG_ID,"REQUEST_CHECK_SETTINGS CANCELLED");};};
                      Applic.Toaster("Location is turned off, can't scan for devices");
                      break;
                  default: break;
              }; break; */
         case OVERLAY_PERMISSION_REQUEST_CODE: {
-            Log.i(LOG_ID, "OVERLAY_PERMISSION_REQUEST_CODE ");
+            {if(doLog) {Log.i(LOG_ID, "OVERLAY_PERMISSION_REQUEST_CODE ");};};
             if(Floating.cannotoverlay()  ) {
                 shoulduseadb(this);
                 return ;
@@ -1173,10 +1174,7 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
          return;
       case REQUEST_BARCODE: 
          if(SiBionics==1 &&!isWearable&&useZXing) {
-           if(ZXing.zXingResult(resultCode, data,this))
-            finepermission();
-            else 
-            systemlocation();
+           ZXing.zXingResult(resultCode, data,this);
            return;
            };break;
     case REQUEST_SAVE_LOGCAT: 
@@ -1250,7 +1248,7 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                 try {
                     Uri uri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
                     if(uri==null) {
-                            Log.i(LOG_ID,"getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)==null");
+                            {if(doLog) {Log.i(LOG_ID,"getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)==null");};};
                         }
                     else {
                         String uristr = uri.toString();
@@ -1268,14 +1266,14 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
 @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-    Log.v(LOG_ID,"OnKeyDown");
+    {if(doLog) {Log.v(LOG_ID,"OnKeyDown");};};
   if(isWearable) {
     if(!backinapp()) moveTaskToBack(true);
     return true;
     }    
     else {
         if(keyCode== KeyEvent.KEYCODE_CAMERA) {
-            Log.i(LOG_ID,"keyCode== KeyEvent.KEYCODE_CAMERA)");
+            {if(doLog) {Log.i(LOG_ID,"keyCode== KeyEvent.KEYCODE_CAMERA)");};};
 
             final int camkey=Natives.camerakey();
             switch(camkey) {
@@ -1283,7 +1281,7 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                 case 1: {
                     curve.render.badscan=8;
                     curve.requestRender();
-                       Log.v(LOG_ID, "Camara");
+                       {if(doLog) {Log.v(LOG_ID, "Camara");};};
                      }; return true;
                 default:break;
             }
@@ -1295,7 +1293,7 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     
 @Override
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
-        Log.v(LOG_ID,"OnLongKeyPress");
+        {if(doLog) {Log.v(LOG_ID,"OnLongKeyPress");};};
     if(keyCode== KeyEvent.KEYCODE_CAMERA) {
         final int camkey=Natives.camerakey();
         switch(camkey) {
@@ -1303,7 +1301,7 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
             case 1: {
                 curve.render.badscan=8;
                 curve.requestRender();
-                Log.v(LOG_ID, "Camara");
+                {if(doLog) {Log.v(LOG_ID, "Camara");};};
             }; return true;
             default:break;
         }
@@ -1320,11 +1318,11 @@ static public int onbacknr() {
         return backrun.size();
         }
 static public void setonback(Runnable run) {
-    Log.i(LOG_ID,"setonback");
+    {if(doLog) {Log.i(LOG_ID,"setonback");};};
     backrun.addFirst(run);
     }
 static public boolean doonback() {
-    Log.i(LOG_ID,"doonback");
+    {if(doLog) {Log.i(LOG_ID,"doonback");};};
     if(!backrun.isEmpty()) {
         Runnable wasback=backrun.removeFirst();
         wasback.run();
@@ -1340,9 +1338,9 @@ static public void clearonback() {
     backrun.clear();
     }
 boolean backinapp()  {
-    Log.d(LOG_ID,"backinapp");
+    {if(doLog) {Log.d(LOG_ID,"backinapp");};};
     if(curve!=null&&(curve.render.stepresult & STEPBACK) == STEPBACK) {
-         Log.d(LOG_ID,"backinapp natives");
+         {if(doLog) {Log.d(LOG_ID,"backinapp natives");};};
          Natives.pressedback();
          curve.render.stepresult = 0;
          curve.render.badscan=0;
@@ -1354,22 +1352,22 @@ boolean backinapp()  {
          return true;
         } 
      else {
-       Log.d(LOG_ID,"backinapp doonback");
+       {if(doLog) {Log.d(LOG_ID,"backinapp doonback");};};
         return doonback();
         }
        }
 
     @Override
     public    void onBackPressed()   {
-        Log.d(LOG_ID, "onBackPressed");
+        {if(doLog) {Log.d(LOG_ID, "onBackPressed");};};
         if(!backinapp())  {
-            Log.d(LOG_ID, "moveTaskToBack");
+            {if(doLog) {Log.d(LOG_ID, "moveTaskToBack");};};
     //        moveTaskToBack(true);
             super.onBackPressed();
             }
     }
 void tonotaccesssettings() {
-    Log.i(LOG_ID,"tonotaccesssettings()");
+    {if(doLog) {Log.i(LOG_ID,"tonotaccesssettings()");};};
     try {
         Intent intent = new Intent(ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
         startActivityForResult(intent, REQUEST_NOTIFICATION);
@@ -1388,13 +1386,13 @@ void tonotaccesssettings() {
             if(isWearable)
                 tonotaccesssettings();
             else {
-                Log.i(LOG_ID,"disturbe");
+                {if(doLog) {Log.i(LOG_ID,"disturbe");};};
                 help.basehelp(R.string.disturbhelp, this, l ->  tonotaccesssettings());
                 }
             return;
             }
         else {
-            Log.i(LOG_ID,"don't ask disturbe");
+            {if(doLog) {Log.i(LOG_ID,"don't ask disturbe");};};
             Natives.setaskedNotify(true);
             }
         } catch (Throwable th) {
@@ -1418,7 +1416,7 @@ void replaceDialogMessage(String message) {
     }
 
 void showindialog(String message,boolean cancel) {
-    Log.i(LOG_ID,"showindialog "+message);
+    {if(doLog) {Log.i(LOG_ID,"showindialog "+message);};};
     var cont=this;
     if(cancel) {
         cancelglucosedialog();
@@ -1471,15 +1469,15 @@ boolean systemlocation() {
     if(Build.VERSION.SDK_INT > 30||Build.VERSION.SDK_INT < 23||!(hasNeedScan()||Build.VERSION.SDK_INT<26))  {
         return true;
     }
-    Log.i(LOG_ID,"systemlocation()");
+    {if(doLog) {Log.i(LOG_ID,"systemlocation()");};};
    try {
        if(!isLocationEnabled(this)) {
-            Log.i(LOG_ID,"Location not Enabled");
+            {if(doLog) {Log.i(LOG_ID,"Location not Enabled");};};
             RunOnUiThread(()-> needsLocation());
             return false;
          }
       else
-         Log.i(LOG_ID,"Location Enabled");
+         {if(doLog) {Log.i(LOG_ID,"Location Enabled");};};
       }catch (Throwable th) {
          Log.stack(LOG_ID,"Settings.Secure.LOCATION_MODE",th);
          return false;
@@ -1493,19 +1491,19 @@ private boolean systemlocation() {
         return true;
     }
 
-    Log.i(LOG_ID,"systemlocation()");
+    {if(doLog) {Log.i(LOG_ID,"systemlocation()");};};
 try {
     LocationManager locationManager =
             (LocationManager) getSystemService(Context.LOCATION_SERVICE);
     final boolean locationEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)||locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
     if (!locationEnabled) {
-        Log.i(LOG_ID, "Location not enabled");
+        {if(doLog) {Log.i(LOG_ID, "Location not enabled");};};
         // Build an alert dialog here that requests that the user enable
         // the location services, then when the user clicks the "OK" button,
         enableLocationSettings();
     } else
-        Log.i(LOG_ID, "Location enabled");
+        {if(doLog) {Log.i(LOG_ID, "Location enabled");};};
 }
 catch (Throwable th) {
     Log.stack(LOG_ID,"LocationManager.isProviderEnabled",th);
@@ -1534,7 +1532,7 @@ private static void needsLocation() {
 private static void enableLocationSettings() {
       MainActivity main=thisone;
       if(thisone!=null) {
-            Log.i(LOG_ID,"ACTION_LOCATION_SOURCE_SETTINGS");
+            {if(doLog) {Log.i(LOG_ID,"ACTION_LOCATION_SOURCE_SETTINGS");};};
              Intent settingsIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
              main.startActivity(settingsIntent);
              }
@@ -1544,7 +1542,7 @@ private boolean systemlocation() {
      if(Build.VERSION.SDK_INT > 30||Build.VERSION.SDK_INT < 23||!(hasSibionics()||Build.VERSION.SDK_INT<26))  {
          return true;
          }
-   Log.i(LOG_ID,"systemlocation()");
+   {if(doLog) {Log.i(LOG_ID,"systemlocation()");};};
    try {
    LocationRequest locr= new Builder(PRIORITY_HIGH_ACCURACY,10000).build(); //How else to ask for android location settings
    LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locr);
@@ -1555,11 +1553,11 @@ private boolean systemlocation() {
      public void onComplete(Task<LocationSettingsResponse> task) {
          try {
              LocationSettingsResponse response = task.getResult(ApiException.class);
-             Log.i(LOG_ID,"settings are satisfied");
+             {if(doLog) {Log.i(LOG_ID,"settings are satisfied");};};
              // All location settings are satisfied. The client can initialize location
              // requests here.
          } catch (ApiException exception) {
-     Log.i(LOG_ID,"exception "+exception.toString());
+     {if(doLog) {Log.i(LOG_ID,"exception "+exception.toString());};};
              switch (exception.getStatusCode()) {
                  case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
                      // Location settings are not satisfied. But could be fixed by showing the
@@ -1571,7 +1569,7 @@ private boolean systemlocation() {
                          // and check the result in onActivityResult().
 
                          resolvable.startResolutionForResult( MainActivity.this, REQUEST_CHECK_SETTINGS);
-             Log.i(LOG_ID,"startResolutionForResult");
+             {if(doLog) {Log.i(LOG_ID,"startResolutionForResult");};};
                          return;
                      } catch (IntentSender.SendIntentException e) {
                          // Ignore the error.
@@ -1630,7 +1628,7 @@ public void useBluetooth(boolean val) {
     }
 
 public  void setbluetoothmain(boolean on) {
-    Log.i(LOG_ID,"setbluetoothmain "+on);
+    {if(doLog) {Log.i(LOG_ID,"setbluetoothmain "+on);};};
     if(on) {
          Natives.setusebluetooth(on);
          if(Build.VERSION.SDK_INT < 26||Build.VERSION.SDK_INT>30||hasNeedScan()) {
@@ -1647,12 +1645,12 @@ public  void setbluetoothmain(boolean on) {
 class ScrollListener extends GestureDetector.SimpleOnGestureListener {
 @Override
    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-      Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);
+      {if(doLog) {Log.i(LOG_ID,"onScroll dX="+distanceX+" dY="+distanceY);};};
       return false;
       }
 @Override
       public boolean onFling (MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-      Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);
+      {if(doLog) {Log.i(LOG_ID,"onFling volX="+velocityX+"volY="+velocityY);};};
       return false;
       }
 };

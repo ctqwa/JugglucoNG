@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
+
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -33,7 +35,7 @@ private static String[] librenames;
 	for(var name:librenames) {
 		intent.setPackage(name);
 		context.sendBroadcast(intent);
-		Log.i(LOG_ID,"send to "+name);
+		{if(doLog) {Log.i(LOG_ID,"send to "+name);};};
 		}
     }
 

@@ -975,16 +975,20 @@ static bool mkdatabaseSI(string_view sensordir,string_view sensorgegs,uint32_t n
         }
     uint32_t start=now;
     //TODO other days
-       Info inf{.starttime=(uint32_t)start,.lastscantime=(uint32_t)start,.starthistory=0,.endhistory=0,.scancount=0,.startid=0,.interval=interval5,.dupl=3,.days=maxdaysSI ,.sibionics=true,.lastLifeCountReceived=0,.pollcount=0,.pollinterval=88.0, .lockcount=1};
+    const bool sib2=sensorgegs.size()==59;
+        
+
+       Info inf{.starttime=(uint32_t)start,.lastscantime=(uint32_t)start,.starthistory=0,.endhistory=0,.scancount=0,.startid=0,.interval=interval5,.dupl=3,.days=maxdaysSI ,.sibionics=true,.lastLifeCountReceived=0,.siType=(uint8_t)(sib2?3:0),.pollcount=0,.pollinterval=88.0, .lockcount=1};
        inf.siIdlen=sensorgegs.size();
        memcpy(inf.siId,sensorgegs.data(),inf.siIdlen);
        if(hasnum) {
-           memcpy(inf.siBlueToothNum,sensorgegs.end()-12,8);
+           memcpy(inf.siBlueToothNum,sensordir.end()-11,8);
         }
     else {
            memcpy(inf.siBlueToothNum,&sensorgegs[28],8);
         }
     inf.siBlueToothNum[8]='\0';
+    LOGGER("siBlueToothNum=%s\n", inf.siBlueToothNum);
         
     writeall(infoname,&inf,sizeof(inf));
 
@@ -1983,6 +1987,8 @@ public:
 int getmaxmgdL() const {
         if(isDexcom())
                 return 400;
+        if(isSibionics())
+                return 450;
          return 500;
         }
 };

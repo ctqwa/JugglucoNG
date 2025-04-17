@@ -24,6 +24,8 @@ package tk.glucodata.settings;
 import tk.glucodata.Applic;
 import tk.glucodata.GlucoseCurve;
 import tk.glucodata.Log;
+
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Specific.useclose;
 
 import android.view.View;
@@ -47,7 +49,7 @@ static void show(MainActivity act) {
     int width=GlucoseCurve.getwidth();
     int height=GlucoseCurve.getheight();
     AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor,c-> {
-        Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));
+        {if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
             Natives.setlastcolor(c);
             tk.glucodata.Applic.app.redraw();
         }, v-> {
@@ -59,8 +61,8 @@ static void show(MainActivity act) {
      else {
         afx=afy=0;
          }
-     Log.i(LOG_ID, "Color systembarTop="+afy);
-     Log.i(LOG_ID, "Color systembarLeft="+afx);
+     {if(doLog) {Log.i(LOG_ID, "Color systembarTop="+afy);};};
+     {if(doLog) {Log.i(LOG_ID, "Color systembarLeft="+afx);};};
          int h=v.getMeasuredHeight();
          int w=v.getMeasuredWidth();    
          v.setX((int)(width*.97)-w);

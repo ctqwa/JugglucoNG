@@ -56,7 +56,7 @@ private static int getBatteryLevel() { //From xDrip
                 return 50;
             }
             int perc= (int) (((float) level / (float) scale) * 100.0f);
-            Log.i(LOG_ID,"BatteryLevel="+perc);
+            {if(doLog) {Log.i(LOG_ID,"BatteryLevel="+perc);};};
             return perc;
         } catch (Throwable error) {
                         String mess=error!=null?error.getMessage():null;

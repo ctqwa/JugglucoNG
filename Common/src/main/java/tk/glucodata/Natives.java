@@ -499,6 +499,8 @@ public static native void setuseWearos(boolean val);
 //public static native Glucose bytearray2glucose( byte[] in);
 
 public static native boolean hasstreamed( );
+public static native boolean hasscans( );
+
 public static native void setXdripServerLocal(boolean val);
 public static native boolean getXdripServerLocal( );
 
@@ -816,8 +818,10 @@ public static native int getInsulinType(int index);
 public static native int getSiSubtype(long dataptr);
 public static native void setSiSubtype(long dataptr,int type);
 
+public static native byte[] getSIResetBytes( );
+public static native String getbackJson(int pos);
+public static native int makeHomeCopy();
 
-//public static native void sendxdripold();
 //s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }
 

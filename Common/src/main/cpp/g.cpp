@@ -516,7 +516,7 @@ else
         }
       }
     if(data->good()) {
-        LOGGER("getdataptr()=%p\n",data);
+        LOGGER("getdataptr()=%p sens=%p\n",data,sens);
         return reinterpret_cast<jlong>(data);
         }
     LOGSTRING("getdataptr(): !data->good()\n");
@@ -524,7 +524,7 @@ else
     return 0LL;
     }
 extern "C" JNIEXPORT void JNICALL   fromjava(freedataptr)(JNIEnv *envin, jclass cl,jlong dataptr) {
-    LOGGER("freedataptr(%p)",dataptr);
+    LOGGER("freedataptr(%p)\n",dataptr);
     streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
     delete sdata;
     }
@@ -615,6 +615,7 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(getShowSensorName)(JNIEnv *envin
     } */
 
 extern "C" JNIEXPORT jstring JNICALL   fromjava(getDeviceAddress)(JNIEnv *envin, jclass cl,jlong dataptr,jboolean getnew) {
+    LOGGER("getDeviceAddress(%p,%d)\n",dataptr,getnew);
     if(!dataptr) {
       LOGAR("getDeviceAddress(null)");
       return nullptr;
@@ -1384,6 +1385,11 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(switchgen2)(JNIEnv *env, jclas
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasstreamed)(JNIEnv *env, jclass _cl) {
     if(sensors)
         return sensors->hasstream();
+    return false;
+    }
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasscans)(JNIEnv *env, jclass _cl) {
+    if(sensors)
+        return sensors->hasscans();
     return false;
     }
 

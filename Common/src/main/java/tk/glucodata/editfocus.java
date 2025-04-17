@@ -21,6 +21,8 @@
 
 package tk.glucodata;
 
+import static tk.glucodata.Log.doLog;
+
 import android.text.Editable;
 
 import android.view.View;
@@ -33,7 +35,7 @@ public static EditText editview;
 @Override
 public void onFocusChange(View v, boolean hasFocus) {
     EditText ed= (EditText)v;
-    Log.v("editfocus","onfocuschange "+hasFocus);
+    {if(doLog) {Log.v("editfocus","onfocuschange "+hasFocus);};};
     if(hasFocus) {
         editview=ed;
       }

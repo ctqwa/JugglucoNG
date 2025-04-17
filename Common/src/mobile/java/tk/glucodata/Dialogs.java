@@ -42,6 +42,7 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 import static java.lang.System.currentTimeMillis;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NumberView.geteditview;
 import static tk.glucodata.NumberView.geteditwearos;
 import static tk.glucodata.NumberView.smallScreen;
@@ -90,7 +91,7 @@ EditText days;
 public void showexport(MainActivity activity,int width,int height,View parent) {
    if(parent!=null) {
        parent.setVisibility(GONE);
-       Log.i(LOG_ID, "parent.setVisibility(GONE)");
+       {if(doLog) {Log.i(LOG_ID, "parent.setVisibility(GONE)");};};
        }
 	if(exportscreen==null) {
 		Button num=exportbutton(activity,activity.getString(R.string.amountsname),0);
@@ -180,7 +181,7 @@ public void showexport(MainActivity activity,int width,int height,View parent) {
 	else  {
 		help.showkeyboard(activity,days);
 		}
-    Log.i(LOG_ID, "parent==null");
+    {if(doLog) {Log.i(LOG_ID, "parent==null");};};
      activity.setonback(() -> {
        if(smallScreen) {
           help.hidekeyboard(activity);
@@ -189,7 +190,7 @@ public void showexport(MainActivity activity,int width,int height,View parent) {
           activity.curve.numberview.hidekeyboard() ;
        exportscreen.setVisibility(GONE);
        if(parent!=null) {
-            Log.i(LOG_ID, "parent.setVisibility(VISIBLE)");
+            {if(doLog) {Log.i(LOG_ID, "parent.setVisibility(VISIBLE)");};};
             parent.setVisibility(VISIBLE);
           }
        else {

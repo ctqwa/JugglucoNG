@@ -1,5 +1,7 @@
 package tk.glucodata.NovoPen.opennov.mt;
 
+import static tk.glucodata.Log.doLog;
+
 import tk.glucodata.NovoPen.opennov.BaseMessage;
 import tk.glucodata.NovoPen.opennov.OpenNov;
 
@@ -16,7 +18,7 @@ import tk.glucodata.Log;
 public class ArgumentsSimple extends BaseMessage {
 
 static    public byte[] encode(int handle) {
-        Log.i(OpenNov.TAG,"ArgumentsSimple("+handle+")");
+        {if(doLog) {Log.i(OpenNov.TAG,"ArgumentsSimple("+handle+")");};};
         var b = ByteBuffer.allocate(6);
         putUnsignedShort(b, handle);
         putUnsignedShort(b, 0);

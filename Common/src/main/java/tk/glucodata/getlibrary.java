@@ -38,6 +38,7 @@ import java.util.zip.ZipInputStream;
 
 import static android.view.View.GONE;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getShownintro;
 import static tk.glucodata.Natives.setShownintro;
 
@@ -63,12 +64,12 @@ public void run() {
 	    for (PackageInfo p : pack) {
 		String name = p.packageName;
 		if(name.startsWith("com.freestylelibre")) {
-		    Log.d(LOG_ID,p.packageName);
-		    Log.d(LOG_ID,p.versionName);
+		    {if(doLog) {Log.d(LOG_ID,p.packageName);};};
+		    {if(doLog) {Log.d(LOG_ID,p.versionName);};};
 		    ApplicationInfo app = p.applicationInfo;
-		    Log.d(LOG_ID,app.name);
-		    Log.d(LOG_ID,"uid=" + app.uid);
-		    Log.d(LOG_ID,"nativeLibraryDir="+app.nativeLibraryDir);
+		    {if(doLog) {Log.d(LOG_ID,app.name);};};
+		    {if(doLog) {Log.d(LOG_ID,"uid=" + app.uid);};};
+		    {if(doLog) {Log.d(LOG_ID,"nativeLibraryDir="+app.nativeLibraryDir);};};
 		   // String[] splits=app.splitSourceDirs;
 			String[] splits= null;
 			if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -76,19 +77,19 @@ public void run() {
 			}
 			if(splits!=null&&splits.length>0) {
 		    	for(var s:splits) {
-			    Log.d(LOG_ID,s);
+			    {if(doLog) {Log.d(LOG_ID,s);};};
 			    if(unzipper(new File(s), libfile, cali)) {
 				if(rightlib.testrightlib(context,cali)!=0)  {
 					return;
 					}
 				}
 			else {
-				Log.d(LOG_ID,"no lib");
+				{if(doLog) {Log.d(LOG_ID,"no lib");};};
 				}
 				}
 		    	}
 		else {
-		         Log.d(LOG_ID,app.sourceDir);
+		         {if(doLog) {Log.d(LOG_ID,app.sourceDir);};};
 			    if(unzipper(new File(app.sourceDir), libfile, cali)) {
 				if(rightlib.testrightlib(context,cali)!=0)  {
 					return;
@@ -269,13 +270,13 @@ static boolean process(FileInputStream arstr,ZipInputStream zf, int size,File ui
  	out.flush();
         out.getFD().sync();
 	 }
-	 Log.i(LOG_ID,"unzipped");
+	 {if(doLog) {Log.i(LOG_ID,"unzipped");};};
 	 return true;
 	}
 
 //static boolean unzipper(InputStream arstr, String file, File uit) 
 static boolean unzipper(FileInputStream arstr, String file, File uit) {
-	Log.i(LOG_ID,file);
+	{if(doLog) {Log.i(LOG_ID,file);};};
 	try(ZipInputStream zf = new ZipInputStream(arstr)) {
 		ZipEntry entry;		
 		while(true) {
@@ -283,7 +284,7 @@ static boolean unzipper(FileInputStream arstr, String file, File uit) {
 		       return false;
 		    if(file.equals(entry.getName())) {
 			int size = (int)entry.getSize();
-			Log.i(LOG_ID,entry.getName()+" size="+size);
+			{if(doLog) {Log.i(LOG_ID,entry.getName()+" size="+size);};};
 		    	return process(arstr,zf,size,uit);
 			}
 		    zf.closeEntry();

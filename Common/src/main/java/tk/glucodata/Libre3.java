@@ -25,6 +25,7 @@ package tk.glucodata;
 import android.nfc.Tag;
 
 import static tk.glucodata.BuildConfig.libreVersion;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.showbytes;
 
 public class  Libre3 {
@@ -39,16 +40,16 @@ public static byte[] firstnfc(Tag tag) {
 public static	long   	libre3NFC(Tag tag) {
 	byte[] res = firstnfc(tag);
 	if(res == null) {
-		Log.i(LOG_ID,"firstnfc==null");
+		{if(doLog) {Log.i(LOG_ID,"firstnfc==null");};};
 		return 2L;
 		}
 	if(libreVersion == 3) {
 		long streamptr=tk.glucodata.libre3.NFC.second(res,tag);
 //		SensorBluetooth.resetDevice(streamptr);
-		Log.i(LOG_ID,"streamptr="+streamptr);
+		{if(doLog) {Log.i(LOG_ID,"streamptr="+streamptr);};};
 		return streamptr;
 		}
-	Log.i(LOG_ID,"libreVersion!=3");
+	{if(doLog) {Log.i(LOG_ID,"libreVersion!=3");};};
 	return 1L;
   	}
 

@@ -25,6 +25,7 @@ import android.content.Intent
 import com.google.android.gms.wearable.*
 import kotlinx.coroutines.launch
 import tk.glucodata.Applic.isWearable
+import tk.glucodata.Log.doLog
 import tk.glucodata.MainActivity.setbluetoothon
 import tk.glucodata.MessageSender.Companion.isGalaxy
 //import tk.glucodata.MessageSender.Companion.messagesender
@@ -46,7 +47,7 @@ class MessageReceiver: WearableListenerService() {
                     return
                     }
                 val source=  sender.localnode
-                  Log.i(LOG_ID,"path==MessageSender.DEFAULTS_PATH "+source );
+                 if(doLog) {Log.i(LOG_ID,"path==MessageSender.DEFAULTS_PATH "+source );}
                   setWearosdefaults(source,true);
                    val context=if(MainActivity.thisone==null)Applic.app;else MainActivity.thisone;
                    Applic.setbluetooth(context,false)
@@ -123,7 +124,7 @@ class MessageReceiver: WearableListenerService() {
              MessageSender.BLUETOOTH_PATH -> {
                 val context=if(MainActivity.thisone==null)Applic.app;else MainActivity.thisone;
                 val on=booldata(data)
-                Log.i(LOG_ID,"set bluetooth $on  ${data[0]}");
+                if(tk.glucodata.Log.doLog) {Log.i(LOG_ID,"set bluetooth $on  ${data[0]}");}
                 Applic.setbluetooth(context,on )
                 }
              MessageSender.ASKFORSTART_PATH -> {

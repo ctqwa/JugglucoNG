@@ -110,7 +110,7 @@ extern int hostsocks[];
 extern std::vector<int> sendsocks;
 extern uint32_t lastuptodate[];
 
-//extern int tmpsocks[maxallhosts][maxip];
+//extern int tmpsocks[maxallhosts][passhost_t::maxip];
 extern std::vector<crypt_t *>crypts;
 struct updateone {
 //    struct sockaddr host;
@@ -438,7 +438,11 @@ const std::array<char,17> getpass(int pos) const {
     }
 void getport(int pos,char *buf) {
     auto &host=getupdatedata()->allhosts[pos];
-    snprintf(buf,6, "%d",host.getport());
+    const auto port=host.getport();
+    if(port==0&&!host.getActive())
+        strcpy(buf,defaultport);
+    else
+        snprintf(buf,6, "%d",port);
 //    snprintf(buf,6, "%d",ntohs(host.ips[0].sin6_port));
     }
 
@@ -789,7 +793,7 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
             }
         }
     int portint=atoi(port.data());
-    if(portint>65535||portint<1024) {
+    if(!passiveonly&&(portint>65535||portint<1024)) {
         LOGGER("port out of range %d\n",portint);
         return -1;
         }
@@ -811,7 +815,7 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
     int tohost;
     bool newthread=false;
     const bool dontopen=sendto&&passiveonly;
-    int lmaxip=maxip-(label?1:0);
+    int lmaxip=passhost_t::maxip-(label?1:0);
     auto &thehost=getupdatedata()->allhosts[index];
 
     if(sendto) {
@@ -862,11 +866,12 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
                 return -8;
                 }
             int namelen= env->GetStringUTFLength( jhostname);
-            if(namelen>=maxhostname) { //terminanting zero
-                LOGGER("supplied name too long %d>%d\n",namelen,maxhostname);
-            if(newhost&&sendto) {
-             --getupdatedata()->sendnr;
-               }
+
+            if(namelen>=passhost_t::hostnamedata::maxhostname) { //terminanting zero
+                LOGGER("supplied name too long %d>%d\n",namelen,passhost_t::hostnamedata::maxhostname);
+                if(newhost&&sendto) {
+                 --getupdatedata()->sendnr;
+                   }
                 return -5;
                 }
 

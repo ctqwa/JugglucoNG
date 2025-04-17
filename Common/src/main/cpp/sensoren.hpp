@@ -403,13 +403,41 @@ int makelibre3sensorindex(std::string_view shortname,uint32_t starttime,const ui
       return ind ;
    }
 #endif
-
+//^]0106972831640165112312091724120810LT41231108C^]21231108GEPD802JPP76  SIBIONICS  name 31108GEPD802JPP7
+//^]0106972831641483112411201726051910LT46241155C^]21P22411J6EP  SIBIONICS2
+//1155CJ6EP2411
 #ifdef SIBIONICS
-static std::string_view namefromSIgegs(const char *gegs,const int len,bool hasnum) {
-   if(hasnum)
-      return {gegs+len-17,16};
-   return {gegs+len-16,16};
-   }
+/*
+static auto namefromSIgegs(const char *gegs,const int len,bool hasnum) {
+   if(len==59) {
+       std::string uit;
+       uit.reserve(16);
+       uit.insert(0,gegs+len-9,9);
+       uit.insert(9,gegs+len-23,7);
+       return uit;
+        }
+   else {
+       const char *start=gegs+len-(hasnum?17:16);
+       return std::string(start,start+16);
+       }
+   }   */
+
+static auto namefromSIgegs(const char *gegs,const int len,bool hasnum) {
+   if(len==59) {
+       std::string uit;
+       uit.reserve(16);
+       uit.append(gegs+len-29,3);
+       uit.append(gegs+len-36,2);
+       uit.append(gegs+len-4,4);
+       uit.append(gegs+len-8,4);
+       uit.append(gegs+len-17,3);
+       return uit;
+        }
+   else {
+       const char *start=gegs+len-(hasnum?17:16);
+       return std::string(start,start+16);
+       }
+   }  
 #endif
 #ifdef DEXCOM
 std::pair<int,SensorGlucoseData *> makeDexComSensorindex(const char *pin,std::string_view gegs,uint32_t now) {
@@ -466,7 +494,7 @@ std::pair<int,SensorGlucoseData *> makeDexComSensorindex(const char *pin,std::st
 std::pair<int,SensorGlucoseData *> makeSIsensorindex(std::string_view gegsSI,uint32_t now) {
 
 #ifndef NOLOG
-   LOGGER("makeSIsensorindex(%s)\n",gegsSI.data());
+   LOGGER("makeSIsensorindex(%s) len=%d\n",gegsSI.data(),gegsSI.size());
 #endif
    std::string_view num="0697283164";
 //   bool hasnum=std::ranges::contains_subrange(gegsSI,num);
@@ -509,7 +537,7 @@ std::pair<int,SensorGlucoseData *> makeSIsensorindex(std::string_view gegsSI,uin
       }
    const pathconcat sensordir(inbasedir,name);
    SensorGlucoseData::mkdatabaseSI(sensordir,gegsSI,now,hasnum );
-   const int ind=addsensor(name);
+   const int ind=addsensor(static_cast<std::string_view>(name));
    sensor *sen=getsensor(ind);
    sen->initialized=true;
    sen->halfdays=maxdaysSI*2;
@@ -747,10 +775,22 @@ vector<SensorGlucoseData *> inperiod(uint32_t starttime,uint32_t endtime) {
    }
 
    bool hasstream() {
-      auto sens = getSensorData();
-      if (!sens)
-         return false;
-      return sens->pollcount() > 0;
+     for(int ind = last();ind>=0;--ind) {
+         if(auto sens = getSensorData(ind)) {
+              if(sens->pollcount() > 0)
+                 return true;
+                }
+         }
+     return false;
+   }
+bool hasscans() {
+     for(int ind = last();ind>=0;--ind) {
+         if(auto sens = getSensorData(ind)) {
+              if(sens->scancount() > 0)
+                 return true;
+                }
+         }
+     return false;
    }
 void finishsensor(int ind) {
    if(ind>=0&&ind<=last()) {

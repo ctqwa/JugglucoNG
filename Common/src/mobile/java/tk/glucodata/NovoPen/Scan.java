@@ -26,6 +26,7 @@ import static android.graphics.Typeface.DEFAULT_BOLD;
 import static android.view.View.INVISIBLE;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Dialogs.fdatename;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.novopentype;
 import static tk.glucodata.Natives.savenovopen;
 import static tk.glucodata.Natives.setnovopenttimeandtype;
@@ -128,7 +129,7 @@ static void setInsulin(MainActivity context, OpContext op) {
 		long sectime=(typetime&0xFFFFFFFFL);
 		lasttime=sectime*1000L;
 		final String datestr=fdatename.format(lasttime)      ;
-		Log.i(LOG_ID,"type= "+type+" Last time: "+String.format("typetime=%X seconds=%X %d",typetime,sectime,sectime)+ " "+datestr);
+		{if(doLog) {Log.i(LOG_ID,"type= "+type+" Last time: "+String.format("typetime=%X seconds=%X %d",typetime,sectime,sectime)+ " "+datestr);};};
 		}
 	else {
 		type=-1;
@@ -148,10 +149,10 @@ static void setInsulin(MainActivity context, OpContext op) {
 		public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
 			if(position>=0&&position<labels.size()) {
 				selected[0]=position;
-				Log.i(LOG_ID, "selected " + labels.get(position));
+				{if(doLog) {Log.i(LOG_ID, "selected " + labels.get(position));};};
 				}
 			else
-				Log.i(LOG_ID,"selected "+position);
+				{if(doLog) {Log.i(LOG_ID,"selected "+position);};};
 			}
 		@Override
 		public  void onNothingSelected (AdapterView<?> parent) {

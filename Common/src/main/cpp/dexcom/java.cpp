@@ -200,7 +200,7 @@ if(!dataptr) {
       timeres.data()[1]=0LL;
       return false;
       }
-  sens->setbroadcastfrom(INT_MAX);
+  sens->setbroadcastfrom(INT16_MAX);
 
   const CritAr  bluedata(envin,bluetoothdata);
   const glucoseinput *glucose=reinterpret_cast<decltype(glucose)>(bluedata.data());

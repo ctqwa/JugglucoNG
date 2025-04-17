@@ -27,6 +27,7 @@ import static android.text.Html.TO_HTML_PARAGRAPH_LINES_CONSECUTIVE;
 import static android.text.Html.fromHtml;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Layout.getMargins;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.help.help;
 import static tk.glucodata.settings.Settings.removeContentView;
@@ -125,7 +126,7 @@ static void show(MainActivity act) {
      var usebluetooth=getcheckbox(act, R.string.use_bluetooth,wasused);
     usebluetooth.setOnCheckedChangeListener(
          (buttonView,  isChecked) -> {
-             Log.i(LOG_ID,"usebluetooth "+isChecked);
+             {if(doLog) {Log.i(LOG_ID,"usebluetooth "+isChecked);};};
              if(isChecked!=wasused) {
                  act.setbluetoothmain( isChecked);
                  act.requestRender();
@@ -136,7 +137,7 @@ static void show(MainActivity act) {
     spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         @Override
         public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-            Log.i(LOG_ID,"onItemSelected "+position);
+            {if(doLog) {Log.i(LOG_ID,"onItemSelected "+position);};};
             if(position!=waspos[0]) {
                 waspos[0]=position;
                 setinfo(info,ptrs[position]);
@@ -166,7 +167,7 @@ static void show(MainActivity act) {
         float ypos=(height-h+MainActivity.systembarTop-MainActivity.systembarBottom)*.5f;
         x.setX((width-w+MainActivity.systembarLeft-MainActivity.systembarRight)*.5f);
         x.setY(ypos);
-        Log.i(LOG_ID,"baselines info="+info.getBaseline()+" buttons="+buttons.getBaseline());
+        {if(doLog) {Log.i(LOG_ID,"baselines info="+info.getBaseline()+" buttons="+buttons.getBaseline());};};
         if(ypos<MainActivity.systembarTop)
                  getMargins(finish).topMargin=(int)(MainActivity.systembarTop-ypos);
          return new int[] {w,h};

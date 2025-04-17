@@ -31,6 +31,7 @@ import static tk.glucodata.Applic.backgroundcolor;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.startMain;
 import static tk.glucodata.CommonCanvas.drawarrow;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.OVERLAY_PERMISSION_REQUEST_CODE;
 import static tk.glucodata.MainActivity.doonback;
 import static tk.glucodata.MainActivity.setonback;
@@ -75,13 +76,13 @@ public class Floating extends View {
     static private final String LOG_ID="Floating";
 static private final int oldage=glucosetimeoutSEC;
 static void init() {
-    Log.i(LOG_ID,"init()");
+    {if(doLog) {Log.i(LOG_ID,"init()");};};
     var pos=Natives.getfloatingPos( );
     final var metrics = Applic.app.getResources().getDisplayMetrics();
     density=metrics.density;
 //   movethreshold=density*2.0f;
    movethreshold=density*2.0f;
-    Log.i(LOG_ID,"density="+density);
+    {if(doLog) {Log.i(LOG_ID,"density="+density);};};
     if(pos!=0) {
         Floating.xview=pos&0xFFFF;
         Floating.yview=pos>>16;
@@ -113,7 +114,7 @@ public    static void setTouchable(boolean isChecked) {
 static void setbackgroundcolor(int c)  {
         Natives.setfloatingbackground(c );
         var getc=Natives.getfloatingbackground();
-        Log.i(LOG_ID,"getfloatingbackground("+(getc&0xFFFFFFFF)+")");
+        {if(doLog) {Log.i(LOG_ID,"getfloatingbackground("+(getc&0xFFFFFFFF)+")");};};
         floatingbackground=c;
         }
 static void setforegroundcolor(int c)  {
@@ -154,7 +155,7 @@ public static void rewritefloating(Activity context) {
             builder.setMessage(R.string.overlaypermissionmessage);
             }
        var dialog=builder.setPositiveButton(R.string.ok, (dia, id) -> {
-            Log.i(LOG_ID,"now ask overlay permission");
+            {if(doLog) {Log.i(LOG_ID,"now ask overlay permission");};};
         }).create();
         dialog.setCanceledOnTouchOutside(false);
         final var metrics = Applic.app.getResources().getDisplayMetrics();
@@ -172,7 +173,7 @@ public static void rewritefloating(Activity context) {
             parent.setPadding(0,0,0,0);
             parent.setMinimumHeight(0);
             parent.set
-            Log.i(LOG_ID,"dialog.setOnShowListener");
+            {if(doLog) {Log.i(LOG_ID,"dialog.setOnShowListener");};};
 //        var dens=GlucoseCurve.getDensity();
 //        negbut.setPadding((int)(dens*10),0,0,0);
             }    
@@ -216,7 +217,7 @@ public static void rewritefloating(Activity context) {
 
     public static void removeFloating() {
         if(floatview!=null) {
-            Log.i(LOG_ID,"removeFloating()");
+            {if(doLog) {Log.i(LOG_ID,"removeFloating()");};};
             windowMana.removeView(floatview);
             floatview=null;
             }
@@ -277,7 +278,7 @@ private void untouchable() {
         var layout=new Layout(context,  
 (v,w,h) -> {
          var wid=ok.getMeasuredWidth()+cancel.getMeasuredWidth();
-         Log.i(LOG_ID,"layout width="+w+" ok+cancel="+wid);
+         {if(doLog) {Log.i(LOG_ID,"layout width="+w+" ok+cancel="+wid);};};
          if(wid>0) {
             untouch.setWidth(wid);
             w=wid;
@@ -334,7 +335,7 @@ private static WindowManager.LayoutParams makeparams(int screenwidth, int screen
         var ypos= -screenheight*.5f+yview;
         floatingx=xpos;
         floatingy=ypos;
-      Log.i(LOG_ID,"Floating glucose: x="+xpos+" y="+ypos);
+      {if(doLog) {Log.i(LOG_ID,"Floating glucose: x="+xpos+" y="+ypos);};};
 
         var type = (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)?WindowManager.LayoutParams.TYPE_SYSTEM_ALERT: WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         var flags = FLAG_NOT_FOCUSABLE|(Natives.getfloatingTouchable()?0:WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
@@ -359,7 +360,7 @@ private static float density;
 public static int floatfontsize;
     static boolean makefloat() {
     {
-    Log.i(LOG_ID,"makefloat");
+    {if(doLog) {Log.i(LOG_ID,"makefloat");};};
 
         hide=false;
 
@@ -441,14 +442,14 @@ static boolean hide=false;
 @Override 
 protected void onDraw(Canvas floatCanvas) {
      super.onDraw(floatCanvas);
-    Log.i(LOG_ID,"onDraw");
+    {if(doLog) {Log.i(LOG_ID,"onDraw");};};
     final strGlucose  glucose= Natives.lastglucose();
     if(glucose!=null) {
         final var now=System.currentTimeMillis()/1000L;
         final var age=now-glucose.time;
         if(age<oldage) {
             if(hide) {
-                Log.i(LOG_ID,"onDraw hide");
+                {if(doLog) {Log.i(LOG_ID,"onDraw hide");};};
                 final var gety = floatCanvas.getHeight() * 0.85f;
                 final var xpos=0.2f;
                 floatCanvas.drawColor(floatingbackground);
@@ -472,7 +473,7 @@ protected void onDraw(Canvas floatCanvas) {
                 floatPaint.setTextSize(timesize);
                 floatCanvas.drawText(timestr, density, gety+timeHeight, floatPaint);
                 floatPaint.setTextSize(floatfontsize);
-                Log.i(LOG_ID,"time: "+glucose.time+" "+timestr);
+                {if(doLog) {Log.i(LOG_ID,"time: "+glucose.time+" "+timestr);};};
                 }
         return;
         }
@@ -497,7 +498,7 @@ protected void onDraw(Canvas floatCanvas) {
             return;
             }
         }
-    Log.i(LOG_ID,"onDraw hide");
+    {if(doLog) {Log.i(LOG_ID,"onDraw hide");};};
     final var gety = floatCanvas.getHeight() * 0.82f;
     final var xpos=0.2f;
     floatCanvas.drawColor(floatingbackground);
@@ -527,17 +528,17 @@ private static float movethreshold=6.0f;
 private boolean startedMain=false;
 public boolean onTouchEvent(MotionEvent event) {
     if(Natives.turnoffalarm()) Notify.stopalarm();
-        Log.i(LOG_ID,event.toString());
+        {if(doLog) {Log.i(LOG_ID,event.toString());};};
     try {
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
         case MotionEvent.ACTION_BUTTON_PRESS:
             case MotionEvent.ACTION_DOWN:
-               Log.i(LOG_ID,"Down");
+               {if(doLog) {Log.i(LOG_ID,"Down");};};
                startX= event.getX();
                startY= event.getY();
-               Log.i(LOG_ID,"startX="+startX+" startY="+ xview+" floatglucosex="+floatglucosex);
+               {if(doLog) {Log.i(LOG_ID,"startX="+startX+" startY="+ xview+" floatglucosex="+floatglucosex);};};
                if(hide) {
-                  Log.i(LOG_ID,"unhide");
+                  {if(doLog) {Log.i(LOG_ID,"unhide");};};
                   hide=false;
                   if(Natives.getfloatglucose( ))
                      makefloat();
@@ -547,7 +548,7 @@ public boolean onTouchEvent(MotionEvent event) {
                   } 
         else {
             if(startX< floatglucosex ) {
-                Log.i(LOG_ID,"<floatglucosex");
+                {if(doLog) {Log.i(LOG_ID,"<floatglucosex");};};
                 startedMain=true;
                 startMain();
                 }
@@ -596,7 +597,7 @@ public boolean onTouchEvent(MotionEvent event) {
       final var newy= event.getY();
         final var distanceX= newx - startX;
         final var distanceY= newy - startY;
-      Log.i(LOG_ID,"DRAG dx="+distanceX+" dy="+distanceY);
+      {if(doLog) {Log.i(LOG_ID,"DRAG dx="+distanceX+" dy="+distanceY);};};
 //        startX= newx; startY= newy;
      if(Math.abs(distanceX)>movethreshold||Math.abs(distanceY)>movethreshold) {
             moved =true;

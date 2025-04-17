@@ -1,10 +1,5 @@
-Kijk naar waarden Sibionics
-Talk:
-    - IOB
-    - Time
-    - verwacht end tijd
-
-network info better
+Add keuze ZXing of Google.
+set rond elke Log if(doLog)
 Add WearOS option to mirror
 
 Longer sensorid Dexcom
@@ -13,15 +8,12 @@ Add multiple alarms with different times.
 
 Remove meer c++ code met #ifdef SIBIONICS DEXCOM LIBRE3
 No am/pm for current time
-Vertikale bewegingen om kleur schermpje te bewegen? Knop naar boven laten komen? close er achter?
 
 Look at order complication types
 
-Verander alarm zonder save?
 
 Enter numbers on all devices.
 
-Talk in WearOS?
 
 naar Libreview  in WearOS
 

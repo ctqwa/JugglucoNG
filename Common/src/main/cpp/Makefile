@@ -1,6 +1,6 @@
 srcdir=$(shell pwd)
 CXX=g++-10
-CXXFLAGS=-std=c++20 -I./share -static-libstdc++   
+CXXFLAGS=-std=c++26 -I./share -static-libstdc++   
 export APP_ABI=fx86_64
 #export APP_ABI=armeabi-v7a
 ifeq ($(APP_ABI),armeabi-v7a)
@@ -59,7 +59,7 @@ LIBRARYPATH=/o/home/jka/src/android/librelibs/2.5.2/$(APP_ABI)
 #ACXXFLAGS=-std=c++2a -O0   -gdwarf-4 -g3   -I. -fno-exceptions -DLIBRARYDIR='"$(LIBRARYPATH)"' 
 #ACFLAGS=-O0     -gdwarf-4 -g3  -fno-exceptions
 ACLDFLAGS+= -O3  -g  -fno-exceptions   -Wl,--export-dynamic -Wl,-Bdynamic
-ACXXFLAGS= -m32 -static-libstdc++  -std=c++20 -I./share -O3   -gdwarf-4 -g3   -I. -fno-exceptions -DLIBRARYDIR='"$(LIBRARYPATH)"' 
+ACXXFLAGS= -m32 -static-libstdc++  -std=c++26 -I./share -O3   -gdwarf-4 -g3   -I. -fno-exceptions -DLIBRARYDIR='"$(LIBRARYPATH)"' 
 ACFLAGS=-O3     -gdwarf-4 -g3  -fno-exceptions
 
 DYNLINK=yes

@@ -39,4 +39,18 @@ static public void	ask(Context context, String title, String mess, Runnable okpr
             }
         }).show().setCanceledOnTouchOutside(false);
 	}
+static public void	ask2(Context context, String title, String mess, Runnable okproc,Runnable cancelproc) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(title).
+	 setMessage(mess).
+           setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+		    	okproc.run();
+                    }
+                }) .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+		    	cancelproc.run();
+            }
+        }).show().setCanceledOnTouchOutside(false);
+	}
 }

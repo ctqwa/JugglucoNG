@@ -21,6 +21,7 @@
 
 package tk.glucodata.libre3;
 
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getlibreAccountIDnumber;
 import static tk.glucodata.Natives.interpret3NFC2;
 import static tk.glucodata.Log.showbytes;
@@ -41,7 +42,7 @@ public static	long   	second(byte[] nfc1,Tag tag) {
 //	long nowsec=Natives.getLibre3secs(nfc1);
 //	if(nowsec==0L) return 0L;
 	long accountId=getlibreAccountIDnumber();
-	Log.i(LOG_ID,"accountId="+accountId);
+	{if(doLog) {Log.i(LOG_ID,"accountId="+accountId);};};
 	byte[] metcrc=new byte[10];// 8C 42 86 62 8D 6D 41 1F BC 93
 	if(Natives.startTimeIDsum(metcrc, nowsec, accountId) != 0) {
 		Log.e(LOG_ID, "startTimeIDsum failed");

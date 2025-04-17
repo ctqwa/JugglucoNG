@@ -41,6 +41,7 @@ import static android.view.View.GONE;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Layout.getMargins;
 import static tk.glucodata.MainActivity.IGNORE_BATTERY_OPTIMIZATION_SETTINGS;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.settings.Settings.removeContentView;
@@ -72,6 +73,7 @@ if(!isWearable) {
 		boolean isIgnoringBatteryOptimizations = pm.isIgnoringBatteryOptimizations(context.getPackageName());
 		battery.setChecked(isIgnoringBatteryOptimizations);
 		context.lightBars(false);
+        getMargins(battery).leftMargin=getMargins(Close).rightMargin=(int)(GlucoseCurve.getwidth()*.15f);
 		final Layout lay=new Layout(context, (l, w, h) -> {
 /*			l.setY(MainActivity.systembarTop);
 			var newh=h-MainActivity.systembarTop; */

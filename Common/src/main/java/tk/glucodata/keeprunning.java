@@ -28,6 +28,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.stack;
 //import static tk.glucodata.Natives.getwakelock;
 
@@ -63,7 +64,7 @@ public static void setWakelock(boolean isChecked) {
 static PowerManager.WakeLock wakeLock =null;
  @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
-       Log.i(LOG_ID,"onStartCommand flags="+flags+" startId="+startId+" started="+started);
+       {if(doLog) {Log.i(LOG_ID,"onStartCommand flags="+flags+" startId="+startId+" started="+started);};};
        if(started) {
                 return Service.START_STICKY;//NODIG?
                 }
@@ -101,7 +102,7 @@ static PowerManager.WakeLock wakeLock =null;
 static boolean start(Context context) {
       try {
        if(!started||theservice==null) {
-          Log.i(LOG_ID,"start keeprunning");
+          {if(doLog) {Log.i(LOG_ID,"start keeprunning");};};
           Intent i = new Intent(context, keeprunning.class);
            context.startService(i);
            return true;
@@ -117,7 +118,7 @@ void stopper() {
    stopForeground(true);
    stopSelf();
 //   turnoffwakelock();
-   Log.i(LOG_ID,"Stopped");
+   {if(doLog) {Log.i(LOG_ID,"Stopped");};};
    }
 static void stop() {
 //   context.stopService(new Intent(context, keeprunning.class));

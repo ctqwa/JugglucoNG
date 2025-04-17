@@ -36,19 +36,19 @@ public class editUIfocus implements View.OnFocusChangeListener {
 	int width=GlucoseCurve.getwidth();	
 	*/
 	if(hasFocus) {
-//		Log.i(LOG_ID,"focus1 width="+metrics.widthPixels+" "+width);
+//		{if(doLog) {Log.i(LOG_ID,"focus1 width="+metrics.widthPixels+" "+width);};};
 //		v.requestLayout();
 		act.showui=true;
 	        act.showSystemUI();
-//		Log.i(LOG_ID,"focus2 width="+metrics.widthPixels+" "+width);
+//		{if(doLog) {Log.i(LOG_ID,"focus2 width="+metrics.widthPixels+" "+width);};};
 	}
 	
 	else {
-//		Log.i(LOG_ID,"nofucos1 width="+metrics.  widthPixels+" "+width);
+//		{if(doLog) {Log.i(LOG_ID,"nofucos1 width="+metrics.  widthPixels+" "+width);};};
 		act.showui=false;
 	       act.hideSystemUI();
 	      help.hidekeyboard(act);
-//		Log.i(LOG_ID,"nofucos2 width="+ metrics.  widthPixels+" "+width);
+//		{if(doLog) {Log.i(LOG_ID,"nofucos2 width="+ metrics.  widthPixels+" "+width);};};
 	   }
     }
 }

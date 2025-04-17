@@ -23,6 +23,8 @@ package tk.glucodata;
 
 import static android.health.connect.datatypes.Metadata.RECORDING_METHOD_UNKNOWN;
 
+import static tk.glucodata.Log.doLog;
+
 import android.os.Build;
 
 import androidx.annotation.NonNull;
@@ -59,7 +61,7 @@ public    GlucoseList(Metadata meta,long sensorptr,int start,int len) {
 
     @Override
     public int size() { 
-    	Log.i(LOG_ID,"size()="+len);
+    	{if(doLog) {Log.i(LOG_ID,"size()="+len);};};
     	return len; 
     	}
 

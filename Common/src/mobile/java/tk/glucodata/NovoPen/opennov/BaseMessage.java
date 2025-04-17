@@ -1,5 +1,7 @@
 package tk.glucodata.NovoPen.opennov;
 
+import static tk.glucodata.Log.doLog;
+
 import tk.glucodata.NovoPen.opennov.buffer.MyByteBuffer;
 
 import java.nio.ByteBuffer;
@@ -57,7 +59,7 @@ public class BaseMessage extends MyByteBuffer {
 
     public static void log(final String msg) {
         if (d) {
-                Log.d(TAG, msg);
+                {if(doLog) {Log.d(TAG, msg);};};
             }
     }
 
