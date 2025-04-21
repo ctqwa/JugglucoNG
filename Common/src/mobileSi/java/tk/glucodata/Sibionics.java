@@ -167,16 +167,22 @@ static void connectSensor(final String scantag,MainActivity act)  {
 
 
 public static void scan(MainActivity act) {
-     if(!isWearable) {
-         if(BuildConfig.DEBUG&&useZXing)
+    if (!isWearable) {
+        if(!Natives.getGoogleScan())
             scanZXing(act);
-          else
-            scanGoogle(act);
-            }
+        else {
+            try {
+                scanGoogle(act);
+                } catch (Throwable th) {
+                    Log.stack(LOG_ID, "scanGoogle", th);
+                    scanZXing(act);
+                    }
+           }
       }
+}
 private static void scanGoogle(MainActivity act) {
      if(!isWearable) {
-         {if(doLog) {Log.i(LOG_ID, "before scan");};};
+        if(doLog) {Log.i(LOG_ID, "before scan");};
         final var options =  new com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions.Builder().setBarcodeFormats( com.google.mlkit.vision.barcode.common.Barcode.FORMAT_DATA_MATRIX, com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE).build();
         final var scanner =  com.google.mlkit.vision.codescanner.GmsBarcodeScanning.getClient(act, options);
         scanner.startScan().addOnSuccessListener(

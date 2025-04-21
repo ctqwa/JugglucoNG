@@ -34,8 +34,18 @@ extern jstring myNewStringUTF(JNIEnv *env,const std::string_view str);
 //#include "fromjava.h"
 #include "config.h"
 #include "datbackup.hpp"
+#include "fromjava.h"
 extern Backup *backup;
-#define fromjava(x) Java_tk_glucodata_Natives_ ##x
+//#define fromjava(x) Java_tk_glucodata_Natives_ ##x
+
+extern "C" JNIEXPORT void  JNICALL   fromjava(setGoogleScan)(JNIEnv *env, jclass cl,jboolean val) {
+	settings->data()->GoogleScan=!val;
+	}
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getGoogleScan)(JNIEnv *env, jclass cl) {
+	return !settings->data()->GoogleScan;
+	}
+
+
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getweight)(JNIEnv *env, jclass cl,jint pos) {
 	return settings->getlabelweight(pos)  ;
 	}

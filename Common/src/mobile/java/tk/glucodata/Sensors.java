@@ -29,7 +29,7 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static tk.glucodata.Layout.getMargins;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
-import static tk.glucodata.help.help;
+import static tk.glucodata.help.helplight;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
@@ -92,7 +92,7 @@ static void show(MainActivity act) {
     var info=new TextView(act);
     info.setMovementMethod(new ScrollingMovementMethod());
     var help=getbutton(act,R.string.helpname);
-    help.setOnClickListener(v-> help(R.string.sensormirror,act));
+    help.setOnClickListener(v-> helplight(R.string.sensormirror,act));
     var close=getbutton(act,R.string.closename);
     close.setOnClickListener(v -> {
         MainActivity.doonback();
@@ -163,13 +163,13 @@ static void show(MainActivity act) {
      buttons.usebaseline=false;
     var width=GlucoseCurve.getwidth(); 
     var height=GlucoseCurve.getheight(); 
+    getMargins(finish).topMargin=(int)(MainActivity.systembarTop);
     var layout=new Layout(act, (x,w,h)->{ 
-        float ypos=(height-h+MainActivity.systembarTop-MainActivity.systembarBottom)*.5f;
+       // float ypos=(height-h+MainActivity.systembarTop-MainActivity.systembarBottom)*.5f;
         x.setX((width-w+MainActivity.systembarLeft-MainActivity.systembarRight)*.5f);
-        x.setY(ypos);
+       // x.setY(ypos);
         {if(doLog) {Log.i(LOG_ID,"baselines info="+info.getBaseline()+" buttons="+buttons.getBaseline());};};
-        if(ypos<MainActivity.systembarTop)
-                 getMargins(finish).topMargin=(int)(MainActivity.systembarTop-ypos);
+//        if(ypos<MainActivity.systembarTop) getMargins(finish).topMargin=(int)(MainActivity.systembarTop-ypos);
          return new int[] {w,h};
            },
           new View[]{info,buttons});

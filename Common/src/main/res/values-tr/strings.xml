@@ -31,8 +31,8 @@
     <string name="nobluetooth">Bluetooth Yok</string>
     <string name="bluetoothenabled">Bluetooth Etkin</string>
     <string name="bluetoothdisabled">Bluetooth Devre Dışı</string>
-    <string name="amountsname">Miktar</string>
-    <string name="mealsname">Yemek</string>
+    <string name="amountsname">Miktarlar</string>
+    <string name="mealsname">Yemekler</string>
     <string name="closename">Kapat</string>
     <string name="exporthelp">Ekranda görünen son değere kadar kaydeder. Başlangıç, geçmişe doğru belirtilen gün kadardır.</string>
     <string name="detect">Belirle</string>
@@ -358,7 +358,7 @@
    <string name="arrow">Yön oku</string>
    <string name="notalldata">DİKKAT: Tüm verileri göndermeden “Şuradan al” ayarlanmadı.</string>
   <string name="libresetalllabels">Öncelikle her etiket için ne yapılması gerektiğini belirtin.</string>
-   <string name="photo">Foto</string>
+   <string name="photo">Fotoğraf</string>
    <string name="photomessage">Dexcom G7 veya Sibionics (Çin) sensörünün veri matrisini (karekodunu) tarayın.</string>
    <string name="exchanges">Veri Değişimi</string>
    <string name="dexfuture">Tahmin (Dexcom)</string>
@@ -366,7 +366,6 @@
    <string name="startjuggluco">Juggluco telefonda çalışıyor mu?\n\nWIFI ve Bluetooth etkin mi?</string> 
    <string name="connected">Bağlandı!</string> 
    <string name="useclose">Kapatma tuşu</string> 
-   <string name="alarmclock">\u23F0</string> 
    <string name="filesize">Dosya Boyutu</string> 
    <string name="logging">Günlük kaydı</string> 
     <string name="aspart">Insülin Aspart/NovoRapid/NovoLog</string>

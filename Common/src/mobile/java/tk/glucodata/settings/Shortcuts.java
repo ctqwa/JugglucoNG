@@ -187,6 +187,7 @@ public void mkshortlistview(MainActivity act) {
 		if(shortedit!=null)
 			removeContentView(shortedit);
 		removeContentView(shortlistview);
+                act.lightBars(!Natives.getInvertColors());
 		};
 	act.setonback(closerun);
 	}

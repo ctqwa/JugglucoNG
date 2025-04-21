@@ -354,6 +354,12 @@ wurde von Fabrice Delfosse ins Französische übersetzt.</font></font></p>
 Яўген</a> </span><span lang="ru-RU">und</span><span lang="en-US">
 </span><a href="mailto:moydiabet@gmail.com"><span lang="ru-RU">Дзіма
 Дыябетык</span></a> ins Ukrainische übersetzt.</p>
+<p>Juggluco wurde von <a href="mailto:q.pw@qq.com">兜子a</a> ins Chinesische übersetzt.</p>
+<p>Juggluco wurde von <a href="mailto:zzzmei_92@mail.ru?subject=Juggluco%20%D0%BD%D0%B0%20%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%BC">Васильев Артем</a> ins Russische übersetzt.</p>
+<p>Juggluco wurde von <a href="mailto:beyazbulut14@gmail.com?subject=Turkish%20translation%20of%20Juggluco">beyazbulut14@gmail.com</a> ins Türkische übersetzt.</p>
+</p><p><br></p>
+<p><br></p>
+
 ]]>
 </string>
 <string name="addconnection" >
@@ -2042,6 +2048,17 @@ Uhren-App gesendet.</p>
 Alarm ausgelöst werden soll, wenn Sie eine bestimmte Menge an
 Lebensmitteln oder Medikamenten nicht innerhalb einer bestimmten
 Zeitspanne eingegeben haben.</p>
+<h2 class="western">Google-Scan</h2>
+<p style="line-height: 100%; margin-bottom: 0in"><span lang="de-DE">Wenn
+aktiviert, scannt Juggluco die Datenmatrix auf Sibionics
+-Sensorpaketen und Dexcom G7/ONE+-Applikatoren sowie den QR-Code im
+linken mittleren Menü → </span><span lang="de-DE">Klon</span><span lang="de-DE">
+mit dem <a href="https://developers.google.com/ml-kit/vision/barcode-scanning/code-scanner">Google-Codescanner</a>.
+Wenn deaktiviert, wird <a href="https://github.com/zxing/zxing">zXing</a>
+verwendet. Auf den meisten Geräten funktioniert Google Scan besser,
+manchmal aber auch nicht. Bei einem Fehler wird zwar immer zXing
+verwendet, manchmal funktioniert Google Scan aber einfach nicht, ohne
+einen Fehler zurückzugeben.</span></p>
 <h2 class="western" align="left">Anzeige</h2>
 <p align="left">Alle Arten von Einstellungen, die sich darauf
 beziehen, wie Daten angezeigt werden, vom Zielbereich bis zur
@@ -2622,22 +2639,6 @@ Sie beliebige Zifferblätter oder Apps verwenden, die Ihre Aktivität
 von Juggluco im linken Menü -&gt; Einstellungen -&gt; <a href="https://www.juggluco.nl/Jugglucohelp/de/floatingconfig.html">Schwebende
 <span lang="de-DE">Glukose</span> -&gt; Hilfe</a>.</p>
 <p style="margin-bottom: 0in"><br/>
-
-</p>
-]]>
-</string>
-<string name="IOB" >
-<![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/IOB.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/IOB.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/IOB.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/IOB.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sv/IOB.html">sv</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/IOB.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/IOB.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/IOB.html?lang=en">en</a>&emsp;&emsp;</p><h1>Insulin onboard (IOB)</h1>
-<p>IOB ist ein Maß dafür, wie viel Insulin von früheren
-Insulindosen noch vorhanden ist. Hierzu müssen Sie Insulindosen
-unter einem Etikett in der Kategorie „ <i>Schnell wirkendes Insulin</i>
-“ eintragen. Sie können im linken Menü→Einstellungen→Daten austauschen→Webserver→
-<a href="https://www.juggluco.nl/Jugglucohelp/de/setlibrenumtype.html">Mengen
-geben</a> angeben, welche Etiketten „<i>Schnell wirkendes Insulin</i>“
-sind.</p>
-<p><br/>
-<br/>
 
 </p>
 ]]>

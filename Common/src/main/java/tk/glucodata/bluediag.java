@@ -81,6 +81,7 @@ import static tk.glucodata.Log.doLog;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.Specific.useclose;
 import static tk.glucodata.help.help;
+import static tk.glucodata.help.helplight;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
@@ -608,7 +609,7 @@ if(!isWearable) {
         }
     if(!isWearable) {
          Button help=!isWearable?view.findViewById(R.id.help):null;
-        help.setOnClickListener(v-> help(R.string.sensorhelp,act));
+        help.setOnClickListener(v-> helplight(R.string.sensorhelp,act));
          Button background=view.findViewById(R.id.background);
         if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             background.setOnClickListener(v-> Battery.batteryscreen(act,showview));

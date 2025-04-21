@@ -282,6 +282,9 @@ static public String glucosestr(float gl) {
         if(!val) {
             if(onenot!=null)
                 onenot.novalue();
+          }
+      else {
+          showoldglucose();
         }
     }
     boolean hasvalue=false;
@@ -300,6 +303,17 @@ void overwriteglucose() {
    showglucose(strgl,strgl.gl);
     }*/
 
+
+private static void showoldglucose() {
+    var noti=onenot;
+    if(noti==null)
+        return;
+    final var strgl=SuperGattCallback.previousglucose;
+    final var gl=SuperGattCallback.previousglucosevalue;
+    if(strgl==null||gl<2.0f)
+        return;
+    noti.arrowglucosenotification(2,gl, format(usedlocale,glucoseformat,gl),strgl,GLUCOSENOTIFICATION ,true);
+    }
 
     void normalglucose(notGlucose strgl,float gl,float rate,boolean waiting) {
         MainActivity.showmessage=null;

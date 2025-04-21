@@ -158,7 +158,10 @@ Close.setOnClickListener(v -> {
 	closeonback.run();
 	});
 act.setonback(closeonback);
-		Help.setOnClickListener(v -> help.help(R.string.stathelp, act));
+		Help.setOnClickListener(v ->  {
+                    act.lightBars(false);
+                    help.help(R.string.stathelp, act,l->act.lightBars(!Natives.getInvertColors( ))); 
+                    });
 		Days.setOnClickListener(v -> {
 			act.poponback();
 			askdays(act);

@@ -243,7 +243,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
     Button helpbutton;
     if(!isWearable) {
         helpbutton=getbutton(context,R.string.helpname);
-        helpbutton.setOnClickListener(v-> help.help(R.string.newamount,context));
+        helpbutton.setOnClickListener(v-> help.helplight(R.string.newamount,context));
         }
     else {
        if(!useclose) cancel.setVisibility(GONE);

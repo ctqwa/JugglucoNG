@@ -977,14 +977,17 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
         glucosenotify.setOnCheckedChangeListener( (buttonView,  isChecked) -> Notify.glucosestatus(isChecked) );
       var floatconfig=getbutton(context,R.string.floatglucose);
       View[] numdis;
+      var googlescan=getcheckbox(context, R.string.googlescan, Natives.getGoogleScan());
+       googlescan.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setGoogleScan(isChecked) );
+
         if(doLog) {
                 Button logview;
                 logview=getbutton(context,R.string.logging);
                 logview.setOnClickListener(v->LogConfig.make(context,thelayout[0]));
-                numdis= new View[]{changelabels,logview,displayview};
+                numdis= new View[]{changelabels,logview,googlescan,displayview};
                 }
           else {
-                numdis= new View[]{changelabels,displayview};
+                numdis= new View[]{changelabels,googlescan,displayview};
                 }
         floatconfig.setOnClickListener(v-> tk.glucodata.FloatingConfig.show(context,thelayout[0]));
         View[] rowglu=new View[]{floatconfig,glucosenotify};

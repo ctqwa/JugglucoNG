@@ -140,7 +140,10 @@ static public void show(MainActivity context) {
 
 	var Ok=getbutton(context,R.string.ok);
 	var Help=getbutton(context,R.string.helpname);
-	Help.setOnClickListener(v-> help.help(R.string.watchinfo,context));
+	Help.setOnClickListener(v-> {
+        context.lightBars(false);
+        help.help(R.string.watchinfo,context,l->context.lightBars(!Natives.getInvertColors( ))); 
+        });
 
 	var layout=new Layout(context,(l,w,h)-> {
 		var width= GlucoseCurve.getwidth();

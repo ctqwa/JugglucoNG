@@ -55,6 +55,7 @@ import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.talkbackrunning;
 import static tk.glucodata.Natives.getalarmdisturb;
 import static tk.glucodata.help.help;
+import static tk.glucodata.help.helplight;
 import static tk.glucodata.help.hidekeyboard;
 import static tk.glucodata.settings.Settings.editoptions;
 import static tk.glucodata.util.getbutton;
@@ -182,7 +183,10 @@ static private void subEnableControls(View view,boolean enable){
 		});
 		Button help=getbutton(context,R.string.helpname);
 		help.setOnClickListener(v-> {
-			help(R.string.ringtone,context);
+            if(parview.getX()>0)
+                helplight(R.string.ringtone,context);
+            else
+                help(R.string.ringtone,context);
 			});
 		EditText duredit=new EditText(context);
 		duredit.setImeOptions(editoptions);

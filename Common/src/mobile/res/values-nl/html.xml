@@ -797,6 +797,9 @@ verzonden.</p>
 <p>Specificeer een alarm dat afgaat als een bepaalde hoeveelheid (bv
 eten of medicatie) niet ingevoerd is binnen een bepaalde
 tijdsperiode.</p>
+<h2 class="western">Google-scan</h2>
+<p>Scan de datamatrix op de Sibionics-sensorverpakking en op de Dexcom G7/ONE+-applicators en de QR-code in het linkermiddenmenu → Kloon met
+ <a href="https://developers.google.com/ml-kit/vision/barcode-scanning/code-scanner">Google code scanner</a>. Indien niet aangevinkt, wordt <a href="https://github.com/zxing/zxing">zXing</a> gebruikt. Op de meeste apparaten werkt Google Scan beter, maar soms werkt het niet. Als er een foutmelding verschijnt, wordt zXing altijd gebruikt, maar soms werkt Google Scan gewoon niet zonder een foutmelding te geven.</p>
 <h2 class="western">Weergave</h2>
 <p>Allerlei instellingen die te maken hebben met de manier waarop
 gegevens worden weergegeven, van doelbereik tot taal.</p>
@@ -1719,22 +1722,22 @@ standaard Android libraries, werd van het volgende gebruik gemaakt:</p>
 	<li><p style="line-height: 100%; margin-bottom: 0in">NFC en
 	Bluetooth commando’s specifiek voor Abbott’s Freestyle Libre
 	sensoren en interpretatie algoritmen specifiek voor Freestyle Libre
-	sensoren. Allemaal ongedocumenteerd;</p>
+	sensoren. Allemaal ongedocumenteerd;</p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in"><span lang="nl-NL">Om
 	met Garmin horloges te communiceren, is gebruik gemaakt van <a href="https://developer.garmin.com/connect-iq/sdk">Connect
-	IQ Mobile SDK</a>;</span></p>
+	IQ Mobile SDK</a>;</span></p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in"><span lang="nl-NL">De
-	grafieken zijn gemaakt met <a href="https://github.com/memononen/nanovg">NanoVG</a>;</span></p>
+	grafieken zijn gemaakt met <a href="https://github.com/memononen/nanovg">NanoVG</a>;</span></p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in"><span lang="nl-NL">De
 	kloon functie gebruikt <a href="https://ascon.iaik.tugraz.at/">Ascon
-	authenticated encryption</a>;</span></p>
+	authenticated encryption</a>;</span></p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in"><span lang="nl-NL">Communicatie
-	met Freestyle Libre3 sensors gebruikt <a href="https://github.com/intel/tinycrypt">Tinycrypt</a>;</span></p>
+	met Freestyle Libre3 sensors gebruikt <a href="https://github.com/intel/tinycrypt">Tinycrypt</a>;</span></p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in"><span lang="nl-NL">De
-	color picker is een aanpassing van <a href="https://github.com/yukuku/ambilwarna">AmbilWarna</a>;</span></p>
+	color picker is een aanpassing van <a href="https://github.com/yukuku/ambilwarna">AmbilWarna</a>;</span></p></li>
 	<li><p style="line-height: 100%; margin-bottom: 0in">Ondersteuning
 	voor NFC NovoPens is een wijziging van de programmacode die uit
-	xDrip is gehaald.</p>
+	xDrip is gehaald.</p></li>
 </ul>
 <p style="line-height: 100%; margin-bottom: 0in"><span lang="nl-NL">Juggluco
 is naar het Italiaans vertaald door <a href="mailto:matteo.gabriele81@gmail.com">Matteo
@@ -1751,8 +1754,12 @@ Wit-Russisch vertaald door <a href="mailto:3477734n@gmail.com">Находкін
 Frans vertaald door Fabrice Delfosse.</p>
 <p style="line-height: 100%; margin-bottom: 0in">Juggluco is naar het
 Oekraïens vertaald door <span lang="ru-RU"><a href="mailto:3477734n@gmail.com">Находкін
-Яўген</a> en</span><span lang="en-US"> </span><a href="mailto:moydiabet@gmail.com"><span lang="ru-RU">Дзіма
+Яўген</a> en</span> <a href="mailto:moydiabet@gmail.com"><span lang="ru-RU">Дзіма
 Дыябетык</span></a>.</p>
+<p style="line-height: 100%; margin-bottom: 0in">Juggluco is naar het
+Chinees vertaald door <font face="Droid Sans"><span lang="zh-CN"><a href="mailto:q.pw@qq.com"><span lang="zh-CN">兜子</span></span></font><span lang="zh-CN">a</span></a>.</p>
+<p style="line-height: 100%; margin-bottom: 0in">Juggluco is naar het Russisch vertaald door <a href="mailto:zzzmei_92@mail.ru?subject=Juggluco%20%D0%BD%D0%B0%20%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%BC">Васильев Артем</a>.</p>
+<p style="line-height: 100%; margin-bottom: 0in">Juggluco is naar het Turks vertaald door <a href="mailto:beyazbulut14@gmail.com?subject=Turkish%20translation%20of%20Juggluco">beyazbulut14@gmail.com</a></a>
 <p style="line-height: 100%; margin-bottom: 0in"><br/>
 
 </p>
@@ -2521,21 +2528,6 @@ een <b>Maaltijd</b>-knop weergegeven. Als je op deze <a href="https://www.jugglu
 koolhydraatgehalte wordt vervolgens berekend of je kunt het
 koolhydraatgehalte opgeven en vervolgens wordt de benodigde
 hoeveelheid van één ingrediënt berekend.</p>
-<p><br/>
-<br/>
-
-</p>
-]]>
-</string>
-<string name="IOB" >
-<![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/IOB.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/IOB.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/IOB.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/IOB.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sv/IOB.html">sv</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/IOB.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/IOB.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/IOB.html?lang=en">en</a>&emsp;&emsp;</p><h1>Insulin onboard (IOB)</h1>
-<p>IOB is een maat voor hoeveel insuline van eerdere insulinedoses
-nog aanwezig is. Hiervoor moet je insulinedoses invoeren onder een
-label in de categorie “<i>Snelwerkende insuline</i>”. Onder
-linkermenu → Instellingen →  Deel gegevens →  Webserver → <a href="https://www.juggluco.nl/Jugglucohelp/nl/setlibrenumtype.html">Geef
-hoeveelheden</a> kun je aangeven welke labels “<i>Snelwerkende
-insuline</i>” zijn.</p>
 <p><br/>
 <br/>
 

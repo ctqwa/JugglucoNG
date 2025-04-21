@@ -49,6 +49,10 @@ import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.doonback;
 import static tk.glucodata.MainActivity.poponback;
 import static tk.glucodata.MainActivity.setonback;
+import static tk.glucodata.MainActivity.systembarBottom;
+import static tk.glucodata.MainActivity.systembarLeft;
+import static tk.glucodata.MainActivity.systembarRight;
+import static tk.glucodata.MainActivity.systembarTop;
 import static tk.glucodata.Specific.useclose;
 import static tk.glucodata.settings.Settings.removeContentView;
 
@@ -63,6 +67,10 @@ public static   void help(int res,Activity act,Consumer<ViewGroup> okproc) {
     }
 public static   void help(int res,Activity act) {
     help(res,act,l->{});
+    }
+public static   void helplight(int res,MainActivity act) {
+    act.lightBars(false);
+    help(res,act, l->act.lightBars(!Natives.getInvertColors()));
     }
 static    WeakReference<Button> okbutton=null;
 public static void hide() {
@@ -153,7 +161,6 @@ public static   void basehelp(int res,Activity act,Consumer<ViewGroup> okproc) {
        helplayout.requestLayout();
         helplayout.setBackgroundResource(R.drawable.helpbackground);
            act.addContentView(helplayout, params);
-//           act.addContentView(ok, new ViewGroup.LayoutParams(WRAP_CONTENT,WRAP_CONTENT));
 
           }
 final var helplayout2=helplayout;
@@ -166,9 +173,9 @@ final var helplayout2=helplayout;
 
 
      Runnable closerun=() -> {
-            okproc.accept(helplayout2);
+        okproc.accept(helplayout2);
         removeContentView(helplayout2);
-         };
+        };
 
     setonback(closerun);
 };
@@ -176,8 +183,8 @@ final var helplayout2=helplayout;
     @SuppressLint("deprecation")
 public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,Placer place, ViewGroup.MarginLayoutParams params) {
     if(doLog) {
-           var len=text.length();
-          {if(doLog) {Log.i(LOG_ID,"help "+((len==0?"":text.substring(0,Math.min(20,len)))));};};
+          var len=text.length();
+          if(doLog) {Log.i(LOG_ID,"help "+((len==0?"":text.substring(0,Math.min(20,len)))));};
           }
       hidekeyboard(act);
       Button ok;
@@ -185,8 +192,6 @@ public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,P
       if(whelplayout==null||((helplayout=whelplayout.get())==null)||act!=helplayout.getContext()||( (ok=    okbutton.get())==null) ) {
          ScrollView       helpscroll=new ScrollView(act);
          TextView helpview=new TextView(act);
-         int pad=(int)(GlucoseCurve.getDensity()*7.0);
-         helpview.setPadding(pad,pad,pad,pad);
          helpview.setTextColor(Color.WHITE);
          helpview.setTextIsSelectable(true);
          whelpview=new WeakReference<TextView>(helpview);
@@ -200,7 +205,8 @@ public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,P
          okbutton=new WeakReference<Button>(ok);
        ok.setText(R.string.ok);
        if(isWearable) {
-              helpview.setPadding(0,0,0,(int)(MainActivity.screenheight*.20)); 
+           // helpview.setPadding(pad,pad,pad,pad);
+              helpview.setPadding(0,0,0,(int)(MainActivity.screenheight*.20));
               ViewGroup  layout=new Layout(act, place::place,new View[]{ok}, new View[]{helpview});
 
               var width=MainActivity.screenwidth;
@@ -218,13 +224,21 @@ public static   void help(String text,Activity act,Consumer<ViewGroup>  okproc,P
     else  {
 //           var marg=Layout.getMargins(ok);
  //          marg.leftMargin=marg.rightMargin=marg.topMargin=marg.bottomMargin=0;
-         helpscroll.addView(helpview);
+         Layout.getMargins(ok).topMargin=systembarTop;
+           int pad=(int)(GlucoseCurve.getDensity()*7.0);
+           helpview.setPadding(pad,pad+systembarTop,pad,pad+systembarBottom);
+           helpview.setBackgroundResource(R.drawable.helpbackground);
+
+           var marg=Layout.getMargins(helpview);
+           ///marg.bottomMargin=(int)(GlucoseCurve.getheight()*.1f);
+          // helpscroll.setFillViewport(true);
+         helpscroll.addView(helpview,marg);
          helplayout=new Layout(act, (l,w,h)-> {
-             var af=MainActivity.systembarTop*3/4;
-               l.setY(af);
-             return place.place(l,w,h -af); 
+//             var af=MainActivity.systembarTop*3/4;
+ //              l.setY(af);
+             return place.place(l,w,h );
             },new View[]{helpscroll});//,new View[]{ok});
-          helplayout.setBackgroundResource(R.drawable.helpbackground);
+ //         helplayout.setBackgroundResource(R.drawable.helpbackground);
         params.setMargins(
             MainActivity.systembarLeft,
             0,

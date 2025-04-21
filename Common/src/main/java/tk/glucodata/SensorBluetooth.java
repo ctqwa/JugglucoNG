@@ -213,7 +213,6 @@ long scantimeouttime=0L;
 
 boolean mScanning = false;
 class Scanner21 implements Scanner  {
-   private List<ScanFilter> mScanFilters = null;
    final    private ScanSettings mScanSettings;
    private BluetoothLeScanner mBluetoothLeScanner=null;
      @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -296,51 +295,45 @@ private int scanTries=0;
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public boolean start()  {
         if(mBluetoothLeScanner!=null) {
-           {if(doLog) {Log.i(LOG_ID,"Scanner21.start");};};
-           // mScanFilters=null;
-            mScanFilters=new ArrayList<>();
+           if(doLog) {Log.i(LOG_ID,"Scanner21.start");};
+           List<ScanFilter> mScanFilters=new ArrayList<>();
            if(filter) {
-             {if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};};
-             for(var cb: gattcallbacks)   {
-              {if(doLog) {Log.d(LOG_ID,"serial number: " + cb.SerialNumber);};};
-              final var address=Natives.getDeviceAddress(cb.dataptr,false);
-              if(address!= null) {
-                  {if(doLog) {Log.d(LOG_ID,"address: " + address);};};
-          /*(
-                  if(BluetoothAdapter.checkBluetoothAddress(address)) {
-                     ScanFilter.Builder builder2 = new ScanFilter.Builder();
-                     builder2.setDeviceAddress(address);
-                     mScanFilters.add(builder2.build());
-                     continue;
-                     } */
-              }
-           final var service=cb.getService();
-           if(service==null) {
-              {if(doLog) {Log.i(LOG_ID,"getService should return UUID");};};
-              mScanFilters=null;
-              }
-           else {
-              if(scanTries++%2==1) {
-                  ScanFilter.Builder builder2 = new ScanFilter.Builder();
-                  builder2.setServiceUuid(new ParcelUuid(service));
-                  mScanFilters.add(builder2.build());
+             if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
+               for(var cb: gattcallbacks)   {
+                   if(doLog) {
+                         Log.d(LOG_ID,"serial number: " + cb.SerialNumber);
+                         final var address=Natives.getDeviceAddress(cb.dataptr,false);
+                         if(address!= null) {
+                              Log.d(LOG_ID,"address: " + address);
+                          }
+                         }
+                   final var service=cb.getService();
+                   if(service==null) {
+                      if(doLog) {Log.i(LOG_ID,"getService should return UUID");};
+                      mScanFilters=null;
+                      }
+                   else {
+                      if(scanTries++%2==1&&mScanFilters!=null) {
+                          ScanFilter.Builder builder2 = new ScanFilter.Builder();
+                          builder2.setServiceUuid(new ParcelUuid(service));
+                          mScanFilters.add(builder2.build());
+                          }
+                     else
+                        mScanFilters=null;
+                      }
                   }
-             else
-                mScanFilters=null;
               }
-          }
-           }
            else {
                   mScanFilters=null;
                   }
-        try {
-             this.mBluetoothLeScanner.startScan(mScanFilters, mScanSettings, mScanCallback);
-             } 
+            try {
+                 this.mBluetoothLeScanner.startScan(mScanFilters, mScanSettings, mScanCallback);
+                 } 
              catch (Throwable e) {
-              Log.stack(LOG_ID, e);
-               if (Build.VERSION.SDK_INT > 30 && !Applic.mayscan()) Applic.Toaster(R.string.turn_on_nearby_devices_permission);
-               return false;
-                    }
+                Log.stack(LOG_ID, e);
+                if (Build.VERSION.SDK_INT > 30 && !Applic.mayscan()) Applic.Toaster(R.string.turn_on_nearby_devices_permission);
+                return false;
+                }
            return true;
            }
         return false;
@@ -1027,29 +1020,29 @@ private boolean initializeBluetooth() {
         } else {
             mBluetoothAdapter = mBluetoothManager.getAdapter();
             if (mBluetoothAdapter == null) {
-                {if(doLog) {Log.i(LOG_ID, "bluetoothManager.getAdapter()==null");};};
+                if(doLog) {Log.i(LOG_ID, "bluetoothManager.getAdapter()==null");};
             } else {
-                if (gattcallbacks.size()!=0) {
-            {if(doLog) {Log.i(LOG_ID,"initializeBluetooth gattcallbacks");};};
-            for(SuperGattCallback cb: gattcallbacks) {
-                if(cb.mActiveDeviceAddress!=null)  {
-                    if (BluetoothAdapter.checkBluetoothAddress(cb.mActiveDeviceAddress)) {
-                        Log.i(LOG_ID,"checkBluetoothAddress("+cb.mActiveDeviceAddress+") succeeded") ;
+                if(gattcallbacks.size()!=0) {
+                    if(doLog) {Log.i(LOG_ID,"initializeBluetooth gattcallbacks");};
+                    for(SuperGattCallback cb: gattcallbacks) {
+                        if(cb.mActiveDeviceAddress!=null)  {
+                            if (BluetoothAdapter.checkBluetoothAddress(cb.mActiveDeviceAddress)) {
+                                Log.i(LOG_ID,"checkBluetoothAddress("+cb.mActiveDeviceAddress+") succeeded") ;
 
-                    cb.mActiveBluetoothDevice = mBluetoothAdapter.getRemoteDevice(cb.mActiveDeviceAddress);
-                    } else {
-                        Log.i(LOG_ID,"checkBluetoothAddress("+cb.mActiveDeviceAddress+") failed") ;
-                        cb.setDeviceAddress(null);
+                            cb.mActiveBluetoothDevice = mBluetoothAdapter.getRemoteDevice(cb.mActiveDeviceAddress);
+                            } else {
+                                Log.i(LOG_ID,"checkBluetoothAddress("+cb.mActiveDeviceAddress+") failed") ;
+                                cb.setDeviceAddress(null);
+                            }
+                            }
+                        }
+                    addReceivers();
+                    return connectToActiveDevice(0);
                     }
+                else
+                    if(doLog) {Log.i(LOG_ID,"initializeBluetooth no gattcallbacks");};
                     }
-                }
-            addReceivers();
-            return connectToActiveDevice(0);
             }
-        else
-            {if(doLog) {Log.i(LOG_ID,"initializeBluetooth no gattcallbacks");};};
-            }
-        }
 
     return false;
     }

@@ -196,7 +196,7 @@ static public void show(MainActivity context,View parent) {
 	direct=getcheckbox(context, context.getString(R.string.directconnection),false);
 	var Ok=getbutton(context,R.string.closename);
 	var Help=getbutton(context,R.string.helpname);
-	Help.setOnClickListener(v-> help.help(R.string.wearosinfo,context));
+	Help.setOnClickListener(v-> help.helplight(R.string.wearosinfo,context));
 	var spin=mkspinner(context);
 	if(spin==null) {
         	Applic.argToaster(context, R.string.nowatchesfound , Toast.LENGTH_SHORT);

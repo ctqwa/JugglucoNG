@@ -111,7 +111,7 @@ static void show(MainActivity act) {
                         tk.glucodata.Menus.show(act);
                             });
                 help.setOnClickListener(v->{
-                    tk.glucodata.help.help(R.string.colorhelp,act);
+                    tk.glucodata.help.helplight(R.string.colorhelp,act);
                     });
             }
         else Log.e(LOG_ID,"findViewbByid failed");

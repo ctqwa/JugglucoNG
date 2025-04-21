@@ -174,7 +174,7 @@ static Layout menuview(final NumberView numb, MainActivity act, int mealptr, Obj
 
     Button add=getbutton(act,R.string.additem);
     Button Help=getbutton(act,R.string.helpname);
-        Help.setOnClickListener(v-> help.help(tk.glucodata.R.string.mealhelp,act));
+        Help.setOnClickListener(v-> help.helplight(tk.glucodata.R.string.mealhelp,act));
     Button roundlabel=getbutton(act,act.getString(R.string.round)+Natives.getroundto());
 
 //    recycle.setLayoutParams(new ViewGroup.LayoutParams( WRAP_CONTENT , ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -213,7 +213,7 @@ static Layout menuview(final NumberView numb, MainActivity act, int mealptr, Obj
         },lay));
         lay.setBackgroundColor(Applic.backgroundcolor);
     lay.setMinimumWidth((width-MainActivity.systembarRight)/2);
-    act.addContentView(lay, smallScreen?new ViewGroup.LayoutParams(  MATCH_PARENT, (height-MainActivity.systembarTop)):new ViewGroup.LayoutParams(WRAP_CONTENT, (height-MainActivity.systembarTop)));
+    act.addContentView(lay, smallScreen?new ViewGroup.LayoutParams(  MATCH_PARENT, (height-MainActivity.systembarTop)):new ViewGroup.LayoutParams(WRAP_CONTENT, (height-MainActivity.systembarTop-MainActivity.systembarBottom)));
     repeat.setOnClickListener(v->{
          removeContentView(lay);
          act.hideSystemUI();
@@ -569,7 +569,7 @@ static private void selectingredient(MainActivity act,NumberView numb,IntConsume
       var af=MainActivity.systembarTop*3/4;
         l.setY(af);
        l.setX((width-w)/2);
-        return new int[]{w,h-af};
+        return new int[]{w,h-af-MainActivity.systembarBottom};
         },new View[]{recycle},new View[] {add,edit,search,close});
 
     lay.setY(ypos);
@@ -794,6 +794,7 @@ static public class MealDatabaseViewAdapter extends RecyclerView.Adapter<MealDat
 }
 final static private Random random=new Random();
 static Layout  fooddatabase(MainActivity act, TriConsumer<String,Float,String> give) {
+    act.lightBars(false);
     RecyclerView recycle = new RecyclerView(act);
     LinearLayoutManager lin = new LinearLayoutManager(act);
     recycle.setLayoutManager(lin);
@@ -857,6 +858,8 @@ static Layout  fooddatabase(MainActivity act, TriConsumer<String,Float,String> g
         removeContentView(lay);
     //    act.hideSystemUI();
         Natives.freefoodptr(hitptr[0]);
+        act.lightBars(!Natives.getInvertColors());
+
         });
     searchbutton.setOnClickListener(v-> { 
         hidekeyboard(act);

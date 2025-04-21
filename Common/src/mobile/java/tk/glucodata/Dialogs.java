@@ -90,6 +90,7 @@ private Button exportbutton(MainActivity activity,String label, int type) {
 EditText days;
 public void showexport(MainActivity activity,int width,int height,View parent) {
    if(parent!=null) {
+       activity.lightBars(!Natives.getInvertColors());
        parent.setVisibility(GONE);
        {if(doLog) {Log.i(LOG_ID, "parent.setVisibility(GONE)");};};
        }
@@ -109,7 +110,10 @@ public void showexport(MainActivity activity,int width,int height,View parent) {
 
 
 		var help=getbutton(activity,R.string.helpname);
-		help.setOnClickListener(v-> tk.glucodata.help.help(R.string.helpexport,activity));
+		help.setOnClickListener(v->  {
+                tk.glucodata.help.helplight(R.string.helpexport,activity); 
+                }
+                );
 
 		exportlabel=new TextView(activity);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -190,6 +194,7 @@ public void showexport(MainActivity activity,int width,int height,View parent) {
           activity.curve.numberview.hidekeyboard() ;
        exportscreen.setVisibility(GONE);
        if(parent!=null) {
+            activity.lightBars(false);
             {if(doLog) {Log.i(LOG_ID, "parent.setVisibility(VISIBLE)");};};
             parent.setVisibility(VISIBLE);
           }

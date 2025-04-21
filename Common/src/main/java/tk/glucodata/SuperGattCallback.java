@@ -163,6 +163,7 @@ static final int mininterval=55;
 static long nexttime=0L; //secs
 public static tk.glucodata.GlucoseAlarms glucosealarms=null;
 static notGlucose previousglucose=null;
+static float previousglucosevalue=0.0f;
 static void init(Application app) {
        if(glucosealarms==null) glucosealarms=new tk.glucodata.GlucoseAlarms(app);
     if(!DontTalk) {
@@ -201,6 +202,7 @@ static void endtalk() {
         boolean waiting = false;
         var sglucose=new notGlucose(timmsec, String.format(Applic.usedlocale,Notify.pureglucoseformat, gl),  rate,sensorgen);
         previousglucose=sglucose;
+        previousglucosevalue=gl;
         final var fview=Floating.floatview;
 //        MainActivity.showmessage=null;
         boolean alarmspeak=false;

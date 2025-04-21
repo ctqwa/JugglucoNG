@@ -821,6 +821,8 @@ public static native void setSiSubtype(long dataptr,int type);
 public static native byte[] getSIResetBytes( );
 public static native String getbackJson(int pos);
 public static native int makeHomeCopy();
+public static native void setGoogleScan(boolean val);
+public static native boolean getGoogleScan( );
 
 //s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }

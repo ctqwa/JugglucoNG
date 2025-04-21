@@ -794,6 +794,15 @@ servers. (For sending data to watches go to left menu-&gt;Watch.)</p>
 <p style="margin-bottom: 0in">Specify that an alarm should go of if
 you didn\'t enter a certain amount of food or medication within a
 certain time period.</p>
+<h2 class="western">Google scan</h2>
+<p style="line-height: 100%; margin-bottom: 0in">Scan
+the data matrix on Sibionics sensor packages and on Dexcom G7/ONE+
+applicators and the QR code of left middle menu→Mirror with the
+<a href="https://developers.google.com/ml-kit/vision/barcode-scanning/code-scanner">Google
+code scanner</a>. If unchecked, <a href="https://github.com/zxing/zxing">zXing</a>
+is used. On most devices, Google scan works better, but sometimes it
+doesn’t work. When it fails with an error, zXing is always used,
+but sometimes Google scan just doesn’t work without returning an error.</p>
 <h2 class="western"><a href="https://www.juggluco.nl/Jugglucohelp/displayhelp.html">Display</a></h2>
 <p>All kind of settings having to do how data is displayed, from
 target range to language.</p>
@@ -1672,6 +1681,9 @@ Gabriele</a>.</p>
 <p>Juggluco was translated into Chinese by <font face="Droid Sans"><span lang="zh-CN"><a href="mailto:q.pw@qq.com"><span lang="zh-CN">兜子</span></span></font><span lang="zh-CN">a</span></a>.</p>
 <p>Juggluco was translated into Russian by <a href="mailto:zzzmei_92@mail.ru?subject=Juggluco%20%D0%BD%D0%B0%20%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%BC">Васильев Артем</a>.</p>
 <p>Juggluco was translated into Turkish by <a href="mailto:beyazbulut14@gmail.com?subject=Turkish%20translation%20of%20Juggluco">beyazbulut14@gmail.com</a></a>
+<p><br></p>
+<p><br></p>
+<p><br></p>
 ]]>
 </string>
 <string name="disturbhelp" >
@@ -1881,9 +1893,6 @@ tapping</b> it.</p>
 <p><b>Above</b>: the floating glucose also present above Juggluco.</p>
 <p><b>Time</b>: timestamp of the glucose value.</p>
 <p><b>Active</b>: turn it on.</p>
-<p>After typing the <b>font size</b>, you have to press the “<i>Enter”,
-</i>“<i>Done”</i> or &quot;✓&quot; -button on the soft
-keyboard.</p>
 <p>You can turn on and off Floating glucose with left middle
 menu-&gt;Float. 
 </p>

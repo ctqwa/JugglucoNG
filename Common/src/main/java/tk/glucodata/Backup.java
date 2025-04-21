@@ -979,7 +979,7 @@ static public String changehostError(MainActivity act,int pos) {
          else {
             autoqr=null;
             }
-         getMargins(Sync).leftMargin=getMargins(Cancel).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
+         getMargins(Help).leftMargin=getMargins(Cancel).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
          var withqr=BuildConfig.minSDK>=20?new View[]{Help,autoqr,hosts,Cancel}:new View[]{Help,hosts,Cancel};
          var layout=new Layout(act, new View[]{ip,blpan,p2p,labport,portview,Save},new View[]{recycle},new View[] {battery,Sync,reinit,staticnum},errorrow,withqr);
 

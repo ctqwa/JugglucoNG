@@ -230,7 +230,8 @@ struct Tings {
     int32_t floatglucose;
 
     char newYuApiKey[41];
-    char reserved7:5;
+    char reserved7:4;
+    bool GoogleScan:1;
     bool logcat:1;
     bool noalarmclock:1;
     bool dontuseclose:1;

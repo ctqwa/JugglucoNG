@@ -56,6 +56,7 @@ import static tk.glucodata.Natives.setkerfstokblack;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
 import static tk.glucodata.help.help;
+import static tk.glucodata.help.helplight;
 import static tk.glucodata.help.hidekeyboard;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
@@ -248,7 +249,7 @@ class GarminStatus {
 		Button ok = new Button(context);
 		ok.setText(R.string.closename);
 		Button help = getbutton(context, R.string.helpname);
-		help.setOnClickListener(v -> help(R.string.kerfstok, context));
+		help.setOnClickListener(v -> helplight(R.string.kerfstok, context));
 		glucose = new CheckBox(context);
 		glucose.setText(R.string.glucose);
 		glucose.setChecked(alldata.sendtowatch);
@@ -371,6 +372,7 @@ class GarminStatus {
 		});
 		var shortcuts = getbutton(context, R.string.shutcuts);
 		shortcuts.setOnClickListener(v -> {
+            context.lightBars(false);
 			hidekeyboard(context);
 			new Shortcuts().mkshortlistview(context);
 		});
@@ -380,7 +382,7 @@ class GarminStatus {
 			setkerfstokblack(isChecked);
 		});
 		var Help = getbutton(context, R.string.helpname);
-		Help.setOnClickListener(v-> help.help(tk.glucodata.R.string.garminconfig,context));
+		Help.setOnClickListener(v-> helplight(tk.glucodata.R.string.garminconfig,context));
 		var Close = getbutton(context, R.string.closename);
 		var layout = new Layout(context, (l, w, h) -> {
 			var width = GlucoseCurve.getwidth();

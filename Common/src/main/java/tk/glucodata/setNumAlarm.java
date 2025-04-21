@@ -65,7 +65,7 @@ import static tk.glucodata.Natives.getNumAlarm;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
 import static tk.glucodata.Specific.useclose;
-import static tk.glucodata.help.help;
+import static tk.glucodata.help.helplight;
 import static tk.glucodata.help.hidekeyboard;
 import static tk.glucodata.settings.Settings.editoptions;
 import static tk.glucodata.settings.Settings.float2string;
@@ -192,7 +192,7 @@ if(genlayout==null) {
     	act.doonback();
     	});
     help.setOnClickListener(v->{
-    	help(R.string.reminders,act);	
+    	helplight(R.string.reminders,act);	
     	});
     newone.setOnClickListener(v->{
     	mkitemlayout(act,genlayout);

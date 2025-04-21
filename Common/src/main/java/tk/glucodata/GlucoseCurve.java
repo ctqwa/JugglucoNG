@@ -69,6 +69,7 @@ import static tk.glucodata.MainActivity.systembarBottom;
 import static tk.glucodata.MainActivity.systembarLeft;
 import static tk.glucodata.MainActivity.systembarRight;
 import static tk.glucodata.MainActivity.systembarTop;
+import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.turnoffalarm;
 import static tk.glucodata.NumberView.geteditview;
 import static tk.glucodata.NumberView.geteditwearos;
@@ -507,8 +508,10 @@ void startlibrelink(String lang) {
                     if(Natives.staticnum()) {
                   if(isWearable)
                      Specific.blockedNum(activity);
-                  else
-                            help.help(R.string.staticnum,activity);
+                  else   {
+                           activity.lightBars(false);
+                            help.help(R.string.staticnum,activity,l->activity.lightBars(!Natives.getInvertColors( ))); 
+                            }
                         }
                     else {
                         numberview.addnumberview(activity);
@@ -1083,7 +1086,10 @@ else {
         helpbut.setImageResource( android.R.drawable.ic_menu_help);
 
     helpbut.setContentDescription(getContext().getString(R.string.helpname));
-        helpbut.setOnClickListener(v-> { help.help(R.string.searchhelp,context); });
+        helpbut.setOnClickListener(v-> { 
+            context.lightBars(false);
+            help.help(R.string.searchhelp,context,l->context.lightBars(!getInvertColors( ))); 
+        });
 
     Button cancel=new Button(context);cancel.setText(R.string.cancel);
     View[] buttonline={getsearchspinner(context),under,line,above};

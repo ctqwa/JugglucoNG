@@ -185,7 +185,10 @@ public static void show(Activity context,View parent) {
 	var Help=getbutton(context,R.string.helpname);
 	Help.setOnClickListener(
 		v-> {
-		help.help(R.string.Nightscouthelp,context);
+           if(parent.getX()>0)
+                help.helplight(R.string.Nightscouthelp, (MainActivity) context);
+            else
+                help.help(R.string.Nightscouthelp,context);
 		});
 		
 
@@ -226,7 +229,6 @@ public static void show(Activity context,View parent) {
 			l.setX((width-w)/2);
 		l.setY(MainActivity.systembarTop);
 		return new int[] {w,h};
-//		},new View[]{secret,editkey,visible},new View[]{sslbox,labport,portview,save} , new View[]{privkey,chain,labinterval,intervalview},new View[]{local,httpport,treatments},new View[]{Help,server,Close} );
 		},new View[]{secret,editkey,visible},new View[]{labport,portview,labinterval,intervalview} , new View[]{sslbox,privkey,chain,save},new View[]{local,httpport,treatments},errorrow,new View[]{Help,server,Close} );
 	treatments.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
 		switch(nochangeamounts[0])  {
