@@ -218,9 +218,9 @@ hourminstr,
 .receivingdata="Odbiór danych",
 .unsupportedSibionics="Nieobsługiwany sensor Sibionics"sv,
 .waitingforconnection="Czekam na połączenie"sv,
-.deleted="Deleted"sv,
-.nolocationpermission="Needs location permission"sv,
-.nonearbydevicespermission="Needs nearby devices permission"sv
+.deleted="Usunięto"sv,
+.nolocationpermission="Wymaga uprawnienia do lokalizacji"sv,
+.nonearbydevicespermission="Wymaga uprawnienia do wykrywania urządzeń w pobliżu"sv
 
 
 
