@@ -366,4 +366,25 @@
    <string name="startjuggluco">Juggluco uruchomione na telefonie?\n\nWIFI i Bluetooth włączone?</string> 
    <string name="connected">Połączono!</string>
    <string name="useclose">Przycisk "zamknij"</string>
+   <string name="alarmclock">\u23F0</string> 
+   <string name="filesize">Rozmiar pliku</string> 
+   <string name="logging">Zapisywanie logów</string> 
+    <string name="aspart">Insulina Aspart/NovoRapid/NovoLog</string>
+    <string name="fiasp">Fiasp</string>
+    <string name="lispro">Insulina Lispro/Humalog</string>
+    <string name="urli">Ultraszybka lispro (URLi)</string>
+    <string name="glulisine">Insulina Glulisine/Apidra</string>
+    <string name="humaninsulin">Insulina ludzka /Humulin R/Novolin R</string>
+    <string name="afrezza">Afrezza</string>
+    <string name="not">Not</string>
+    <string name="eusibionics">Sibionics Europa - com.sisensing.sijoy</string>
+    <string name="chsibionics">Sibionics Chiny - com.sisensing.sisensingcgm</string>
+    <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
+    <string name="sibionics2">Sibionics2 - com.sisensing.eco</string>
+    <string name="datapresent">&quot;Dane obecne: &quot;</string>
+    <string name="overwrite">Nadpisać?</string>
+    <string name="autoqr">Auto QR</string>
+    <string name="autoqrmessage">Prześlij dane z tego telefonu do innego telefonu w sieci domowej. Naciśnięcie przycisku OK spowoduje wygenerowanie połączenia na tym telefonie i wyświetlenie kodu QR, który można zeskanować za pomocą innego urządzenia z systemem Android. Zeskanowanie kodu QR za pomocą lewego menu→Zdjęcie na drugim telefonie spowoduje wygenerowanie połączenia, dzięki któremu telefon będzie odbierał wszystkie dane z tego telefonu.</string>
+    
+    <string name="googlescan">Skanowanie Google</string>
 </resources>
