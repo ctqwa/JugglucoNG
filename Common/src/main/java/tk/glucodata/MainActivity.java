@@ -218,8 +218,9 @@ private void startdisplay() {
       }
     getlibrary.getlibrary(this);//after setfilesdir for settings
     handleIntent(getIntent());
-    var lang=getString(R.string.language);
-    {if(doLog) {Log.i(LOG_ID,"curlang="+Applic.curlang+" newlang="+lang+" locale="+util.getlocale().getLanguage());};};
+    var langstring=getString(R.string.language);
+    var lang=util.getlocale().getLanguage();
+    if(doLog) {Log.i(LOG_ID,"curlang="+Applic.curlang+" newlang="+langstring+" locale="+lang);};
     if(!lang.equals(Applic.curlang)) {
         Natives.setlocale(lang);
         Applic.curlang=lang;

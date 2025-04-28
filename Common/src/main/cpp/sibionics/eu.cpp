@@ -268,7 +268,8 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
    LOGGER("%s\n",jsonuit.data->data());
    logbytes("bar2",(const uint8_t *)bar2.data->data(),bar2.data->size());
    int *idat=jiar.data->data();
-   char tmpbuf[80];
+   #ifndef NOLOG
+{   char tmpbuf[80];
    const char str[]="jiar:";
    memcpy(tmpbuf,str,sizeof(str)-1);
    char *ptr=tmpbuf+ sizeof(str)-1;
@@ -277,6 +278,8 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
       }
    *ptr++='\n';
    LOGGERN(tmpbuf,ptr-tmpbuf);
+   }
+   #endif
   jlong *basear=sprintargs;
   switch(idat[0]) {
     case 49159: {
