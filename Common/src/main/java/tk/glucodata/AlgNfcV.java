@@ -41,7 +41,6 @@ public class AlgNfcV {
     private static final String LOG_ID = "AlgNfcV";
     private static final long nfcReadTimeout = 5000; // [ms]
 
-//static boolean NFC_USE_MULTI_BLOCK_READ=true ;
 
     private static void log(final String str) {
         {if(doLog) {Log.d(LOG_ID, str);};};
@@ -52,22 +51,20 @@ public class AlgNfcV {
     }
 
     static boolean nfctry(final Tag tag) {
-
-
         log("nfctry");
         return nfccmd(tag, new byte[]{38, 1, 0}) != null;
     }
     static boolean enableStreaming(final Tag tag, byte[] info) {
-	if(getversion(info)==2) 
-		return gen2enablestreaming(tag);
-	return EUenableStreaming(tag, info);
-	}
+    if(getversion(info)==2) 
+        return gen2enablestreaming(tag);
+    return EUenableStreaming(tag, info);
+    }
 
     static boolean EUenableStreaming(final Tag tag, byte[] info) {
         byte[] uid = tag.getId();
         byte[] payload = bluetoothOnKey(uid, info);
         if (payload != null) {
-	   byte[] addr=enableStreaming2(tag, payload);
+       byte[] addr=enableStreaming2(tag, payload);
             if (addr!=null) {
                 Natives.enabledStreaming(uid, info, 1,((Build.VERSION.SDK_INT < 26)&&Applic.mayscan())?null:addr);
                 return true;
@@ -116,7 +113,7 @@ public class AlgNfcV {
         }
         if(enableStreaming(tag, info) ) {
                 log("Streaming enabled");
-                return	Natives.getserial(uid,info);
+                return    Natives.getserial(uid,info);
                 }
        else
         log("Enable streaming failed");
@@ -127,27 +124,27 @@ public class AlgNfcV {
         log("start activate");
         if (!nfctry(tag)) //Overbodig?
             return false;
-	if(getversion(info)==2) {
-		{if(doLog) {Log.i(LOG_ID,"US libre 2");};};
-		if(!Gen2.activate(tag))
-			return false;
-		}
-	else {
+    if(getversion(info)==2) {
+        {if(doLog) {Log.i(LOG_ID,"US libre 2");};};
+        if(!Gen2.activate(tag))
+            return false;
+        }
+    else {
         byte activationCommand = Natives.activationcommand(info);
         log("command=" + activationCommand);
         byte person = 0;
         byte[] activationPayload = Natives.activationpayload(uid, info, person);
-		{if(doLog) {Log.i(LOG_ID,"Non US libre 2");};};
-		byte[] precmd = {2, activationCommand, 7};
-		byte[] cmd = new byte[(precmd.length + activationPayload.length)];
-		System.arraycopy(precmd, 0, cmd, 0, precmd.length);
-		System.arraycopy(activationPayload, 0, cmd, precmd.length, activationPayload.length);
-		log("activate cmd");
-		if(nfccmd(tag, cmd) == null) {
-		    log("activation failed");
-		    return false;
-		}
-		}
+        {if(doLog) {Log.i(LOG_ID,"Non US libre 2");};};
+        byte[] precmd = {2, activationCommand, 7};
+        byte[] cmd = new byte[(precmd.length + activationPayload.length)];
+        System.arraycopy(precmd, 0, cmd, 0, precmd.length);
+        System.arraycopy(activationPayload, 0, cmd, precmd.length, activationPayload.length);
+        log("activate cmd");
+        if(nfccmd(tag, cmd) == null) {
+            log("activation failed");
+            return false;
+        }
+        }
         if(enableStreaming(tag, info)) {
             log("Streaming enabled");
             return true;
@@ -157,55 +154,59 @@ public class AlgNfcV {
     }
 
 
-    static public byte[] wholenfccmd(final Tag tag, final byte[] cmd) {
-        log("nfccmd");
-	for(int outi=0;outi<10;outi++) {
+static public byte[] wholenfccmd(final Tag tag, final byte[] cmd) {
+        return wholenfccmdtimes( tag, cmd,10);
+        }
+static private byte[] wholenfccmdtimes(final Tag tag, final byte[] cmd,int times) {
+    if(doLog) {
+        Log.i(LOG_ID,"wholenfccmdtimes "+times);
+       }
+    for(int outi=0;outi<times;outi++) {
         final NfcV nfcvTag = NfcV.get(tag);
-	if(nfcvTag == null) {
-		Log.e(LOG_ID,"NfcV.get(tag)==null");
-		return null;
-		}
+        if(nfcvTag == null) {
+            Log.e(LOG_ID,"NfcV.get(tag)==null");
+            return null;
+            }
         try {
-		    nfcvTag.connect();
-		    final long endReadingTime = System.currentTimeMillis() + nfcReadTimeout;
-		    byte[] infodata = null;
-		    int it = 10;
-		    do {
-			try {
-			    infodata = nfcvTag.transceive(cmd);
-			    } 
-			catch(Throwable  error) {
-				String mess=error!=null?error.toString():null;
-				if(mess==null) {
-					mess="error";
-					}
-				{if(doLog) {Log.i(LOG_ID,"transceive "+ mess);};};
-				 if ((System.currentTimeMillis() > endReadingTime)) {
-					{if(doLog) {Log.i(LOG_ID, "tag read timeout " + System.currentTimeMillis());};};
-					return null;
-					}
-				}
-			if(goodnfc(infodata))  {
-			    return infodata;
-			    }
-		    } while (--it != 0);
-		    {if(doLog) {Log.i(LOG_ID, "tried 10 times");};};
-		    return null;
-		} 
-		catch (Exception e) {
-		    {if(doLog) {Log.i(LOG_ID,"connect: "+ e.toString());};};
-			} 
-		finally {
-
-		    try {
-			{if(doLog) {Log.i(LOG_ID,"nfcvTag.close()");};};
-			nfcvTag.close();
-		    } catch (Exception e) {
-			Log.stack(LOG_ID, "Error closing tag ", e);
-		    }
-		}
-		}
-		return null;
+            nfcvTag.connect();
+            final long endReadingTime = System.currentTimeMillis() + nfcReadTimeout;
+            byte[] infodata = null;
+            int it = times;
+            do {
+            try {
+                infodata = nfcvTag.transceive(cmd);
+                } 
+            catch(Throwable  error) {
+                String mess=error!=null?error.toString():null;
+                if(mess==null) {
+                    mess="error";
+                    }
+                {if(doLog) {Log.i(LOG_ID,"transceive "+ mess);};};
+                 if ((System.currentTimeMillis() > endReadingTime)) {
+                    {if(doLog) {Log.i(LOG_ID, "tag read timeout " + System.currentTimeMillis());};};
+                    return null;
+                    }
+                }
+            if(goodnfc(infodata))  {
+                return infodata;
+                }
+            } while (--it != 0);
+            {if(doLog) {Log.i(LOG_ID, "tried "+times+" times");};};
+            return null;
+        } 
+        catch (Exception e) {
+            {if(doLog) {Log.i(LOG_ID,"connect: "+ e.toString());};};
+            } 
+        finally {
+            try {
+                {if(doLog) {Log.i(LOG_ID,"nfcvTag.close()");};};
+                nfcvTag.close();
+            } catch (Exception e) {
+               Log.stack(LOG_ID, "Error closing tag ", e);
+            }
+        }
+        }
+        return null;
     }
 
 static private byte[] nfccmd(final Tag tag, final byte[] cmd) {
@@ -213,7 +214,17 @@ static private byte[] nfccmd(final Tag tag, final byte[] cmd) {
     if(res==null)
             return null;
      return Arrays.copyOfRange(res, 1, res.length);
-	}
+    }
+static private byte[] nfccmdtimes(final Tag tag, final byte[] cmd,int times) {
+    byte[] res=wholenfccmdtimes(tag, cmd,times);
+    if(res==null)
+            return null;
+     return Arrays.copyOfRange(res, 1, res.length);
+    }
+    static byte[] nfcinfotimes(final Tag tag,int times) {
+        log("nfcinfotimes");
+        return nfccmdtimes(tag, new byte[]{2, -95, 7},times);
+    }
     static byte[] nfcinfo(final Tag tag) {
         log("nfcinfo");
         return nfccmd(tag, new byte[]{2, -95, 7});
@@ -255,10 +266,10 @@ static private byte[] nfccmd(final Tag tag, final byte[] cmd) {
     }
 
 static public byte[] readpatchdata(NfcV nfc, byte[] uid, byte[] info) {
-	final  int start=0,len=344;
-	final boolean us=getversion(info)==2;
-	return  us?getuspatch(nfc, uid,start, len):readoncedata(nfc, uid,start, len);
-	}
+    final  int start=0,len=344;
+    final boolean us=getversion(info)==2;
+    return  us?getuspatch(nfc, uid,start, len):readoncedata(nfc, uid,start, len);
+    }
 
 
 
@@ -266,7 +277,7 @@ static public byte[] readpatchdata(NfcV nfc, byte[] uid, byte[] info) {
 
 
 static    private byte[] readoncedata(NfcV nfc, byte[] uid,int start, int len) {
-	{if(doLog) {Log.i(LOG_ID,"readoncedata "+start+" "+len);};};
+    {if(doLog) {Log.i(LOG_ID,"readoncedata "+start+" "+len);};};
         int startinblocks = start / 8;
         int startblock = start % 8;
         int totlen = len + startblock;
@@ -280,11 +291,11 @@ static    private byte[] readoncedata(NfcV nfc, byte[] uid,int start, int len) {
             byte[] received = issuenfc(nfc, new byte[]{2, 35, (byte) curblock, (byte) (min - 1)});
             if(!goodnfc(received) || received.length < (min * 8) + 1) {
                 return null;
-            	}
-	    int destpos= iter * 8;
-	    int copylen=Math.min(received.length - 1,lenwholeblocks-destpos);
-//	    int copylen=received.length - 1;
-	    {if(doLog) {Log.i(LOG_ID,"destpos="+destpos+" len="+copylen);};};
+                }
+        int destpos= iter * 8;
+        int copylen=Math.min(received.length - 1,lenwholeblocks-destpos);
+//        int copylen=received.length - 1;
+        {if(doLog) {Log.i(LOG_ID,"destpos="+destpos+" len="+copylen);};};
             System.arraycopy(received, 1, buf,destpos, copylen);
             iter+=min;
         }

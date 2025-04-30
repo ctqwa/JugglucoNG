@@ -33,8 +33,7 @@
 //00A500010001000000C04E1E0D0101040C013036385A4D52463138164A
 extern Sensoren *sensors;
 struct firstnfc {
-	uint8_t zero;
-	uint8_t start[2];
+//	uint8_t zero; uint8_t start[2];
 	uint16_t sec_version;
 	uint16_t localization;
 	uint16_t puckgen;
@@ -48,37 +47,36 @@ struct firstnfc {
 	}  __attribute__ ((packed));
 
 struct nfc1 {
-	firstnfc nfc;
+    uint8_t nfcbuf[50+sizeof(firstnfc)];
+	firstnfc *nfcptr;
 	bool error;
 	const std::string_view getSerialNumber() const {
- 		return std::string_view(nfc.serialnumber,9);
+ 		return std::string_view(nfcptr->serialnumber,9);
 		}
 	nfc1(JNIEnv *env,  jbyteArray jnfcout) {
-         	jsize lens=env->GetArrayLength(jnfcout);
-		if(lens!=sizeof(firstnfc)) {
+        jsize lens=env->GetArrayLength(jnfcout);
+		if(lens<(sizeof(firstnfc)+3)) {
 			LOGGER("NFC: sizeof bytearray=%d sizeof(firstnfc)=%ld\n",lens,sizeof(firstnfc));
 			error=true;
 			return;
 			}
-		env->GetByteArrayRegion(jnfcout, 0, lens, reinterpret_cast<jbyte*>(&nfc));
+		env->GetByteArrayRegion(jnfcout, 0, lens, reinterpret_cast<jbyte*>(nfcbuf));
 #ifndef NOLOG
 {
-		hexstr hex((uint8_t*)&nfc,lens);
+		hexstr hex((uint8_t*)nfcbuf,lens);
 		LOGGERN(hex.str(),hex.size());
 		}
 #endif
-	    const uint16_t start=0xa5;
-	    if(*reinterpret_cast<const uint16_t*>(nfc.start)!=start) {
-		   LOGSTRING("NFC: doesn't start with 0xA5,0x0\n");
-		   error=true; ;
-		   }
-		   error=false;
-		nfc.crc16[0]=0;
-		LOGGER("serialnumber=%s state=%d warmup=%d*5 wearduration=%d\n",nfc.serialnumber,nfc.state,nfc.warmup,nfc.wearduration);
+       auto *iter=nfcbuf+1;
+       while(*iter++==0xa5)
+           ;
+        nfcptr=reinterpret_cast<firstnfc*>(iter);
+		nfcptr->crc16[0]=0;
+		LOGGER("serialnumber=%s state=%d warmup=%d*5 wearduration=%d\n",nfcptr->serialnumber,nfcptr->state,nfcptr->warmup,nfcptr->wearduration);
 		};
 	};
 
-static_assert(sizeof(firstnfc)==29);
+static_assert(sizeof(firstnfc)==26);
 
 
 
@@ -158,7 +156,7 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(getLibre3secs)(JNIEnv *env, jclass t
       LOGAR("getLibre3secs error");
 		return 0LL;
 		}
- 	const auto  name=Sensoren::namelibre3(std::string_view(first.nfc.serialnumber,9));
+ 	const auto  name=Sensoren::namelibre3(std::string_view(first.nfcptr->serialnumber,9));
 	time_t nu=time(nullptr);
 	if(const uint32_t start=sensors->sensorStarttime(name.data())) {
 		if((nu-start)>	13*dayseconds) {
@@ -195,6 +193,7 @@ extern					void setusedsensors() ;
 extern "C" JNIEXPORT jlong JNICALL fromjava(interpret3NFC2)(JNIEnv *env, jclass thiz, jbyteArray  nfc1ar,jbyteArray jnfcout,jlong now) {
 	nfc1 first(env,nfc1ar);
 	if(first.error) {
+        LOGAR("interpret3NFC2 error");
 		return 0LL;
 		}
 	if(!jnfcout)  {
@@ -224,7 +223,7 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(interpret3NFC2)(JNIEnv *env, jclass 
 				if(nfc->error==0xb1)
 					return 1LL;
 				else  {
-					switch(first.nfc.state) {
+					switch(first.nfcptr->state) {
 						case 8: finishsensor(first);return 5LL;
 						case 6: finishsensor(first);return 6LL;
 						default: return 3LL;
@@ -252,7 +251,7 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(interpret3NFC2)(JNIEnv *env, jclass 
 #endif
   const auto pin=nfc->pin;
 #endif
-	int sensindex=sensors->makelibre3sensorindex(std::string_view(first.nfc.serialnumber,9),acttime,pin,devaddress,now,first.nfc.warmup*5,first.nfc.wearduration);
+	int sensindex=sensors->makelibre3sensorindex(std::string_view(first.nfcptr->serialnumber,9),acttime,pin,devaddress,now,first.nfcptr->warmup*5,first.nfcptr->wearduration);
 	SensorGlucoseData *sens=sensors->getSensorData(sensindex);
 	sendstreaming(sens); 
 	libre3stream *streamd=new libre3stream(sensindex,sens);

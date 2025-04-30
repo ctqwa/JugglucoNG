@@ -110,6 +110,15 @@ array<unsigned char,8> unserial(const char * const str) {
 using std::cout;
 using std::endl;
 #if 1
+#include <algorithm>
+int main(int argc,char **argv) {
+  unsigned char byt[]={(unsigned char)0xE0,(unsigned char)0x7A,(unsigned char)0x00,(unsigned char)0x74,(unsigned char)0x8D,(unsigned char)0xC2,(unsigned char)0x87,(unsigned char)0x4F};
+//    unsigned char byt[]={(unsigned char)0xE0,(unsigned char)0x07,(unsigned char)0xA0,(unsigned char)0x00,(unsigned char)0x06,(unsigned char)0x6D,(unsigned char)0x1D,(unsigned char)0xF6};
+    std::reverse(std::begin(byt),std::end(byt));
+    auto ser=getserial(3,byt);
+    cout<<ser<<endl;
+    }
+#elif 0
 pathconcat logbasedir("/tmp/logs");
 int main(int argc,char **argv) {
 mkdir(logbasedir.data(),0777);
@@ -174,6 +183,7 @@ int64_t libreviewHistor(const sensorname_t *sensorid) {
         return  (uit << 14);
     }
 */
+//#define TESThistor
 #ifdef TESThistor
 #include <cinttypes>
 typedef std::array<char,11>  sensorname_t;

@@ -78,25 +78,27 @@ static String makestring(String[] names,int nr,boolean detect,String port,boolea
                   Applic.wakemirrors();
                    };
             if(receive) {
-               String type=null; 
+                String type=""; 
                 if(!nums&&numio.hasNumdata()) {
                     type=act.getString(R.string.amountsname); 
                     }
                 if(!scans&&Natives.hasscans()) {
-                    if(type!=null)
-                        type=type+", ";
-                    type=type+act.getString(R.string.scansname); 
+                    final var addstr=act.getString(R.string.scansname); 
+                    if(type.length()>0)
+                        type+=", "+addstr; 
+                    else type=addstr; 
                     }
                 if(!stream&&Natives.hasstreamed( )) {
-                    if(type!=null)
-                        type=type+", ";
-                    type=type+act.getString(R.string.streamname); 
+                    final var addstr=act.getString(R.string.streamname); 
+                    if(type.length()>0)
+                        type+=", "+addstr; 
+                    else type=addstr; 
                     }
-                if(type!=null) {
+                if(type.length()>0) {
                         Confirm.ask(act,act.getString(R.string.datapresent)+type,act.getString(R.string.overwrite),save);
                         return;
                        } 
-                     }
+                 }
              save.run();
             ;
             }

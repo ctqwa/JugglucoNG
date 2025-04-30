@@ -358,6 +358,7 @@ private static int timeHeight;
 public static boolean showtime=true;
 private static float density;
 public static int floatfontsize;
+private static float valueWidth;
     static boolean makefloat() {
     {
     {if(doLog) {Log.i(LOG_ID,"makefloat");};};
@@ -402,7 +403,15 @@ public static int floatfontsize;
             else {
                 timeHeight =  timesize = 0;
             } 
+
             floatPaint.setTextSize(floatfontsize);
+            /*
+            if(colorAge) {    
+                Rect bounds=new Rect();
+                final var value=(Applic.unit==1)?"27.8":"488";
+                floatPaint.getTextBounds( value, 0,value.length() ,bounds);
+                valueWidth=bounds.width();
+                } */
 
             floatglucosex = (int) (notwidth * .272f);
             floatingwidth=(int)notwidth;
@@ -439,7 +448,30 @@ public static int floatfontsize;
     }
 
 static boolean hide=false;
-@Override 
+/*
+public void drawRect (float left, 
+                float top, 
+                float right, 
+                float bottom, 
+                Paint paint) */
+private void showAgeColor(Canvas floatCanvas,int age,float xposin,float getyin,float w,float h) {
+    float gety=getyin;
+//    h-=5*density;
+    float xpos=xposin;
+    float agewidth=w*age/oldage;
+    floatPaint.setColor(floatingforeground);
+    float midx=xpos+agewidth;
+
+    floatCanvas.drawRect(xpos,gety,midx,gety+h,floatPaint);
+    final var restcolor=floatingbackground|0xFF000000;
+    if(restcolor==floatingbackground)
+        floatPaint.setColor((restcolor+floatingforeground)/2);
+     else
+        floatPaint.setColor(restcolor);
+    floatCanvas.drawRect(midx,gety,xpos+w,gety+h,floatPaint);
+    }
+//private static final boolean colorAge=true;
+@Override
 protected void onDraw(Canvas floatCanvas) {
      super.onDraw(floatCanvas);
     {if(doLog) {Log.i(LOG_ID,"onDraw");};};
@@ -462,12 +494,19 @@ protected void onDraw(Canvas floatCanvas) {
             var gety = (floatCanvas.getHeight()-timeHeight) * 0.98f;
             var xpos=floatglucosex;
             var rate=glucose.rate;
-            if (!isNaN(rate))  {
+            if(!isNaN(rate))  {
                  float weightrate = (rate > 1.6 ? -1.0f : (rate < -1.6 ? 1.0f : (rate / -1.6f)));
                  float arrowy = gety - floatfontsize * .4f + weightrate * floatfontsize * .4f;
                 drawarrow(floatCanvas, floatPaint, floatdensity, rate, xpos*.85f, arrowy);
                 }
-            floatCanvas.drawText(glucose.value, xpos, gety*.9659f, floatPaint);
+            final var value=glucose.value;
+            floatCanvas.drawText(value, xpos, gety*.9659f, floatPaint);
+            /*
+            if(colorAge) {
+//                Rect bounds=new Rect();
+ //               floatPaint.getTextBounds( value, 0,value.length() ,bounds);
+                showAgeColor(floatCanvas, (int) age,xpos,gety,valueWidth, timeHeight);
+                } */
             if(showtime)  {
                 var timestr= minhourstr(glucose.time*1000L);
                 floatPaint.setTextSize(timesize);

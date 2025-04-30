@@ -62,42 +62,44 @@ public class FloatingConfig {
 private static final String LOG_ID="FloatingConfig";
 //   AmbilWarnaDialog(Context context, int color, boolean supportsAlpha, OnAmbilWarnaListener listener)
 static private boolean background=true;
-static public void	setcolor(int c) {
-		{if(doLog) {Log.i(LOG_ID,"setcolor("+(c&0xFFFFFFFF)+")");};};
-		if(background) { 
-			Floating.setbackgroundcolor(c);
-			}
-		else  {Floating.setforegroundcolor(c);			}
-		}
-static public int	getcolor() {
-		return background?Natives.getfloatingbackground( ):Natives.getfloatingforeground( );
-		}
+static public void    setcolor(int c) {
+        if(doLog) {Log.i(LOG_ID,"setcolor("+(c&0xFFFFFFFF)+")");};
+        if(background) { 
+                Floating.setbackgroundcolor(c);
+                }
+        else  {
+              Floating.setforegroundcolor(c);
+              }
+        }
+static public int    getcolor() {
+        return background?Natives.getfloatingbackground( ):Natives.getfloatingforeground( );
+        }
 
 
 
 static public void show(MainActivity act,View parent) {
-	parent.setVisibility(INVISIBLE);
-	int initialColor= getcolor();
+    parent.setVisibility(INVISIBLE);
+    int initialColor= getcolor();
 
 
-	int height=GlucoseCurve.getheight();
-	int width=GlucoseCurve.getwidth();
+    int height=GlucoseCurve.getheight();
+    int width=GlucoseCurve.getwidth();
     AmbilWarnaDialog dialog = new AmbilWarnaDialog(act, initialColor,c-> {
-	{if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
-		setcolor(c);
-		//rewritefloating(act);
-		Floating.invalidatefloat();
+    {if(doLog) {Log.i(LOG_ID,String.format(usedlocale,"col=%x",c));};};
+        setcolor(c);
+        //rewritefloating(act);
+        Floating.invalidatefloat();
     }, v-> {
-    	}
-	);
-	View view=dialog.getview();
+        }
+    );
+    View view=dialog.getview();
    final String fontstring=act.getString(R.string.fontsize)+ " ";
-	var  sizelabel=getlabel(act,fontstring);
+    var  sizelabel=getlabel(act,fontstring);
 
 
    final int maxfont=height*7/10;
 
-	int currentfont=Natives.getfloatingFontsize();
+    int currentfont=Natives.getfloatingFontsize();
      if(currentfont<5||currentfont>(int)(screenheight*.8)) {
                 currentfont=(int)Notify.glucosesize; 
                 }
@@ -112,145 +114,145 @@ static public void show(MainActivity act,View parent) {
         fontsizeview.setMin(minimumvalue);
     }*/
     fontsizeview.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-		@Override
-		public  void onProgressChanged (SeekBar seekBar, int progress, boolean fromUser) {
+        @Override
+        public  void onProgressChanged (SeekBar seekBar, int progress, boolean fromUser) {
 //         int newprogress=progress+minimumvalue; 
-			var siz=(int)Math.round(progress/100.0)+5;
+            var siz=(int)Math.round(progress/100.0)+5;
 //         if(doLog) sizelabel.setText(fontstring+siz);
          Natives.setfloatingFontsize(siz);
           rewritefloating(act);
-			}
-		@Override
-		public void onStartTrackingTouch(SeekBar seekBar) {
-			{if(doLog) {Log.i(LOG_ID,"onStartTrackingTouch");};};
-			}
-		@Override
-		public void onStopTrackingTouch(SeekBar seekBar) {
-			}
-		});
+            }
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+            {if(doLog) {Log.i(LOG_ID,"onStartTrackingTouch");};};
+            }
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
 
 
 
 /*
-	var  sizeview= new EditText(act);
+    var  sizeview= new EditText(act);
               sizeview.setImeOptions(editoptions);
                 sizeview.setMinEms(4);
                 sizeview.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
 
-	int fontsize=Natives.getfloatingFontsize();
-	sizeview.setText(fontsize+"");
+    int fontsize=Natives.getfloatingFontsize();
+    sizeview.setText(fontsize+"");
         TextView.OnEditorActionListener  actlist= new TextView.OnEditorActionListener() {
                     @Override
                     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                     if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER || actionId == EditorInfo.IME_ACTION_DONE) {
                                  {if(doLog) {Log.i(LOG_ID,"onEditorAction");};};
-				 try {
-					var siz=Integer.parseInt(String.valueOf(v.getText()));
-					int maxfont=height*7/10;
-					if(siz>maxfont) {
-						Applic.argToaster(act, act.getString(R.string.fonttoolarge)+maxfont, Toast.LENGTH_SHORT);
-						return true;
-						}
-					else  {
-						Natives.setfloatingFontsize(siz);
-						 rewritefloating(act);
-						//Floating.invalidatefloat();
-						 }
-					}
-				catch(Throwable th) {
-					Log.stack(LOG_ID,"parseInt",th);
-					}
+                 try {
+                    var siz=Integer.parseInt(String.valueOf(v.getText()));
+                    int maxfont=height*7/10;
+                    if(siz>maxfont) {
+                        Applic.argToaster(act, act.getString(R.string.fonttoolarge)+maxfont, Toast.LENGTH_SHORT);
+                        return true;
+                        }
+                    else  {
+                        Natives.setfloatingFontsize(siz);
+                         rewritefloating(act);
+                        //Floating.invalidatefloat();
+                         }
+                    }
+                catch(Throwable th) {
+                    Log.stack(LOG_ID,"parseInt",th);
+                    }
 //                                return true;
                            }
                     return false;
                     }};
-	sizeview.setOnEditorActionListener(actlist);
+    sizeview.setOnEditorActionListener(actlist);
    */
 
 
 
-	var color=Natives.getfloatingbackground();
-	boolean transp= Color.alpha(color)!=0xFF;
-	var transparant=getcheckbox(act,R.string.transparent,transp);
-	var touch=Natives.getfloatingTouchable();
-	var touchable=getcheckbox(act,R.string.touchable,touch);
-	if(!background)
-			transparant.setVisibility(INVISIBLE);
-	else {
-		if (transp)
-			view.setVisibility(INVISIBLE);
-		}
-	var close=getbutton(act,R.string.closename);
-//	CompoundButton foregroundswitch;
+    var color=Natives.getfloatingbackground();
+    boolean transp= Color.alpha(color)!=0xFF;
+    var transparant=getcheckbox(act,R.string.transparent,transp);
+    var touch=Natives.getfloatingTouchable();
+    var touchable=getcheckbox(act,R.string.touchable,touch);
+    if(!background)
+            transparant.setVisibility(INVISIBLE);
+    else {
+        if (transp)
+            view.setVisibility(INVISIBLE);
+        }
+    var close=getbutton(act,R.string.closename);
+//    CompoundButton foregroundswitch;
 
-	Layout layout;
-	CheckBox floatglucose=new CheckBox(act);
-	floatglucose.setText(R.string.active);
-	floatglucose.setChecked(Natives.getfloatglucose());
-	floatglucose.setOnCheckedChangeListener( (buttonView,  isChecked) -> Floating.setfloatglucose(act,isChecked) ) ;
-	var Help=getbutton(act,R.string.helpname);
-	Help.setOnClickListener(v-> help.help(R.string.floatingconfig,act));
+    Layout layout;
+    CheckBox floatglucose=new CheckBox(act);
+    floatglucose.setText(R.string.active);
+    floatglucose.setChecked(Natives.getfloatglucose());
+    floatglucose.setOnCheckedChangeListener( (buttonView,  isChecked) -> Floating.setfloatglucose(act,isChecked) ) ;
+    var Help=getbutton(act,R.string.helpname);
+    Help.setOnClickListener(v-> help.help(R.string.floatingconfig,act));
 
 
     var    foregroundbutton = new RadioButton(act);
       var   backgroundbutton = new RadioButton(act);
         foregroundbutton.setText(R.string.foreground);
         backgroundbutton.setText(R.string.background);
-	foregroundbutton.setChecked(!background);
-	backgroundbutton.setChecked(background);
-	backgroundbutton.setTextColor(WHITE);
-	foregroundbutton.setTextColor(WHITE);
+    foregroundbutton.setChecked(!background);
+    backgroundbutton.setChecked(background);
+    backgroundbutton.setTextColor(WHITE);
+    foregroundbutton.setTextColor(WHITE);
 
 //    getMargins(backgroundbutton).rightMargin=getMargins(foregroundbutton).leftMargin=(int)(width*0.1);
-//	backgroundbutton.setChecked(background);
+//    backgroundbutton.setChecked(background);
 
-	var timeshow=getcheckbox(act,R.string.time,Floating.showtime);
-	timeshow.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-		Floating.showtime=isChecked;
-		Natives.setfloattime(isChecked);
-		rewritefloating(act);
-		});
-	boolean[] hidden={Natives.gethidefloatinJuggluco()};
-	var hide=getcheckbox(act,R.string.floatjuggluco, !hidden[0]);
-	if(hidden[0]) {
-		Floating.makefloat();
-		}
-	hide.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-		hidden[0]=!isChecked;
-		Natives.sethidefloatinJuggluco(!isChecked);
-		});
+    var timeshow=getcheckbox(act,R.string.time,Floating.showtime);
+    timeshow.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+        Floating.showtime=isChecked;
+        Natives.setfloattime(isChecked);
+        rewritefloating(act);
+        });
+    boolean[] hidden={Natives.gethidefloatinJuggluco()};
+    var hide=getcheckbox(act,R.string.floatjuggluco, !hidden[0]);
+    if(hidden[0]) {
+        Floating.makefloat();
+        }
+    hide.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+        hidden[0]=!isChecked;
+        Natives.sethidefloatinJuggluco(!isChecked);
+        });
 
 
 
-	var leftlayout=new Layout(act,(l, w, h)-> { return new int[] {w,h}; },new View[]{sizelabel},new View[]{fontsizeview},new View[]{foregroundbutton,touchable}, new View[]{backgroundbutton,transparant},new View[]{hide,timeshow,floatglucose},new View[]{Help,close});
-	leftlayout.setLayoutParams( new ViewGroup.LayoutParams(WRAP_CONTENT,MATCH_PARENT));
-	view.setLayoutParams( new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
+    var leftlayout=new Layout(act,(l, w, h)-> { return new int[] {w,h}; },new View[]{sizelabel},new View[]{fontsizeview},new View[]{foregroundbutton,touchable}, new View[]{backgroundbutton,transparant},new View[]{hide,timeshow,floatglucose},new View[]{Help,close});
+    leftlayout.setLayoutParams( new ViewGroup.LayoutParams(WRAP_CONTENT,MATCH_PARENT));
+    view.setLayoutParams( new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
    final var density= tk.glucodata.GlucoseCurve.metrics.density;
    view.setPadding(0,MainActivity.systembarTop+ (int)(density*10) ,0,0);
    getMargins(close).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
    leftlayout.setPadding(0,MainActivity.systembarTop/2+ (int)(density*5) ,0,0);
-	 layout=new Layout(act,(l,w,h)-> { return new int[] {w,h}; }, new View[]{view,leftlayout});
+     layout=new Layout(act,(l,w,h)-> { return new int[] {w,h}; }, new View[]{view,leftlayout});
 
-  	layout.setPadding(MainActivity.systembarLeft+(int)(density*10),0,MainActivity.systembarRight+(int)(density*12),MainActivity.systembarBottom+(int)(density*5));
-	layout.setBackgroundColor(Applic.backgroundcolor);
-	transparant.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-		Floating.setbackgroundalpha(isChecked?0:0xff);
-		Floating.invalidatefloat();
-		removeContentView(layout);
-		act.poponback();
-		show(act,parent);
-	});
-	touchable.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-		Floating.setTouchable(isChecked);
-		});
+      layout.setPadding(MainActivity.systembarLeft+(int)(density*10),0,MainActivity.systembarRight+(int)(density*12),MainActivity.systembarBottom+(int)(density*5));
+    layout.setBackgroundColor(Applic.backgroundcolor);
+    transparant.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+        Floating.setbackgroundalpha(isChecked?0:0xff);
+        Floating.invalidatefloat();
+        removeContentView(layout);
+        act.poponback();
+        show(act,parent);
+    });
+    touchable.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+        Floating.setTouchable(isChecked);
+        });
 /*
-	foregroundswitch.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-		background=isChecked;
-		removeContentView(layout);
-		act.poponback();
-		show(act,parent);
+    foregroundswitch.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+        background=isChecked;
+        removeContentView(layout);
+        act.poponback();
+        show(act,parent);
 
-	});*/
+    });*/
 
 
         foregroundbutton.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
@@ -271,26 +273,26 @@ static public void show(MainActivity act,View parent) {
 
 
 
-	       act.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
-	Button noclose= act.findViewById(R.id.closeambi);
-	 if(noclose!=null) {
-		noclose.setVisibility(GONE);
-		noclose.setText("");
-		Button nohelp= act.findViewById(R.id.helpambi);
-		nohelp.setText("");
-		nohelp.setVisibility(GONE);
-	  }
-	act.setonback(()-> { 
-		parent.setVisibility(VISIBLE);
-		removeContentView(layout); 
-		if(hidden[0]) {
-			Floating.removeFloating();
-			}
+           act.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
+    Button noclose= act.findViewById(R.id.closeambi);
+     if(noclose!=null) {
+        noclose.setVisibility(GONE);
+        noclose.setText("");
+        Button nohelp= act.findViewById(R.id.helpambi);
+        nohelp.setText("");
+        nohelp.setVisibility(GONE);
+      }
+    act.setonback(()-> { 
+        parent.setVisibility(VISIBLE);
+        removeContentView(layout); 
+        if(hidden[0]) {
+            Floating.removeFloating();
+            }
 
-		});
-	close.setOnClickListener(v->{
-		act.doonback();
-	});
+        });
+    close.setOnClickListener(v->{
+        act.doonback();
+    });
 }
 
 }

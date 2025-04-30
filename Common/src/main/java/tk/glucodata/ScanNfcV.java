@@ -66,11 +66,8 @@ public class ScanNfcV   {
     private static final String LOG_ID = "ScanNfcV";
 
 
-//        if(android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.LOLLIPOP)
-//           else vibrator.vibrate( vibrationPatternstart , 1, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM) .build());
 
-//static int enablestreaming=0;
-static byte[] newdevice=null;
+static private byte[] newdevice=null;
     @SuppressWarnings("deprecation")
 public static void failure(Vibrator vibrator) {
     final long[] vibrationPatternFailure = {0, 500}; // [ms]
@@ -82,18 +79,6 @@ public static void failure(Vibrator vibrator) {
 
 
 
-/*
-static Ringtone getringtone(Context context, int res) {
-    String    uristr= "android.resource://" + context.getPackageName() + "/" + res;
-    Uri uri=Uri.parse(uristr);
-        Ringtone ring = RingtoneManager.getRingtone(context, uri);
-    try {
-        if(Build.VERSION.SDK_INT >=23)
-            ring.setLooping(true);
-            } catch(Exception e) {
-                }
-    return ring;
-    }*/
 
 static            boolean mayEnablestreaming(Tag tag,byte[] uid,byte[] info) {
     if(!Natives.streamingAllowed()) {
@@ -112,10 +97,6 @@ static            boolean mayEnablestreaming(Tag tag,byte[] uid,byte[] info) {
     return true;
     }
 
-/*
-private static boolean righttag(byte[] id) {
-         return (id.length == 8 && id[7] == -32 && id[6] == 7) ;
-        } */
 
 
 static     AudioAttributes audioattributes;
@@ -132,7 +113,7 @@ static void vibrates(Vibrator vibrator,final long[] vibrationPatternstart ,final
         vibrator.vibrate(VibrationEffect.createWaveform(vibrationPatternstart,amplitude, 1),vibrationattributes);
         }
     }
-static    boolean askpermission=false;
+static private   boolean askpermission=false;
     @SuppressWarnings("deprecation")
 public static Vibrator getvibrator(Context context) {
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
@@ -151,9 +132,78 @@ public static void startvibration(Vibrator vibrator) {
         vibrates(vibrator,vibrationPatternstart,amplitude); 
             }
     }
+static private int[] libre3scan(GlucoseCurve curve,MainActivity main, Vibrator vibrator,Tag tag) {
+    int value=0;
+    int ret = 0x100000;
+    if(android.os.Build.VERSION.SDK_INT >= 26) {
+        long streamptr;
+        streamptr=libre3NFC(tag);
+        vibrator.cancel();
+        if(streamptr==2L) {
+            {if(doLog) {Log.i(LOG_ID,"streamptr==2");};};
+            ret= 0xFD;
+            }
+        else {
+           if(libreVersion == 3) {
+                if(streamptr>=0L&&streamptr<7L) {
+                switch((int)(streamptr&0xFFFFFFF)) {
+                    case 1: {
+                        {if(doLog) {Log.i(LOG_ID,"streamptr==1");};};
+                        ret=0xFB;
+                        };break;
+                    case 5: {
+                        {if(doLog) {Log.i(LOG_ID,"terminated");};};
+                        ret=13;
+                        break;
+                        }
+                    case 6: {
+                        {if(doLog) {Log.i(LOG_ID,"ended");};};
+                        ret=4;
+                        break;
+                        }
+                    default: {
+                         if(streamptr>=0L&&streamptr<4L) {
+                            {if(doLog) {Log.i(LOG_ID,"p<streamptr<4");};};
+                              ret=0xFA;
+                              }
+                        }
+                    }
+                }
+             else {
+                 var name = Natives.getSensorName(streamptr);
+                 if(name==null){
+                    {if(doLog) {Log.i(LOG_ID,"name==null");};};
+                    ret=0xFA;
+                    Natives.freedataptr(streamptr);
+                    }
+                 else{
+                    {if(doLog) {Log.i(LOG_ID,"scanned "+name);};};
+                    if(SensorBluetooth.resetDeviceOrFree(streamptr, name))
+                        askpermission = true;
+                    ret = 0xFC;
+                    value=1;
+                    askcalendar=true;
+                    curve.render.badscan =calendar(main, ret, name);
+                    }
+                }
+                }
+            else {
+                {if(doLog) {Log.i(LOG_ID,"libreVersion!=3");};};
+                ret = 0xFE;
+                }
+        }
+        if(ret!=0xFC)
+            failure(vibrator);
+           }
+       else  {
+              {if(doLog) {Log.i(LOG_ID,"No Libre 3 Android <8");};};
+              ret=0xF9;
+              }
+    return new int[]{ret,value};
+    }
 static public synchronized void scan(GlucoseCurve curve,Tag tag) {
-     askpermission=false;
-        MainActivity main= (MainActivity)(curve.getContext());
+    askpermission=false;
+    MainActivity main= (MainActivity)(curve.getContext());
     if(!isWearable) {
         if (Menus.on) {
             Applic.RunOnUiThread(() -> {
@@ -173,8 +223,8 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
             Applic.RunOnUiThread(() -> {   main.openfile.showchoice(main,true); });
         return;
         }
-            int value=0;
-            int ret = 0x100000;
+    int value=0;
+    int ret = 0x100000;
         try {
            byte[] uid=tag.getId();
             if(doLog) {
@@ -184,84 +234,30 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                     }
                 {if(doLog) {Log.i(LOG_ID,"TAG::sensid="+sensid);};};
                 }
-
+/*
         if(uid.length==8&&uid[6]!=7) {
-            if(android.os.Build.VERSION.SDK_INT >= 26) {
-                long streamptr;
-                streamptr=libre3NFC(tag);
-                vibrator.cancel();
-                if(streamptr==2L) {
-                    {if(doLog) {Log.i(LOG_ID,"streamptr==2");};};
-                    ret= 0xFD;
-                    }
-                else {
-                   if(libreVersion == 3) {
-                        if(streamptr>=0L&&streamptr<7L) {
-                        switch((int)(streamptr&0xFFFFFFF)) {
-                            case 1: {
-                                {if(doLog) {Log.i(LOG_ID,"streamptr==1");};};
-                                ret=0xFB;
-                                };break;
-                            case 5: {
-                                {if(doLog) {Log.i(LOG_ID,"terminated");};};
-                                ret=13;
-                                break;
-                                }
-                            case 6: {
-                                {if(doLog) {Log.i(LOG_ID,"ended");};};
-                                ret=4;
-                                break;
-                                }
-                            default: {
-                                 if(streamptr>=0L&&streamptr<4L) {
-                                    {if(doLog) {Log.i(LOG_ID,"p<streamptr<4");};};
-                                      ret=0xFA;
-                                      }
-                                }
-                            }
-                        }
-                     else {
-                         var name = Natives.getSensorName(streamptr);
-                         if(name==null){
-                            {if(doLog) {Log.i(LOG_ID,"name==null");};};
-                            ret=0xFA;
-                            Natives.freedataptr(streamptr);
-                            }
-                         else{
-                            {if(doLog) {Log.i(LOG_ID,"scanned "+name);};};
-                            if(SensorBluetooth.resetDeviceOrFree(streamptr, name))
-                                askpermission = true;
-                            ret = 0xFC;
-                            value=1;
-                            askcalendar=true;
-                            curve.render.badscan =calendar(main, ret, name);
-                            }
-                        }
-                        }
+               int[] uit= libre3scan(curve,main,vibrator,tag);
+               ret=uit[0];
+               value=uit[1];
+              }
+        else  */
+            {
+            var isLibre3=uid.length==8&&uid[6]!=7;
+            byte[] info = AlgNfcV.nfcinfotimes(tag,(isLibre3||doLog)?1:10);
+            if(info==null||info.length!=6) {
+                    if(isLibre3) {
+                           int[] uit= libre3scan(curve,main,vibrator,tag);
+                           ret=uit[0];
+                           value=uit[1];
+                          }
                     else {
-                        {if(doLog) {Log.i(LOG_ID,"libreVersion!=3");};};
-                        ret = 0xFE;
+                        ret=17;
+                        {if(doLog) {Log.i(LOG_ID,"Read Tag Info Error");};};
+                        vibrator.cancel();
                         }
-                }
-                if(ret!=0xFC)
-
-                    failure(vibrator);
-                   }
-               else  {
-                      {if(doLog) {Log.i(LOG_ID,"No Libre 3 Android <8");};};
-                      ret=0xF9;
-                      }
-                   }
-                else {
-                byte[] info = AlgNfcV.nfcinfo(tag);
-                if(info==null) {
-                    ret=17;
-                    {if(doLog) {Log.i(LOG_ID,"Read Tag Info Error");};};
-                    vibrator.cancel();
                     }
                 else  {
                     byte[] data;
-
                     if((data = AlgNfcV.readNfcTag(tag,uid,info)) != null) {
                         curve.render.badscan =0xff;
                         curve.requestRender();

@@ -297,8 +297,8 @@ private int scanTries=0;
         if(mBluetoothLeScanner!=null) {
            if(doLog) {Log.i(LOG_ID,"Scanner21.start");};
            List<ScanFilter> mScanFilters=new ArrayList<>();
-           if(filter) {
-             if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
+           if(filter&&scanTries++%2==1) {
+               if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
                for(var cb: gattcallbacks)   {
                    if(doLog) {
                          Log.d(LOG_ID,"serial number: " + cb.SerialNumber);
@@ -313,13 +313,11 @@ private int scanTries=0;
                       mScanFilters=null;
                       }
                    else {
-                      if(scanTries++%2==1&&mScanFilters!=null) {
+                      if(mScanFilters!=null) {
                           ScanFilter.Builder builder2 = new ScanFilter.Builder();
                           builder2.setServiceUuid(new ParcelUuid(service));
                           mScanFilters.add(builder2.build());
                           }
-                     else
-                        mScanFilters=null;
                       }
                   }
               }

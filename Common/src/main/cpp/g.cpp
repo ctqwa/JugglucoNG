@@ -79,7 +79,9 @@ extern int    timestr(char *buf,time_t tim) ;
 extern lastscan_t  scantoshow;
 //JNIEXPORT void JNICALL Java_tk_glucodata_Glucose_nfcdata(JNIEnv *env, jobject thiz, jbyteArray uid, jbyteArray info,jbyteArray data) {
 //JNIEXPORT int JNICALL Java_tk_glucodata_Natives_nfcdata(JNIEnv *env, jclass thiz, jbyteArray uid, jbyteArray info,jbyteArray data) {
-//#define SCANLOG
+#ifndef NOLOG
+#define SCANLOG
+#endif
 #if defined(SCANLOG) //|| defined(__arm__) 
 
 class scanlogger {
@@ -1406,14 +1408,14 @@ extern "C" JNIEXPORT jint JNICALL   fromjava(getinfogen)(JNIEnv *env, jclass _cl
     #ifndef NOLOG
     const char label[]="getinfogen ";
     auto labellen=sizeof(label)-1;
-    int totlen=labellen+lens*3+3;
+    int totlen=labellen+lens*3+4;
     char mess[totlen];
     memcpy(mess,label,labellen);
     int pos=labellen;
     for(int i=0;i<lens;i++) {
         pos+=sprintf(mess+pos,"%02X ",info[i]);
         }
-    pos+=sprintf(mess+pos,"%d",gen);
+    pos+=sprintf(mess+pos,"=%d",gen);
     LOGGERN(mess,pos);
     #endif
 

@@ -3,10 +3,16 @@ To modify, change the html files in https://github.com/j-kaltes/Jugglucohelp -->
 <resources>
 <string name="staticnum" >
 <![CDATA[
-<h1 align="center">Engellendi</h1>
-<p style="margin-bottom: 0in"><b>Sol orta menü → Ayna(Klon) → &quot;</b><em><b>Ayna(Klon) gönderir</b></em><em><b>bağlar</b></em><b>&quot;</b> bu uygulamada miktarların girilmesini engellemek için ayarlanmıştır, çünkü bunlar ayna(klon) bağlantısından alınan miktarlar tarafından
-geçersiz kılınacaktır.</p>
-<p style="margin-bottom: 0in">Bu uygulama bir yansıtma (klon) bağlantısından miktar almıyorsa, bu seçeneği kaldırın.</p>
+<h1 class="western" align="left">
+Engellendi</h1>
+<p style="margin-bottom: 0cm"><i><b>O</b></i><i><b>rta </b></i><i><b>Sol</b></i><i><b>
+</b></i><i><b>M</b></i><i><b>enü → Klon → </b></i><em><i><b>Klon
+</b></i></em><em><i><b>miktarları </b></i></em><em><i><b>gönderir</b></i></em>
+bu uygulamada miktarların girilmesini engellemek için
+ayarlanmıştır, çünkü bunlar klon bağlantısından alınan
+miktarlar tarafından geçersiz kılınacaktır.</p>
+<p style="margin-bottom: 0cm">Bu uygulama bir yansıtma (klon)
+bağlantısından miktar almıyorsa, bu seçeneği kaldırın.</p>
 ]]>
 </string>
 <string name="locationpermission" >
@@ -39,9 +45,19 @@ saatlere bağlanmak için bu izne ihtiyaç duymaz.</p>
 </string>
 <string name="notificationpermission" >
 <![CDATA[
-<h1>Bildirimler</h1>
-<p>Juggluco, Freestyle Libre 0 sensörleriyle kullanılmadığı sürece, Juggluco her dakika doğrudan sensörden Bluetooth veya bir ağ bağlantısı aracılığıyla glikoz ölçümü almak için arka planda aktif kalmalıdır. Androidin uygulamanın sonlandırmasını önlemek için uygulamanın arka planda olduğunu bilmesi ve bir bildirim görüntülemesi gerekir. "Sensörle bağlantı kurmak için" veya "Veri alışverişi yapmak için" metni, Juggluco\'nun neden arka planda aktif kalması gerektiğini açıklar.</p>
-<p>Juggluco ayrıca bildirimi mevcut glikoz değerini ve yön değiştirme okunu görüntülemek için kullanır.J</p>
+<h1 class="western">
+Bildirimler</h1>
+<p>Juggluco, Freestyle Libre 0 sensörleriyle kullanılmadığı
+sürece, Juggluco her dakika doğrudan sensörden Bluetooth veya bir
+ağ bağlantısı aracılığıyla glikoz ölçümü almak için arka
+planda aktif kalmalıdır. Android’in uygulamanın sonlandırmasını
+önlemek için uygulamanın arka planda olduğunu bilmesi ve bir
+bildirim görüntülemesi gerekir. <i>&quot;Sensörle bağlantı
+kurmak için&quot;</i> veya <i>&quot;Veri alışverişi yapmak için&quot;</i>
+metni, Juggluco\'nun neden arka planda aktif kalması gerektiğini
+açıklar.</p>
+<p>Juggluco, bildirimi mevcut glikoz değerini ve yön okunu
+görüntülemek için kullanır.</p>
 <p><br/>
 <br/>
 

@@ -9,7 +9,8 @@ def task = gradle.startParameter.taskNames[0] ?: ""
 //def MINSDK = 19
 int MINSDK=19
 
-if(task.contains("LibreOldNosi")&&!task.contains("Wear")) {
+//if(task.contains("LibreOldNosi")&&!task.contains("Wear")) {
+if(false) {
     ndkver = '25.2.9519653'
    APPCOMPAT = '1.6.1'
      GMSBASE = '18.4.0'
@@ -85,7 +86,7 @@ android {
         compileSdk 35
         applicationId "tk.glucodata"
 
-         versionName '9.4.3'
+         versionName '9.5.2'
 //    multiDexEnabled true
 
         buildConfigField 'String', 'BUILD_TIME', 'new java.text.SimpleDateFormat("HH:mm:ss dd-MMM-yyyy").format(new java.util.Date(' + System.currentTimeMillis() + 'L))'
@@ -159,8 +160,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         libreOld {
     //******  Zet op rollout op 100% ******
             dimension 'libreVersion'
-            versionCode 698 //LIBRE2ONLY
-         //    versionName '9.4.3-no3'
+            versionCode 706 //LIBRE2ONLY
+         //    versionName '9.5.2-no3'
             versionNameSuffix '-no3'
             buildConfigField 'int', 'libreVersion', '2'
             externalNativeBuild.cmake {
@@ -173,7 +174,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 //       minSdk 23
             dimension 'libreVersion'
         versionNameSuffix '-li3'
-        versionCode 699 //LIBRE3
+        versionCode 707 //LIBRE3
     //******  Zet op rollout op 100% ******
 
                buildConfigField 'int', 'libreVersion', '3'
@@ -188,7 +189,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         si {
       dimension 'SiBionics'
         versionNameSuffix '-si'
-        versionCode 699 
+        versionCode 707 
        buildConfigField 'int', 'SiBionics', '1'
        externalNativeBuild.cmake {
          cppFlags "   -DSIBIONICS=1 "
@@ -197,7 +198,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         }
         nosi {
             dimension 'SiBionics'
-         versionCode 698 
+         versionCode 706 
          versionNameSuffix '-nosi'
           buildConfigField 'int', 'SiBionics', '0'
           externalNativeBuild.cmake {
@@ -215,9 +216,9 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         minSdkVersion 26
         buildConfigField 'int', 'minSDK', "$minSdk"
         manifestPlaceholders["minSDK"] = "$minSdk"
-        versionCode 700 //WATCH
+        versionCode 708 //WATCH
     //******  Zet op rollout op 100% ******
-        //versionName '9.4.3-wear'
+        //versionName '9.5.2-wear'
         versionNameSuffix '-wear'
         signingConfig signingConfigs.alg
 
@@ -239,8 +240,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 
 //        minSdk 19
             dimension 'wearos'
-        versionCode 700 //WATCH
-        //versionName '9.4.3-small'
+        versionCode 708 //WATCH
+        //versionName '9.5.2-small'
         versionNameSuffix '-small'
         signingConfig signingConfigs.alg
 
@@ -601,7 +602,7 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.1.20'
     implementation "com.google.android.gms:play-services-base:$GMSBASE"
  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2'
-  mobileImplementation 'androidx.health.connect:connect-client:1.1.0-beta02'
+  mobileImplementation 'androidx.health.connect:connect-client:1.1.0-rc01'
 //  mobileImplementation files('/n/ojka/Downloads/ciq-companion-app-sdk-2.0.3.aar');
   mobileImplementation 'com.garmin.connectiq:ciq-companion-app-sdk:2.2.0@aar'
 
@@ -613,7 +614,7 @@ dependencies {
     wearImplementation 'androidx.activity:activity-ktx:1.10.1'
     wearImplementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     wearImplementation 'com.google.android.material:material:1.12.0'
-    wearImplementation 'androidx.databinding:viewbinding:8.9.1'
+    wearImplementation 'androidx.databinding:viewbinding:8.9.2'
     wearImplementation 'androidx.core:core-ktx:1.16.0'
 
 
@@ -630,7 +631,7 @@ dependencies {
     wearImplementation 'androidx.wear.watchface:watchface:1.2.1'
     wearImplementation 'androidx.wear.watchface:watchface-complications-rendering:1.2.1'
     wearImplementation 'androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1'
-     wearImplementation 'androidx.core:core-splashscreen:1.2.0-beta01'
+     wearImplementation 'androidx.core:core-splashscreen:1.2.0-beta02'
      wearImplementation 'androidx.wear.protolayout:protolayout-external-protobuf:1.2.1'
 configurations {
 mobileLibre3SiDexGoogleImplementation {}

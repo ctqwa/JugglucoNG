@@ -842,19 +842,20 @@ static int getgeneration(const char *info) {
     return 2;
     } */
 static int getgeneration(const char *info) {
-    int i = info[2] >> 4;
-    int i2 = info[2] & 0xF;
+    const int i = info[2] >> 4;
+    const int i2 = info[2] & 0xF;
     if(i == 3) {
-    if (i2 < 9) {
-        return 1;
-    }
-    return 2;
-    } else if (i == 7) {
-    if (i2 < 4) {
-        return 1;
-    }
-    return 2;
-    }
+        if(i2 < 9) {
+            return 1;
+            }
+        return 2;
+       } 
+    else if(i == 7) {
+        if(i2 < 4) {
+            return 1;
+            }
+        return 2;
+        }
     return 0;
     } 
 

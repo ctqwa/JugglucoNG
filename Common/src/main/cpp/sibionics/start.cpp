@@ -106,7 +106,10 @@ extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const A
 extern data_t *fromjbyteArray(JNIEnv *env,jbyteArray jar,jint len=-1);
 
 extern "C" JNIEXPORT void JNICALL   fromjava(EverSenseClear)(JNIEnv *env, jclass cl,jlong dataptr) {
- 	reinterpret_cast<streamdata *>(dataptr)->hist->setbroadcastfrom(INT16_MAX);
+    if(!dataptr)
+        return;
+    if(auto *sens=reinterpret_cast<streamdata *>(dataptr)->hist)
+        sens->setbroadcastfrom(INT16_MAX);
 	}
 extern "C" JNIEXPORT jlong JNICALL   fromjava(SIprocessData)(JNIEnv *envin, jclass cl,jlong dataptr, jbyteArray bluetoothdata,jlong mmsec) {
 if(!dataptr) {

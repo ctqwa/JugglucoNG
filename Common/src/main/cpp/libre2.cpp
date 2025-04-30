@@ -1535,8 +1535,8 @@ extern "C" JNIEXPORT void JNICALL   fromjava(enabledStreaming)(JNIEnv *envin, jc
         }
     }
 extern "C" JNIEXPORT void JNICALL   fromjava(USenabledStreaming)(JNIEnv *envin, jclass cl,jbyteArray sensorident,jbyteArray jauth,jbyteArray address) {
-    const char uslog[]="USenabledStreaming\n";
-        setthreadname(uslog );
+    const char uslog[]="USenabledStreaming";
+    setthreadname(uslog );
     LOGGERN(uslog,sizeof(uslog)-1);
     const int fam=3;
     const data_t *uid=fromjbyteArray(envin,sensorident);
