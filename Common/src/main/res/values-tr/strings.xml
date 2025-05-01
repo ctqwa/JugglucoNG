@@ -31,8 +31,8 @@
     <string name="nobluetooth">Bluetooth Yok</string>
     <string name="bluetoothenabled">Bluetooth Etkin</string>
     <string name="bluetoothdisabled">Bluetooth Devre Dışı</string>
-    <string name="amountsname">Miktar</string>
-    <string name="mealsname">Yemek</string>
+    <string name="amountsname">Miktarlar</string>
+    <string name="mealsname">Yemekler</string>
     <string name="closename">Kapat</string>
     <string name="exporthelp">Ekranda görünen son değere kadar kaydeder. Başlangıç, geçmişe doğru belirtilen gün kadardır.</string>
     <string name="detect">Belirle</string>
