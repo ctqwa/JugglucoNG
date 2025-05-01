@@ -42,6 +42,7 @@ import androidx.appcompat.app.AlertDialog;
 import android.content.DialogInterface;
 import android.text.InputType;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -136,7 +137,13 @@ void mkchangelabel(MainActivity context,Runnable onsave,View parent) {
 			float wei=edit2float(labelweight);
 			String name=label.getText().toString();
 			int pos=(labelpos>=0) ? labelpos:labels.size()-1;
-
+            if(wei>0.0)  {
+                  Toast.makeText(context,String.format(Applic.usedlocale,context.getString(R.string.usedweight),wei), Toast.LENGTH_LONG).show();
+  //              var to=Toast.makeText(context,String.format(Applic.usedlocale,context.getString(R.string.usedweight),wei), Toast.LENGTH_LONG);
+//                to.setGravity(Gravity.CENTER_VERTICAL |Gravity.CENTER_HORIZONTAL,0,0);
+//                to.setGravity(Gravity.TOP|Gravity.LEFT, 0, 0);
+ //               to.show();
+                }
 			if(!Natives.setlabel(pos,name,pr,wei)) {
 				Applic.argToaster(context, name+context.getString(R.string.toolarg), Toast.LENGTH_SHORT);
 				return;

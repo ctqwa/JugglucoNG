@@ -237,19 +237,22 @@ if(!DontTalk) {
 
 public void speak(String message) {
     if(!DontTalk) {
+        try {
+            if(
+                    ((android.os.Build.VERSION.SDK_INT >= 21)?
+                    engine.speak(message, TextToSpeech.QUEUE_FLUSH, null,message):
+                            engine.speak(message, TextToSpeech.QUEUE_FLUSH, null)) ==TextToSpeech.SUCCESS)
 
 
-        if(
-                ((android.os.Build.VERSION.SDK_INT >= 21)?
-                engine.speak(message, TextToSpeech.QUEUE_FLUSH, null,message):
-                        engine.speak(message, TextToSpeech.QUEUE_FLUSH, null)) ==TextToSpeech.SUCCESS)
-
-
-        {
-            if(doLog) {Log.i(LOG_ID,"success speak "+message);}
+            {
+                if(doLog) {Log.i(LOG_ID,"success speak "+message);}
+                }
+             else {
+                Log.e(LOG_ID,"failed speak "+message);
+                }
             }
-         else {
-            Log.e(LOG_ID,"failed speak "+message);
+        catch(Throwable th) {
+            Log.i(LOG_ID,"speak failed",th);
             }
         }
     }

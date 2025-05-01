@@ -396,4 +396,5 @@ Send data from this phone to another phone on your home network.
 Pressing OK will generate a connection on this phone and display a QR code that can be scanned by another Android device. Scanning the QR code with left menu→Photo on the other phone will generate a connection, by which it will receive all data from this phone.</string>
     
     <string name="googlescan">Google scan</string>
+    <string name="usedweight">WARNING: weight (%.1f) larger than 0</string>
 </resources>

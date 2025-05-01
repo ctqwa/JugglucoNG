@@ -31,8 +31,8 @@
     <string name="nobluetooth">Bluetooth Yok</string>
     <string name="bluetoothenabled">Bluetooth Etkin</string>
     <string name="bluetoothdisabled">Bluetooth Devre Dışı</string>
-    <string name="amountsname">Miktarlar</string>
-    <string name="mealsname">Yemekler</string>
+    <string name="amountsname">Miktar</string>
+    <string name="mealsname">Yemek</string>
     <string name="closename">Kapat</string>
     <string name="exporthelp">Ekranda görünen son değere kadar kaydeder. Başlangıç, geçmişe doğru belirtilen gün kadardır.</string>
     <string name="detect">Belirle</string>
@@ -74,7 +74,7 @@
  <string name="targetrange">"Hedef Aralık: "</string>
  <string name="graphrange">"Grafik Aralığı: "</string>
  <string name="unit">"Birim: "</string>
- <string name="glucoseaxisleft">Glikoz ekseni SOLDA</string>
+ <string name="glucoseaxisleft">Glikoz ekseni Solda</string>
  <string name="startsapp">Tarama, uygulamayı başlatır</string>
  <string name="sendtoxdrip">Yamalı Libre</string>
  <string name="disablecamerakey">Kamera tuşu devre dışı</string>
@@ -170,9 +170,9 @@
  <string name="wronglibrary">Kütüphane düzgün çalışmıyor, farklı bir tane deneyin.</string>
  <string name="installedlibrary">Yüklü kütüphane</string>
  <string name="cantextract">%s ayıklanamıyor, farklı bir apk deneyin</string>
- <string name="connectwithsensor">Sensöre bağlanmaya çalışıyor</string>
+ <string name="connectwithsensor">Sensöre bağlanmaya çalışılıyor</string>
  <string name="exchangedata">Veri alışverişi için çalışıyor</string>
- <string name="nonewvalue">"Yeni veri yok. Son veri zamanı:"</string>
+ <string name="nonewvalue">"Veri yok. Son veri zamanı:"</string>
  <string name="lowglucose">" Düşük Glikoz!"</string>
  <string name="highglucose">" Yüksek Glikoz!"</string>
  <string name="sendto">Gönder</string>
@@ -273,7 +273,7 @@
     <string name="notify">Bildir</string>
  <string name="separate">Ayır</string>
     <string name="librecurrent">Hemen</string>
-    <string name="USE_ALARM">Alarmı cihazdan ayarla</string>
+    <string name="USE_ALARM">Alarmı Cihazdan Ayarla</string>
     <string name="speed">Hız</string>
  <string name="pitch">Perde</string>
  <string name="talker">Ses</string>
@@ -356,7 +356,7 @@
    <string name="glucosearrowvaluecomplicationlabel">Değer + Yön oku</string>
    <string name="text">Metin</string>
    <string name="arrow">Yön oku</string>
-   <string name="notalldata">DİKKAT: Tüm verileri göndermeden “Şuradan al” ayarlanmadı.</string>
+   <string name="notalldata">DİKKAT: Tüm verileri göndermeden “Gelen” ayarlanmadı.</string>
   <string name="libresetalllabels">Öncelikle her etiket için ne yapılması gerektiğini belirtin.</string>
    <string name="photo">Fotoğraf</string>
    <string name="photomessage">Dexcom G7 veya Sibionics (Çin) sensörünün veri matrisini (karekodunu) tarayın.</string>
@@ -379,5 +379,13 @@
     <string name="eusibionics">EU Sibionics - com.sisensing.sijoy</string>
     <string name="chsibionics">Chinese Sibionics - com.sisensing.sisensingcgm</string>
     <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
+    <string name="sibionics2">Sibionics2 - com.sisensing.eco</string>
+    <string name="datapresent">"Veri Mevcut: "</string>
+    <string name="overwrite">Üzerine Yazılsın Mı?</string>
+    <string name="autoqr">Otomatik QR</string>
+    <string name="autoqrmessage">
+Bu telefondan ev ağınızdaki başka bir telefona veri gönderebilirsiniz.
+Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer telefonda Sol Menü → Fotoğraf ile taradığınızda bağlantı kurulacak ve bu telefondan tüm verileri alacaktır.</string>
     
+    <string name="googlescan">Google Tarama</string>
 </resources>
