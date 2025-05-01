@@ -363,10 +363,10 @@
 
    <string name="text">Text</string>
    <string name="arrow">Arrow</string>
-   <string name="notalldata">WARNING: “Receive from” not set, without sending all data.</string>
+   <string name="notalldata">WARNING: “Receive from” not set, but some data types are not sent.</string>
   <string name="libresetalllabels">First specify for each label what should be done with it.</string>
    <string name="photo">Photo</string>
-   <string name="photomessage">Scan the data matrix of a Dexcom G7 or Chinese market Sibionics sensor.</string>
+   <string name="photomessage">Scan the data matrix of a Dexcom G7 or GS1 Sibionics sensor.</string>
    <string name="exchanges">Exchange data</string>
    <string name="dexfuture">Predict (Dexcom)</string>
    <string name="initializing">Initializing</string> 
@@ -397,4 +397,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     
     <string name="googlescan">Google scan</string>
     <string name="usedweight">WARNING: weight (%.1f) larger than 0</string>
+ <string name="verylowglucosealarm">Very low glucose alarm</string>
+ <string name="veryhighglucosealarm">Very high glucose alarm</string>
 </resources>
