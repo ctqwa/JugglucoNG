@@ -301,7 +301,7 @@
 
 <string name="notfound">Nicht gefunden</string>
   <string name="no_ringtone_picker_found">Keine Ringtone picker gefunden</string>
-  <string name="can_t_play">"Kann nicht abgespielt werden"</string>
+  <string name="can_t_play">"Kann nicht abgespielt werden "</string>
   <string name="seconds">" Sekunden"</string>
   <string name="duration_can_t_be_negative">"Dauer kann nicht negativ sein: "</string>
   <string name="too_large_maximum_65535">" zu groß, Maximum=65535, "</string>
@@ -343,7 +343,7 @@
 
 <string name="libresetalllabels">Das Häkchen bei „Mengen senden“ können Sie erst setzen, nachdem Sie bei jedem Etikett angegeben haben, was damit geschehen soll.</string>
    <string name="photo">Foto</string>
-<string name="photomessage">Scannen Sie die Datenmatrix eines Dexcom G7- oder Sibionics-Sensors vom chinesischen Markt.</string>
+<string name="photomessage">Scannen Sie die Datenmatrix eines Dexcom G7/ONE+ oder Sibionics GS1 Sensors oder den Klon-QR-Code</string>
    <string name="exchanges">Daten austauschen</string>
 
    <string name="initializing">Initialisierung</string> 
@@ -357,4 +357,27 @@
 <string name="overwrite">Überschreiben?</string>
   <string name="autoqrmessage">Daten von diesem Telefon an ein anderes Telefon in Ihrem Heimnetzwerk senden.
 Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt und ein QR-Code angezeigt, der von einem anderen Android-Gerät gescannt werden kann. Durch Scannen des QR-Codes über das linke Menü → „Foto“ auf dem anderen Telefon wird eine Verbindung hergestellt, über die alle Daten von diesem Telefon empfangen werden.</string>
+
+<string name="usedweight">WARNUNG: Gewicht (%.1f) größer als 0</string>
+
+<string name="verylowglucose">" Sehr niedriger Glukose!"</string>
+<string name="veryhighglucose">" Sehr hoher Glukose!"</string>
+
+ <string name="verylowglucoseshort">" Sehr niedrig!"</string>
+ <string name="veryhighglucoseshort">" Sehr hoch!"</string>
+
+<string name="prelowglucose">" Bald niedriger Glukose!"</string>
+<string name="prehighglucose">" Bald hoher Glukose!"</string>
+
+<string name="verylowglucosealarm">Alarm für sehr niedrigen Glukosewert</string>
+<string name="veryhighglucosealarm">Alarm für sehr hohen Glukosewert</string>
+
+<string name="prelowglucosealarm">Alarm, wenn bald unter</string>
+<string name="prehighglucosealarm">Alarm, wenn bald über</string>
+<string name="schedules">Zeitpläne</string>
+<string name="profile">"Profil"</string>
+<string name="lossofsignal">Signalverlust</string>
+<string name="valuenotification">Wertbenachrichtigung</string>
+ <string name="advanced">Extra</string>
+
 </resources>

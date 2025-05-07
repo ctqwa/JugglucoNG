@@ -259,10 +259,11 @@ static private void subEnableControls(View view,boolean enable){
 				 el.setEnabled(isChecked);
 		 }
 		 );
-		
-	int hasname=(label==null&&kind>1)?0:1;
+	final boolean glucosealarm=(kind<2||kind>4);
+//	int hasname=(label==null&&kind>1)?0:1;
+	int hasname=(label==null&&!glucosealarm)?0:1;
 	int start=0;
-	 View [][] views=new View[(kind<2?5:((label==null)?3:4))+3][];
+	 View [][] views=new View[(glucosealarm?5:((label==null)?3:4))+3][];
 View[] durviews;
 	if(isWearable) {
 		TextView durlabel=getlabel(context,R.string.duractionsec);
@@ -279,7 +280,7 @@ View[] durviews;
 	
 	views[1]=durviews;
 
-	 if(kind<2) {
+	 if(glucosealarm) {
 	 	start=2;
 		 waitedit.setImeOptions(editoptions);
 		 waitedit.setMinEms(2);
@@ -371,7 +372,7 @@ View[] durviews;
 					}
 				Natives.writealarmduration(kind,durs);
 				}
-			if(kind<2) {
+			if(glucosealarm) {
 				str = waitedit.getText().toString();
 				if (str != null) {
 					short wa = Short.parseShort(str);

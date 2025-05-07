@@ -34,6 +34,8 @@ To modify, change the html files in https://github.com/j-kaltes/Jugglucohelp -->
 <string name="NightPost" ></string>
 <string name="newamount" ></string>
 <string name="exchangehelp" ></string>
+<string name="advancedAlarmshelp" ></string>
+<string name="schedulehelp" ></string>
 <string name="staticnum" >
 <![CDATA[
 <h1 align="center">Blocked</h1>

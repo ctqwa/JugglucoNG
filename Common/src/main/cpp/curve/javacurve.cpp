@@ -99,6 +99,7 @@ static jmethodID summaryready=nullptr;
 static jmethodID showsensorinfo=nullptr;
 #endif
 jmethodID  jdoglucose=nullptr, jupdateDevices=nullptr, jbluetoothEnabled=nullptr,jspeak=nullptr, jresetWearOS=nullptr, jbluePermission=nullptr;
+//jmethodID jchangedProfile;
 jclass JNIApplic,JNIString;
 #ifdef OLDEVERSENSE
 #ifndef  WEAROS
@@ -201,6 +202,9 @@ if(cl) {
    if(!(jresetWearOS=env->GetStaticMethodID(JNIApplic,"resetWearOS","()V"))) {
       LOGAR(R"(jresetWearOS=env->GetStaticMethodID(JNIApplic,"resetWearOS","()V") failed)" "");
       }
+ /*  if(!(jchangedProfile=env->GetStaticMethodID(JNIApplic,"changedProfile","()V"))) {
+      LOGAR(R"(jchangedProfile=env->GetStaticMethodID(JNIApplic,"changedProfile","()V") failed)" "");
+      } */
 #ifdef WEAROS
    if(!(jsetinittext=env->GetStaticMethodID(JNIApplic,"setinittext","(Ljava/lang/String;)V"))) {
       LOGAR(R"%(jsetinittext=env->GetStaticMethodID(JNIApplic,"setinittext","(Ljava/lang/String;)V)" failed)%" );
@@ -336,6 +340,14 @@ void resetWearOS() {
      else
         getenv()->CallStaticVoidMethod(JNIApplic,jresetWearOS);
     }
+    /*
+void changedProfile() {
+    if(!jchangedProfile)  {
+       LOGAR("jchangedProfile==null");
+       return;
+      }
+    getenv()->CallStaticVoidMethod(JNIApplic,jchangedProfile);
+    } */
 void visiblebutton() {
    if(glucosecurve) {
       if(summaryready)  {
@@ -777,7 +789,7 @@ void toCalendar(const char *message) {
 extern bool speakout;
 extern "C" JNIEXPORT void JNICALL fromjava(settouchtalk)(JNIEnv *env, jclass thiz,jboolean val) {
 
-   settings->data()->talktouch=val;
+   settings->data()->talktouchset(val);
    speakout=val;
    }
 
@@ -786,19 +798,19 @@ extern "C" JNIEXPORT jboolean JNICALL fromjava(gettouchtalk)(JNIEnv *env, jclass
    }
 extern "C" JNIEXPORT void JNICALL fromjava(setspeakmessages)(JNIEnv *env, jclass thiz,jboolean val) {
 
-   settings->data()->speakmessages=val;
+   settings->data()->speakmessagesset(val);
    }
 
 extern "C" JNIEXPORT jboolean JNICALL fromjava(speakmessages)(JNIEnv *env, jclass thiz) {
-   return settings->data()->speakmessages;
+   return settings->data()->speakmessagesget();
    }
 extern "C" JNIEXPORT void JNICALL fromjava(setspeakalarms)(JNIEnv *env, jclass thiz,jboolean val) {
 
-   settings->data()->speakalarms=val;
+   settings->data()->speakalarmsset(val);
    }
 
 extern "C" JNIEXPORT jboolean JNICALL fromjava(speakalarms)(JNIEnv *env, jclass thiz) {
-   return settings->data()->speakalarms;
+   return settings->data()->speakalarmsget();
    }
 //extern   const SensorGlucoseData *getlaststream(const uint32_t nu);
 extern std::pair<const SensorGlucoseData *,int> getlaststream(const uint32_t nu) ;
@@ -840,6 +852,8 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(saylastglucose)(JNIEnv *env, jclass 
       }
    return -1L;
    }
+#endif
+#ifndef WEAROS
 //MENUS functions:
 extern "C" JNIEXPORT jboolean JNICALL fromjava(getsystemui)(JNIEnv *env, jclass thiz) {
    return showui;

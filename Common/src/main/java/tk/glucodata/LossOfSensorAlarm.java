@@ -41,7 +41,7 @@ public void onReceive(Context context, Intent intent) {
        {if(doLog) {Log.i(LOG_ID,"onReceive ");};};
        Applic app=(Applic) context.getApplicationContext();
        app.initproc();
-       SuperGattCallback.init(app);
+       SuperGattCallback.initAlarmTalk();
        SuperGattCallback.glucosealarms.handlealarm();
        if(!keeprunning.started) {
             Applic.possiblybluetooth(context) ;

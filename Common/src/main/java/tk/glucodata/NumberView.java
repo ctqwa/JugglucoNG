@@ -962,12 +962,7 @@ void setmealbutton(int labelsel,long hitptr) {
     }
 Spinner getspinner(Activity context) {
 if(spinner==null) {
-     spinner=getGenSpin(context);
-//     if(isWearable) spinner.setDropDownVerticalOffset((int)(GlucoseCurve.getheight()*.60));
-//     spinner.setDropDownVerticalOffset((int)(GlucoseCurve.getheight()*.54));
-//    final int minheight=GlucoseCurve.dpToPx(48);
-//    spinner.setMinimumHeight(minheight);
-    avoidSpinnerDropdownFocus(spinner);
+    spinner=getGenSpin(context);
     numspinadapt=new LabelAdapter<String>(context,Natives.getLabels(),1);
     spinner.setAdapter(numspinadapt);
     spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {

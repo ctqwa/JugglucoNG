@@ -338,7 +338,7 @@
    <string name="notalldata">LETOP: “Ontvang van” niet aangevinkt, zonder alle data te zenden.</string>
 <string name="libresetalllabels">Je kunt ‘Zend hoeveelheden’ pas aanvinken nadat je voor elk label hebt aangegeven wat ermee moet gebeuren.</string>
    <string name="photo">Foto</string>
-<string name="photomessage">Scan the data matrix of a Dexcom G7 or Chinese market Sibionics sensor.</string>
+<string name="photomessage">Scan data matrix van een Dexcom G7/ONE+ of Sibionics GS1 sensor of de kloon QR code</string>
    <string name="exchanges">Deel gegevens</string>
    <string name="dexfuture">Voorspel (Dexcom)</string>
    <string name="initializing">Initialiseren</string>
@@ -353,6 +353,26 @@
 <string name="autoqrmessage">Verzendt gegevens van deze telefoon naar een andere telefoon in je thuisnetwerk.
 Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er een QR-code weergegeven die door een ander Android-apparaat kan worden gescand. Scan de QR-code met het linkermenu → Foto op de andere telefoon om een verbinding te maken, waarmee alle gegevens van deze telefoon worden ontvangen.</string>
 
+    <string name="usedweight">LETOP: gewicht (%.1f) groter dan 0</string>
+
+ <string name="verylowglucose">" Zeer LAGE glucose!"</string>
+ <string name="veryhighglucose">" Zeer HOGE glucose!"</string>
+
+ <string name="verylowglucoseshort">" Zeer LAAG!"</string>
+ <string name="veryhighglucoseshort">" Zeer HOOG!"</string>
+
+ <string name="prelowglucose">" dadelijk laag glucose!"</string>
+ <string name="prehighglucose">" dadelijk hoog glucose!"</string>
+
+ <string name="verylowglucosealarm">Zeer lage glucose alarm</string>
+ <string name="veryhighglucosealarm">Zeer hoge glucose alarm</string>
+
+ <string name="prelowglucosealarm">Alarm als zo dadelijk onder</string>
+ <string name="prehighglucosealarm">Alarm als zo dadelijk boven</string>
+    <string name="schedules">Tijdrooster</string>
+    <string name="profile">"Profiel "</string>
+ <string name="lossofsignal">Signaal verlies</string>
+ <string name="valuenotification">Waarde aanwezig</string>
 
 </resources>
 

@@ -35,7 +35,9 @@ constexpr auto insulinsNR() {
     }
 
 constexpr int maxbluetoothage=11*30;
+#ifdef NDEBUG
 #define CONV18 1 //Minimally different and 18 fits better
+#endif
 #ifdef CONV18
 static constexpr const double convfactor=180.0;
 #else
@@ -103,6 +105,7 @@ struct ring {
 constexpr static const int maxcolors=80;
 constexpr static const int startbackground=maxcolors/2;
 constexpr static const int maxalarms=5;
+constexpr static const int maxextraalarms=5;
 
 typedef std::array<char,179> auth_t;
 constexpr static const int AUTHMAX=512;
@@ -111,6 +114,62 @@ struct authpair {
     uint32_t expires;
     };
 
+constexpr static const int maxprofiles=5;
+constexpr static const int maxprofileMins=10;
+
+struct AlarmProfile {
+    uint32_t alow,ahigh,averylow,averyhigh,aprelow,aprehigh;
+    struct ring alarms[maxalarms+maxextraalarms];
+    uint32_t empty[4];
+    int32_t soundtype;
+    float voicespeed;
+    float voicepitch;
+    uint16_t voicesep:15;
+    bool voiceactive:1;
+    uint8_t voicespeaker;
+    uint8_t restbits:4;
+    bool speakmessages:1;
+    bool speakalarms:1;
+    bool talktouch:1;
+    bool USE_ALARMoff:1;
+    bool verylowalarm,prelowalarm,lowalarm,highalarm,prehighalarm,veryhighalarm,availablealarm,lossalarm;
+    };
+struct  ProfileMin {
+    int16_t min;
+    int16_t profile;
+    };
+
+inline std::pair<uint32_t,uint16_t> startdaynowmin() {
+        const time_t tim=time(nullptr);
+        struct tm nutm;
+        localtime_r(&tim, &nutm);
+        uint16_t nu=nutm.tm_hour*60+nutm.tm_min;
+        nutm.tm_hour=0;
+        nutm.tm_min=0;
+        nutm.tm_sec=0;
+        time_t startday=mktime(&nutm);
+        return {startday,nu};
+        }
+template <typename Tfunc>
+    uint32_t nextalarmtime(int nr, Tfunc atime) {
+        const auto [startday,nu]=startdaynowmin();
+        /*
+        const time_t tim=time(nullptr);
+        struct tm nutm;
+        localtime_r(&tim, &nutm);
+        uint16_t nu=nutm.tm_hour*60+nutm.tm_min;
+        nutm.tm_hour=0;
+        nutm.tm_min=0;
+        nutm.tm_sec=0;
+        time_t startday=mktime(&nutm); */
+        for(int i=0;i<nr;i++) {
+            const auto mins=atime(i);
+            if(mins>nu) {
+                return (mins*60LL+startday);
+                }
+            }
+        return ((atime(0)+24LL*60LL)*60LL+startday);
+        }
 struct Tings {
     uint32_t glow,ghigh,tlow,thigh,alow,ahigh;
     int32_t duration;
@@ -312,7 +371,35 @@ struct Tings {
 
     Insulin insulintypes[maxvarnr];
     int32_t iobupdate;
+    uint32_t averylow,averyhigh,aprelow,aprehigh;
+    int16_t currentProfile,nrProfile,nrProfileMins;
+    bool verylowalarm,veryhighalarm,prelowalarm,prehighalarm;
+    int8_t reserved2[2];
+    AlarmProfile  profiles[maxprofiles];
+    ProfileMin profileMins[maxprofileMins];
+    struct ring extraAlarms[maxextraalarms];
+    int32_t soundtype;
 
+
+ void        mkadvancedalarms() {
+    struct ring *al=extraAlarms;
+    for(int i=0;i<maxextraalarms;i++) {
+        al[i].uri[0]='\0';
+        al[i].wait=20;
+        al[i].duration=0xFFFF;
+        }
+    averylow=550;
+    averyhigh=14*180;
+    aprelow=39*18;
+    aprehigh=13*180;
+    soundtype=
+#ifdef WEAROS
+    13
+#else
+    5  
+#endif
+    ;
+    }
 
     void setdefault() {
         memcpy(watchid,defaultid,sizeof(watchid));
@@ -330,6 +417,193 @@ struct Tings {
             librecountry=unit==1?1:2;
         return librecountry-1;
         }
+
+
+
+struct ring &getalarmringtone(int type) {
+    if(type==3||currentProfile<1) {
+        if(type<maxalarms)
+            return alarms[type];
+        else
+            return extraAlarms[type-maxalarms];
+        }
+    return profiles[currentProfile-1].alarms[type];
+    }
+
+template <typename T>
+  T &alarmget(T &at,T AlarmProfile::*ap) {  
+        if(currentProfile>0) {
+            const int profindex=currentProfile-1;
+            return profiles[profindex].*ap;
+            }
+        else
+            return at;
+        }
+   
+/*
+    float voicespeed;
+    float voicepitch;
+    uint8_t voicespeaker;
+    uint16_t voicesep:15;
+    bool voiceactive:1;
+    bool speakmessages:1;
+    bool speakalarms:1; */
+
+#define maketalk(type)\
+  auto &type##Get() {  \
+    return alarmget(type,&AlarmProfile::type);\
+    }
+maketalk(soundtype)
+maketalk(voicespeed)
+maketalk(voicepitch)
+maketalk(voicespeaker)
+#define makebitvoice(type)\
+    auto type##get() const {\
+        if(currentProfile>0) {\
+            const int profindex=currentProfile-1;\
+            return profiles[profindex].type;\
+            }\
+        else\
+            return type;\
+        }\
+    void type##set(decltype(type) val) {\
+        if(currentProfile>0) {\
+            const int profindex=currentProfile-1;\
+            profiles[profindex].type=val;\
+            }\
+        else\
+            type=val;\
+        }
+
+makebitvoice(voicesep)
+makebitvoice(voiceactive)
+makebitvoice(speakmessages)
+makebitvoice(speakalarms)
+makebitvoice(talktouch)
+makebitvoice(USE_ALARMoff)
+
+#define mkhasalarm(type)\
+bool &has##type##alarm() {\
+    return alarmget(type##alarm,&AlarmProfile::type##alarm);\
+    } \
+const  bool has##type##alarm() const {  \
+       return const_cast<Tings*>(this)->has##type##alarm();\
+        } 
+
+#define mkalarmget(type)\
+  uint32_t &a##type##get() {  \
+    return alarmget(a##type,&AlarmProfile::a##type);\
+    }\
+ mkhasalarm(type)\
+const  uint32_t a##type##get() const {  \
+       return const_cast<Tings*>(this)->a##type##get();\
+        }
+
+mkalarmget(low)
+mkalarmget(verylow)
+mkalarmget(prelow)
+mkalarmget(high)
+mkalarmget(veryhigh)
+mkalarmget(prehigh)
+mkhasalarm(loss)
+mkhasalarm(available)
+
+#define setproel(x)  prof.x=x;
+void newprofile(int nr) {
+   for(int prnr=nrProfile;prnr<nr;++prnr) {
+         struct AlarmProfile  &prof=profiles[prnr];
+        memcpy(prof.alarms,alarms,maxalarms*sizeof(alarms[0]));
+        memcpy(prof.alarms+maxalarms,extraAlarms,maxextraalarms*sizeof(extraAlarms[0]));
+
+        prof.alow=alow;
+        prof.averylow=averylow;
+        prof.aprelow=aprelow;
+        prof.ahigh=ahigh;
+        prof.averyhigh=averyhigh;
+        prof.aprehigh=aprehigh;
+        setproel(verylowalarm) setproel(prelowalarm) setproel(lowalarm) setproel(highalarm) setproel(prehighalarm) setproel(veryhighalarm) setproel(availablealarm) setproel(lossalarm) 
+
+        setproel( voicespeed)
+        setproel( voicepitch)
+        setproel( voicesep)
+        setproel( voiceactive)
+        setproel( voicespeaker)
+        setproel( speakmessages)
+        setproel( speakalarms)
+        setproel( talktouch)
+        setproel( USE_ALARMoff)
+        }
+     nrProfile=nr;
+    }
+bool setprofile() {
+       const int nr=nrProfileMins;
+       if(nr<=0)  {
+           LOGAR("setprofile nrProfileMins=0");
+            return false;
+            }
+        const time_t tim=time(nullptr);
+        struct tm nutm;
+        localtime_r(&tim, &nutm);
+        const uint16_t nu=nutm.tm_hour*60+nutm.tm_min;
+        for(int i=nr-1;i>=0;--i) { //std::upper_bound?
+            if(profileMins[i].min<=nu) {
+                currentProfile=profileMins[i].profile;
+                LOGGER("setprofile: min=%d profile=%d\n",profileMins[i].min,currentProfile);
+                extern bool speakout;
+                speakout=talktouchget();
+                return true;
+                }
+           } 
+        LOGAR("setprofile: no profile activated");
+        return false;
+        } 
+
+    uint32_t nextprofiletime() const {
+        const int nr=nrProfileMins;
+        if(nr<=0)
+            return 0;
+        return nextalarmtime(nr,[mins=profileMins](const int index) {return mins[index].min;});
+        }
+
+void setAdvancedAlarms(uint32_t verylow1, uint32_t veryhigh1, bool verylowalarm1, bool veryhighalarm1, bool prelowalarm1,bool prehighalarm1,
+                       uint32_t prelow1, uint32_t prehigh1) {
+        averylowget()=verylow1;
+        averyhighget()=veryhigh1;
+        hasverylowalarm()=verylowalarm1;
+        hasveryhighalarm()=veryhighalarm1;
+        hasprelowalarm()=prelowalarm1;
+        hasprehighalarm()=prehighalarm1;
+        aprelowget()=prelow1;
+        aprehighget()=prehigh1;
+        }
+void removeProfileMin(int index) {
+    if(index>=0&&index<nrProfileMins) {
+        int len=--nrProfileMins-index;
+        if(len<=0)
+            return;
+        memmove(profileMins+index,profileMins+index+1,len*sizeof(profileMins[0]));
+        }
+    }
+int addProfileMin(int min,int profile) {
+    if(nrProfileMins>=maxprofileMins)
+        return -1;
+    struct  ProfileMin zoek{
+        .min=(int16_t)min
+        };
+    auto *beg=profileMins;
+    auto *end=profileMins+nrProfileMins++;
+    auto *hit=std::lower_bound(beg,end, zoek,[](const ProfileMin one, const ProfileMin two) {return one.min<two.min;});
+    if(hit<end) {
+        memmove(hit+1,hit,(uint8_t*)end-(uint8_t*)hit);
+        }
+    hit->min=min;
+    hit->profile=profile;
+    return hit-beg;
+    }
+int changeProfileMin(int index,int min,int profile) {
+    removeProfileMin(index);
+    return addProfileMin(min,profile);
+    }
     };
 
 struct Settings:Mmap<Tings> {
@@ -443,7 +717,7 @@ Settings(const char *settingsname,const char *base,const char *country): Mmap(se
 //    if(data()->initVersion<30) 
    { 
     LOGGER("initVersion=%d\n",data()->initVersion);
-   if(data()->initVersion<32) { 
+   if(data()->initVersion<33) { 
     if(data()->initVersion<31) { 
         if(data()->initVersion<26) { 
           if(data()->initVersion<22) { 
@@ -467,15 +741,6 @@ Settings(const char *settingsname,const char *base,const char *country): Mmap(se
                                      data()->update=1;
                                      mklabels();
                                      mkalarms();
-                                     /*
-                                     extern bool iswatch;
-                                     if(iswatch) {
-                                        data()->orientation=1;
-                                        data()->invertcolors=true;
-                                        }
-                                     else {
-                                        data()->orientation=8;
-                                        }*/
                       #ifdef WEAROS
                                      data()->orientation=1;
                       #else
@@ -502,7 +767,6 @@ Settings(const char *settingsname,const char *base,const char *country): Mmap(se
                       #endif
                             }
 
-                         setdisturbs();
                          data()->balanced_priority=true;
                          }
                       }
@@ -529,21 +793,6 @@ Settings(const char *settingsname,const char *base,const char *country): Mmap(se
 
               data()->libreinit=0; //reinit during switch to 2.10.1
                 }
-                /*
-              if(!strcasecmp(country,"GB")) {
-                data()->libreviewDeviceID[0]='\0';
-                   data()->libreinit=0; 
-                data()->librecountry=3;
-                }
-             else {
-                 if (!strcasecmp(country, "FR")) {
-                    data()->libreviewDeviceID[0] = '\0';
-                    data()->libreinit = 0;
-                    data()->librecountry = 4;
-                 } else {
-                    data()->librecountry = data()->libreunit;
-                 }
-              } */
               if(country&&!strcasecmp(country,"RU")) {
                 data()->librecountry=5;
                 }
@@ -578,34 +827,18 @@ if(data()->startlibretime>now) {
 
 #endif
     }
+    data()->mkadvancedalarms();
     }
-//      data()->ComplicationArrowColor=0xff00ffff;
-//      data()->ComplicationTextColor=0xffffffff;
- //     data()->ComplicationTextBorderColor=0xff000000;
-     // data()->ComplicationBackgroundColor=0xff000000;
       }
 
     setconvert(country);
 
      showui=getui();
 
-    /*
-    setnumalarm(0, .5,19*60+30,21*60);
-    setnumalarm(3, 7,21*60+30,23*60);
-    setnumalarm(0, 5,12*60,13*60);
-    setnumalarm(7, 5,11*60,11*60+30);
-    setnumalarm(0, .5,13*60+30,15*60); */
 }
 
 
 
-void        setdisturbs() {
-/*
-    struct ring *al=data()->alarms;
-    al[0].disturb=true;
-    al[1].disturb=true;
-    al[3].disturb=true; */
-    }
 
  void        mkalarms() {
     struct ring *al=data()->alarms;
@@ -623,6 +856,7 @@ void        setdisturbs() {
 
     al[4].duration=0xFFFF; //Loss of sensor alarm
     }
+
 void setnodebug(bool val) {
     data()->nodebug=val;
     data()->havelibrary=true;
@@ -679,15 +913,39 @@ void setunit(int unit) {
 
     }
 bool availableAlarm() const {
-    return data()->availablealarm;
+    return data()->hasavailablealarm();
     }
 bool highAlarm(int val) const {
-    if(data()->highalarm&&val>data()->ahigh)
+    if(data()->hashighalarm()&&val>data()->ahighget())
         return true;
     return false;
     }
 bool lowAlarm(int val) const {
-    if(data()->lowalarm&&val<data()->alow)
+    if(data()->haslowalarm()&&val<data()->alowget())
+        return true;
+    return false;
+    }
+bool veryhighAlarm(int val) const {
+    LOGGER("veryhighalarm(%d) has=%d threshold=%d\n",val,data()->hasveryhighalarm(),data()->averyhighget());
+    if(data()->hasveryhighalarm()&&val>data()->averyhighget())
+        return true;
+    return false;
+    }
+bool verylowAlarm(int val) const {
+    if(data()->hasverylowalarm()&&val<data()->averylowget())
+        return true;
+    return false;
+    }
+static float preval(int val,float rate)  {
+        return val+rate*.4f*180.0f;
+        }
+bool prehighAlarm(int val,float rate) const { 
+    if(data()->hasprehighalarm()&&preval(val,rate)>data()->aprehighget()) 
+        return true;
+    return false;
+    }
+bool prelowAlarm(int val,float rate) const { 
+    if(data()->hasprelowalarm()&&preval(val,rate)< data()->aprelowget())
         return true;
     return false;
     }
@@ -695,11 +953,11 @@ void setranges(uint32_t glow, uint32_t ghigh, uint32_t tlow, uint32_t thigh) {
     data()->glow=glow;data()->ghigh=ghigh;data()->tlow=tlow;data()->thigh=thigh;
     }
 void setalarms(uint32_t alow, uint32_t ahigh, bool lowalarm, bool highalarm, bool availablealarm,bool lossalarm) {
-    data()->alow=alow;data()->ahigh=ahigh;
-    data()->lowalarm=lowalarm;
-    data()->highalarm=highalarm;
-    data()->lossalarm=lossalarm;
-    data()->availablealarm=availablealarm;
+    data()->alowget()=alow;data()->ahighget()=ahigh;
+    data()->haslowalarm()=lowalarm;
+    data()->hashighalarm()=highalarm;
+    data()->haslossalarm()=lossalarm;
+    data()->hasavailablealarm()=availablealarm;
     }
 
 

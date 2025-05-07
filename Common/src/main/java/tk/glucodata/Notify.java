@@ -76,6 +76,9 @@ import java.util.concurrent.TimeUnit;
 //import tk.glucodata.Natives;
 
 public class Notify {
+static {
+        makenotification_audio();
+        };
 static public final int glucosetimeoutSEC=30*11;
 static public final long glucosetimeout=1000L*glucosetimeoutSEC;
 
@@ -124,13 +127,51 @@ Ringtone setring(String uristr, int res) {
            }
     return ring;
     }
-static final private int[] defaults ={ R.raw.siren, R.raw.classic, R.raw.ghost, R.raw.nudge,R.raw.elves};
+static public String alarmtext(int kind) {
+        return Applic.getContext().getString(switch(kind) {
+                case 0-> R.string.lowglucoseshort;
+                case 1-> R.string.highglucoseshort;
+                case 5-> R.string.verylowglucose;
+                case 6-> R.string.veryhighglucose;
+                case 7-> R.string.prelowglucose;
+                case 8-> R.string.prehighglucose;
+                default -> R.string.nothing;
+                });
+        }
+//                                        0               1           2               3           4           5             6          7                    8
+ //                                       low             high         avail       amount        loss        very low     very high   pre low           pre high
+static final private int[] defaults ={ R.raw.siren, R.raw.classic, R.raw.ghost, R.raw.nudge,R.raw.elves, R.raw.verylow, R.raw.veryhigh,R.raw.lowsoon, R.raw.highsoon};
+
+
 
 //static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable?USAGE_UNKNOWN:USAGE_NOTIFICATION) .build():null;
-static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_ASSISTANCE_SONIFICATION: AudioAttributes.USAGE_NOTIFICATION) .build():null;
 //static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage( USAGE_ASSISTANCE_SONIFICATION) .build():null;
 //static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(USAGE_NOTIFICATION) .build():null;
 
+static AudioAttributes notification_audio;
+//static AudioAttributes notification_audio=(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_ASSISTANCE_SONIFICATION: AudioAttributes.USAGE_NOTIFICATION) .build():null;
+static AudioFocusRequest audiofocusrequest;
+static public void makenotification_audio() {
+    if(android.os.Build.VERSION.SDK_INT >= 21) {
+        int type=Natives.getSoundType( );
+        Log.i(LOG_ID,"getSoundType()="+type);
+        if(type==0) {
+            type=isWearable? USAGE_ASSISTANCE_SONIFICATION: AudioAttributes.USAGE_NOTIFICATION;
+            } 
+        notification_audio=new AudioAttributes.Builder().setUsage(type).build();
+        if(android.os.Build.VERSION.SDK_INT >= 26) {
+                audiofocusrequest = new AudioFocusRequest.Builder( AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes( notification_audio ).build();
+                Log.i(LOG_ID, "audiofocusrequest  has value");
+                }
+         else {
+                audiofocusrequest =null;
+                Log.i(LOG_ID, "audiofocusrequest=null");
+                }
+        }
+    else {
+                notification_audio=null;
+        }
+    }
 
 static private AudioManager audioManager = (android.os.Build.VERSION.SDK_INT <26)?null:(AudioManager) Applic.getContext().getSystemService(Context.AUDIO_SERVICE);
 static private boolean turnfocusoff=false;
@@ -266,9 +307,31 @@ static RemoteGlucose arrowNotify;
                 tk.glucodata.WearInt.alarm("HIGH "+strgl.value);
                 }
             }
-
-
+        }
+    void veryhighglucose(notGlucose strgl,float gl,float rate,boolean alarm) {
+        arrowglucosealarm(6,gl,format(usedlocale,glucoseformat, gl)+Applic.getContext().getString(isWearable?R.string.veryhighglucoseshort:R.string.veryhighglucose), strgl,GLUCOSEALARM,alarm);
+        if(!isWearable) {
+            if(alarm)  {
+                tk.glucodata.WearInt.alarm("HIGH "+strgl.value);
+                }
+            }
+        }
+    void verylowglucose(notGlucose strgl,float gl,float rate,boolean alarm) {
+        arrowglucosealarm(5,gl, format(usedlocale,glucoseformat, gl)+Applic.getContext().getString(isWearable?R.string.verylowglucoseshort:R.string.verylowglucose), strgl,GLUCOSEALARM,alarm);
+        if(!isWearable) {
+            if(alarm)  {
+                tk.glucodata.WearInt.alarm("LOW "+strgl.value);
+                }
+            }
     }
+
+    void prehighglucose(notGlucose strgl,float gl,float rate,boolean alarm) {
+        arrowglucosealarm(8,gl,format(usedlocale,glucoseformat, gl)+Applic.getContext().getString(R.string.prehighglucose), strgl,GLUCOSEALARM,alarm);
+        }
+    void prelowglucose(notGlucose strgl,float gl,float rate,boolean alarm) {
+        arrowglucosealarm(7,gl, format(usedlocale,glucoseformat, gl)+Applic.getContext().getString(R.string.prelowglucose), strgl,GLUCOSEALARM,alarm);
+    }
+
     static private final int glucosenotificationid=81431;
     static private final int glucosealarmid=81432;
     static boolean alertwatch=false;
@@ -426,14 +489,15 @@ static    void stoplossalarm(){
         }
     }
 
-static AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <26)?null:new AudioFocusRequest.Builder( AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes( notification_audio ).build();
+
     private synchronized void playringhier(Ringtone ring,int duration,boolean sound,boolean flash,boolean vibrate,boolean disturb,int kind) {
         notifyfocus=true;
         doTurnFocuson();
         stopalarm();
 //        final int[] curfilter={-1};
+        final boolean glucosealarm=kind<2||kind>4;
         if(!DontTalk) {
-              if(kind<=1&&Natives.speakalarms()) {
+              if(glucosealarm&&Natives.speakalarms()) {
                  final var  glu=SuperGattCallback.previousglucose;
                  if(glu!=null) {
                            SuperGattCallback.talker.speak(glu.value, getUSEALARM()?ScanNfcV.audioattributes:notification_audio);
@@ -495,7 +559,7 @@ static AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <
                     stopvibratealarm();
                     }
                 if(!DontTalk) {
-                    if(kind<=1&&Natives.speakalarms()) {
+                    if(glucosealarm&&Natives.speakalarms()) {
                         final var  glu=SuperGattCallback.previousglucose;
                         if(glu!=null) {
                             Applic.scheduler.schedule(
@@ -511,7 +575,7 @@ static AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <
                 else
                     doTurnFocusoff();
 
-                if(kind<2) overwriteglucose(kind);
+                if(glucosealarm) overwriteglucose(kind);
                 setisalarm(false);
 
                 }
@@ -663,8 +727,7 @@ void overwriteglucose(int kind) {
     static final String fromnotification="FromNotification";
     final static int forcecloserequest=10;
     final static int stopalarmrequest=8;
-    static final String closename= "ForceClose";
-    static final String stopalarm= "StopAlarm";
+//    static final String closename= "ForceClose";
     final static int penmutable= android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M? PendingIntent.FLAG_IMMUTABLE:0;
 
 private final boolean makeicon=!isWearable&&tk.glucodata.BuildConfig.minSDK>=23;
@@ -757,14 +820,14 @@ static public boolean alertseparate=false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             GluNotBuilder.setVisibility(VISIBILITY_PUBLIC);
             }
-
+        final boolean glucosealarm=kind<2||kind>4;
         if(!isWearable) {
               if(Build.VERSION.SDK_INT  >= 24) {
                 GluNotBuilder.setStyle(new Notification.DecoratedCustomViewStyle());
         //    GluNotBuilder.setStyle( new Notification.DecoratedMediaCustomViewStyle());
             }
             GluNotBuilder.setShowWhen(true);
-            RemoteViews remoteViews=arrowNotify.arrowremote(kind,glucose,kind<2&&!once);
+            RemoteViews remoteViews=arrowNotify.arrowremote(kind,glucose,glucosealarm&&!once);
             if(whiteonblack) {
                 if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     GluNotBuilder.setColorized(true);

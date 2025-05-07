@@ -823,6 +823,30 @@ public static native String getbackJson(int pos);
 public static native int makeHomeCopy();
 public static native void setGoogleScan(boolean val);
 public static native boolean getGoogleScan( );
+    
+public static native boolean hasalarmverylow( );
+public static native float alarmverylow( );
+public static native boolean hasalarmveryhigh( );
+public static native float alarmveryhigh( );
+
+public static native boolean hasalarmprelow( );
+public static native float alarmprelow( );
+public static native boolean hasalarmprehigh( );
+public static native float alarmprehigh( );
+public static native int getProfile( );
+public static native void setProfile(int pro);
+public static native void setAdvancedAlarms(float verylow, float veryhigh, boolean verylowalarm, boolean veryhighalarm, boolean prelowalarm,boolean prehighalarm,float prelow,float prehigh);
+public static native int setScheduleProfile(int index,int min,int profile);
+public static native short[] getScheduleProfile(int index);
+public static native int nrScheduledProfiles( );
+public static native void removeScheduleProfile(int index);
+public static native long nextScheduledProfileMSEC( );
+public static native boolean set2Schedule( );
+        
+public static native void setSoundType(int val);
+public static native int getSoundType( );
+
+    
 
 //s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }

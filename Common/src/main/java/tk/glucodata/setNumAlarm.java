@@ -105,52 +105,27 @@ if(genlayout==null) {
 //    recycle.setLayoutParams(new ViewGroup.LayoutParams(  MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     View[][] views;
     if(isWearable) {
-      var list=getbutton(act,"List");
+      var list=getbutton(act,R.string.list);
        views=new View[][]{new View[]{list},new View[]{ring,newone},new View[]{ok}};
       genlayout= new Layout(act, (l, w, h) -> { int[] ret={w,h}; return ret; },views);
       numadapt = new NumAlarmAdapter(genlayout); //USE recycle.setAdapter(numadapt);
-        list.setOnClickListener(v->{
+      list.setOnClickListener(v->{
             var listclose=getbutton(act,R.string.closename);
-///    		   var width=GlucoseCurve.getwidth();
     	    var recycle = new RecyclerView(act);
             LinearLayoutManager lin = new LinearLayoutManager(act);
-          //  recycle.setLayoutParams(new ViewGroup.LayoutParams(  (int)(width*.9),ViewGroup.LayoutParams.MATCH_PARENT)); */
-
-      		 /*  var recycle = new WearableRecyclerView(act);
-            var lin=new WearableLinearLayoutManager(act);
-           recycle.setCircularScrollingGestureEnabled(true); */
-
-//            recycle.setLayoutParams(new ViewGroup.LayoutParams(  (int)(width*.9),ViewGroup.LayoutParams.MATCH_PARENT));
-
             recycle.setLayoutManager(lin);
-/*              var listlay=new LinearLayout(act);
-              listlay.setOrientation(VERTICAL);
-              listlay.addView(listclose,new  ViewGroup.LayoutParams(  WRAP_CONTENT, WRAP_CONTENT)); 
-              listlay.addView(recycle,new  ViewGroup.LayoutParams(  WRAP_CONTENT,WRAP_CONTENT)); */
-    		   var height=GlucoseCurve.getheight();
+            var height=GlucoseCurve.getheight();
             recycle.setLayoutParams(new ViewGroup.LayoutParams(  WRAP_CONTENT,height));
-
-              recycle.setPadding(0,0,0,(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0f)); 
-      if(!useclose) {
+            recycle.setPadding(0,0,0,(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0f)); 
+          if(!useclose) {
               recycle.setPadding(0,(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0f),0,(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0f));
-         listclose.setVisibility(GONE);
-      /*
-         listclose.setText("");
-         listclose.setVisibility(INVISIBLE);
-         final int butwidth=0;
-         listclose.setMinWidth(butwidth);
-        listclose.setMinimumWidth(butwidth);
-         listclose.setMinHeight(butwidth);
-        listclose.setMinimumHeight(butwidth);
-        listclose.setPadding(0,0,0,0); */
-            }
-     else  {
-              recycle.setPadding(0,0,0,(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0f)); 
-//          listclose.setPadding(0,0,0,0); 
-          }
+             listclose.setVisibility(GONE);
+                }
+         else  {
+                  recycle.setPadding(0,0,0,(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0f)); 
+              }
           var listlay= new Layout(act, (l, w, h) -> { int[] ret={w,h}; return ret; },new  View[]{listclose},new View[]{recycle});
-//var listlay=recycle;
-      listlay.setPadding(0,(int)(tk.glucodata.GlucoseCurve.metrics.density*1.0f),0,0);
+           listlay.setPadding(0,(int)(tk.glucodata.GlucoseCurve.metrics.density*1.0f),0,0);
            act.addContentView(listlay, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
            listlay.setBackgroundColor(Applic.backgroundcolor);
             act.setonback( () -> {
@@ -236,14 +211,13 @@ act.setonback( () -> {
 public class NumAlarmHolder extends RecyclerView.ViewHolder {
 
     public NumAlarmHolder(View view,View ok) {
-        super(view);
+       super(view);
        view.setOnClickListener(v -> {
-//    	genlayout.setVisibility(GONE);
-    	int pos=getAbsoluteAdapterPosition();
-    	mkitemlayout((Activity)v.getContext(),ok);
-    	fillitemlayout(pos) ;
-    	alarmpos=pos;
-    	});
+            int pos=getAbsoluteAdapterPosition();
+            mkitemlayout((Activity)v.getContext(),ok);
+            fillitemlayout(pos) ;
+            alarmpos=pos;
+            });
 
     }
 
@@ -259,20 +233,16 @@ public class NumAlarmAdapter extends RecyclerView.Adapter<NumAlarmHolder> {
     @NonNull
     @Override
     public NumAlarmHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        var view=new TextView( parent.getContext());
-      view.setTransformationMethod(null);
-//       view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f);
-//          view.setTextSize(TypedValue.COMPLEX_UNIT_PX, isWearable?Applic.mediumfontsize:Applic.largefontsize);
+         var view=new TextView( parent.getContext());
+          view.setTransformationMethod(null);
           view.setTextSize(TypedValue.COMPLEX_UNIT_PX, Applic.largefontsize);
-
-      view.setLayoutParams(new ViewGroup.LayoutParams(  MATCH_PARENT, WRAP_CONTENT));
-      if(isWearable)
-       view.setGravity(Gravity.CENTER);
-      else
-       view.setGravity(Gravity.LEFT);
-        return new NumAlarmHolder(view,ok);
-
-    }
+          view.setLayoutParams(new ViewGroup.LayoutParams(  MATCH_PARENT, WRAP_CONTENT));
+          if(isWearable)
+              view.setGravity(Gravity.CENTER);
+          else
+              view.setGravity(Gravity.LEFT);
+           return new NumAlarmHolder(view,ok);
+          }
 
     @Override
     public void onBindViewHolder(final NumAlarmHolder holder, int pos) {
@@ -310,18 +280,18 @@ static void settime(TextView but,int min) {
 int[] minutes=new int[2];
 static Button gettimeview(Activity act,int[] minutes,int ind,View[] parent) {
     Button but=new Button(act);
-        but.setOnClickListener(
-                v->  {
-    		parent[0].setVisibility(INVISIBLE);
-        		hidekeyboard(act);
-        		MainActivity main=(MainActivity) act;
-    		main.getnumberview().gettimepicker(main,minutes[ind]/60, minutes[ind]%60,
-    		(hour,min) -> {
-    			minutes[ind]=hour*60+min;
+    but.setOnClickListener(
+            v->  {
+                parent[0].setVisibility(INVISIBLE);
+                hidekeyboard(act);
+                MainActivity main=(MainActivity) act;
+                main.getnumberview().gettimepicker(main,minutes[ind]/60, minutes[ind]%60,
+                (hour,min) -> {
+                        minutes[ind]=hour*60+min;
 
-    			but.setText(String.format(Locale.US,"%02d:%02d",hour,min));
-    		   },()-> parent[0].setVisibility(VISIBLE));
-    	});
+                        but.setText(String.format(Locale.US,"%02d:%02d",hour,min));
+                   },()-> parent[0].setVisibility(VISIBLE));
+         });
     return but;
     }
 
@@ -374,7 +344,6 @@ void  mkitemlayout(Activity act,View parent) {
   if(itemlayout==null) {
         spinner=getGenSpin(act);
 //        if(isWearable) spinner.setDropDownVerticalOffset((int)(GlucoseCurve.getheight()*.54));
-        avoidSpinnerDropdownFocus(spinner);
        LabelAdapter<String> labelspinadapt=new LabelAdapter<String>(act,Natives.getLabels(),1);
        spinner.setAdapter(labelspinadapt);
        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {

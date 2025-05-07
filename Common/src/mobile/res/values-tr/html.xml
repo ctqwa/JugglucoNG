@@ -1979,7 +1979,7 @@ gösterilecektir.</p>
 <![CDATA[
 <p><a href="https://www.juggluco.nl/Jugglucohelp/be/settinghelp.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/settinghelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/settinghelp.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/settinghelp.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/settinghelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/settinghelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/settinghelp.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/settinghelp.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/settinghelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/settinghelp.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/settinghelp.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/settinghelp.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Ayarlar</h1>
 <h2 class="western">Birim</h2>
-<p style="margin-bottom: 0cm">Glikoz değerlerinin mmol/L veya dm/dL
+<p style="margin-bottom: 0cm">Glikoz değerlerinin mmol/L veya mg/dL
 cinsinden verilmesini seçin.</p>
 <h2 class="western">NFC Sesi</h2>
 <p>Tarama sırasında titreşime ek olarak ses seçin.</p>
@@ -2962,6 +2962,30 @@ görüntüleneceğini seçebilirsiniz.</p>
 </p>
 <p><br/>
 <br/>
+
+</p>
+]]>
+</string>
+<string name="QRmirror" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/QRmirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><h1>QR Klon</h1>
+<p style="line-height: 100%; margin-bottom: 0cm">Diğer telefonda <i>S</i><i>ol
+</i><i>M</i><i>enü → Fotoğraf</i> ile QR kodunu tarayarak klon
+bağlantısının diğer tarafını yapılandırabilirsiniz.</p>
+<p style="line-height: 100%; margin-bottom: 0cm"><i>O</i><i>rta </i><i>Sol</i><i>
+</i><i>M</i><i>enü→</i><i>Klon</i><i>→Otomatik QR</i> ile
+bağlantının her iki tarafı otomatik olarak oluşturulur. Bunu
+kullanarak telefondaki tüm verileri başka bir telefona
+gönderebilirsiniz.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Bu şekilde
+yanlışlıkla çok sayıda bağlantı oluşturulabilir. Bu
+bağlantılara dokunup <i>Değiştir</i> ve ardından <i>Sil</i>\'e
+basarak silebilirsiniz.</p>
+<p style="line-height: 100%; margin-bottom: 0cm"><i>O</i><i>rta </i><i>Sol</i><i>
+</i><i>M</i><i>enü→</i><i>Klon</i><i>→Bağlantı Ekle → QR</i>\'ı
+kullanarak telefonda bağlantının bir tarafını manuel olarak
+yapılandırın ve diğer tarafı QR kodunu tarayarak yapılandırın.</p>
+<p style="line-height: 100%; margin-bottom: 0cm"><br/>
 
 </p>
 ]]>

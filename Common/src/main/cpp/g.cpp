@@ -79,9 +79,6 @@ extern int    timestr(char *buf,time_t tim) ;
 extern lastscan_t  scantoshow;
 //JNIEXPORT void JNICALL Java_tk_glucodata_Glucose_nfcdata(JNIEnv *env, jobject thiz, jbyteArray uid, jbyteArray info,jbyteArray data) {
 //JNIEXPORT int JNICALL Java_tk_glucodata_Natives_nfcdata(JNIEnv *env, jclass thiz, jbyteArray uid, jbyteArray info,jbyteArray data) {
-#ifndef NOLOG
-#define SCANLOG
-#endif
 #if defined(SCANLOG) //|| defined(__arm__) 
 
 class scanlogger {
@@ -746,6 +743,12 @@ constexpr const jlong isLow=7LL<<48;
 constexpr const jlong isAgain=3LL<<48;
 constexpr const jlong isLowest=5LL<<48;
 
+constexpr const jlong isVeryHigh=16LL<<48;
+constexpr const jlong isVeryLow=17LL<<48;
+
+constexpr const jlong isPreHigh=18LL<<48;
+constexpr const jlong isPreLow=19LL<<48;
+
 #include "gluconfig.hpp"
 extern void setbuffer(char *);
 
@@ -771,14 +774,18 @@ static void savestate(libre2stream *sdata) {
     }
 
 
-static jlong getalarmonly(const uint32_t glval,const SensorGlucoseData *hist) {
+static jlong getalarmonly(const uint32_t glval,float drate,const SensorGlucoseData *hist) {
     const uint32_t val=glval*10;
-    auto res=(glval<glucoselowest?isLowest:(glval>hist->getmaxmgdL()?isHighest:(settings->highAlarm(val)?isHigh:(settings->lowAlarm(val)?isLow:(settings->availableAlarm()&&hist->waiting?isAgain:0)))));
+    auto res=glval<glucoselowest?isLowest:(glval>hist->getmaxmgdL()?isHighest:
+ (settings->veryhighAlarm(val)?isVeryHigh:(settings->highAlarm(val)?isHigh:(settings->verylowAlarm(val)?isVeryLow:(settings->lowAlarm(val)?isLow:(
+settings->prelowAlarm(val,drate)?isPreLow:
+(settings->prehighAlarm(val,drate)?isPreHigh:
+(settings->availableAlarm()&&hist->waiting?isAgain:0))))))));
     LOGGER("val=%u, high=%d, low=%d res=%" PRId64 "\n",val,settings->highAlarm(val),settings->lowAlarm(val),res);
     return res;
     }
-int getalarmcode(const uint32_t glval,SensorGlucoseData *hist) {
-    int res= getalarmonly(glval,hist)>>48;
+int getalarmcode(const uint32_t glval,float drate,SensorGlucoseData *hist) {
+    int res= getalarmonly(glval,drate,hist)>>48;
     hist->waiting=false;
     return res;
     }
@@ -793,8 +800,7 @@ jlong glucoselong(uint32_t glval,float drate,const SensorGlucoseData *hist) {
             return 0LL;
         const jlong rate=roundl(((long double)drate)*1000LL);
 
-//        const jlong alarmcode= glval<glucoselowest?isLowest:(glval>glucosehighest?isHighest:(settings->highAlarm(val)?isHigh:(settings->lowAlarm(val)?isLow:(settings->availableAlarm()&&hist->waiting?isAgain:0))));
-        const jlong alarmcode= getalarmonly(glval,hist);
+        const jlong alarmcode= getalarmonly(glval,drate,hist);
         const jlong res= (rate&0xFFFF)<<32|alarmcode|glval;
         LOGGER("glucoselong=%" PRId64 "\n",res);
         return res;

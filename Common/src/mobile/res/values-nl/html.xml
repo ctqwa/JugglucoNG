@@ -1318,8 +1318,18 @@ signaalalarmen de categorie Alarmen in Android. Dit betekent dat in
 Android-instellingen het volume wordt beheerd met het volume controle
 met de naam Alarmen en de alarmen niet worden gedempt wanneer het
 geluid van de hele telefoon wordt uitgeschakeld of op trillen wordt
-gezet. Als <i>Alarm is alarm</i> niet is ingesteld, wordt Beltoon
-gebruikt. Dit is altijd het geval voor de waarde aanwezig melding.</p>
+gezet. Als <i>Alarm is alarm</i> niet is ingesteld, wordt de volumeknop voor meldingen op telefoons gebruikt en de systeemknop op de Samsung Galaxy 4-7. Dit is altijd het geval voor de beschikbare meldingswaarde.
+<h3>Standaard:</h3>
+<p>Geef aan voor welk <b>profiel</b> deze instellingen gelden. Zo kun je schakelen tussen instellingen voor alarmen en Praat. Je kunt een profiel zo instellen dat het op een bepaald tijdstip automatisch wordt ingeschakeld via Geavanceerd →  <a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html">Tijdrooster</a>.</p>
+<h3><a href="https://www.juggluco.nl/Jugglucohelp/advancedAlarmshelp.html">Geavanceerd:</a></h3>
+<p>Menu met geavanceerde alarmen: zeer laag, zeer hoog, binnenkort laag, binnenkort hoog en profielen op een bepaalde tijd actief laten worden.</p>
+<p><br>
+<br>
+
+</p>
+
+
+
 ]]>
 </string>
 <string name="flashpermission" >
@@ -2429,14 +2439,14 @@ installeren. Op andere telefoons staat dit onder
 <p>Als <em>Talk Touch</em> is ingeschakeld, zorgt aanraking op
 bepaalde plaatsen voor praten:</p>
 <ul>
-	<li><p>Het aanraken van de huidige glucose;</p>
-	<li><p>Aanraken van grafiek- en scanpunten;</p>
-	<li><p>Hoeveelheden aanraken;</p>
+	<li><p>Het aanraken van de huidige glucose;</p></li>
+	<li><p>Aanraken van grafiek- en scanpunten;</p></li>
+	<li><p>Hoeveelheden aanraken;</p></li>
 	<li><p>De datum van dat punt van de grafiek wordt gezegd wanneer de
-	linker- en rechterbovenhoek worden aangeraakt;</p>
-	<li><p>Lang drukken op een menu-item;</p>
+	linker- en rechterbovenhoek worden aangeraakt;</p></li>
+	<li><p>Lang drukken op een menu-item;</p></li>
 	<li><p>Lang indrukken van een hoeveelheid in de lijst met
-	hoeveelheden (links midden menu-&gt;lijst).</p>
+	hoeveelheden (links midden menu-&gt;lijst).</p></li>
 </ul>
 <h2 class="western">Spreek berichten uit</h2>
 <p>Leest berichten die tijdelijk zichtbaar zijn op het scherm en het
@@ -2445,6 +2455,29 @@ resultaat van het scannen (foutmeldingen en de glucosewaarde).</p>
 <p>Spreekt het glucoseniveau uit tijdens alarmen voor lage en hoge
 glucose. Deze wordt zowel bij aanvang van het alarm uitgelezen als op
 het moment dat het alarm wordt gestopt.</p>
+<h2 class="western">Profiel</h2>
+<p>Selecteer welk profiel actief is. <b>Standaard</b> is het
+standaardprofiel. Alle instellingen in het linkermenu →
+Instellingen → <a href="https://www.juggluco.nl/Jugglucohelp/nl/alarmhelp.html">Alarmen</a>
+en Praat zijn specifiek voor het actieve profiel. 
+</p>
+<h2 class="western"><a href="https://www.juggluco.nl/Jugglucohelp/nl/schedulehelp.html">Tijdrooster</a></h2>
+<p>Je kunt Juggluco zo configureren dat een profiel op een bepaald
+tijdstip van de dag actief wordt.</p>
+<h2 class="western">Volume</h2>
+<p>Je kunt het volume van het <i>praat</i>-geluid verhogen of verlagen in
+de Android-instellingen onder Geluid. Als&nbsp;<b>MEDIA</b>&nbsp;<b>niet</b> is aangevinkt,&nbsp;kan ik dit op mijn
+telefoon doen met de <i>Meldingsgeluid</i>&nbsp;regelaar en op mijn
+WearOS-horloge met de <i>Systeemgeluid</i>&nbsp;regelaar. Het zou
+niet hoorbaar moeten zijn wanneer &quot;<i>Niet storen</i>&quot; is
+ingeschakeld. Wanneer&nbsp;<b>MEDIA&nbsp;</b>is aangevinkt, wordt de
+knop voor het mediavolume gebruikt en op de meeste telefoons is het
+te horen tijdens&nbsp;&quot;<i>Niet storen</i>&quot;.</p>
+<p style="line-height: 100%; margin-bottom: 0in"><i>Alarmen
+uitspreken</i> is anders. Alarmen worden uitgesproken in de categorie
+\'<i>Alarmen</i>\' als \'<i>Alarm is Alarm</i>\' is ingeschakeld. Op mijn telefoon regel ik het
+volume met de alarm volume regelaar, op mijn horloge met de melding
+volume regelaar.</p>
 <p><br/>
 <br/>
 
@@ -2454,8 +2487,6 @@ het moment dat het alarm wordt gestopt.</p>
 
 </p>
 <p><br/>
-<br/>
-<br/>
 <br/>
 
 </p>
@@ -2821,8 +2852,7 @@ welke sensor je de informatie wilt bekijken.</p>
 </string>
 <string name="QRmirror" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><p align="center" style="line-height: 100%; margin-top: 0.17in; margin-bottom: 0.08in; page-break-after: avoid">
-<font face="Liberation Sans, sans-serif"><font size="6" style="font-size: 28pt"><b>QR-kloon</b></font></font></p>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/QRmirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><h1>QR-kloon</h1>
 <p style="line-height: 100%; margin-bottom: 0in">Je kunt de andere
 kant van een kloon verbinding configureren door een QR-code te
 scannen met het linkermenu → Foto op de andere telefoon.</p>
@@ -2846,6 +2876,38 @@ configureer de andere kant door de QR-code te scannen.</p>
 <br/>
 
 </p>
+]]>
+</string>
+<string name="advancedAlarmshelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/advancedAlarmshelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/advancedAlarmshelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/advancedAlarmshelp.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">
+Extra alarmen</h1>
+<h3 class="western">Zeer lage glucose alarm</h3>
+<p>Tweede alarm voor lage glucosewaarde, dat afgaat wanneer de
+glucosewaarde lager is dan het alarm voor lage glucosewaarde.</p>
+<h3 class="western">Zeer hoge glucose alarm</h3>
+<p>Tweede hoog alarm dat afgaat wanneer de glucosewaarde hoger is dan
+het alarm voor hoge glucose.</p>
+<h3 class="western">Alarm als zo dadelijk onder</h3>
+<p>Alarm die afgaat als dalende waarde zo dadelijk onder bepaalde
+waarde gaat komen.</p>
+<h3 class="western">Alarm als zo dadelijk boven</h3>
+<p>Alarm die afgaat als stijgende waarde zo dadelijk boven bepaalde
+waarde gaat komen.</p>
+<h3 class="western">Tijdrooster</h3>
+<p>Stel een bepaald profiel in om op een bepaald tijdstip van de dag
+actief te worden. Zo kun je overdag en \'s nachts andere
+glucosedrempelwaarden of beltonen gebruiken, of \'s nachts het
+uitspreken van glucosewaarden automatisch uitschakelen.</p>
+]]>
+</string>
+<string name="schedulehelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/schedulehelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/schedulehelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html?lang=en">en</a>&emsp;&emsp;</p><h1>Tijdrooster</h1>
+<p>Stel in dat een bepaald profiel actief wordt op een bepaalde tijd van de dag. Druk op "<strong>Nieuw</strong>" om een koppeling te maken tussen een bepaald tijdstip en een profiel. <a href="https://www.juggluco.nl/">Juggluco</a> schakelt elke dag op het opgegeven tijdstip over naar dat profiel. Je kunt een tijdprofielkoppeling bewerken door erop te tikken.</p>
+<p>Alle instellingen voor Alarmen en Praat zijn specifiek voor een gemeenschappelijk profiel. Welk profiel actief is, wordt weergegeven in het linkermenu &rarr; Instellingen &rarr; <a href="https://www.juggluco.nl/Jugglucohelp/nl/alarmhelp.html">Alarmen</a> en linker midden menu &rarr; <a href="https://www.juggluco.nl/Jugglucohelp/nl/talkhelp.html">Praat</a>. Aanvankelijk is het profiel "<strong>Standaard</strong>". Je kunt dit veranderen in "<strong>Profiel 1</strong>" of "<strong>Profiel 2</strong>", enz. Alle specificaties in Alarm en Praat zijn specifiek voor het actieve profiel.</p>
+<p><br /> </p>
+<p><br /> </p>
 ]]>
 </string>
 </resources>

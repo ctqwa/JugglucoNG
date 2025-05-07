@@ -176,6 +176,8 @@
  <string name="nonewvalue">"No new value since "</string>
  <string name="lowglucose">" Low Glucose!"</string>
  <string name="highglucose">" High Glucose!"</string>
+ <string name="lowglucoseshort">@string/lowglucose</string>
+ <string name="highglucoseshort">@string/highglucose</string>
  <string name="sendto">Send to</string>
  <string name="resenddata">Resend data</string>
  <string name="minimum">Minimum</string>
@@ -183,8 +185,6 @@
  <string name="duractionsec">Duration (sec):</string>
  <string name="duraction">Duration:</string>
  <string name="sec">sec</string>
- <string name="lowglucoseshort">" Low Glucose!"</string>
- <string name="highglucoseshort">" High Glucose!"</string>
  <string name="notentered">" not entered"</string>
  <string name="spacedand">" and "</string>
     <string name="disturb">Disturb</string>
@@ -366,7 +366,7 @@
    <string name="notalldata">WARNING: “Receive from” not set, but some data types are not sent.</string>
   <string name="libresetalllabels">First specify for each label what should be done with it.</string>
    <string name="photo">Photo</string>
-   <string name="photomessage">Scan the data matrix of a Dexcom G7 or GS1 Sibionics sensor.</string>
+   <string name="photomessage">Scan the data matrix of a Dexcom G7/ONE+ or Sibionics GS1 sensor or the mirror QR code.</string>
    <string name="exchanges">Exchange data</string>
    <string name="dexfuture">Predict (Dexcom)</string>
    <string name="initializing">Initializing</string> 
@@ -397,6 +397,25 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     
     <string name="googlescan">Google scan</string>
     <string name="usedweight">WARNING: weight (%.1f) larger than 0</string>
+
+ <string name="verylowglucose">" Very LOW glucose!"</string>
+ <string name="veryhighglucose">" Very HIGH glucose!"</string>
+
+ <string name="verylowglucoseshort">" Very LOW!"</string>
+ <string name="veryhighglucoseshort">" Very HIGH!"</string>
+
+ <string name="prelowglucose">" Soon LOW glucose!"</string>
+ <string name="prehighglucose">" Soon HIGH glucose!"</string>
+
  <string name="verylowglucosealarm">Very low glucose alarm</string>
  <string name="veryhighglucosealarm">Very high glucose alarm</string>
+
+ <string name="prelowglucosealarm">Alarm when soon below</string>
+ <string name="prehighglucosealarm">Alarm when soon above</string>
+    <string name="schedules">Schedules</string>
+    <string name="profile">"Profile "</string>
+ <string name="lossofsignal">Loss of signal</string>
+ <string name="valuenotification">Value notification</string>
+ <string name="nothing"></string>
+ 
 </resources>

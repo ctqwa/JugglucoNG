@@ -21,6 +21,7 @@
 
 package tk.glucodata;
 
+import static android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION;
 import static android.media.AudioAttributes.USAGE_NOTIFICATION;
 import static android.media.AudioAttributes.USAGE_UNKNOWN;
 import static android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION;
@@ -41,7 +42,9 @@ import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
 import static tk.glucodata.settings.Settings.editoptions;
 import static tk.glucodata.settings.Settings.getGenSpin;
+import static tk.glucodata.settings.Settings.getProfileSpinner;
 import static tk.glucodata.settings.Settings.removeContentView;
+import static tk.glucodata.settings.Settings.scheduleProfiles;
 import static tk.glucodata.settings.Settings.str2float;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
@@ -206,7 +209,7 @@ if(!DontTalk) {
           });
     engine.setOnUtteranceProgressListener(new UtteranceProgressListener() {
 
- //  AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <26)?null:new AudioFocusRequest.Builder( AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes( defaultAudioAttributes ).build();
+ //  AudioFocusRequest audiofocusrequest = (android.os.Build.VERSION.SDK_INT <26)?null:new AudioFocusRequest.Builder( AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes( notification_audio ).build();
         @Override
         public void onDone(String utteranceId) {
             if(doLog) {Log.i(LOG_ID,"onDone "+utteranceId);};
@@ -231,7 +234,7 @@ if(!DontTalk) {
     });
     if(doLog) {Log.i(LOG_ID,"after new TextToSpeech");};
     if(android.os.Build.VERSION.SDK_INT >= minandroid)
-        engine.setAudioAttributes(defaultAudioAttributes);
+        engine.setAudioAttributes(notification_audio);
         }
    }
 
@@ -252,18 +255,18 @@ public void speak(String message) {
                 }
             }
         catch(Throwable th) {
-            Log.i(LOG_ID,"speak failed",th);
+            Log.stack(LOG_ID,"speak failed",th);
             }
         }
     }
 static boolean notifyfocus=false;
-//private static final AudioAttributes defaultAudioAttributes = (new AudioAttributes.Builder()) .setLegacyStreamType(TextToSpeech.Engine.DEFAULT_STREAM) .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH) .build(); 
-//private static final AudioAttributes defaultAudioAttributes =(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_ASSISTANCE_SONIFICATION:USAGE_NOTIFICATION ) .build():null;
-private static final AudioAttributes defaultAudioAttributes = notification_audio;
+//private static final AudioAttributes notification_audio = (new AudioAttributes.Builder()) .setLegacyStreamType(TextToSpeech.Engine.DEFAULT_STREAM) .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH) .build(); 
+//private static final AudioAttributes notification_audio =(android.os.Build.VERSION.SDK_INT >= 21)?new AudioAttributes.Builder().setUsage(isWearable? USAGE_ASSISTANCE_SONIFICATION:USAGE_NOTIFICATION ) .build():null;
+//private static final AudioAttributes notification_audio = notification_audio;
 public void speak(String message, AudioAttributes attr) {
 if(!DontTalk) {
     if(android.os.Build.VERSION.SDK_INT >= minandroid) {
-        if(attr!=defaultAudioAttributes) {
+        if(attr!=notification_audio) {
             engine.setAudioAttributes(attr);
            }
            }
@@ -271,8 +274,8 @@ if(!DontTalk) {
 //    engine.speak(message, TextToSpeech.QUEUE_FLUSH, null);
     speak(message);
     if(android.os.Build.VERSION.SDK_INT >= minandroid) {
-        if(attr!=defaultAudioAttributes)
-            engine.setAudioAttributes(defaultAudioAttributes);
+        if(attr!=notification_audio)
+            engine.setAudioAttributes(notification_audio);
          }
          }
     }
@@ -408,8 +411,6 @@ public static void config(MainActivity context) {
 
         var pitchs=slider(context,curpitch);
         var cancel=getbutton(context,R.string.cancel);
-        var helpview=getbutton(context,R.string.helpname);
-        helpview.setOnClickListener(v-> help.help(R.string.talkhelp,context));
 
         var save=getbutton(context,R.string.save);
         var width= GlucoseCurve.getwidth();
@@ -420,6 +421,20 @@ public static void config(MainActivity context) {
         var voicelabel=getlabel(context,context.getString(R.string.talker));
         var active=getcheckbox(context,R.string.speakglucose, SuperGattCallback.dotalk);
         active.setPadding(0,0,pad*3,0);
+
+        var mediasound=getcheckbox(context,"MEDIA", Natives.getSoundType( )==AudioAttributes.USAGE_MEDIA);
+        mediasound.setOnCheckedChangeListener(
+                 (buttonView,  isChecked) -> {
+                     if (isChecked) {
+                         Natives.setSoundType(AudioAttributes.USAGE_MEDIA);
+                     } else {
+                         Natives.setSoundType(isWearable ? USAGE_ASSISTANCE_SONIFICATION : AudioAttributes.USAGE_NOTIFICATION);
+                     }
+                     Notify.makenotification_audio();
+                        }
+                        );
+                        
+
 
         var test=getbutton(context,context.getString(R.string.test));
         if(spinner!=null) {
@@ -441,6 +456,23 @@ public static void config(MainActivity context) {
         var touchtalk= getcheckbox(context,context.getString(R.string.talk_touch), Natives.gettouchtalk());
         var speakmessages= getcheckbox(context,context.getString(R.string.speakmessages), Natives.speakmessages());
         var speakalarms= getcheckbox(context,context.getString(R.string.speakalarms), Natives.speakalarms());
+        var pro=getProfileSpinner(context);
+       int curProfile=Natives.getProfile();
+        pro.setSelection(curProfile);
+       pro.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        @Override
+        public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
+            if(position!=curProfile) {
+               Natives.setProfile(position);
+               SuperGattCallback.initAlarmTalk();
+               MainActivity.doonback();
+               config(context);
+               }
+            }
+        @Override
+        public  void onNothingSelected (AdapterView<?> parent) {
+
+        } });
         if(android.os.Build.VERSION.SDK_INT >= minandroid) { 
             spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
@@ -453,7 +485,6 @@ public static void config(MainActivity context) {
                 public  void onNothingSelected (AdapterView<?> parent) {
 
                 } });
-            avoidSpinnerDropdownFocus(spin);
             spin.setAdapter(new RangeAdapter<Voice>(voiceChoice, context, voice -> {
                     return voice.getName();
                     }));
@@ -463,12 +494,10 @@ public static void config(MainActivity context) {
             spinpos[0]=-1;
             }
         ViewGroup layout;
+    var schedules=getbutton(context,R.string.schedules);
+
         if(isWearable) {
             int marg=(int)(width*.1f);
-    /*         Layout.getMargins(active).topMargin=(int)(GlucoseCurve.metrics.density*10.0);
-             Layout.getMargins(cancel).leftMargin=(int)(GlucoseCurve.metrics.density*10.0);
-             Layout.getMargins(test).rightMargin=(int)(GlucoseCurve.metrics.density*10.0);
-             Layout.getMargins(separation).rightMargin=(int)(GlucoseCurve.metrics.density*10.0); */
              Layout.getMargins(voicelabel).topMargin=marg;
              Layout.getMargins(cancel).leftMargin=marg;
              Layout.getMargins(test).rightMargin=marg;
@@ -477,7 +506,7 @@ public static void config(MainActivity context) {
                 return new int[] {w,h};
                 },
 
-                 new View[]{voicelabel},new View[]{spin},new View[]{active},new View[]{seplabel,separation}, new View[]{touchtalk},new View[]{ speakmessages},new View[]{speakalarms },new View[]{speedlabel},new View[]{speeds[1],speeds[0]},new View[]{pitchlabel},new View[]{pitchs[1],pitchs[0]}, new View[]{cancel,test},new View[]{save});
+                 new View[]{voicelabel},new View[]{spin},new View[]{active},new View[]{seplabel,separation}, new View[]{touchtalk},new View[]{ speakmessages},new View[]{speakalarms },new View[]{speedlabel},new View[]{speeds[1],speeds[0]},new View[]{pitchlabel},new View[]{pitchs[1],pitchs[0]},new View[]{mediasound},  new View[]{pro},new View[]{schedules},new View[]{cancel,test},new View[]{save});
 
             var scroll=new ScrollView(context);
             scroll.addView(lay);
@@ -498,13 +527,18 @@ public static void config(MainActivity context) {
                 firstrow=new View[]{active,seplabel,separation,space};
               }
             var secondrow=new View[]{touchtalk, speakmessages, speakalarms };
-            Layout.getMargins(cancel).leftMargin=Layout.getMargins(save).rightMargin=(int)(width*.1f);
+            Layout.getMargins(cancel).leftMargin=Layout.getMargins(save).rightMargin=(int)(width*.05f);
+            var helpview=getbutton(context,R.string.helpname);
+            helpview.setOnClickListener(v-> help.help(R.string.talkhelp,context));
             layout= new Layout(context,(l,w,h)-> {
                 return new int[] {w,h};
-                },firstrow,secondrow,new View[]{speedlabel,speeds[1],speeds[0]},new View[]{pitchlabel,pitchs[1],pitchs[0]}, new View[]{cancel,helpview,test,save});
+                },firstrow,secondrow,new View[]{speedlabel,speeds[1],speeds[0],pro},new View[]{pitchlabel,pitchs[1],pitchs[0],mediasound}, new View[]{cancel,helpview,schedules,test,save});
             }
 
         final var lay=layout;
+        schedules.setOnClickListener(v->  {
+            scheduleProfiles(context,lay);
+        });
           //layout.setBackgroundResource(R.drawable.dialogbackground);
         layout.setBackgroundColor( Applic.backgroundcolor);
           context.lightBars(false);

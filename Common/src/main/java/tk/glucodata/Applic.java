@@ -86,7 +86,8 @@ static final boolean ALLGALAXY=true;
 static final boolean hasNotChinese=true;
 public static final  boolean scrollbar=true;
 public static final  boolean horiScrollbar=true;
-static final float mgdLmult= doLog?18.0182f:18.0f;
+//static final float mgdLmult= doLog?18.0182f:18.0f;
+static final float mgdLmult= BuildConfig.DEBUG?18.0182f:18.0f;
 //public static tk.glucodata.MessageSender messagesender=null;
    static boolean Nativesloaded=false;
 public static boolean hour24=true;
@@ -184,6 +185,8 @@ void setnotify(boolean on) {
     {if(doLog) {Log.i(LOG_ID,"setnotify="+on);};};
     }
 public void setunit(int unit)  {
+     if(Applic.unit!=unit)
+        SuperGattCallback.previousglucosevalue=0.0f;
     Natives.setunit(unit);
     Notify.mkunitstr(app,unit);
     }
@@ -549,7 +552,7 @@ boolean initproc() {
         needsnatives();
         {if(doLog) {Log.i("Applic","initproc width="+initscreenwidth);};};
         libre3init.init();
-        SuperGattCallback.init(this);
+        SuperGattCallback.initAlarmTalk();
         initialize();
         NumAlarm.handlealarm(this);
         Maintenance.setMaintenancealarm(this);
@@ -754,7 +757,7 @@ if(isWearable) {
 
     Floating.init(); 
    final var initversion=Natives.getinitVersion();
-    if(initversion<32) {
+    if(initversion<33) {
       if(initversion<29) {
          if(initversion<22) {
             if(initversion<14) {
@@ -769,7 +772,7 @@ if(isWearable) {
             }
          sethour24(DateFormat.is24HourFormat(app));
          }
-      Natives.setinitVersion(32);
+      Natives.setinitVersion(33);
       }
 
    setjavahour24(Natives.gethour24());
@@ -811,6 +814,10 @@ static public void speak(String message) {
 static public boolean getHeartRate() {
     return initproccalled&&Natives.getheartrate();
     }
+/*@Keep
+static void changedProfile() {
+        SuperGattCallback.init();
+        } */
 @Keep
 static void setinittext(String str) {
    RunOnUiThread(()-> {Specific.settext(str);});

@@ -116,11 +116,12 @@ RemoteGlucose(float gl,float notwidth,float xper,int whiteonblack,boolean giveti
       };
 }
 
+static final String stopalarmAction= "StopAlarm";
 final RemoteViews arrowremote(int kind, notGlucose glucose,final boolean alarm) {
    RemoteViews remoteViews= new RemoteViews(Applic.app.getPackageName(),alarm?R.layout.alarm:R.layout.arrowandvalue);
    if(alarm) {
       Intent closeintent=new Intent(Applic.app,NumAlarm.class);
-      closeintent.setAction(Notify.stopalarm);
+      closeintent.setAction(stopalarmAction);
       PendingIntent closepending=PendingIntent.getBroadcast(Applic.app, stopalarmrequest, closeintent,PendingIntent.FLAG_UPDATE_CURRENT|penmutable);
       remoteViews.setOnClickPendingIntent(R.id.stopalarm, closepending); 
       }
@@ -145,14 +146,15 @@ final RemoteViews arrowremote(int kind, notGlucose glucose,final boolean alarm) 
    }
 
    canvas.drawText(glucose.value, getx, gety, glucosePaint);
+   final boolean glucosealarm=kind<2||kind>4;
    if(kind<50) {
       float valwidth = glucosePaint.measureText(glucose.value, 0, glucose.value.length());
-      if (kind > 1) {
+      if(!glucosealarm) {
          glucosePaint.setTextSize(useglsize * .4f);
          canvas.drawText(unitlabel, getx + valwidth + useglsize * .2f, gety - useglsize * .25f, glucosePaint);
       } else {
          glucosePaint.setTextSize(useglsize * .65f);
-         canvas.drawText(" " + Applic.getContext().getString(kind == 0 ? R.string.lowglucoseshort : R.string.highglucoseshort), getx + valwidth + useglsize * .2f, gety - useglsize * .15f, glucosePaint);
+         canvas.drawText(" " + Notify.alarmtext(kind ), getx + valwidth + useglsize * .2f, gety - useglsize * .15f, glucosePaint);
       }
        }
    else {

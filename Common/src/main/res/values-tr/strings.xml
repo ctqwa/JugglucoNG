@@ -340,8 +340,6 @@
  <string name="mmolL">mmol/L</string>
  <string name="mgdL">mg/dL</string>
  <string name="interval">Aralık</string>
- <string name="off">Kapat</string>
- <string name="shortoff">Off</string>
  <string name="streamingenabled">" Akış Etkin"</string>
  <string name="streamingnotenabled">" Akış Devre Dışı"</string>
     <string name="everSensebroadcast">EverSense</string>
@@ -356,7 +354,7 @@
    <string name="glucosearrowvaluecomplicationlabel">Değer + Yön oku</string>
    <string name="text">Metin</string>
    <string name="arrow">Yön oku</string>
-   <string name="notalldata">DİKKAT: Tüm verileri göndermeden “Gelen” ayarlanmadı.</string>
+   <string name="notalldata">UYARI: “Alıcı” işaretlenmemiş, bazı veri türleri gönderilmiyor.</string>
   <string name="libresetalllabels">Öncelikle her etiket için ne yapılması gerektiğini belirtin.</string>
    <string name="photo">Fotoğraf</string>
    <string name="photomessage">Dexcom G7 veya Sibionics (Çin) sensörünün veri matrisini (karekodunu) tarayın.</string>

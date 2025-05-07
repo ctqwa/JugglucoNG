@@ -703,8 +703,8 @@ static bool givedripstatus(std::string_view origin,recdata *outdata) {
 		return outofmemory(outdata);
 		}
         char *start=outdata->allbuf+152;
-	auto halarm=gconvert(settings->data()->ahigh,2);
-	auto lowalarm=gconvert(settings->data()->alow,2);
+	auto halarm=gconvert(settings->data()->ahighget(),2);
+	auto lowalarm=gconvert(settings->data()->alowget(),2);
 	int alllen=snprintf(start,len,format, settings->getunitlabel().data(),halarm,lowalarm);
 	mkjsonheader(start,start+alllen,false,outdata,origin); 
 	return true;
@@ -763,9 +763,9 @@ static bool givenightstatus(std::string_view origin,recdata *outdata) {
         char *start=outdata->allbuf+152;
 	auto thigh=gconvert(settings->targethigh(),2);
 	auto tlow=gconvert(settings->targetlow(),2);
-	auto halarm=gconvert(settings->data()->ahigh,2);
+	auto halarm=gconvert(settings->data()->ahighget(),2);
 
-	auto lowalarm=gconvert(settings->data()->alow,2);
+	auto lowalarm=gconvert(settings->data()->alowget(),2);
 	const char *unitlabel=settings->getunitlabel().data();
 	int alllen=snprintf(start,len,statusformat,tmbuf.tm_year+1900,tmbuf.tm_mon+1,tmbuf.tm_mday, tmbuf.tm_hour, tmbuf.tm_min,tmbuf.tm_sec,0,tim*1000LL,unitlabel,halarm,thigh,tlow,lowalarm);
 	mkjsonheader(start,start+alllen,false,outdata,origin); 

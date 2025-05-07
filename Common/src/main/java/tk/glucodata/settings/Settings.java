@@ -36,15 +36,18 @@ import static android.widget.Spinner.MODE_DIALOG;
 import static android.widget.Spinner.MODE_DROPDOWN;
 import static androidx.core.os.LocaleListCompat.getEmptyLocaleList;
 import static tk.glucodata.Applic.isWearable;
+import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.Backup.getnumedit;
 import static tk.glucodata.Layout.getMargins;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.getRTL;
+import static tk.glucodata.Natives.getScheduleProfile;
 import static tk.glucodata.Natives.getshowhistories;
 import static tk.glucodata.Natives.getshownumbers;
 import static tk.glucodata.Natives.getshowscans;
 import static tk.glucodata.Natives.getshowstream;
+import static tk.glucodata.Natives.removeScheduleProfile;
 import static tk.glucodata.Natives.setthreshold;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
@@ -65,6 +68,7 @@ import android.graphics.Color;
 import android.os.Build;
 import android.text.InputType;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
@@ -86,6 +90,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 import androidx.core.widget.NestedScrollView;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 //import com.google.android.material.slider.LabelFormatter;
 //import com.google.android.material.slider.RangeSlider;
@@ -96,6 +102,7 @@ import java.util.List;
 
 import tk.glucodata.Applic;
 import tk.glucodata.Backup;
+import tk.glucodata.BooleanSupplier;
 import tk.glucodata.BuildConfig;
 import tk.glucodata.Floating;
 import tk.glucodata.GlucoseCurve;
@@ -108,8 +115,10 @@ import tk.glucodata.MainActivity;
 import tk.glucodata.Menus;
 import tk.glucodata.Natives;
 import tk.glucodata.Notify;
+import tk.glucodata.NumAlarm;
 import tk.glucodata.R;
 import tk.glucodata.Specific;
+import tk.glucodata.SuperGattCallback;
 
 import java.text.DecimalFormat;
 import java.util.Locale;
@@ -175,8 +184,7 @@ private void makesettingsin(MainActivity act) {
         activity=act;
 
         colorwindowbackground=Applic.backgroundcolor;
-    boolean[] issaved={false};
-       mksettings(activity,issaved);
+       mksettings(activity);
 
     activity.setonback(() -> {
 
@@ -194,11 +202,10 @@ private void makesettings(MainActivity act) {
 }
 
 
-void recreate(boolean[] issaved) {
-  issaved[0]=true;
+void recreate() {
 // removeContentView(settinglayout);
     layoutweg();
-   mksettings(activity,issaved);
+   mksettings(activity);
 
    }
 void layoutweg() {
@@ -334,7 +341,315 @@ void setvalues() {
     }
 
 
-static public void alarmsettings(MainActivity context,View parview,boolean[] issaved) {
+
+
+static public Spinner getProfileSpinner(MainActivity context) {
+   var spin=  getGenSpin(context);
+   final String profile=context.getString(R.string.profile);
+   final List<String> strprofiles= Arrays.asList(context.getString(R.string.defaultname),profile+"1",profile+"2",profile+"3",profile+"4",profile+"5");
+   final var adapt=new LabelAdapter<String>(context,strprofiles,0);
+    spin.setAdapter(adapt);
+    return spin;
+    }
+
+static private void advancedalarm(MainActivity context,View parview) {
+    View[] verylowalarm= mkalarm(context,context.getString(R.string.verylowglucosealarm),Natives.hasalarmverylow(),Natives.alarmverylow(),5);
+    View[] prelowalarm= mkalarm(context,context.getString(R.string.prelowglucosealarm),Natives.hasalarmprelow(),Natives.alarmprelow(),7);
+    View[] veryhighalarm=mkalarm(context,context.getString(R.string.veryhighglucosealarm),Natives.hasalarmveryhigh(),Natives.alarmveryhigh(),6);
+    View[] prehighalarm=mkalarm(context,context.getString(R.string.prehighglucosealarm),Natives.hasalarmprehigh(),Natives.alarmprehigh(),8);
+
+    var close=getbutton(context,R.string.closename);
+    var schedules=getbutton(context,R.string.schedules);
+   ViewGroup layout;
+    if(isWearable) {
+       final var height= GlucoseCurve.getheight();
+       getMargins(schedules).topMargin=getMargins(close).bottomMargin=(int)(height*.05);
+       final var width= GlucoseCurve.getwidth();
+       getMargins(veryhighalarm[1]).leftMargin=getMargins(veryhighalarm[2]).rightMargin=(int)(height*.1f);
+       getMargins(verylowalarm[1]).leftMargin=getMargins(verylowalarm[2]).rightMargin=(int)(height*.1f);
+       getMargins(prehighalarm[1]).leftMargin=getMargins(prehighalarm[2]).rightMargin=(int)(height*.1f);
+       getMargins(prelowalarm[1]).leftMargin=getMargins(prelowalarm[2]).rightMargin=(int)(height*.1f);
+
+        Layout lay = new Layout(context, (l, w, h) -> {
+            int[] ret={w,h};
+            return ret;
+            },
+            new View[]{schedules},
+            new View[]{verylowalarm[0]},new View[]{verylowalarm[1],verylowalarm[2]},
+            new View[]{veryhighalarm[0]},new View[]{veryhighalarm[1],veryhighalarm[2]},
+            new View[]{prelowalarm[0]},new View[]{prelowalarm[1],prelowalarm[2]},
+            new View[]{prehighalarm[0]},new View[]{prehighalarm[1],prehighalarm[2]},
+            new View[]{close});
+        var scroll=new ScrollView(context);    
+        scroll.addView(lay);
+        scroll.setFillViewport(true);
+        scroll.setSmoothScrollingEnabled(false);
+       scroll.setScrollbarFadingEnabled(true);
+       scroll.setVerticalScrollBarEnabled(Applic.scrollbar);
+       layout=scroll;
+    lay.setPadding((int)(width*0.02f),0,(int)(width*0.05f),0);
+       }
+    else {
+     var help=getbutton(context,R.string.helpname);
+     help.setOnClickListener(v-> help(R.string.advancedAlarmshelp,context));
+     final var width= GlucoseCurve.getwidth();
+     getMargins(close).rightMargin=getMargins(help).leftMargin=(int)(width*.15);
+        Layout lay = new Layout(context, (l, w, h) -> {
+            int[] ret={w,h};
+            return ret;
+
+            },verylowalarm,veryhighalarm,prelowalarm,prehighalarm,new View[]{help,schedules,close});
+        layout=lay;
+    final int sidepad=(int)(GlucoseCurve.metrics.density*8);
+    layout.setPadding(MainActivity.systembarLeft+sidepad,MainActivity.systembarTop*2/3,sidepad+MainActivity.systembarRight,sidepad+MainActivity.systembarBottom*9/10);
+        }
+
+
+    schedules.setOnClickListener(v->scheduleProfiles(context,layout));
+
+    verylowalarm[2].setOnClickListener(v->{
+        new tk.glucodata.RingTones(5).mkviews(context,context.getString(R.string.verylowglucosealarm),layout);
+        });
+    veryhighalarm[2].setOnClickListener(v->{
+        new tk.glucodata.RingTones(6).mkviews(context,context.getString(R.string.veryhighglucosealarm),layout);
+        });
+    prelowalarm[2].setOnClickListener(v->{
+        new tk.glucodata.RingTones(7).mkviews(context,context.getString(R.string.prelowglucosealarm),layout);
+        });
+    prehighalarm[2].setOnClickListener(v->{
+        new tk.glucodata.RingTones(8).mkviews(context,context.getString(R.string.prehighglucosealarm),layout);
+        });
+Runnable saver=() -> {
+         boolean hasverylow=((CheckBox) verylowalarm[0]).isChecked();
+         boolean hasveryhigh=((CheckBox) veryhighalarm[0]).isChecked();
+         boolean hasprelow=((CheckBox) prelowalarm[0]).isChecked();
+         boolean hasprehigh=((CheckBox) prehighalarm[0]).isChecked();
+
+         Natives.setAdvancedAlarms(str2float(((EditText)verylowalarm[1]).getText().toString()),
+                    str2float(((EditText)veryhighalarm[1]).getText().toString()),hasverylow,hasveryhigh,hasprelow,hasprehigh,
+str2float(((EditText)prelowalarm[1]).getText().toString()), str2float(((EditText)prehighalarm[1]).getText().toString()));
+        };
+
+
+    layout.setBackgroundColor(Applic.backgroundcolor);
+    context.addContentView(layout, new ViewGroup.LayoutParams( MATCH_PARENT ,MATCH_PARENT));
+    MainActivity.setonback(()-> {
+        saver.run();
+        removeContentView(layout);
+        alarmsettings(context,parview);
+        } );
+    close.setOnClickListener(v->{MainActivity.doonback(); });
+}
+
+static private class ProfileScheduleHolder extends RecyclerView.ViewHolder {
+    public ProfileScheduleHolder(View view,ProfileScheduleAdapter adapt,View parent) {
+       super(view);
+       view.setOnClickListener(v -> {
+            int pos=getAbsoluteAdapterPosition();
+            changeProfile((MainActivity)view.getContext(),pos,adapt,parent);
+            });
+
+    }
+
+}
+static private String profilename(int pos) {
+    if(pos==0)
+        return Applic.getContext().getString(R.string.defaultname);
+    return Applic.getContext().getString(R.string.profile)+pos;
+    }
+static private class ProfileScheduleAdapter extends RecyclerView.Adapter<ProfileScheduleHolder> {
+    View layout;
+
+    ProfileScheduleAdapter(View layout) {
+        this.layout=layout;
+        }
+    @NonNull
+    @Override
+    public ProfileScheduleHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+         var view=new TextView( parent.getContext());
+          view.setTransformationMethod(null);
+          view.setTextSize(TypedValue.COMPLEX_UNIT_PX, Applic.largefontsize);
+          view.setLayoutParams(new ViewGroup.LayoutParams(  MATCH_PARENT, WRAP_CONTENT));
+          if(isWearable)
+              view.setGravity(Gravity.CENTER);
+          else
+              view.setGravity(Gravity.LEFT);
+           return new ProfileScheduleHolder(view,this,layout);
+          }
+
+    @Override
+    public void onBindViewHolder(final ProfileScheduleHolder holder, int pos) {
+    	TextView text=(TextView)holder.itemView;
+        short[] minprofile=getScheduleProfile(pos);
+        short min=minprofile[0];
+        short profile=minprofile[1];
+        text.setText(String.format(usedlocale,"%02d:%02d\t➡\t%s", min/60,min%60,profilename(profile)));
+    	}
+
+        @Override
+        public int getItemCount() {
+            return Natives.nrScheduledProfiles();
+           }
+    }
+static private void changeProfile(MainActivity act,int wasindex, ProfileScheduleAdapter adapt,View parview) {
+    if(!isWearable)
+        EnableControls(parview,false);
+    int index;
+    if(wasindex<0) {
+        index=Natives.nrScheduledProfiles( );
+        if(index>=10) {
+                Applic.argToaster(act,"Too many schedules",Toast.LENGTH_LONG);
+                return;
+                }
+          }
+    else
+        index=wasindex;
+
+   short[] minpro=Natives.getScheduleProfile(index);
+   var spin=getProfileSpinner(act) ;
+   spin.setSelection(minpro[1]);
+   spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        @Override
+        public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
+             minpro[1]= (short) position;
+            }
+        @Override
+        public  void onNothingSelected (AdapterView<?> parent) {
+
+        } });
+    Button timebut=new Button(act);
+    timebut.setText(String.format(Locale.US,"%02d:%02d",minpro[0]/60, minpro[0]%60));
+
+    timebut.setOnClickListener(
+            v->  {
+                act.getnumberview().gettimepicker(act,minpro[0]/60, minpro[0]%60,
+                (hour,min) -> {
+                        minpro[0]= (short) (hour*60+min);
+                        timebut.setText(String.format(Locale.US,"%02d:%02d",hour,min));
+                   },()->{;});
+         });
+    var save=getbutton(act,R.string.save);
+    var cancel=getbutton(act,R.string.cancel);
+    var delete=getbutton(act,R.string.delete);
+    if(wasindex<0)
+        delete.setVisibility(INVISIBLE);
+     else {
+        delete.setOnClickListener(v->{
+            removeScheduleProfile(index);
+            adapt.notifyItemRemoved(index);
+    	    NumAlarm.handlealarm(Applic.app);
+            MainActivity.doonback();
+            });
+         }
+    cancel.setOnClickListener(v->{
+    	MainActivity.doonback();
+    	});
+    save.setOnClickListener(v->{
+        int induit=Natives.setScheduleProfile(wasindex,minpro[0], minpro[1]);
+        if(induit>=0) {
+    	    MainActivity.doonback();
+            if(induit==index) {
+                if(wasindex<0)
+                    adapt.notifyItemInserted(induit);
+                else
+                    adapt.notifyItemChanged(induit);
+                }
+            else
+                adapt.notifyDataSetChanged();
+    	    NumAlarm.handlealarm(Applic.app);
+            return;
+            }
+        else {
+            Applic.argToaster(act,"Too many schedules",Toast.LENGTH_SHORT);
+            }
+    	});
+//    Button help=getbutton(act,R.string.helpname);
+    var height=GlucoseCurve.getheight();
+   if(isWearable) {
+       var width=GlucoseCurve.getheight();
+        getMargins(cancel).bottomMargin=(int)(height*.1);
+        getMargins(timebut).leftMargin=(int)(width*.01);
+        var layout= new Layout(act, (l, w, h) -> {
+    	int[] ret={w,h};
+    	return ret;
+    	},new View[]{cancel},new View[]{timebut,spin},new View[]{delete},new View[]{save});
+        layout.setBackgroundColor(Applic.backgroundcolor);
+        act.addContentView(layout,new ViewGroup.LayoutParams( MATCH_PARENT, MATCH_PARENT));
+        MainActivity.setonback( () -> {
+                removeContentView(layout);
+                });
+        }
+     else {
+        var layout= new Layout(act, (l, w, h) -> {
+            int[] ret={w,h};
+            return ret;
+            },new View[]{timebut,spin},new View[]{cancel,delete,save});
+        layout.measure(WRAP_CONTENT, WRAP_CONTENT);
+        layout.setX( (GlucoseCurve.getwidth()-layout.getMeasuredWidth())*.5f);
+        layout.setY( height-layout.getMeasuredHeight()-MainActivity.systembarBottom);
+         layout.setBackgroundResource(R.drawable.helpbackground);
+        act.addContentView(layout,new ViewGroup.LayoutParams(  WRAP_CONTENT,  WRAP_CONTENT));
+        MainActivity.setonback( () -> {
+                removeContentView(layout);
+                EnableControls(parview,true);
+                });
+         }
+    }
+static public void scheduleProfiles(MainActivity act,View parview) {
+    if(!isWearable)
+        EnableControls(parview,false);
+    if(doLog) {Log.i(LOG_ID,"scheduleProfiles");};
+    Button ok=getbutton(act,R.string.closename);
+    Button newone=getbutton(act,R.string.newname);
+    RecyclerView recycle = new RecyclerView(act);
+    recycle.setLayoutParams(new ViewGroup.LayoutParams( WRAP_CONTENT , WRAP_CONTENT));
+    LinearLayoutManager lin = new LinearLayoutManager(act);
+    recycle.setLayoutManager(lin);
+    View[][] views;
+    if(isWearable) {
+        views=new View[][]{new View[]{ok},new View[]{recycle},new View[]{newone}};
+        }
+    else {
+        final   int pad=(int)(tk.glucodata.GlucoseCurve.metrics.density*9.0);
+        recycle.setPadding(pad,0,0,0);
+        Button help=getbutton(act,R.string.helpname);
+        help.setOnClickListener(v->{
+            help(R.string.schedulehelp,act);
+            });
+        views=new View[][]{new View[]{recycle},new View[]{help,newone,ok}};
+        }
+    var layout= new Layout(act, (l, w, h) -> {
+    	int[] ret={w,h};
+    	return ret;
+    	},views);
+    var numadapt = new ProfileScheduleAdapter(layout); 
+    recycle.setAdapter(numadapt);
+    ok.setOnClickListener(v->{
+    	MainActivity.doonback();
+    	});
+    newone.setOnClickListener(v->{
+         changeProfile(act, -1, numadapt,layout);
+    	});
+    if(!isWearable) {
+        var height=GlucoseCurve.getheight();
+        recycle.setMinimumHeight(2*height/3);
+        layout.measure(WRAP_CONTENT, WRAP_CONTENT);
+        layout.setX( (GlucoseCurve.getwidth()-layout.getMeasuredWidth())*.5f);
+        layout.setY( (height-layout.getMeasuredHeight())*.5f);
+        }
+    final var type=isWearable?MATCH_PARENT: WRAP_CONTENT;
+     act.addContentView(layout,new ViewGroup.LayoutParams( type,type));
+     if(isWearable)
+        layout.setBackgroundColor(Applic.backgroundcolor);
+    else
+        layout.setBackgroundResource(R.drawable.dialogbackground);
+    MainActivity.setonback( () -> {
+                removeContentView(layout);
+            if(!isWearable)
+                EnableControls(parview,true);
+            });
+    }
+static private void alarmsettings(MainActivity context,View parview) {
     parview.setVisibility(GONE);
     TextView alarmlow,alarmhigh;
     View[] lowalarm= mkalarm(context,context.getString(R.string.lowglucosealarm),Natives.hasalarmlow(),Natives.alarmlow(),0);
@@ -398,37 +713,33 @@ static public void alarmsettings(MainActivity context,View parview,boolean[] iss
         }
 
 
-    var Save=getbutton(context,R.string.save);
-    var Cancel=getbutton(context,R.string.cancel);
+    var Save=getbutton(context,R.string.closename);
+//    var Cancel=getbutton(context,R.string.cancel);
+     var advanced=getbutton(context,R.string.advanced);
+//    var schedules=getbutton(context,R.string.schedules);
     View[][] views;
-   /*
-        var graphrange=new RangeSlider(context);
-        graphrange.setValueFrom(0);
-         graphrange.setValueTo(500f);
-         graphrange.setValues(round(Natives.graphlow(),10.0f),round(Natives.graphhigh(),10.0f)); */
+    var spin=getProfileSpinner(context);
+   int pos=Natives.getProfile();
+    spin.setSelection(pos);
     if(isWearable) {
         var ala=getlabel(context,R.string.alarms);
-        final   int pad=(int)(tk.glucodata.GlucoseCurve.metrics.density*9.0);
-           ala.setPadding(pad,pad,pad,pad);
+        final   int pad=(int)(tk.glucodata.GlucoseCurve.metrics.density*5.0);
+           ala.setPadding(pad,pad,pad,0);
         final var width= GlucoseCurve.getwidth();
         getMargins(lowalarm[1]).leftMargin=(int)(width*.08);
         getMargins(highalarm[1]).leftMargin=(int)(width*.08);
-        views=new View[][]{new View[]{ala},new View[]{lowalarm[0]},new View[]{lowalarm[1],lowalarm[2]}, new View[]{highalarm[0]},new View[]{highalarm[1],highalarm[2]},
+        getMargins(Save).topMargin=pad;
+        views=new View[][]{new View[]{ala},new View[]{spin},new View[]{lowalarm[0]},new View[]{lowalarm[1],lowalarm[2]}, new View[]{highalarm[0]},new View[]{highalarm[1],highalarm[2]},
 new View[]{lossalarm},new View[]{losswait,min,ringlossalarm},
-new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View[]{Save}};
-//new View[]{isvalue},new View[]{ringisvalue},new View[]{Cancel,Save}, new View[] {toucheverywhere}};
+new View[]{isvalue},new View[]{ringisvalue},new View[]{usealarm},new View[]{advanced},new View[]{Save}};
         }
     else {
-      View[] lostrow={lossalarm,losswait,min,ringlossalarm};
-        View[] row6={usealarm,isvalue, ringisvalue};
-        View[] rowshow={help,Cancel,Save};
+         View[] lostrow={lossalarm,losswait,min,ringlossalarm};
+         View[] row6={usealarm,isvalue, ringisvalue};
+         View[] rowshow={help,spin,advanced,Save};
 
-        getMargins(help).leftMargin=getMargins(Save).rightMargin=(int)(GlucoseCurve.getwidth()*.15f);
-      /*
-      var seekbar=new SeekBar(context);
-      seekbar.setMax(100);
-      seekbar.setProgress(4);
-      seekbar.setMinimumWidth((int) (context.curve.getWidth()*0.8f)); */
+        getMargins(help).leftMargin=getMargins(Save).rightMargin=(int)(GlucoseCurve.getwidth()*.05f);
+
 
         views=new View[][]{lowalarm,highalarm,lostrow,row6,rowshow};
         }    
@@ -459,6 +770,7 @@ new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View
         }
     else
         lay=layout; */
+//    schedules.setOnClickListener(v->scheduleProfiles(context,lay));
         lay.setBackgroundColor(Applic.backgroundcolor);
     context.addContentView(lay, new ViewGroup.LayoutParams( MATCH_PARENT ,MATCH_PARENT));
 
@@ -475,48 +787,75 @@ new View[]{isvalue},new View[]{ringisvalue,Cancel},new View[]{usealarm},new View
         tk.glucodata.help.hidekeyboard(context);
         removeContentView(lay) ;
         });
-    Cancel.setOnClickListener(
-        v->{
-        parview.setVisibility(VISIBLE);
-           context.poponback();
-            tk.glucodata.help.hidekeyboard(context);
-        removeContentView(lay) ;
-        });
 
     usealarm.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setUSEALARM(isChecked));
-    Save.setOnClickListener(v->{
+    BooleanSupplier saver=() -> {
       final boolean hasloss= lossalarm.isChecked();
-    if(hasloss) {
-        String str = losswait.getText().toString();
-         try  {
-        if(str != null) {
-             short wa = Short.parseShort(str);
-             Natives.writealarmsuspension(4, wa);
+        if(hasloss) {
+            String str = losswait.getText().toString();
+             try  {
+                if(str != null) {
+                     short wa = Short.parseShort(str);
+                     Natives.writealarmsuspension(4, wa);
+                    }
+                tk.glucodata.SuperGattCallback.glucosealarms.sensorinit();
+                } catch(Throwable e) {
+                Log.stack(LOG_ID,"parseShort",e);
+                        Applic.argToaster(context,context.getString(R.string.cantsetminutes)+str,Toast.LENGTH_SHORT);
+                return false;
+                }
             }
-        tk.glucodata.SuperGattCallback.glucosealarms.sensorinit();
-        } catch(Throwable e) {
-            Log.stack(LOG_ID,"parseShort",e);
-                    Applic.argToaster(context,context.getString(R.string.cantsetminutes)+str,Toast.LENGTH_SHORT);
-            return;
-            }
-        }
-            boolean haslow=((CheckBox) lowalarm[0]).isChecked();
-            boolean hashigh=((CheckBox) highalarm[0]).isChecked();
-           Natives.setalarms(str2float(((EditText)lowalarm[1]).getText().toString()),
+         boolean haslow=((CheckBox) lowalarm[0]).isChecked();
+         boolean hashigh=((CheckBox) highalarm[0]).isChecked();
+         Natives.setalarms(str2float(((EditText)lowalarm[1]).getText().toString()),
                     str2float(((EditText)highalarm[1]).getText().toString()),
                      haslow, hashigh, isvalue.isChecked(),hasloss);
-    //    Natives.setUSEALARM(usealarm.isChecked());
-       context.poponback();
+         return true;
+         };
+    Save.setOnClickListener(v->{
+        if(!saver.getAsBoolean()) {
+            return;
+            }
+        context.poponback();
+        removeContentView(lay) ;
+        parview.setVisibility(VISIBLE);
+        tk.glucodata.help.hidekeyboard(context);
+        });
+    context.setonback(() -> {
+        saver.getAsBoolean();
         parview.setVisibility(VISIBLE);
         tk.glucodata.help.hidekeyboard(context);
         removeContentView(lay) ;
-        issaved[0]=true;
+        });
+
+   spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        @Override
+        public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
+            if(position!=pos) {
+               saver.getAsBoolean();
+               removeContentView(lay) ;
+               MainActivity.poponback();
+               Natives.setProfile(position);
+               SuperGattCallback.initAlarmTalk();
+               alarmsettings(context,parview);
+               }
+            }
+        @Override
+        public  void onNothingSelected (AdapterView<?> parent) {
+
+        } });
+
+     advanced.setOnClickListener(v->{ 
+        saver.getAsBoolean();
+        context.poponback();
+        removeContentView(lay) ;
+        advancedalarm(context,parview); 
         });
     ringisvalue.setOnClickListener(v->{
-        new tk.glucodata.RingTones(2).mkviews(context,"Value notification", lay);
+        new tk.glucodata.RingTones(2).mkviews(context,context.getString(R.string.valuenotification), lay);
         });
     ringlossalarm.setOnClickListener(v->{
-        new tk.glucodata.RingTones(4).mkviews(context,"Loss of signal",lay);
+        new tk.glucodata.RingTones(4).mkviews(context,context.getString(R.string.lossofsignal),lay);
         });
 }
 
@@ -531,13 +870,9 @@ static private final List<String> supportedlanguages= SPANISH?Arrays.asList("Lan
 
 //static private final List<String> supportedlanguages= IWRU?Arrays.asList("Language","be","de","en","es","fr","it","iw","nl","pl","pt","ru","sv","uk"):Arrays.asList("Language","be","de","en","es","fr","it","nl","pl","pt","sv","uk");
 static public Spinner getGenSpin(Activity context) {
-//   var spin=  new Spinner(context, MODE_DROPDOWN);
     var spin=  new Spinner(context,isWearable?MODE_DIALOG: MODE_DROPDOWN);
+    avoidSpinnerDropdownFocus(spin);
    if(isWearable) {
-     // spin.setPopupBackgroundResource(R.drawable.helpbackground);
-      //  spin.setBackgroundColor(BLACK);
-   //   spin.setPopupBackgroundResource(BLACK);
-//      spin.setDropDownVerticalOffset(0);
       var width= GlucoseCurve.getwidth();
       spin.setDropDownWidth(width);
       spin.setDropDownHorizontalOffset(0);
@@ -546,12 +881,7 @@ static public Spinner getGenSpin(Activity context) {
      }
 
 static private Spinner languagespinner(MainActivity context) {
-//    var spin=  new Spinner(context,isWearable?MODE_DIALOG: MODE_DROPDOWN);
    var spin=  getGenSpin(context);
-   if(isWearable) {
-//      spin.setDropDownVerticalOffset((int)(GlucoseCurve.getheight()*.24));
-//      spin.setDropDownVerticalOffset((int)(MainActivity.screenheight*.12));
-      }
     var locales=AppCompatDelegate.getApplicationLocales();
     int prepos;
     if(locales.isEmpty()||(prepos=supportedlanguages.indexOf(locales.get(0).getLanguage()))<1)
@@ -570,7 +900,6 @@ static private Spinner languagespinner(MainActivity context) {
 
         } });
 
-    avoidSpinnerDropdownFocus(spin);
     supportedlanguages.set(0,context.getString(R.string.languagename));
    final var adapt=new LabelAdapter<String>(context,supportedlanguages,0);
     spin.setAdapter(adapt);
@@ -787,7 +1116,7 @@ Runnable closerun= () -> {
 //       graphrange.setLabelBehavior(LabelFormatter.LABEL_WITHIN_BOUNDS);
 //       graphrange.setLabelBehavior(LabelFormatter.LABEL_FLOATING);
  //      graphrange.setHaloRadius((int)(tk.glucodata.GlucoseCurve.metrics.density*15.0f));
-private    void mksettings(MainActivity context,boolean[] issaved) {
+private    void mksettings(MainActivity context) {
 
     if(settinglayout==null) {
         mmolL = new RadioButton(context);
@@ -795,7 +1124,7 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
         mmolL.setOnClickListener(v-> {
          ((Applic) context.getApplication()).setunit(1);
                   mgdl.setChecked(false);
-                 recreate(issaved);
+                 recreate();
                 });
 
             mmolL.setText(R.string.mmolL);
@@ -803,7 +1132,7 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
         mgdl.setOnClickListener(v-> {
             ((Applic) context.getApplication()).setunit(2);
             mmolL.setChecked(false);
-              recreate(issaved);
+              recreate();
            });
 
         mgdl.setText(R.string.mgdL);
@@ -879,7 +1208,7 @@ private    void mksettings(MainActivity context,boolean[] issaved) {
     //bluetooth.setChecked(blueused);
     var alarmbut=getbutton(context,R.string.alarms);
         alarmbut.setOnClickListener(v->{
-        alarmsettings(context,settinglayout,issaved);
+        alarmsettings(context,settinglayout);
         });
 
 

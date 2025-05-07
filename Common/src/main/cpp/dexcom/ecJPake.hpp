@@ -67,6 +67,9 @@ typedef struct ec_key_st EC_KEY;
 
 struct KeyPair {
    EC_KEY *keyptr; 
+   bool invalid() const {
+        return keyptr==nullptr;
+        }
    KeyPair();
    ~KeyPair();
    const BIGNUM *getprivate() const;

@@ -1253,7 +1253,8 @@ touched;</p>
 notification of Juggluco is touched (in unlocked state);</p>
 <p style="line-height: 100%; margin-bottom: 0in">- Cancel button is
 touched of the alarm notification in Juggluco;</p>
-<p style="line-height: 100%; margin-bottom: 0in">- The <i>Floating Glucose</i> is touched.</p>
+<p style="line-height: 100%; margin-bottom: 0in">- The <i>Floating
+Glucose</i> is touched.</p>
 <h3 class="western">Value available:</h3>
 <p style="line-height: 100%; margin-bottom: 0in">Sometimes the sensor
 doesn’t work. When you turn this on, you will be notified when the
@@ -1264,14 +1265,27 @@ will the value available notification not be evoked.</p>
 <p style="line-height: 100%; margin-bottom: 0in">For each alarm you
 can specify which <a href="https://www.juggluco.nl/Jugglucohelp/ringtone.html">Ringtone</a>
 to play and for how long.</p>
-<h3 class="western">Alarm is alarm:</h3>
+<h3>Alarm is alarm:</h3>
 <p>When set, is the <a href="https://www.juggluco.nl/Jugglucohelp/ringtone.html">Ringtone</a>
 played for low, high and loss of signal alarms given the Android
 Alarms category. This means that in Android settings it\'s volume is
-managed with the Alarms volume level and it is not silenced when
+managed with the Alarms volume lever and it is not silenced when
 sound of the whole phone is turned off or set to vibration. When
-<i>Alarm is alarm</i> is not set, the ringtone volume level is used.
-This is always the case for the value available notification.</p>
+<i>Alarm is alarm</i> is not set, the notification volume lever is
+used on phones and the system lever on Samsung Galaxy 4-7. This is
+always the case for the value available notification.</p>
+<h3>Default:</h3>
+<p>Specify for which <b>profile</b> these settings are. This way you
+can change between settings for alarms and talk. You can specify a
+profile to be automatically turned on at a certain time under
+Advanced → <a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html">Schedules</a>.</p>
+<h3><a href="https://www.juggluco.nl/Jugglucohelp/advancedAlarmshelp.html">Advanced:</a></h3>
+<p>Menu with advanced alarms: very low, very high, soon low, soon high
+and you can schedule profiles to become active at certain times.</p>
+<p><br/>
+<br/>
+
+</p>
 <h3 class="western"><br/>
 <br/>
 
@@ -2281,14 +2295,14 @@ settings</i>.</p>
 <p>When <em>talk touch</em> is switched on, touching at certain
 places creates talk:</p>
 <ul>
-	<li><p>Touching the current glucose;</p>
-	<li><p>Touching points of the graphs and scan points;</p>
-	<li><p>Touching amounts;</p>
+	<li><p>Touching the current glucose;</p></li>
+	<li><p>Touching points of the graphs and scan points;</p></li>
+	<li><p>Touching amounts;</p></li>
 	<li><p>The date of that point of the graph is said, when the upper
-	left and right corners are touched;</p>
-	<li><p>Long pressing a menu item;</p>
+	left and right corners are touched;</p></li>
+	<li><p>Long pressing a menu item;</p></li>
 	<li><p>Long pressing an amount in the list of amounts (left middle
-	menu-&gt;list).</p>
+	menu-&gt;list).</p></li>
 </ul>
 <h2 class="western">Speak messages</h2>
 <p>Reads text messages, that are temporarily visible on the screen,
@@ -2297,6 +2311,29 @@ and the result of scanning (error messages and the glucose value).</p>
 <p>Speaks out the glucose level during Low and High glucose alarms.
 It is read both at the start of the alarm as at the moment the alarm
 is stopped.</p>
+<h2 class="western">Profile</h2>
+<p>Select which profile is active. <b>Default</b> is the default
+profile. All settings in left menu → Settings → <a href="https://www.juggluco.nl/Jugglucohelp/alarmhelp.html">Alarms</a>
+and Talk are specific for the active profile. 
+</p>
+<h2 class="western"><a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html">Schedules</a></h2>
+<p>You can configure Juggluco to activate a profile at a certain time
+of day.</p>
+<h2 class="western">Volume</h2>
+<p>You can increase or decrease the volume of talk sound in Android
+settings under sound. If <span lang="en-US"><b>MEDIA</b></span><span lang="en-US">
+is switch </span><span lang="en-US"><b>off</b></span><span lang="en-US">,
+</span>I can do it on my phone with the <i>Notification</i> sound
+lever, on my WearOS watch with the <i>System</i> sound lever. It
+shouldn’t be heard when “<i>Do not disturb</i>” is turned on.
+When <b>MEDIA</b><span style="font-weight: normal"> is set, the media
+volume lever is used and on most phones it will be heard during </span><span lang="en-US"><span style="font-weight: normal">“</span></span><span lang="en-US"><i><span style="font-weight: normal">Do
+not disturb</span></i></span><span lang="en-US"><span style="font-weight: normal">”</span></span></p>
+<p style="line-height: 100%; margin-bottom: 0in"><i>Speak alarms</i>
+is different. Alarms are spoken with the “<i>Alarms</i>” category
+when “<i>Alarm is Alarm</i>” is set on. On my phone the volume is
+regulated with the Alarm-lever, on my watch with the Notification
+lever.</p>
 <p><br/>
 <br/>
 
@@ -2716,9 +2753,8 @@ view information.</p>
 </string>
 <string name="QRmirror" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><p align="center" style="line-height: 100%; margin-top: 0.17in; margin-bottom: 0.08in; page-break-after: avoid">
-<font face="Liberation Sans, sans-serif"><font size="6" style="font-size: 28pt"><b>QR
-mirror</b></font></font></p>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/QRmirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p>
+<h1>QR mirror</h1>
 <p lang="en-US" style="line-height: 100%; margin-bottom: 0in">You can
 configure the other side of a mirror connection by scanning a QR code
 with left menu → Photo on the other phone.</p>
@@ -2740,6 +2776,42 @@ other side by scanning the QR code.</p>
 <p style="line-height: 100%; margin-bottom: 0in"><br/>
 
 </p>
+]]>
+</string>
+<string name="advancedAlarmshelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/advancedAlarmshelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/advancedAlarmshelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/advancedAlarmshelp.html?lang=en">en</a>&emsp;&emsp;</p>
+	<h1>Advanced Alarms</h1>
+<h3>Very low glucose alarm</h3>
+<p>Second low alarm to go off when the glucose value is lower than
+the low glucose alarm.</p>
+<h3>Very high glucose alarm</h3>
+<p>Second high alarm to go off when the glucose value is higher then
+the high glucose alarm.</p>
+<h3>Alarm when soon below value</h3>
+<p>Alarm when by falling glucose the value will soon be below value.</p>
+<h3>Alarm when soon above value</h3>
+<p>Alarm when rising glucose will be soon above a value.</p>
+<h3><a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html">Schedules</a></h3>
+<p>Schedule a certain profile to become active at a certain time of
+the day. This way you can use other glucose threshold or ringtones
+during the day and night, or automatically turn off speaking glucose
+values at night.</p>
+]]>
+</string>
+<string name="schedulehelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/schedulehelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/schedulehelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html?lang=en">en</a>&emsp;&emsp;</p><h1>Schedules</h1>
+<p>Schedule profiles to become active at a certain time. Press “<b>New</b>”
+to create an association between a certain time and a profile.
+<a href="https://www.juggluco.nl/">Juggluco</a> will switch every day
+to that profile at the specified time. You can edit a time profile
+association by touching it.</p>
+<p>All settings for Alarms and Talk are specific to a common profile.
+Which one is active is shown under left menu → Settings → <a href="https://www.juggluco.nl/Jugglucohelp/alarmhelp.html">Alarms</a>
+and left middle menu → <a href="https://www.juggluco.nl/Jugglucohelp/talkhelp.html">Talk</a>. Initially the profile is “<b>Default</b>”, you can change it to
+“<b>Profile 1”</b> or “<b>Profile 2”</b> etc. What you
+specify in Alarm and Talk are specific for the active profile.</p>
 ]]>
 </string>
 </resources>

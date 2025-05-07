@@ -47,6 +47,7 @@ static final private String LOG_ID="NumAlarm";
 	   {if(doLog) {Log.i(LOG_ID,"onReceive "+((action!=null)?action:" null"));};};
 	   handlealarm(app);
 	   if(action!=null) {
+       /*
 	   	if(Notify.closename.equals(action)) {
 				if( ((KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE)).isKeyguardLocked()) {
 					{if(doLog) {Log.i(LOG_ID,"Don't kill myself in locked state");};};
@@ -54,10 +55,19 @@ static final private String LOG_ID="NumAlarm";
 					killprogram(0);
 					}
 			}
-         else {
-             if(Notify.stopalarm.equals(action)) {
+         else 
+*/
+         {
+             if(RemoteGlucose.stopalarmAction.equals(action)) {
                 {if(doLog) {Log.i(LOG_ID,"Stop Alarm");};};
 	        Notify.stopalarm();
+                }
+             else {
+                if(scheduleProfileAlarm.equals(action)) {
+                        if(Natives.set2Schedule()) {
+                            SuperGattCallback.initAlarmTalk();
+                            }
+                        }
                 }
             }
 		}
@@ -76,7 +86,7 @@ static void killprogram(int ret) {
 		android.util.Log.i("NumAlarm","closed");
 		System.exit(ret);
 		}
-static void numalarm(Application mApp) {
+static private void numalarm(Application mApp) {
     	int[] nums=Natives.numAlarmEvents();
     	if(nums==null)
     		return;
@@ -105,16 +115,28 @@ static void numalarm(Application mApp) {
 	Notify.init(mApp);
 	Notify.onenot.amountalarm(builder.toString());
 	}
-static void	   handlealarm(Application context) {
+static public void	   handlealarm(Application context) {
 	numalarm(context);
-	long first=Natives.firstAlarm();
-	if(first>0)
-		setalarm(context,first);
+	long firstNum=Natives.firstAlarm();
+        long  firstProfile=Natives.nextScheduledProfileMSEC();
+	if(firstNum>0L) {
+                if(firstProfile==0L||firstProfile>firstNum) {
+                    setalarm(context,firstNum,false);
+                    return;
+                    }
+               }
+        else {
+                if(firstProfile==0L)
+                        return;
+                }
+        setalarm(context,firstProfile,true);
 	}
-static    void setalarm(Context context, long alarmtime) {
+static private final String scheduleProfileAlarm="scheduleProfileAlarm";
+static  private  void setalarm(Context context, long alarmtime,boolean profiles) {
         final int alarmrequest = 6;
         Intent alarmintent = new Intent(context, NumAlarm.class);
-
+        if(profiles)
+            alarmintent.setAction(scheduleProfileAlarm);
 	final int alarmflags;
 	if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
 	   alarmflags = PendingIntent.FLAG_IMMUTABLE;
@@ -125,7 +147,7 @@ static    void setalarm(Context context, long alarmtime) {
         PendingIntent onalarm = getBroadcast(context, alarmrequest, alarmintent, alarmflags);
         AlarmManager manager= (AlarmManager) context.getSystemService(ALARM_SERVICE);
 //	manager.cancel(onalarm);//is done automatically
-        int type=RTC_WAKEUP;
+        final int type=RTC_WAKEUP;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             manager.setExactAndAllowWhileIdle(type,alarmtime,onalarm);
         }

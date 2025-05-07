@@ -594,6 +594,7 @@ const EC_POINT *KeyPair::getpublic() const {
 KeyPair::~KeyPair() {
   LOGGER("%p->~KeyPair()\n",this);
   EC_KEY_free(keyptr);
+  keyptr=nullptr;
   }
 KeyPair::KeyPair() {
   LOGGER("%p->KeyPair()\n",this);

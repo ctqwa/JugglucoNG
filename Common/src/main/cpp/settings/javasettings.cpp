@@ -69,23 +69,90 @@ extern "C" JNIEXPORT jfloat  JNICALL   fromjava(targethigh)(JNIEnv *env, jclass 
 	return gconvert(settings->data()->thigh);
 	}
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmlow)(JNIEnv *env, jclass cl) {
-	return gconvert(settings->data()->alow);
+	return gconvert(settings->data()->alowget());
 	}
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmhigh)(JNIEnv *env, jclass cl) {
-	return gconvert(settings->data()->ahigh);
+	return gconvert(settings->data()->ahighget());
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmhigh)(JNIEnv *env, jclass cl) {
-	return settings->data()->highalarm;
+	return settings->data()->hashighalarm();
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmlow)(JNIEnv *env, jclass cl) {
-	return settings->data()->lowalarm;
+	return settings->data()->haslowalarm();
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmloss)(JNIEnv *env, jclass cl) {
-	return settings->data()->lossalarm;
+	return settings->data()->haslossalarm();
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasvaluealarm)(JNIEnv *env, jclass cl) {
-	return settings->data()->availablealarm;
+	return settings->data()->hasavailablealarm();
 	}
+
+
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmverylow)(JNIEnv *env, jclass cl) {
+	return settings->data()->hasverylowalarm();
+	}
+extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmverylow)(JNIEnv *env, jclass cl) {
+	return gconvert(settings->data()->averylowget());
+	}
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmveryhigh)(JNIEnv *env, jclass cl) {
+	return settings->data()->hasveryhighalarm();
+	}
+extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmveryhigh)(JNIEnv *env, jclass cl) {
+	return gconvert(settings->data()->averyhighget());
+	}
+
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmprelow)(JNIEnv *env, jclass cl) {
+	return settings->data()->hasprelowalarm();
+	}
+extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmprelow)(JNIEnv *env, jclass cl) {
+	return gconvert(settings->data()->aprelowget());
+	}
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasalarmprehigh)(JNIEnv *env, jclass cl) {
+	return settings->data()->hasprehighalarm();
+	}
+extern "C" JNIEXPORT jfloat  JNICALL   fromjava(alarmprehigh)(JNIEnv *env, jclass cl) {
+	return gconvert(settings->data()->aprehighget());
+	}
+
+extern "C" JNIEXPORT jint  JNICALL   fromjava(getProfile)(JNIEnv *env, jclass cl) {
+	return settings->data()->currentProfile;
+	}
+
+        extern bool speakout;
+extern "C" JNIEXPORT void  JNICALL   fromjava(setProfile)(JNIEnv *env, jclass cl,jint pro) {
+    if(pro<=maxprofiles) {
+        settings->data()->currentProfile=pro;
+        speakout=settings->data()->talktouchget();
+        if(pro>settings->data()->nrProfile)  {
+           settings->data()->newprofile(pro);
+           }
+        }
+    }
+
+extern "C" JNIEXPORT void  JNICALL   fromjava(removeScheduleProfile)(JNIEnv *env, jclass cl,jint index) {
+        settings->data()->removeProfileMin(index);
+        }
+
+extern "C" JNIEXPORT jint  JNICALL   fromjava(setScheduleProfile)(JNIEnv *env, jclass cl,jint index,jint min,jint profile) {
+        return settings->data()->changeProfileMin( index, min, profile);
+        }
+extern "C" JNIEXPORT jshortArray  JNICALL   fromjava(getScheduleProfile)(JNIEnv *env, jclass cl,jint index) {
+	jshortArray  uit=env->NewShortArray(2) ;
+	env->SetShortArrayRegion(uit, 0,2, &settings->data()->profileMins[index].min);
+        return uit;
+        }
+extern "C" JNIEXPORT jint  JNICALL   fromjava(nrScheduledProfiles)(JNIEnv *env, jclass cl) {
+        return settings->data()->nrProfileMins;
+        }
+
+extern "C" JNIEXPORT jlong  JNICALL   fromjava(nextScheduledProfileMSEC)(JNIEnv *env, jclass cl) {
+        return 1000LL*settings->data()->nextprofiletime(); 
+        }
+
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(set2Schedule)(JNIEnv *env, jclass cl) {
+        return settings->data()->setprofile() ;
+        }
+
 extern "C" JNIEXPORT void  JNICALL   fromjava(setunit)(JNIEnv *env, jclass cl,jint unit) {
 	settings->setunit(unit);
 	}
@@ -108,8 +175,12 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(sethaslib)(JNIEnv *env, jclass cl,
 	}
 */
 extern "C" JNIEXPORT void  JNICALL   fromjava(setalarms)(JNIEnv *env, jclass cl,jfloat alow, jfloat ahigh, jboolean lowalarm, jboolean highalarm, jboolean availablealarm,jboolean lossalarm) {
-settings->setalarms(roundf(settings->tomgperL(alow)), roundf(settings->tomgperL(ahigh)),lowalarm, highalarm, availablealarm,lossalarm) ;
-	}
+    settings->setalarms(roundf(settings->tomgperL(alow)), roundf(settings->tomgperL(ahigh)),lowalarm, highalarm, availablealarm,lossalarm) ;
+    }
+
+extern "C" JNIEXPORT void  JNICALL   fromjava(setAdvancedAlarms)(JNIEnv *env, jclass cl,jfloat verylow1, jfloat veryhigh1, jboolean verylowalarm1, jboolean veryhighalarm1, jboolean prelowalarm1,jboolean prehighalarm1,jfloat prelow,jfloat prehigh) {
+    settings->data()->setAdvancedAlarms(roundf(settings->tomgperL(verylow1)), roundf(settings->tomgperL(veryhigh1)),  verylowalarm1,  veryhighalarm1,  prelowalarm1, prehighalarm1,roundf(settings->tomgperL(prelow)), roundf(settings->tomgperL(prehigh)));
+   }
 /*
 bool hasnotiset() {
 	if(!settings)
@@ -487,7 +558,7 @@ mkrings(num)
 */
 
 extern "C" JNIEXPORT jstring  JNICALL   fromjava(readring)(JNIEnv *env, jclass cl,jint type) {
-	return env->NewStringUTF(settings->data()->alarms[type].uri);
+	return env->NewStringUTF(settings->data()->getalarmringtone(type).uri);
 	}
 
 static void	updateflash() {
@@ -508,53 +579,53 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(writering)(JNIEnv *env, jclass
 			}
 
 		jint jlen = env->GetStringLength( juristr);
-		env->GetStringUTFRegion(juristr, 0,jlen, settings->data()->alarms[type].uri);
-		settings->data()->alarms[type].uri[len]='\0';
+		env->GetStringUTFRegion(juristr, 0,jlen, settings->data()->getalarmringtone(type).uri);
+		settings->data()->getalarmringtone(type).uri[len]='\0';
 		}
 	else  {
-		settings->data()->alarms[type].uri[0]='\0';
+		settings->data()->getalarmringtone(type).uri[0]='\0';
 		}
 	}
-     settings->data()->alarms[type].nosound=!sound;
-     settings->data()->alarms[type].novibration=!vibration;
-	if(settings->data()->alarms[type].flash!=flash) {
-		settings->data()->alarms[type].flash=flash;
+     settings->data()->getalarmringtone(type).nosound=!sound;
+     settings->data()->getalarmringtone(type).novibration=!vibration;
+	if(settings->data()->getalarmringtone(type).flash!=flash) {
+		settings->data()->getalarmringtone(type).flash=flash;
 		updateflash();
 		}
 	return true;
 	}
 
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(alarmhasvibration)(JNIEnv *env, jclass cl,jint type) {
-	return !settings->data()->alarms[type].novibration;
+	return !settings->data()->getalarmringtone(type).novibration;
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(alarmhassound)(JNIEnv *env, jclass cl,jint type) {
-	return !settings->data()->alarms[type].nosound;
+	return !settings->data()->getalarmringtone(type).nosound;
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(alarmhasflash)(JNIEnv *env, jclass cl,jint type) {
-	return settings->data()->alarms[type].flash;
+	return settings->data()->getalarmringtone(type).flash;
 	}
 extern "C" JNIEXPORT jint  JNICALL   fromjava(readalarmduration)(JNIEnv *env, jclass cl,jint type) {
-	return settings->data()->alarms[type].duration;
+	return settings->data()->getalarmringtone(type).duration;
 	}
 
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getalarmdisturb)(JNIEnv *env, jclass cl,jint type) {
-	return settings->data()->alarms[type].disturb;
+	return settings->data()->getalarmringtone(type).disturb;
 	}
 extern "C" JNIEXPORT void  JNICALL   fromjava(setalarmdisturb)(JNIEnv *env, jclass cl,jint type,jboolean dist) {
-	settings->data()->alarms[type].disturb=dist;
+	settings->data()->getalarmringtone(type).disturb=dist;
 	}
 extern "C" JNIEXPORT void  JNICALL   fromjava(writealarmduration)(JNIEnv *env, jclass cl,jint type,jint dur) {
-	settings->data()->alarms[type].duration=dur;
+	settings->data()->getalarmringtone(type).duration=dur;
 	}
 extern "C" JNIEXPORT jshort  JNICALL   fromjava(readalarmsuspension)(JNIEnv *env, jclass cl,jint type) {
-    const auto susp=settings->data()->alarms[type].wait;
+    const auto susp=settings->data()->getalarmringtone(type).wait;
     LOGGER("readalarmsuspension(%d)=%hd\n",type,susp);
 	return susp;
 	}
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(writealarmsuspension)(JNIEnv *env, jclass cl,jint type,jshort sus) {
     LOGGER("writealarmsuspension(%d,%hd)\n",type,sus);
-	settings->data()->alarms[type].wait=sus;
+	settings->data()->getalarmringtone(type).wait=sus;
 	}
 extern bool fixatex,fixatey;
 bool fixatex=true,fixatey=true;
@@ -752,7 +823,7 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(setlibrepass)(JNIEnv *env, jclass 
 	settings->data()->librepasslen=len;
 	 }
 
-bool savefield(JNIEnv *env,jstring jin,uint8_t *out) {
+static bool savefield(JNIEnv *env,jstring jin,uint8_t *out) {
 	const jint jlen = env->GetStringLength(jin);
 	jint len = env->GetStringUTFLength( jin);
 	char tmp[len+1];
@@ -1521,10 +1592,10 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getLibreCurrent)(JNIEnv *env, 
 	}
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(setUSEALARM)(JNIEnv *env, jclass cl,jboolean val) {
-	settings->data()->USE_ALARMoff=!val;
+	settings->data()->USE_ALARMoffset(!val);
 	}
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getUSEALARM)(JNIEnv *env, jclass cl) {
-	return !settings->data()->USE_ALARMoff;
+	return !settings->data()->USE_ALARMoffget();
 	}
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(setgadgetbridge)(JNIEnv *env, jclass cl,jboolean val) {
@@ -1535,27 +1606,27 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getgadgetbridge)(JNIEnv *env, 
 	}
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(saveVoice)(JNIEnv *env, jclass cl,jfloat speed,jfloat pitch,jint voicesep,jint voice,jboolean active) {
-	settings->data()->voicespeed=speed;
-	settings->data()->voicepitch=pitch;
-	settings->data()->voicesep=voicesep;
-	settings->data()->voicespeaker=voice;
-	settings->data()->voiceactive=active;
+	settings->data()->voicespeedGet()=speed;
+	settings->data()->voicepitchGet()=pitch;
+	settings->data()->voicesepset(voicesep);
+	settings->data()->voicespeakerGet()=voice;
+	settings->data()->voiceactiveset(active);
 	}
 extern "C" JNIEXPORT jint  JNICALL   fromjava(getVoiceTalker)(JNIEnv *env, jclass cl) {
-	return settings->data()->voicespeaker;
+	return settings->data()->voicespeakerGet();
 	}
 extern "C" JNIEXPORT jint  JNICALL   fromjava(getVoiceSeparation)(JNIEnv *env, jclass cl) {
-	return settings->data()->voicesep;
+	return settings->data()->voicesepget();
 	}
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getVoiceSpeed)(JNIEnv *env, jclass cl) {
-	return settings->data()->voicespeed;
+	return settings->data()->voicespeedGet();
 	}
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getVoicePitch)(JNIEnv *env, jclass cl) {
-	return settings->data()->voicepitch;
+	return settings->data()->voicepitchGet();
 	}
 
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getVoiceActive)(JNIEnv *env, jclass cl) {
-	return settings->data()->voiceactive;
+	return settings->data()->voiceactiveget();
 	}
 /*
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(isLibreMmol)(JNIEnv *env, jclass cl) {
@@ -1803,4 +1874,10 @@ jstring myNewStringUTF(JNIEnv *env,const std::string_view str){
     const static jmethodID ctor = env->GetMethodID(JNIString, "<init>", "([B)V");
     jstring jstr = (jstring) env->NewObject(JNIString, ctor, strBytes);
     return jstr;
-}
+    }
+extern "C" JNIEXPORT void  JNICALL   fromjava(setSoundType)(JNIEnv *env, jclass cl,jint val) {
+    settings->data()->soundtypeGet()=val;
+    }
+extern "C" JNIEXPORT jint  JNICALL   fromjava(getSoundType)(JNIEnv *env, jclass cl) {
+    return settings->data()->soundtypeGet();
+    }

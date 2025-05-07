@@ -243,7 +243,7 @@ LOGAR("no NEEDSPATH");
 #endif
 #ifndef DONTTALK
 extern bool speakout;
-    speakout=settings->data()->talktouch;
+    speakout=settings->data()->talktouchget();
 #endif
 #endif
 
@@ -350,11 +350,13 @@ uint32_t Settings::firstAlarm() const {
     const int nr=data()->alarmnr;
     if(!nr)
         return 0;
-    const time_t tim=time(nullptr);
     const amountalarm *alarms=data()->numalarm;
-//    const time_t tim=time(nullptr);
+
+    return nextalarmtime(nr,[alarms](const int index) {return alarms[index].alarm;});
+/*
+    const time_t tim=time(nullptr);
     struct tm nutm;
-        localtime_r(&tim, &nutm);
+    localtime_r(&tim, &nutm);
     uint16_t nu=nutm.tm_hour*60+nutm.tm_min;
     nutm.tm_hour=0;
     nutm.tm_min=0;
@@ -365,7 +367,7 @@ uint32_t Settings::firstAlarm() const {
             return (alarms[i].alarm*60LL+startday);
             }
         }
-    return ((alarms[0].alarm+24LL*60LL)*60LL+startday);
+    return ((alarms[0].alarm+24LL*60LL)*60LL+startday); */
     }
 
 std::vector<int> Settings::numAlarmEvents()const  {
@@ -374,7 +376,7 @@ std::vector<int> Settings::numAlarmEvents()const  {
     const amountalarm *alarms=data()->numalarm;
     const int nr=data()->alarmnr;
     struct tm nutm;
-        localtime_r(&nutimet, &nutm);
+    localtime_r(&nutimet, &nutm);
     uint16_t nu=nutm.tm_hour*60+nutm.tm_min;
     nutm.tm_hour=0;
     nutm.tm_min=0;

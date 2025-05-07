@@ -525,76 +525,33 @@ Hotspot.</p>
 </string>
 <string name="alarmhelp" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/be/alarmhelp.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/alarmhelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/alarmhelp.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/alarmhelp.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/alarmhelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/alarmhelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/alarmhelp.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/alarmhelp.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sv/alarmhelp.html">sv</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/alarmhelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/alarmhelp.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/alarmhelp.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/alarmhelp.html?lang=en">en</a>&emsp;&emsp;</p><h1 style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman">Alarm</font></h1>
-<h2 class="western" style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2; margin-top: 0.14in; margin-bottom: 0.08in; background: transparent">
-<font face="Liberation Sans, sans-serif"><font size="4" style="font-size: 16pt">Glukosealarme:</font></font></h2>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Die
-über Bluetooth empfangenen Stream-Werte können verwendet werden, um
-Alarme für niedrige und hohe Glukose einzustellen.</font></font></p>
-<h3 class="western" style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2; margin-top: 0.1in; margin-bottom: 0.08in; background: transparent">
-<font face="Liberation Sans, sans-serif">Niedriger Glukosewert:</font></h3>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Wert,
-bei und unter dem ein Alarm ausgelöst werden soll.</font></font></p>
-<h3 class="western" style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2; margin-top: 0.1in; margin-bottom: 0.08in; background: transparent">
-<font face="Liberation Sans, sans-serif">Hoher Glukosewert:</font></h3>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Wert,
-bei und über dem ein Alarm ausgelöst werden soll.</font></font></p>
-<h3 class="western" style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2; margin-top: 0.1in; margin-bottom: 0.08in; background: transparent">
-<font face="Liberation Sans, sans-serif">Signalverlustalarm:</font></h3>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Legen
-Sie fest, nach wie vielen Minuten ein Alarm ertönen soll, wenn kein
-Glukosewert über Bluetooth empfangen wird.</font></font></p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Alarme
-werden beendet&nbsp;<b>,</b>&nbsp;wenn eine der folgenden Bedingungen
-erfüllt ist:</font></font></p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">-
-Die angegebene Dauer ist abgelaufen;</font></font></p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">-
-Die Kurvenansicht wird berührt;</font></font></p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">-
-Die Android-Benachrichtigung von Juggluco wird berührt (im
-entsperrten Zustand);</font></font></p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">-
-Schaltfläche „Abbrechen“ wird von der Alarmbenachrichtigung in
-Juggluco berührt.</font></font></p>
-<h3 class="western" style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2; margin-top: 0.1in; margin-bottom: 0.08in; background: transparent">
-<font face="Liberation Sans, sans-serif">Verfügbarer Wert:</font></h3>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-Manchmal funktioniert der Sensor nicht. Wenn Sie dies einschalten,
-werden Sie benachrichtigt, wenn der Sensor wieder funktioniert, aber
-nur, wenn Sie in der Juggluco-App selbst gesehen haben, dass der Wert
-fehlt. Wenn Sie nur wissen, dass der Wert aufgrund der
-Benachrichtigung von Juggluco oder seines Zifferblatts gefehlt hat,
-wird die Benachrichtigung über den verfügbaren Wert nicht aufgerufe</p>
-<p style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal; orphans: 2; widows: 2">
-Für jeden Alarm können Sie festlegen, welcher Klingelton wie lange
-abgespielt werden soll.</p>
-<h3 class="western" style="font-variant: normal; letter-spacing: normal; font-style: normal; font-weight: normal">
-<font face="Times New Roman"><font size="4" style="font-size: 14pt">Alarm
-ist alarm</font></font></h3>
-<p style="orphans: 2; widows: 2"><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><span style="font-style: normal"><span style="font-weight: normal">Wenn
-eingestellt, erhält der Klingelton, der für niedriger, hoher</span></span></span></font></font></span><span style="font-variant: normal"><span style="letter-spacing: normal">
-</span></span><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><span style="font-style: normal"><span style="font-weight: normal">und
-Signalverlustalarme abgespielt wird, die Kategorie „</span></span></span></font></font></span><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><i><span style="font-weight: normal">Alarme</span></i></span></font></font></span><span style="font-variant: normal"><span style="letter-spacing: normal">“
-</span></span><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><span style="font-style: normal"><span style="font-weight: normal">in
-Android. Dies bedeutet, dass in den Android-Einstellungen die
-Lautstärke mit dem Lautstärkeregler namens Alarms gesteuert wird
-und die Alarme nicht stummgeschaltet werden, wenn das gesamte Telefon
-stummgeschaltet oder auf Vibration eingestellt ist. Wenn &quot;</span></span></span></font></font></span><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><i><span style="font-weight: normal">Alarm
-ist alarm</span></i></span></font></font></span><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><span style="font-style: normal"><span style="font-weight: normal">&quot;
-nicht eingestellt ist, wird Klingelton verwendet. Bei der</span></span></span></font></font></span><span style="font-variant: normal"><span style="letter-spacing: normal">
-</span></span><span style="font-variant: normal"><font face="Times New Roman"><font size="4" style="font-size: 14pt"><span style="letter-spacing: normal"><span style="font-style: normal"><span style="font-weight: normal">Verfügbarer
-Wert Benachrichtigung ist dies immer der Fall.</span></span></span></font></font></span></p>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/be/alarmhelp.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/alarmhelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/alarmhelp.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/alarmhelp.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/alarmhelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/alarmhelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/alarmhelp.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/alarmhelp.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sv/alarmhelp.html">sv</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/alarmhelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/alarmhelp.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/alarmhelp.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/alarmhelp.html?lang=en">en</a>&emsp;&emsp;</p>
+<h1>Alarm</h1>
+<h2>Glukosealarme:</h2>
+<p>Die über Bluetooth empfangenen Stream-Werte können verwendet werden, um Alarme für niedrige und hohe Glukose einzustellen.</p>
+<h3>Niedriger Glukosewert:</h3>
+<p>Wert, bei und unter dem ein Alarm ausgelöst werden soll.</p>
+<h3>Hoher Glukosewert:</h3>
+<p>Wert, bei und über dem ein Alarm ausgelöst werden soll.</p>
+<h3>Signalverlustalarm:</h3>
+<p>Legen Sie fest, nach wie vielen Minuten ein Alarm ertönen soll, wenn kein Glukosewert über Bluetooth empfangen wird.</p>
+<p>Alarme werden beendet <strong>,</strong> wenn eine der folgenden Bedingungen erfüllt ist:</p>
+<p>- Die angegebene Dauer ist abgelaufen;</p>
+<p>- Die Kurvenansicht wird berührt;</p>
+<p>- Die Android-Benachrichtigung von Juggluco wird berührt (im entsperrten Zustand);</p>
+<p>- Schaltfläche "Abbrechen" wird von der Alarmbenachrichtigung in Juggluco berührt.</p>
+<h3>Verfügbarer Wert:</h3>
+<p>Manchmal funktioniert der Sensor nicht. Wenn Sie dies einschalten, werden Sie benachrichtigt, wenn der Sensor wieder funktioniert, aber nur, wenn Sie in der Juggluco-App selbst gesehen haben, dass der Wert fehlt. Wenn Sie nur wissen, dass der Wert aufgrund der Benachrichtigung von Juggluco oder seines Zifferblatts gefehlt hat, wird die Benachrichtigung über den verfügbaren Wert nicht aufgerufe</p>
+<p>Für jeden Alarm können Sie festlegen, welcher Klingelton wie lange abgespielt werden soll.</p>
+<h3>Alarm ist alarm</h3>
+<p>Wenn eingestellt, erhält der Klingelton, der für niedriger, hoher und Signalverlustalarme abgespielt wird, die Kategorie "<i>Alarme</i>" in Android. Dies bedeutet, dass in den Android-Einstellungen die Lautstärke mit dem Lautstärkeregler namens Alarms gesteuert wird und die Alarme nicht stummgeschaltet werden, wenn das gesamte Telefon stummgeschaltet oder auf Vibration eingestellt ist. Wenn "<i>Alarm ist alarm</i>" nicht eingestellt ist, wird der Benachrichtigungslautstärkeregler auf Telefonen und der Systemlautstärkeregler auf Samsung Galaxy 4-7 verwendet. Dies gilt immer für den verfügbaren Wert der Benachrichtigung.</p>
+<h3>Standard:</h3>
+<p>Geben Sie an, für welches <strong>Profil</strong> diese Einstellungen gelten. So können Sie zwischen den Einstellungen für Alarme und Spechen wechseln. Unter Erweitert → <a href="https://www.juggluco.nl/Jugglucohelp/de/schedulehelp.html">Zeitpläne</a> können Sie festlegen, dass ein Profil zu einer bestimmten Zeit automatisch aktiviert wird</p>
+<h3><a href="https://www.juggluco.nl/Jugglucohelp/de/advancedAlarmshelp.html">Extra:</a></h3>
+<p>Menü mit erweiterten Alarmen: sehr niedrig, sehr hoch, bald niedrig, bald hoch und Sie können Profile so planen, dass sie zu bestimmten Zeiten aktiv werden.</p>
+</p>
+<p><br>
+<br>
 ]]>
 </string>
 <string name="battery" >
@@ -2219,56 +2176,68 @@ Option.</p>
 </string>
 <string name="talkhelp" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/be/talkhelp.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/talkhelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/talkhelp.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/talkhelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/talkhelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/talkhelp.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/talkhelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/talkhelp.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/talkhelp.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/talkhelp.html?lang=en">en</a>&emsp;&emsp;</p><h1>Sprechen</h1>
-<h2 class="western">Glukose sprechen</h2>
-<p>Sagt Glukosewerte, wenn sie eintreffen.</p>
-<p><b>Sekunden zwischen</b> : Gibt an, wie viele Sekunden Juggluco
-warten soll, bevor der nächste Glukosewert angezeigt wird.
-Glukosewerte werden immer sofort angesagt, wenn sie eintreffen. Wenn
-ein großer Wert angegeben wird, überspringt Juggluco Glukosewerte,
-die vor Ablauf dieses Zeitraums eintreffen.</p>
-<p><b>Sprecher</b>: Wählt einen Sprecher aus einer Liste möglicher
-Sprecher aus.</p>
-<p><b>Geschwindigkeit</b>: Eine höhere Zahl bedeutet schnelleres
-Sprechen.</p>
-<p><b>Tonhöhe</b>: Eine höhere Zahl bedeutet eine höhere Tonhöhe.</p>
-<p><b>Test</b>: sagt den letzten Glukosewert aus.</p>
-<p>Auf einigen Telefonen müssen die Android-Einstellungen für
-Text-zu-Sprache geändert werden, damit es funktioniert. Manchmal
-müssen die Daten einer Sprache installiert oder die Konfiguration
-geändert werden. Auf Samsung-Handys muss „<i>Speech Services by
-Google</i>“ anstelle von „<i>Samsung Text-zu-Sprache</i> <i>Engine</i>“
-eingestellt werden, um zwischen verschiedenen Stimmen wählen zu
-können. Diese Optionen finden Sie, indem Sie in den
-Android-Einstellungen nach Text-to-Speech suchen oder zu <i>Sprache
-und Eingabe -&gt;</i> <i>Text-zu-Sprache</i> or S<i>ystem -&gt;
-Sprache und Eingabe -&gt; Sprachausgabe</i> gehen. Hier können Sie
-&quot;<i>Google Sprachausgabe</i>&quot; oder „<i>Speech services by</i>
-<i>Google</i>“ auswählen und Sprachdaten installieren. Bei anderen
-Telefonen befindet es sich unter <i>Systemeinstellungen</i> <i>-&gt;</i>
-<i>Bedienungshilfen</i> <i>-&gt;</i> <i>Sehen -&gt;</i>
-<i>Text-in-Sprache-Einstellungen</i>.</p>
-<h2 class="western">Talk touch</h2>
-<p>Wenn <em>Talk touch</em> eingeschaltet ist, wird durch das
-Berühren bestimmter Stellen Sprechen erzeugt:</p>
-<ul>
-	<li><p>Berühren der aktuellen Glukose;</p>
-	<li><p>Berühren von Diagramm- und Scanpunkten;</p>
-	<li><p>Berührte „Mengen“ werden ausgesprochen;</p>
-	<li><p>Das Datum dieses Punkts der Grafik wird angegeben, wenn die
-	obere linke und rechte Ecke berührt wird;</p>
-	<li><p>Langes Drücken eines Menüpunkts;</p>
-	<li><p>Langes Drücken auf eine Menge in der Mengenliste (linkes
-	mittleres Menü -&gt; Liste).</p>
-</ul>
-<h2 class="western">Mitteilungen sprechen</h2>
-<p>Liest Textnachrichten, die vorübergehend auf dem Bildschirm
-angezeigt werden, und das Ergebnis des Scans (Fehlermeldungen und
-Glukosewert).</p>
-<h2 class="western">Alarme sprechen</h2>
-<p>Liest den Glukosespiegel bei Alarmen für niedrigen und hohen
-Glukosespiegel vor. Es wird sowohl zu Beginn des Alarms als auch zum
-Zeitpunkt des Stoppens des Alarms gelesen.</p>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/be/talkhelp.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/talkhelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/talkhelp.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/talkhelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/talkhelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/talkhelp.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/talkhelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/talkhelp.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/talkhelp.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/talkhelp.html?lang=en">en</a>&emsp;&emsp;</p>
+  <h1>Sprechen</h1>
+  <h2>Glukose sprechen</h2>
+  <p>Sagt Glukosewerte, wenn sie eintreffen.</p>
+  <p><strong>Sekunden zwischen</strong> : Gibt an, wie viele Sekunden Juggluco warten soll, bevor der nächste Glukosewert angezeigt wird. Glukosewerte werden immer sofort angesagt, wenn sie eintreffen. Wenn ein großer Wert angegeben wird, überspringt Juggluco Glukosewerte, die vor Ablauf dieses Zeitraums eintreffen.</p>
+  <p><strong>Sprecher</strong>: Wählt einen Sprecher aus einer Liste möglicher Sprecher aus.</p>
+  <p><strong>Geschwindigkeit</strong>: Eine höhere Zahl bedeutet schnelleres Sprechen.</p>
+  <p><strong>Tonhöhe</strong>: Eine höhere Zahl bedeutet eine höhere Tonhöhe.</p>
+  <p><strong>Test</strong>: sagt den letzten Glukosewert aus.</p>
+  <p>Auf einigen Telefonen müssen die Android-Einstellungen für Text-zu-Sprache geändert werden, damit es funktioniert. Manchmal müssen die Daten einer Sprache installiert oder die Konfiguration geändert werden. Auf Samsung-Handys muss "<i>Speech Services by Google</i>" anstelle von "<i>Samsung Text-zu-Sprache</i> <i>Engine</i>" eingestellt werden, um zwischen verschiedenen Stimmen wählen zu können. Diese Optionen finden Sie, indem Sie in den Android-Einstellungen nach Text-to-Speech suchen oder zu <i>Sprache und Eingabe -&gt;</i> <i>Text-zu-Sprache</i> or S<i>ystem -&gt; Sprache und Eingabe -&gt; Sprachausgabe</i> gehen. Hier können Sie "<i>Google Sprachausgabe</i>" oder "<i>Speech services by</i> <i>Google</i>" auswählen und Sprachdaten installieren. Bei anderen Telefonen befindet es sich unter <i>Systemeinstellungen</i> <i>-&gt;</i> <i>Bedienungshilfen</i> <i>-&gt;</i> <i>Sehen -&gt;</i> <i>Text-in-Sprache-Einstellungen</i>.</p>
+  <h2>Talk touch</h2>
+  <p>Wenn Talk touch eingeschaltet ist, wird durch das Berühren bestimmter Stellen Sprechen erzeugt:</p>
+  <ul>
+    <li>
+      <p>Berühren der aktuellen Glukose;</p>
+    </li>
+    <li>
+      <p>Berühren von Diagramm- und Scanpunkten;</p>
+    </li>
+    <li>
+      <p>Berührte "Mengen" werden ausgesprochen;</p>
+    </li>
+    <li>
+      <p>Das Datum dieses Punkts der Grafik wird angegeben, wenn die obere linke und rechte Ecke berührt wird;</p>
+    </li>
+    <li>
+      <p>Langes Drücken eines Menüpunkts;</p>
+    </li>
+    <li>
+      <p>Langes Drücken auf eine Menge in der Mengenliste (linkes mittleres Menü -&gt; Liste).</p>
+    </li>
+  </ul>
+  <h2>Mitteilungen sprechen</h2>
+  <p>Liest Textnachrichten, die vorübergehend auf dem Bildschirm angezeigt werden, und das Ergebnis des Scans (Fehlermeldungen und Glukosewert).</p>
+  <h2>Alarme sprechen</h2>
+  <p>Liest den Glukosespiegel bei Alarmen für niedrigen und hohen Glukosespiegel vor. Es wird sowohl zu Beginn des Alarms als auch zum Zeitpunkt des Stoppens des Alarms gelesen.</p>
+  <h2>Profil</h2>
+  <p>Wählen Sie das aktive Profil aus. <strong>Standard</strong> ist das Standardprofil. Alle Einstellungen im linken Menü → Einstellungen → <a href="https://www.juggluco.nl/Jugglucohelp/de/alarmhelp.html">Alarme</a> und Sprechen sind profilspezifisch.</p>
+  <h2><a href="https://www.juggluco.nl/Jugglucohelp/de/schedulehelp.html">Zeitpläne</a></h2>
+  <p>Sie können Juggluco so konfigurieren, dass ein Profil zu einer bestimmten Tageszeit aktiviert wird.</p>
+  <h2>Lautstärke</h2>
+<p>Sie können die Lautstärke des <i>Sprechen</i>-Tons in den
+Android-Einstellungen unter „Ton“ erhöhen oder verringern. Wenn
+<b>MEDIA</b> ausgeschaltet ist, kann ich dies auf meinem Telefon über
+den <i>Benachrichtigungston</i> -Regler und auf meiner WearOS-Uhr
+über den <i>Systemton</i> -Regler tun. Bei aktiviertem „<i>Nicht
+stören</i>“ sollte der Ton nicht zu hören sein. Bei aktiviertem
+„<b>MEDIA</b>“ wird der Medienlautstärkeregler verwendet, und
+auf den meisten Telefonen ist er während des „<i>Nicht stören</i>“-Modus zu hören.</p>
+  <p>Das Aussprechen von Alarmen ist anders. Alarme werden in der Kategorie "<i>Alarme</i>" vorgelesen, wenn "<i>Alarm ist Alarm</i>" aktiviert ist. Auf meinem Handy regelt man die Lautstärke mit dem Alarm-Hebel, auf meiner Uhr mit dem Benachrichtigungs-Hebel.</p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
 <p><br/>
 <br/>
 <br/>
@@ -2959,8 +2928,7 @@ für welchen Sensor Informationen angezeigt werden sollen.</p>
 </string>
 <string name="QRmirror" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><p align="center" style="line-height: 100%; margin-top: 0.17in; margin-bottom: 0.08in; page-break-after: avoid">
-<font face="Liberation Sans, sans-serif"><font size="6" style="font-size: 28pt"><b>QR-Klon</b></font></font></p>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/QRmirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><h1>QR-Klon</h1>
 <p style="line-height: 100%; margin-bottom: 0in">Sie können die
 andere Seite einer Klonverbindung konfigurieren, indem Sie auf dem
 anderen Telefon einen QR-Code mit dem linken Menü → Foto scannen.</p>
@@ -2984,6 +2952,53 @@ und die andere Seite durch Scannen des QR-Codes zu konfigurieren.</p>
 <br/>
 
 </p>
+]]>
+</string>
+<string name="advancedAlarmshelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/advancedAlarmshelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/advancedAlarmshelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/advancedAlarmshelp.html?lang=en">en</a>&emsp;&emsp;</p><h1>Erweiterte Alarme</h1>
+<h3 class="western">Alarm für sehr niedrigen Blutzucker</h3>
+<p>Ein zweiter Alarm wird ausgelöst, wenn der Glukosewert niedriger
+ist als der Alarm für niedrigen Glukosewert.</p>
+<h3 class="western">Alarm für sehr hohen Blutzucker</h3>
+<p>Ein zweiter Alarm wird ausgelöst, wenn der Glukosewert höher ist
+als der Alarm für hohen Glukosewert.</p>
+<h3 class="western">Alarm, wenn bald unter</h3>
+<p>Alarm, wenn der Blutzuckerwert bald unter einen bestimmten Wert
+sinkt.</p>
+<h3 class="western">Alarm, wenn bald über</h3>
+<p>Alarm, wenn der Blutzuckerspiegel bald einen bestimmten Wert
+überschreitet.</p>
+<h3><a href="https://www.juggluco.nl/Jugglucohelp/de/schedulehelp.html">Zeitpläne</a></h3>
+<p>Planen Sie ein bestimmtes Profil so, dass es zu einer bestimmten
+Tageszeit aktiv wird. So können Sie tagsüber und nachts andere
+Glukoseschwellenwerte oder Klingeltöne verwenden oder die Ansage der
+Glukosewerte nachts automatisch deaktivieren.</p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+]]>
+</string>
+<string name="schedulehelp" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/schedulehelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/schedulehelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/schedulehelp.html?lang=en">en</a>&emsp;&emsp;</p><h1>Zeitpläne</h1>
+<p>Hier können Sie ein Profil zu einem bestimmten Zeitpunkt aktiv
+werden lassen. Drücken Sie „<b>Neu</b>“, um eine Zuordnung
+zwischen einer bestimmten Zeit und einem Profil zu erstellen.
+<a href="https://www.juggluco.nl/">Juggluco</a> wechselt täglich zur
+angegebenen Zeit zu diesem Profil. Sie können die Zuordnung eines
+Zeitprofils bearbeiten, indem Sie darauf tippen.</p>
+<p>Alle Einstellungen für Alarme und Sprechen sind profilspezifisch.
+Welches Profil aktiv ist, wird unter linkem Menü → Einstellungen →
+<a href="https://www.juggluco.nl/Jugglucohelp/de/alarmhelp.html">Alarme</a>
+und linkem mittleren Menü → <a href="https://www.juggluco.nl/Jugglucohelp/de/talkhelp.html">Sprechen</a> angezeigt. Anfangs ist das Profil „<b>Standard</b>“. Sie können es in „<b>Profil 1</b>“ oder „<b>Profil 2</b>“ usw.
+ändern. Was Sie in „Alarme“ und „Sprechen“ angeben, ist
+spezifisch für das aktive Profil.</p>
 ]]>
 </string>
 </resources>
