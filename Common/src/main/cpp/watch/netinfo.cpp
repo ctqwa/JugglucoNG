@@ -301,7 +301,6 @@ static bool hasDirectWatchConnection(const passhost_t *wearhost) {
 template<typename OUTTYPE> int getownips(OUTTYPE *outips,int max,bool &) ;
 
 
-
 static int getreceivefrom(int index,bool receive,bool activeonly,bool passiveonly) {
     bool sendto;
     if(index<0) {
@@ -316,7 +315,6 @@ static int getreceivefrom(int index,bool receive,bool activeonly,bool passiveonl
     LOGGER("passiveonly=%d activeonly=%d reconnect=%d getreceivefrom(%d,%d)=%d\n",passiveonly,activeonly,reconnect,index,receive,res);
     return res;
     }
-
 static void        setsendinfo(struct netinfo1 &info,passhost_t *wearhost) {
             if(usedversion) {
                 if(wearhost->index>=0) {

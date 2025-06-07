@@ -419,4 +419,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="nothing"></string>
  <string name="scantranstitle">Scan TRANSMITTER data matrix</string>
  <string name="scantransmessage">Sibionics 2 sensor data matrix succesfully scanned. \nScan now the transmitter data matrix."</string>
+ <string name="mirrorscansucces">Successfully added connection to left middle menu→Mirror.</string>
+ <string name="resettitle">Reset</string>
+ <string name="resetmessage">Clears transmitter memory. Should be pressed before using a new sensor in an already used transmitter.</string>
 </resources>

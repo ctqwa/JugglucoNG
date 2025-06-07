@@ -41,7 +41,17 @@ extern std::string_view globalbasedir;
 
 	#elif defined(__i386__)
 	const char *systembase[]={"/usr/lib/i386-linux-gnu","/usr/lib32","/usr/lib"};
-	#else
+	#elif defined(__aarch64__) 
+    const char *systembase[]={"/usr/lib/aarch64-linux-gnu","/usr/lib64","/usr/lib"};
+	#elif defined(__arm__)
+	const char *systembase[]={"/usr/lib/arm-linux-gnueabihf","/usr/lib32","/usr/lib"};
+    #elif defined(__powerpc)|| defined(__powerpc__)|| defined(__powerpc64__)|| defined(__POWERPC__)|| defined(__ppc__)|| defined(__ppc64__)|| defined(__PPC__)|| defined(__PPC64__)|| defined(_ARCH_PPC)|| defined(_ARCH_PPC64)
+    const char *systembase[]={"/usr/lib/powerpc64le-linux-gnu","/usr/lib64","/usr/lib"};
+    #elif defined(__hppa__)
+    const char *systembase[]={"/usr/lib/riscv64-linux-gnu","/usr/lib64","/usr/lib"};
+    #elif defined(__s390x__) || defined(__zarch__) ||defined(__s390__)
+    const char *systembase[]={"/usr/lib/s390x-linux-gnu","/usr/lib64","/usr/lib"};
+    #else
 	const char *systembase[]={"/usr/lib"};
 	#endif
 #endif

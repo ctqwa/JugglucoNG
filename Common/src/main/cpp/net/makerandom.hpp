@@ -25,6 +25,7 @@
 #else
 #include <sys/random.h>
 #endif
+#include "logs.hpp"
 
 inline bool makerandom(void *buf,size_t len) {
 	#if defined(__ANDROID_API__) && __ANDROID_API__ < 28

@@ -284,13 +284,24 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
     case 49159: {
       sensor *sensor=sensors->getsensor(sensorindex);
       for(int i=0;i<nritems;i++) {
-        const int maxid=sens->getSiIndex();
+        int maxid=sens->getSiIndex();
         int index=(int) basear[0];
         time_t eventTime=basear[10];
         if(index!=maxid)   {
                 if(index<maxid)   {
                    LOGGER("SIprocess index=%d<maxid=%d\n",index,maxid);
-                   return 3LL;
+                   uint32_t lasttime=sens->getlastpolltime();
+                   if(eventTime>lasttime) {
+                      int larger=maxid-index; 
+                      int add2index=5*((larger+4)/5);
+                      sens->setSiAdd2Index(add2index);
+                      maxid=index;
+                      sens->setSiIndex(index);
+                      LOGGER("index=%d setSiAdd2Index(add2index=%d)\n",index,add2index);
+                      }
+                   else {
+                       return 3LL;
+                       }
                    }
                 else {
                    LOGGER("SIprocess index=%d>maxid=%d\n",index,maxid);
@@ -335,10 +346,11 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
              const int trend2=algcontext?algcontext->ig_trend:trend;
             const float change=sitrend2RateOfChange(trend2);
             const int abbottrend=sitrend2abbott(trend2);
-            LOGGER("index=%d temp=%f value=%f newvalue=%f trend=(%d?) %d %d %1.f itime=%" PRIu64 " %s" ,index,temp,value,newvalue,trend,trend2,abbottrend,change,eventTime,ctime(&eventTime));
-
+          const int totalIndex=sens->siAddedIndex(index);
+            LOGGER("totalIndex=%d index=%d temp=%f value=%f newvalue=%f trend=(%d?) %d %d %1.f itime=%" PRIu64 " %s" ,totalIndex,index,temp,value,newvalue,trend,trend2,abbottrend,change,eventTime,ctime(&eventTime));
           if(newvalue>1.8&&newvalue<30) {
-               sens->savestream(eventTime,index,mgdL,abbottrend,change);
+               sens->savestream(eventTime,totalIndex,mgdL,abbottrend,change);
+               sens->setSiIndex(index+1);
                sens->retried=0;
                if(!reindex)  {
                      sens->sensorerror=false;
@@ -404,8 +416,9 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
         
         };break;
       case 49227: {
-            if(sens->siSubtype()==3)
+            if(sens->siSubtype()==3)  {
                 return 10LL;
+                }
             return 6LL; //Never used??
             }
        }

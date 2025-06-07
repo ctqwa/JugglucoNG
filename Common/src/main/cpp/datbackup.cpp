@@ -310,7 +310,7 @@ void    updateone::open() {
 
     }
     if(getsock()>=0) {
-//        mirrorstatus[allindex].sendor.hassocket=true;
+        LOGGER("updateone::open()=%d\n",getsock());
         receivetimeout(getsock(),60);
         sendtimeout(getsock(),60*5);
         }

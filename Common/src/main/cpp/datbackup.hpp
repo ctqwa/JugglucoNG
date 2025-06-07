@@ -148,16 +148,12 @@ struct updateone {
             crypts[ind]=ctx;
             }
         else {
-            LOGGER("setcrypt ind (%d) <=crypts.size() (%d)\n",ind,crypts.size());
+            LOGGER("setcrypt ind (%d) <=crypts.size() (%d) delete %p\n",ind,crypts.size(),ctx);
+            delete ctx;
             }
         }
     
     crypt_t *getcrypt() const; 
-        /*
-    int * gettmpsock() const {
-        return tmpsocks[allindex];
-        }
-        */
     int &getsock() const {
         return sendsocks[ind];
         }
@@ -325,8 +321,9 @@ Backup(std::string_view base): mapdata(base,backupdat,sizeof(struct updatedata))
 #endif
           }
        if(getupdatedata()->allhosts[host.allindex].haspass()) {
-           LOGGER("crypts[%d]=new crypt_t()\n",i);
-           crypts.push_back(new crypt_t());
+           auto cry=new crypt_t();
+           LOGGER("crypts[%d]=%p=new crypt_t()\n",i,cry);
+           crypts.push_back(cry);
            }
        else  {
            LOGGER("crypts[%d]=nullptr\n",i);
@@ -631,8 +628,9 @@ void changereceiver(int allindex,int index,const bool sendnums,const bool sendst
     crypt_t *oldcrypt=host.getcrypt();
     if(haspass)  {
         if(!oldcrypt)  {
-            LOGGER("crypts[%d]=new crypt\n",index);
-            host.setcrypt(new crypt_t);
+            auto cry=new crypt_t;
+            LOGGER("crypts[%d]=%p=new crypt\n",index,cry);
+            host.setcrypt(cry);
             }
         }
     else  {
@@ -648,8 +646,11 @@ void changereceiver(int allindex,int index,const bool sendnums,const bool sendst
 void setcrypt(passhost_t *host) {
     const int ind=host->index;
     if(crypts.size()>ind&&ind>=0) {
-         if(!crypts[ind])
-                crypts[ind]=new crypt_t;
+         if(!crypts[ind])  {
+            auto cry=new crypt_t;
+            LOGGER("crypts[%d]=%p=new crypt\n",ind,cry);
+            crypts[ind]=cry;
+            }
          }
     }
 
@@ -781,7 +782,7 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
     if(index<0) 
         index=hostnr;
     if(index>=maxallhosts)  {
-        LOGSTRING("changehost: index>=maxallhosts\n");
+        LOGAR("changehost: index>=maxallhosts");
         return -3;
         }
     const bool receiveactive=receive&&activeonly;
@@ -790,7 +791,7 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
         }
     else {
         if(port.size()>5) {
-            LOGSTRING("changehost: port.size()>5)\n");
+            LOGAR("changehost: port.size()>5)");
             return -1;
             }
         }
@@ -915,7 +916,7 @@ int changehost(int index,JNIEnv *env,jobjectArray jnames,int nr,bool detect,stri
         }
     else {
         if(!hashostname&&res==0&&!(passiveonly&&!testip))   {
-            LOGSTRING("res==0&&!(passiveonly&&!testip))\n");
+            LOGAR("res==0&&!(passiveonly&&!testip))");
             ret=-2;
             }
         thehost.detect=false;
@@ -1063,7 +1064,7 @@ static constexpr const uintptr_t wakesend=128;
 static constexpr const uintptr_t wakereconnect=256;
 static constexpr const uintptr_t wakestreamsend=512;
 void closeallsocks() {
-    LOGSTRING("closeallsocks\n");
+    LOGAR("closeallsocks");
     for(int i=0;i<getupdatedata()->hostnr;i++) {
          LOGGER("hostsock %d shutdown(%d)\n",i,hostsocks[i]);
         ::shutdown(hostsocks[i],SHUT_RDWR);
@@ -1118,7 +1119,10 @@ extern void lockwait(uintptr_t &current,int h) ;
 extern void        notpassive(uintptr_t current,int sendindex);
 extern bool doend(int sendindex); */
 void backupthread(int allindex,int sendindex) {
-    LOGGER("%d backupthread, wearos=%d\n", allindex,getupdatedata()->allhosts[allindex].wearos);
+#ifndef NOLOG
+    auto &host=getupdatedata()->tosend[sendindex];
+#endif
+    LOGGER("%d backupthread, wearos=%d con_vars=%p sock=%i %p\n", allindex,getupdatedata()->allhosts[allindex].wearos,con_vars[sendindex],host.getsock(),host.getcrypt());
 //    const int sendindex=getupdatedata()->allhosts[allindex].index;
     const bool passive=getupdatedata()->allhosts[allindex].sendpassive;
 
@@ -1128,10 +1132,10 @@ void backupthread(int allindex,int sendindex) {
     {
     constexpr int maxbuf=15;
     char buf[maxbuf];
-     snprintf(buf,maxbuf,"send %d",sendindex);
-       LOGGER("%s\n",buf);
+    snprintf(buf,maxbuf,"send %d",sendindex);
+    LOGGER("%s\n",buf);
 #ifndef HAVE_NOPRCTL
-       prctl(PR_SET_NAME, buf, 0, 0, 0);
+    prctl(PR_SET_NAME, buf, 0, 0, 0);
 #endif
        }
     uintptr_t current=0;
@@ -1217,15 +1221,26 @@ int updateproc(condvar_t *varsptr,uintptr_t cond,updateone &shost,int  (updateon
 
 
   void    endbackupthread(int h) {
-    LOGGER("%d: end backupthread  %p\n",h,con_vars[h]);
+    const int sendnr=getupdatedata()->sendnr;
+    LOGGER("%d:sendnr=%d end backupthread  %p \n",h, sendnr, con_vars[h]);
 #ifndef TESTMENU
       const std::lock_guard<std::mutex> lock(change_host_mutex);
 #endif
 
-    getupdatedata()->tosend[h].close();
-    delete con_vars[h];
-    con_vars[h]=nullptr;
-    LOGSTRING("after delete con_vars[h]\n");
+    if(h<sendnr) {
+        getupdatedata()->tosend[h].close();
+        }
+    else {
+        LOGGER("endbackupthread h(%d)>sendnr(%d)\n",h,sendnr);
+        }
+    if(h<con_vars.size()) {
+        delete con_vars[h];
+        con_vars[h]=nullptr;
+        }
+    else {
+        LOGGER("endbackupthread h(%d)>con_vars.size()(%d)\n",h,con_vars.size());
+        }
+    LOGAR("after delete con_vars[h]");
     }
 
 void        doupdates(const uintptr_t current,const int h) { 
@@ -1265,7 +1280,7 @@ void wakebackuponly(myuintptr_t kind=wakeall){
           if(el)
             el->wakebackuponly(kind);
         }
-    LOGSTRING(" end wakebackuponly\n");
+    LOGAR(" end wakebackuponly");
   }
 void wakebackup(myuintptr_t kind=wakeall){
     LOGGER("start wakebackup %lx\n",kind);
@@ -1288,11 +1303,11 @@ void wakebackup(myuintptr_t kind=wakeall){
                 const int index=here.allindex;
                 const auto &host=getupdatedata()->allhosts[index];
                 if(host.wearos) {
-                    LOGSTRING("networkabsent wearos->wake\n");
+                    LOGAR("networkabsent wearos->wake");
                     doe=true;
                     }
                 else {
-                    LOGSTRING("networkabsent !wearos\n");
+                    LOGAR("networkabsent !wearos");
                     doe=false;
                     }
                 }
@@ -1302,7 +1317,7 @@ void wakebackup(myuintptr_t kind=wakeall){
                 }
             }
         }
-    LOGSTRING(" end wakebackup\n");
+    LOGAR(" end wakebackup");
   }
   static void startthread(int allindex,int sendindex) {
     LOGGER("in startthread %d %d\n",allindex,sendindex);
@@ -1311,7 +1326,7 @@ void wakebackup(myuintptr_t kind=wakeall){
     back.detach();
     }
 static void startbackup(std::string_view globalbasedir) {
-    LOGSTRING("startbackup\n");
+    LOGAR("startbackup");
     backup=new(std::nothrow) Backup(globalbasedir);
     if(backup) {
         const int maxsend=backup->getupdatedata()->sendnr;
@@ -1335,7 +1350,7 @@ static void startbackup(std::string_view globalbasedir) {
                         }
                     }
                 else {
-                    LOGSTRING(" no start\n");
+                    LOGAR(" no start");
                     }
                 }
             }

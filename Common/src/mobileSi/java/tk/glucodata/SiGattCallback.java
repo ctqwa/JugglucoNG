@@ -256,8 +256,9 @@ private void   activate() {
       write2(Natives.getSIActivation( ));
    }
 private boolean   writeReset() {
-   if(hasNotChinese)
+   if(hasNotChinese) {
       return write2(Natives.getSIResetBytes());
+      }
    return true;
    }
 
@@ -269,14 +270,15 @@ private void  sendtime() {
       write2(Natives.getSItimecmd());
    }
 
-private static final boolean doReset=false;
+boolean doReset=false;
 private void   processchanged(byte[] value) {
    long timmsec=System.currentTimeMillis();
   long res=Natives.SIprocessData(dataptr, value,timmsec);
   if(res==10L||doReset) {
        if(writeReset()) {
-//           doReset=false;
+           Log.i(LOG_ID,"writeReset successful");
            }
+       doReset=false;
        return;
        }
   if(res==2L) {

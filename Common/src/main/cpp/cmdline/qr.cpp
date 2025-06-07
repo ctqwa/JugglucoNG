@@ -1,5 +1,6 @@
 #include <string>
 #include <stdio.h>
+#include <algorithm>
 #include "qr.h"
 #include "logs.hpp"
 extern std::string mkbackjson(int pos) ;
@@ -14,7 +15,34 @@ static const char *getchar(bool upper,bool lower) {
     return " ";
     }
 
+void print_qr(FILE *fp,const qr::Qr &codec) {
+    printf("\n\n\n\n");
+    const int len= codec.side_size();
+    int y;
+    if(len%2) {
+        fprintf(fp,"        ");
+        for (int x = 0;x < len; ++x) {
+            const char *ch=getchar(false,codec.module(x, 0));
+            fputs(ch,fp);
+            }
+        fprintf(fp,"\n");
+        y=1;
+        }
+   else {
+        y=0;
+        }
+    for(; y < len; y+=2) {
+        fprintf(fp,"        ");
+        for (int x = 0;x < len; ++x) {
+            const char *ch=getchar(codec.module(x, y),codec.module(x, y+1) );
+            fputs(ch,fp);
+            }
+        fprintf(fp,"\n");
+        }
+    fprintf(fp,"\n\n\n\n");
+}
 
+/*
 void print_qr(FILE *fp,const qr::Qr &codec) {
     printf("\n\n\n\n");
     const int len= codec.side_size();
@@ -30,7 +58,7 @@ void print_qr(FILE *fp,const qr::Qr &codec) {
     }
     fprintf(fp,"\n\n\n\n");
 }
-
+*/
 static constexpr int version(int by) {
     static constexpr const int bytes[]={33, 54, 79, 107, 135, 155, 193, 231, 272, 322, 368, 426, 459, 521, 587, 645, 719, 793, 859, 930, 1004, 1092, 1172, 1274, 1368, 1466, 1529, 1629, 1733, 1841, 1953, 2069, 2189, 2304, 2432, 2564, 2700, 2810};
     constexpr auto en=std::end(bytes);

@@ -73,7 +73,7 @@ constexpr int maxdays=
 #ifdef TESTLONGSI
 50;
 #else
-30;
+35;
 #endif
 
 constexpr const int maxdaysDex=12;
@@ -206,7 +206,7 @@ struct Info {
 uint32_t starttime;
 uint32_t lastscantime;
 int32_t starthistory;
-int32_t endhistory;  //In reality one past last pos. Previously said wrong.
+int32_t endhistory;  //In one past last pos.
 uint32_t scancount;
 uint16_t startid;
 uint16_t interval;
@@ -451,8 +451,9 @@ const int glucosebytes()const {
     }
 bool waiting=true;
 const int32_t maxpos() const {
-  if(isSibionics())
+  if(isSibionics()) {
        return maxSIhours*perhour();
+       }
   return getinfo()->days*24*perhour();
   }
 
@@ -464,8 +465,9 @@ const int32_t maxpos() const {
 int32_t maxstreampos() const {
   if(haserror)
         return 24*24*60;
-  if(isSibionics())
-     return maxSIhours*streamperhour();
+  if(isSibionics1()) {
+       return maxSIhours*streamperhour();
+      }
    auto days=getinfo()->days;
    if(days<15&&!isDexcom())
       days=15;
@@ -588,7 +590,7 @@ uint32_t getmaxtime() const {
     #endif
         }
     else */
-   const int hours=isSibionics()?maxSIhours:getinfo()->days*24;
+   const int hours= isSibionics1()?maxSIhours:getinfo()->days*24;
     return hours*60*60+getstarttime();
     }
 uint32_t getstarttime() const {
@@ -933,6 +935,9 @@ E07A-000T3YL1R50
  bool isSibionics() const {
     return getinfo()->sibionics;
     }
+ bool isSibionics1() const {
+    return isSibionics()&&!(getinfo()->notchinese&&siSubtype()==3);
+    }
  bool isDexcom() const {
     return getinfo()->dexcom;
     }
@@ -997,10 +1002,10 @@ static bool mkdatabaseSI(string_view sensordir,string_view sensorgegs,uint32_t n
         }
     uint32_t start=now;
     //TODO other days
-    const bool sib2=sensorgegs.size()==59;
+  //  const bool sib2=sensorgegs.size()==59;
         
 
-       Info inf{.starttime=(uint32_t)start,.lastscantime=(uint32_t)start,.starthistory=0,.endhistory=0,.scancount=0,.startid=0,.interval=interval5,.dupl=3,.days=maxdaysSI ,.sibionics=true,.lastLifeCountReceived=0,.siType=(uint8_t)(sib2?3:0),.pollcount=0,.pollinterval=88.0, .lockcount=1};
+       Info inf{.starttime=(uint32_t)start,.lastscantime=(uint32_t)start,.starthistory=0,.endhistory=0,.scancount=0,.startid=0,.interval=interval5,.dupl=3,.days=maxdaysSI ,.sibionics=true,.lastLifeCountReceived=0,.siType=0,.pollcount=0,.pollinterval=88.0, .lockcount=1};
        inf.siIdlen=sensorgegs.size();
        memcpy(inf.siId,sensorgegs.data(),inf.siIdlen);
        if(hasnum) {
@@ -1160,6 +1165,8 @@ if(error()) {
     LOGGER("SensorGlucoseData %s %s Error\n",sensordir.data(),baseuit.data());
     return;
     }
+if(!isSibionics1())
+    getinfo()->days=30;
 if(const ScanData *last=lastpoll()) {
     if(last->g) {
         lastlifecount=last->id;;
@@ -1321,7 +1328,6 @@ bool savepoll(time_t tim,int id,int glu,int trend,float change) {
 
 bool savestream(time_t tim,int id,int glu,int trend,float change) {
     saveglucosedata(polls,getinfo()->pollcount,tim, id, glu, trend, change);
-    setSiIndex(id+1);
     return true;
     }
 
@@ -2017,6 +2023,13 @@ int getmaxmgdL() const {
                 return 450;
          return 500;
         }
+void setSiAdd2Index(int32_t add) {
+        getinfo()->starthistory=add;
+        }
+int siAddedIndex(int index) const {
+        return index+getinfo()->starthistory;
+        }
+
 };
 
 struct lastscan_t {

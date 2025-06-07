@@ -502,10 +502,11 @@ static constexpr const    char defaultname[]="jugglucodata";
             }
         }
     else {
-        int dirlen=strlen(dir)-1;
-        for(;dir[dirlen]=='/'||dir[dirlen]=='\\';dirlen--)
-            dir[dirlen]='\0';    
-        if(!writeall(dirconf,dir,dirlen+1)) {
+        int dirend=strlen(dir)-1;
+        for(;dir[dirend]=='/'||dir[dirend]=='\\';dirend--)
+            dir[dirend]='\0';    
+        int dirlen=dirend+1;
+        if(!writeall(dirconf,dir,dirlen)) {
             cerr<<"Write to "<<dirconf<<" failed\n";
             }
         alldir.assign(dir,dirlen);
@@ -635,7 +636,7 @@ static constexpr const    char defaultname[]="jugglucodata";
     if(!sender&&!receive) {
         if(rmindex>=0) {
             if(rmindex>=hostnr) {
-                cerr<<"Argument to -R should refer to an existing connection (1-"<<hostnr<<endl<<")"<<endl;
+                cerr<<"Argument to -R should refer to an existing connection (1-"<<hostnr<<")"<<endl;
                 return 9;
                 }
             backup->deletehost(rmindex);

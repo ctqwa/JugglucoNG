@@ -862,6 +862,10 @@ again receive stream glucose values from this sensor, you only have
 to scan it again. If the sensor is directly connected with the watch,
 you need first to turn that off and then press on <i>Terminate</i> on
 the phone and then on <i>Sync</i> on the watch.</p>
+<p><b>Reset</b>: Sibionics 2 only. When switching sensor in a
+transmitter this button should be pressed. Either when Juggluco is
+connected to the old sensor and/or when Juggluco is connect to the
+new sensor. You shouldn’t press it when the transmitter already was reset by another app.</p>
 <p style="border: none; padding: 0in"><i><b>Turbo</b></i>:
 Increases effort to contact with sensor in the hope that it results
 in less connection errors, but can uses more battery power. Seems to
@@ -2007,7 +2011,7 @@ took the domain away from me and when I tried to register it again it
 had a price. You can buy a hostname for a few Euro\'s a year (for
 example from <a href="https://www.strato.nl/domeinnaam">https://www.strato.nl/domeinnaam</a>).</p>
 <p style="line-height: 100%; margin-bottom: 0in">After installing
-Certbot and having redirected port 80 (http) from your modem to your
+Certbot and having forwarded port 80 (http) from your modem to your
 computer, you can simply press:</p>
 <pre style="margin-bottom: 0.2in">certbot certonly --standalone --preferred-challenges http -d <i>myhostname</i></pre><p>
 See <a href="https://devpress.csdn.net/linux/62e7999e907d7d59d1c8cfd0.html">https://devpress.csdn.net/linux/62e7999e907d7d59d1c8cfd0.html</a>.

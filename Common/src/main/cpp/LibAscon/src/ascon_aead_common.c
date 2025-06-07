@@ -133,7 +133,7 @@ ascon_aead_is_tag_valid(ascon_aead_ctx_t* const ctx,
 ASCON_API void
 ascon_aead_cleanup(ascon_aead_ctx_t* const ctx)
 {
-LOGGER("ascon_aead_cleanup(%p\n",ctx);
+LOGGER("ascon_aead_cleanup(%p)\n",ctx);
 #ifdef ASCON_INPUT_ASSERTS
     ASCON_ASSERT(ctx != NULL);
 #endif

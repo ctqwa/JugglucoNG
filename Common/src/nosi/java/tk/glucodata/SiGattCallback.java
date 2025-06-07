@@ -25,7 +25,7 @@ package tk.glucodata;
 
 
 public class SiGattCallback extends SuperGattCallback {
-
+	boolean doReset=false;
 
 	public SiGattCallback(String SerialNumber, long dataptr) {
 		super(SerialNumber,dataptr,0x10);

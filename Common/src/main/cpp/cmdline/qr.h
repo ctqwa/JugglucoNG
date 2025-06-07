@@ -361,9 +361,13 @@ bool Qr::module(int x, int y) const
 // most expensive operation. Takes about 95 % of all computation time.
 bool Qr::encode(const char *str, size_t len, Ecc ecc, int mask)
 {
-    uint8_t data[N_DAT_BYTES]           = {};
-    uint8_t data_with_ecc[N_DAT_BYTES]  = {};
-    uint8_t patterns[N_BYTES]           = {};
+    uint8_t data[N_DAT_BYTES];
+    uint8_t data_with_ecc[N_DAT_BYTES];
+    uint8_t patterns[N_BYTES]; 
+
+    bzero(data, N_DAT_BYTES *sizeof(data[0]));
+    bzero(data_with_ecc, N_DAT_BYTES *sizeof(data_with_ecc[0]));
+    bzero(patterns, N_BYTES*sizeof(patterns[0]));
 
     if (!encode_data(str, len, ecc, data)) {
         return status = false;

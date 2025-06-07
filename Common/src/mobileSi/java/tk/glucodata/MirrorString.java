@@ -74,8 +74,10 @@ static String makestring(String[] names,int nr,boolean detect,String port,boolea
                       Log.i(LOG_ID,mess);
                       Applic.argToaster(Applic.getContext(),mess, Toast.LENGTH_SHORT);
                       }
-               else      
+               else   {
+                  Applic.argToaster(Applic.getContext(),R.string.mirrorscansucces, Toast.LENGTH_SHORT);
                   Applic.wakemirrors();
+                  }
                    };
             if(receive) {
                 String type=""; 

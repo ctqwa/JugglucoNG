@@ -178,12 +178,17 @@ if(!dataptr) {
      }
 #ifdef NOTCHINESE
    if(sens->notchinese()) {
-	 return sdata->sicontext.processData2(sens,timsec,bluedata,sdata->sensorindex);
+         
+	 const jlong res=sdata->sicontext.processData2(sens,timsec,bluedata,sdata->sensorindex);
+         LOGGER("processData2=%lld\n",res);
+         return res;
    	}
    else   
 #endif
    {
-	 return sdata->sicontext.processData(sens,timsec,bluedata->data(),bluedata->size(),sdata->sensorindex);
+         const jlong res= sdata->sicontext.processData(sens,timsec,bluedata->data(),bluedata->size(),sdata->sensorindex);
+         LOGGER("processData=%lld\n",res);
+         return res;
 	 }
 }
 extern std::string_view libdirname;

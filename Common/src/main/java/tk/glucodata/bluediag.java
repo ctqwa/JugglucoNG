@@ -187,10 +187,14 @@ void showinfo(final SuperGattCallback gatt,MainActivity act) {
     if(Natives.optionStreamHistory()&&gatt.sensorgen<2) {
        streamhistory.setVisibility(VISIBLE);
       alarmclock.setVisibility(GONE);
+      resetbutton.setVisibility(GONE);
         }
+        
     else  {
         streamhistory.setVisibility(GONE);
       alarmclock.setVisibility(gatt.sensorgen==0x40?VISIBLE:GONE);
+      final boolean resetvis=gatt.sensorgen==0x10&&Natives.getSiSubtype(gatt.dataptr)==3;
+      resetbutton.setVisibility(resetvis?VISIBLE:GONE);
       }
 
     starttimeV.setText(datestr(gatt.starttime));
@@ -267,6 +271,7 @@ private BluetoothAdapter mBluetoothAdapter=null;
 CheckBox usebluetooth;
 boolean wasuse;
 CheckBox priority,streamhistory, alarmclock;
+Button resetbutton;
 
 Button locationpermission;
 TextView scanview;
@@ -476,6 +481,7 @@ bluediag(MainActivity act,final ArrayList<SuperGattCallback> gatts) {
     priority=view.findViewById(R.id.priority);
     streamhistory=view.findViewById(R.id.streamhistory);
     alarmclock=view.findViewById(R.id.alarmclock);
+    resetbutton=view.findViewById(R.id.resetbutton);
    alarmclock.setChecked(Natives.getalarmclock());
 if(!isWearable) {
     Button finish = view.findViewById(R.id.finish);
@@ -533,6 +539,27 @@ if(!isWearable) {
 
     streamhistory.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setStreamHistory(isChecked) );
     alarmclock.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setalarmclock(isChecked) );
+    resetbutton.setOnClickListener( v -> {
+            Confirm.ask(act,act.getString(R.string.resettitle),act.getString(R.string.resetmessage),()-> {
+                final SuperGattCallback gatt = gatts.get(gattselected);
+                if(gatt.sensorgen!=0x10) {
+                    final String message="ERROR: resetbutton on sensorgen="+gatt.sensorgen;
+                    Log.i(LOG_ID,message);
+                    Applic.Toaster(message);
+                    return;
+                    }
+                 final int subtype=Natives.getSiSubtype(gatt.dataptr);
+                 if(subtype!=3) {
+                    final String message="ERROR: resetbutton on "+subtype;
+                    Log.i(LOG_ID,message);
+                    Applic.Toaster(message);
+                    return;
+                    }
+                Log.i(LOG_ID,"resetbutton");
+                ((SiGattCallback) gatt).doReset=true;
+                Applic.Toaster("Resetted");
+                });
+            });
 
      if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
     priority.setOnCheckedChangeListener(
