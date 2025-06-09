@@ -104,7 +104,9 @@ for(const char *base:systembase) {
 		LOGGER("dlopen %s\n", sysname.data());
 		return handle;
 		}
+#if !defined(JUGGLUCO_APP) || !defined(NOLOG)
         errpos+=snprintf(errorm+errpos,maxerr-errpos, "%s\n",dlerror());
+#endif
 	}
 #if defined(JUGGLUCO_APP) 
 LOGGERN(errorm, errpos);

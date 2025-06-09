@@ -145,13 +145,15 @@ std::string loadsslfunctions() {
 #endif
      *((void **)&TheMethod)=dlsym(handle, "TLSv1_2_server_method");
      if(!TheMethod) {
+     #ifndef NOLOG
         const char *error=dlerror();
         LOGGER("dlsym(TLSv1_2_server_method): %s\n",error?error:"?");
+    #endif
       *((void **)&TheMethod)=dlsym(handle, "SSLv23_method");
          if(!TheMethod) {
             const char *error=dlerror();
             dlclose(handle);
-            return std::string("dlsym(SSLv23_method): ")+std::string(error?error:"");
+            return std::string("dlsym(SSLv23_method): ")+(error?std::string(error):""s);
             }
       }
 
