@@ -716,6 +716,7 @@ Settings(const char *settingsname,const char *base,const char *country): Mmap(se
 //    if(data()->initVersion<30) 
    { 
     LOGGER("initVersion=%d\n",data()->initVersion);
+   if(data()->initVersion<34) { 
    if(data()->initVersion<33) { 
     if(data()->initVersion<31) { 
         if(data()->initVersion<26) { 
@@ -828,8 +829,10 @@ if(data()->startlibretime>now) {
     }
     data()->mkadvancedalarms();
     }
-      }
 
+    data()->loadtime=10.0/(3000.0*3000.0);
+      }
+   }
     setconvert(country);
 
      showui=getui();

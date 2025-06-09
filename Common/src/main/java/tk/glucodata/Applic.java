@@ -757,7 +757,7 @@ if(isWearable) {
 
     Floating.init(); 
    final var initversion=Natives.getinitVersion();
-    if(initversion<33) {
+    if(initversion<34) {
       if(initversion<29) {
          if(initversion<22) {
             if(initversion<14) {
@@ -772,7 +772,7 @@ if(isWearable) {
             }
          sethour24(DateFormat.is24HourFormat(app));
          }
-      Natives.setinitVersion(33);
+      Natives.setinitVersion(34);
       }
 
    setjavahour24(Natives.gethour24());

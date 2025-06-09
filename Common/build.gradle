@@ -160,7 +160,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         libreOld {
     //******  Zet op rollout op 100% ******
             dimension 'libreVersion'
-            versionCode 723 //LIBRE2ONLY
+            versionCode 726 //LIBRE2ONLY
          //    versionName '9.7.5-no3'
             versionNameSuffix '-no3'
             buildConfigField 'int', 'libreVersion', '2'
@@ -174,7 +174,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 //       minSdk 23
             dimension 'libreVersion'
         versionNameSuffix '-li3'
-        versionCode 724 //LIBRE3
+        versionCode 727 //LIBRE3
     //******  Zet op rollout op 100% ******
 
                buildConfigField 'int', 'libreVersion', '3'
@@ -189,7 +189,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         si {
       dimension 'SiBionics'
         versionNameSuffix '-si'
-        versionCode 724 
+        versionCode 727 
        buildConfigField 'int', 'SiBionics', '1'
        externalNativeBuild.cmake {
          cppFlags "   -DSIBIONICS=1 "
@@ -198,7 +198,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         }
         nosi {
             dimension 'SiBionics'
-         versionCode 723 
+         versionCode 726 
          versionNameSuffix '-nosi'
           buildConfigField 'int', 'SiBionics', '0'
           externalNativeBuild.cmake {
@@ -216,7 +216,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         minSdkVersion 26
         buildConfigField 'int', 'minSDK', "$minSdk"
         manifestPlaceholders["minSDK"] = "$minSdk"
-        versionCode 725 //WATCH
+        versionCode 728 //WATCH
     //******  Zet op rollout op 100% ******
         //versionName '9.7.5-wear'
         versionNameSuffix '-wear'
@@ -240,7 +240,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 
 //        minSdk 19
             dimension 'wearos'
-        versionCode 725 //WATCH
+        versionCode 728 //WATCH
         //versionName '9.7.5-small'
         versionNameSuffix '-small'
         signingConfig signingConfigs.alg

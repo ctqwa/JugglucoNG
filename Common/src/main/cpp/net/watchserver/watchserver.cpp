@@ -506,6 +506,14 @@ static   constexpr const char status[]="HTTP/1.1 413 Content Too Large\r\nAccess
    outdata->len=statuslen;
    return true;
 }
+static bool toolarge(recdata *outdata) {
+static   constexpr const char status[]="HTTP/1.1 413 Content Too Large\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: 36\r\n\r\n<h1>Request will take too long</h1>\n";
+   const int statuslen=sizeof(status)-1;
+   outdata->allbuf=nullptr;
+   outdata->start=status;
+   outdata->len=statuslen;
+   return true;
+}
 
 
 static bool giveservererror(recdata *outdata) {
@@ -2018,7 +2026,7 @@ sizear(afterstatistics)+
     <title>Juggluco Report</title>)"sv,{buf,wrotelen},darkmode);
     }
 
-
+extern bool isLargeCurve(Getopts &opts);
 static bool jugglucos(const char * const input,int size, std::string_view hostname, bool secure,std::string_view origin,recdata *outdata) {
    const char *posptr=input;
     {constexpr const char summary[]="summarygraph";
@@ -2026,6 +2034,9 @@ static bool jugglucos(const char * const input,int size, std::string_view hostna
         constexpr const int sumsize=(sizeof(summary)-1);
         posptr+=sumsize;
         Getopts opts(posptr,size-sumsize,60*60*24*20);
+        if(isLargeCurve(opts)) {
+            return toolarge(outdata);
+            }
         time_t now=time(nullptr);
         if(opts.end>now)
             opts.end=now;
@@ -2039,6 +2050,9 @@ static bool jugglucos(const char * const input,int size, std::string_view hostna
         constexpr const int sumsize=(sizeof(stats)-1);
         posptr+=sumsize;
         Getopts opts(posptr,size-sumsize,60*60*24*20);
+        if(isLargeCurve(opts)) {
+            return toolarge(outdata);
+            }
         return givestats(opts,origin,outdata);
         }
       }
@@ -2047,6 +2061,9 @@ static bool jugglucos(const char * const input,int size, std::string_view hostna
         constexpr const int sumsize=(sizeof(curve)-1);
         posptr+=sumsize;
         Getopts opts(posptr,size-sumsize);
+        if(isLargeCurve(opts)) {
+            return toolarge(outdata);
+            }
         return givecurve(opts,origin,outdata);
         }
       }

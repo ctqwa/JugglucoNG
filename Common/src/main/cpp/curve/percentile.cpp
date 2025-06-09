@@ -1053,158 +1053,6 @@ struct PercentileGraph {
 constexpr float devidewith=3;
 constexpr  int winWidth = 1536*3/devidewith;
 constexpr   int winHeight = 1080/devidewith;
-/*
-static void makepercentiles() {
-    if(persimages.setBusy()) {
-        LOGAR("makepercentile busy");
-        return ;
-        }
-//    const auto started = std::chrono::high_resolution_clock::now();
-    const auto started=clock();
-
-    destruct _ {[]{persimages.clearBusy();}};
-    JCurve perscurve;
-    perscurve.dheight=winHeight;
-    perscurve.dwidth=winWidth;
-    auto &item=persimages.end()[0];
-    uint32_t endsecs;
-    uint32_t startsecs;
-    bool darkmode;
-    auto &opts=item.opts;
-    if(!newopts.empty()) {
-        item.opts=newopts.back();
-        newopts.pop_back();
-        endsecs=opts.end;
-        startsecs=opts.start;
-        darkmode=opts.darkmode;
-        LOGGER("makepercentiles: Use newopts opts.start=%u opts.end=%u darkmode=%d\n",startsecs,endsecs,darkmode);
-        }
-    else {
-         int anatime;
-        if(persimages.size()>0) {
-            opts=persimages.end()[-1].opts;
-            anatime=opts.end-opts.start;
-            LOGGER("makepercentiles: size>0 opts.start=%u opts.end=%u\n",opts.start,opts.end);
-            }
-        else {
-            anatime= 20*24*60*60;
-            opts.unit=settings->data()->unit;
-            }
-//        const uint32_t startday=endtime-getminutes(endtime)*60;
- //       const uint32_t endday=startday+daysecs-1;
-        uint32_t endtime=time(nullptr);
-        opts.end=endtime;
-        startsecs=opts.start=endtime-anatime;
-        endsecs=endtime;
-        //opts.start=startsecs=endday-anatime;
-        darkmode=opts.darkmode;
-        #ifndef NOLOG
-           if(persimages.size()<=0)
-                LOGGER("makepercentiles:  opts.start=%u opts.end=%u darkmode=%d\n",startsecs,endsecs,darkmode);
-            #endif
-         }
-//    if(opts.end>endtime) opts.end=endtime;
-    if(opts.unit)
-        perscurve.setunit(opts.unit);
-    int showdur=perscurve.duration=24*60*60;
-    uint32_t starttime=endsecs-showdur;
-    uint32_t startday=starttime-getminutes(starttime)*60;
-    perscurve.starttime=startday;
-    int days=(endsecs-startsecs+showdur-1)/showdur;
-    const auto [start,endt]=percStartEnd(endsecs,days);
-    if(start>=endt) {
-        LOGAR("makepercentiles: start>=endt");
-        return ;
-        }
-    auto stream=getsensorranges(start,endt);
-    if(stream.size()<=0) {
-        LOGAR("makepercentiles: stream.size()<=0");
-        return ;
-        }
-    auto *text=language::gettext(opts.lang);
-    auto percptr=sortedmatched(&stream,start,endt,text);
-    if(!percptr)  {
-        LOGAR("sortedmatched==null");
-        return;
-        }
-    perscurve.invertcolorsset(darkmode);
-
-    perscurve.usedtext=text;
-    percptr->startday=startday;
-    percptr->endday=startday+seconds_in_day;
-    perscurve.setend=0;
-
-//    perscurve.setfontsize(38.5f/devidewith,44.0f/devidewith,2.8f/devidewith,308.0f/devidewith); 
-    perscurve.setfontsize(38.5f/devidewith,44.0f/devidewith,2.8f/devidewith,308.0f/devidewith); 
-    auto vg = nvgCreateRT(0, winWidth, winHeight);
-    destruct _{[vg]{nvgDeleteRT(vg);}};
-    perscurve.initfont(vg);
-
-    backgroundcolor(vg,*perscurve.getwhite());
-
-    perscurve.startstepNVG(vg,winWidth,winHeight);
-
-    percptr->showpercentiles(vg,perscurve); 
-    LOGAR("makepercentiles: after showpercentiles");
-    delete percptr;
-    nvgEndFrame(vg);
-    unsigned char *rgba = nvgReadPixelsRT(vg);
-    constexpr const int startpos=152;
-    int len;
-    char *imagestart = reinterpret_cast<char *>(stbi_write_png_to_mem(startpos,rgba, winWidth*4, winWidth, winHeight, 4, &len));
-    if(!imagestart) {
-        LOGAR("makepercentiles: no image");
-        return;
-        }
-    delete[] item.image.allbuf;
-    item.image.allbuf=imagestart-startpos;
-    char *imageend=imagestart+len;
-    constexpr const std::string_view imagetype{"image/png"sv};
-    LOGAR("makepercentiles before mktypeheader");
-    mktypeheader(imagestart,imageend,false,&item.image,imagetype,""sv);
-    persimages.inc(); 
-//   const auto  stopped= std::chrono::high_resolution_clock::now();
- //  double duration =std::chrono::seconds(stopped  - started) ????;
-    const auto stopped=clock();
-    double clockduration=(( long double)stopped-started)*1000.0L/CLOCKS_PER_SEC;
-   settings->data()->loadtime=clockduration;
-    LOGGER("end makepercentiles start=%u end=%u %d loadtime=%lf lang=%.2s\n", opts.start, opts.end, darkmode,clockduration,(const char *)&opts.lang);
-    }
-    */
-    /*
-std::span<char> getSummaryImage(int startpos,Getopts &opts) {
-    uint32_t startsecs=opts.start;
-    uint32_t endsecs=opts.end;
-    int duration=curveimage.duration=24*60*60;
-    curveimage.invertcolorsset(opts.darkmode);
-    curveimage.starttime=endsecs-duration;
-
-    uint32_t startday=curveimage.starttime-getminutes(curveimage.starttime)*60;
-
-    curveimage.starttime=startday;
-    int days=(endsecs-startsecs+curveimage.duration-1)/curveimage.duration;
-    const auto [start,endt]=percStartEnd(endsecs,days);
-    LOGGER("getSummaryImage %d %d days=%d\n",start,endt,days);
-    if(start>=endt)
-        return {(char *)nullptr,0};
-    auto stream=getsensorranges(start,endt);
-    if(stream.size()<=0)
-        return {(char *)nullptr,0};
-    auto percptr=sortedmatched(&stream,start,endt);
-    percptr->startday=startday;
-    percptr->endday=startday+seconds_in_day;
-    curveimage.setend=0;
-    //struct stats st(stream);
-
-    auto *vg=getfilevg();
-    percptr->showpercentiles(vg,curveimage); 
-    delete percptr;
-    nvgEndFrame(vg);
-    unsigned char *rgba = nvgReadPixelsRT(vg);
-    int len;
-    unsigned char *png = stbi_write_png_to_mem(startpos,rgba, winWidth*4, winWidth, winHeight, 4, &len);
-    return {(char *)png,static_cast<std::size_t>(len)};
-    } */
 
 
 
@@ -1235,7 +1083,9 @@ std::span<char> getStatImage(int startpos,Getopts &opts) {
     destruct _{[vg]{nvgDeleteRT(vg);}};
     statimage.dheight=winHeight;
     statimage.dwidth=winWidth;
-    statimage.setfontsize(38.5*mult,44.0*mult,2.8*mult,308.0*mult); 
+    //statimage.setfontsize(38.5*mult,44.0*mult,2.8*mult,308.0*mult); 
+    statimage.setfontsize(38.5*mult,44.0*mult,2.8*mult,250.0*mult);
+ 
     statimage.initfont(vg);
     backgroundcolor(vg,*statimage.getwhite());
     statimage.startstepNVG(vg,winWidth,winHeight);
@@ -1257,19 +1107,33 @@ static NVGcontext* getfilevg(JCurve &curveimage,int width,int height) {
     auto vg = nvgCreateRT(0, width, height);
     curveimage.dheight=height;
     curveimage.dwidth=width;
-    curveimage.setfontsize(38.5f*multiply,44.0f*multiply,2.8f*multiply,308.0f*multiply);
+//    curveimage.setfontsize(38.5f*multiply,44.0f*multiply,2.8f*multiply,308.0f*multiply);
+    curveimage.setfontsize(38.5*multiply,44.0*multiply,2.8*multiply,250.0*multiply);
     curveimage.initfont(vg);
     backgroundcolor(vg,*curveimage.getwhite());
     curveimage.startstepNVG(vg,width,height);
     return vg;
     }
 
+
+extern bool isLargeCurve(Getopts &opts);
+bool isLargeCurve(Getopts &opts) {
+        const int width=opts.width?opts.width:winWidth;
+        const int height=opts.height?opts.height:winHeight;
+        const double curvetime=settings->data()->loadtime;
+        return ((width*height)*curvetime)>20.0 ;
+        }
 std::span<char> getCurveImage(int startpos,Getopts &opts) {
+    int width=opts.width?opts.width:winWidth;
+    int height=opts.height?opts.height:winHeight;
+  
   if(!(opts.streammode||opts.scansmode||opts.historymode||opts.amountsmode||opts.mealsmode)) {
         opts.streammode=true;
         opts.scansmode=true;
         opts.amountsmode=true;
         }
+
+    const long double started=clock();
     uint32_t startsecs=opts.start;
     uint32_t endsecs=opts.end;
     JCurve curveimage(opts.unit?opts.unit:settings->data()->unit);
@@ -1282,8 +1146,6 @@ std::span<char> getCurveImage(int startpos,Getopts &opts) {
     curveimage.shownumbers=opts.amountsmode;
     curveimage.invertcolorsset(opts.darkmode);
 
-    int width=opts.width?opts.width:winWidth;
-    int height=opts.height?opts.height:winHeight;
 
     curveimage.glow=curveimage.userunit2mgL(opts.glow);
     curveimage.ghigh=curveimage.userunit2mgL(opts.ghigh);
@@ -1292,36 +1154,16 @@ std::span<char> getCurveImage(int startpos,Getopts &opts) {
     destruct _{[vg]{nvgDeleteRT(vg);}};
     curveimage.starttime=startsecs; 
     curveimage.duration=endsecs-startsecs;
-    auto nu=time(nullptr);
-    curveimage.displaycurve(vg,nu);
+    curveimage.displaycurve(vg,time(nullptr));
     nvgEndFrame(vg);
     unsigned char *rgba = nvgReadPixelsRT(vg);
     int len;
     unsigned char *png = stbi_write_png_to_mem(startpos,rgba, width*4, width, height, 4, &len);
+    const long double stopped=clock();
+    double clocksecs=(stopped-started)/CLOCKS_PER_SEC;
+    settings->data()->loadtime=clocksecs/(width*height);
     return {(char *)png,static_cast<std::size_t>(len)};
     }
-    /*
-void savegraph() {
-curveimage.showstream=1;
-curveimage.showscans=0;
-curveimage.showhistories=0;
-curveimage.shownumbers=0;
-curveimage.showmeals=0;
-
-    NVGcontext* vg=getfilevg();
-    curveimage.starttime= 1746655200;
-    curveimage.duration=24*60*60;
-    auto nu=time(nullptr);
-    curveimage.displaycurve(vg,nu);
-    nvgEndFrame(vg);
-    unsigned char *rgba = nvgReadPixelsRT(vg);
-    stbi_write_png("/data/data/tk.glucodata/files/logs/graph.png", winWidth, winHeight, 4, rgba, winWidth * 4);
-//    nvgDeleteRT(vg);
-
-//int stbi_write_png(char const *filename, int x, int y, int comp, const void *data, int stride_bytes)
- //  unsigned char *png = stbi_write_png_to_mem((unsigned char *) data, stride_bytes, x, y, comp, &len);
-    }
-    */
 
 
 #include "secs.h"
@@ -1340,14 +1182,10 @@ static std::pair<uint32_t,uint32_t> percStartEnd(Getopts &opts) {
     }
 
 static bool givepercentiles(Getopts &opts,uint32_t start, uint32_t endt,recdata *outdata) {
+#ifndef NOLOG
     const auto started=clock();
-
-//    uint32_t endsecs=opts.end;
-//    uint32_t startsecs=opts.start;
+#endif
     constexpr int showdur=daysecs;
-//    int days=(endsecs-startsecs+showdur-1)/showdur;
-//    const auto [start,endt]=percStartEnd(endsecs,days);
-
     if(start>=endt) {
         LOGAR("givepercentiles: start>=endt");
         return false;
@@ -1365,10 +1203,8 @@ static bool givepercentiles(Getopts &opts,uint32_t start, uint32_t endt,recdata 
         }
     int width=opts.width;
     int height=opts.height;
-//    uint32_t starttime=endsecs-showdur;
     uint32_t starttime=endt-showdur;
     uint32_t startday=starttime-getminutes(starttime)*60;
-//    JCurve perscurve; perscurve.setunit(opts.unit?opts.unit:settings->data()->unit);
     JCurve perscurve(opts.unit?opts.unit:settings->data()->unit);
     perscurve.duration=showdur;
     perscurve.starttime=startday;
@@ -1382,11 +1218,11 @@ static bool givepercentiles(Getopts &opts,uint32_t start, uint32_t endt,recdata 
     percptr->endday=startday+seconds_in_day;
     perscurve.setend=0;
 
-    //double devidewith=1080.0/height;
 
     double multiply=height/800.0;
     LOGGER("multiply=%f\n",multiply);
-    perscurve.setfontsize(38.5f*multiply,44.0f*multiply,2.8f*multiply,308.0f*multiply); 
+    //perscurve.setfontsize(38.5f*multiply,44.0f*multiply,2.8f*multiply,308.0f*multiply); 
+    perscurve.setfontsize(38.5*multiply,44.0*multiply,2.8*multiply,250.0*multiply);
     auto vg = nvgCreateRT(0, width, height);
     destruct _{[vg]{nvgDeleteRT(vg);}};
     perscurve.initfont(vg);
@@ -1413,10 +1249,11 @@ static bool givepercentiles(Getopts &opts,uint32_t start, uint32_t endt,recdata 
     constexpr const std::string_view imagetype{"image/png"sv};
     LOGAR("givepercentiles before mktypeheader");
     mktypeheader(imagestart,imageend,false,outdata,imagetype,""sv);
+#ifndef NOLOG
     const auto stopped=clock();
-    double clockduration=(( long double)stopped-started)*1000.0L/CLOCKS_PER_SEC;
-    settings->data()->loadtime=clockduration;
+    double clockduration=((( long double)stopped-started)*1000)/CLOCKS_PER_SEC;
     LOGGER("end givepercentiles start=%u end=%u darkmode=%d loadtime=%lf lang=%.2s\n", opts.start, opts.end, darkmode,clockduration,(const char *)&opts.lang);
+#endif
     return true;
     }
 #endif
