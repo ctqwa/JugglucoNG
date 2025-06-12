@@ -11,7 +11,8 @@ To compile without logging and debug information (in a fresh directory):
 cmake -DLOG=off $srcdir
 make juggluco
 
-Juggluco server can also function as simplified Nightscout/xDrip web server.
+Juggluco server can also function as Nightscout/xDrip web server, export data and show images, see:
+https://www.juggluco.nl/Juggluco/webserver.html
 
 SSL doesn't work with the statically linked precompiled version, use the dynamic precompiled version or compile it yourself.
 
@@ -19,9 +20,9 @@ To use the SSL version, you need an authenticated ssl key for the hostname that 
 
 You can get such a key for your domain name for free using certbot (https://certbot.eff.org/instructions). 
 
-See Left menu->Settings->Web server->Help in Juggluco or https://www.juggluco.nl/Jugglucohelp/Nightscouthelp.html
+See Left menu->Settings->Exchange Data->Web server->Help in Juggluco or https://www.juggluco.nl/Jugglucohelp/Nightscouthelp.html
 
 Put fullchain.pem privkey.pem in the jugglucodata directory where also the other data is saved. 
 
-For more information see in Juggluco Left menu->Settings->Web Server->Help.
+For more information see in Juggluco Left menu->Settings->Exchange Data->Web Server->Help.
 
