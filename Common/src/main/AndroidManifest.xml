@@ -72,6 +72,7 @@
         android:localeConfig="@xml/locales_config"
         android:persistent="true"
         android:usesCleartextTraffic="true"
+        android:pageSizeCompat="enabled"
         tools:ignore="HardcodedDebugMode">
         <activity
             android:exported="true"

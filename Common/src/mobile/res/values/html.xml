@@ -2527,33 +2527,9 @@ Fit</a>. Other apps again can get assess to data from Google Fit.</p>
 <p>Connect with Libreview to send Freestyle Libre 2 and 3 glucose
 values and amounts to Libreview and to get the account id used during
 Freestyle Libre 3 sensor activation. Touch to change settings.</p>
-<h2 class="western">Patched Libre</h2>
-<p>Use the Patched Libre broadcast (originally send by the patched
-German Librelink app 2.3.0), to send the Bluetooth glucose stream
-data every minute to xDrip. In xDrip you need to set Libre2 (patched
-App) as hardware data source. The glucose values displayed in xDrip
-are different from the values it receives. For some reason xDrip only
-updates its value every 5 minutes, probably because it was made for
-devices that send only once per 5 minutes (A watch face connected to
-xDrip regularly displayed more than 9 minute old values.) In
-addition, xDrip displays its own interpretation of received glucose
-values. Mirror devices can also sent to xDrip.</p>
-<p>See <a href="https://github.com/jakobheyman/xdripJH">https://github.com/jakobheyman/xdripJH</a>
-for an attempt to update the glucose value of xDrip every minute.</p>
-<p>Freestyle Libre 3 sensors send missed values after a disconnection
-period. These values are not sent with this broadcast. You will
-receive them if you turn on the Web server in Juggluco and make xDrip
-a Nightscout follower of Juggluco. Nightscout server:
-http://127.0.0.1:17580</p>
-<p>Juggluco can also directly contact with xDrip watch apps, so that
-the watch app displays more recent glucose values. To use this
-feature check <i>&quot;xDrip webserver&quot;</i> in the left menu
-under <b>Watch</b>. See Help under left menu-&gt;<a href="https://www.juggluco.nl/Jugglucohelp/watchinfo.html">Watch</a>
-for more information. Only one app can listen to the network port
-used by the xDrip webserver, so you need to turn off &quot;<i>xDrip
-webservice</i>&quot; in xDrip itself if you want to make use of the
-one in Juggluco.</p>
-<h2 class="western"><a name="eversense"></a>EverSense</h2>
+<h2 class="western"><strike>Patched Libre</strike>. <b>Deprecated! Will be removed from future versions. Switch to the Eversense Broadcast.</b></h2>
+<p>The Patched Libre broadcast was in the past used to send the glucose values to xDrip. 
+<h2 class="western"><a name="eversense"></a>EverSense broadcast</h2>
 <p>Yet another glucose broadcast. It can be used to send every minute
 a glucose value to xDrip. In xDrip you need to set “<i>460G/EverSense</i>”
 as the <i>Hardware Data Source</i>. 

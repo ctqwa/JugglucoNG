@@ -2933,22 +2933,8 @@ Fit</a> . Andere apps kunnen weer gegevens van Google Fit krijgen.</p>
 glucose waarden naar Libreview verzonden worden. Voor Freestyle Libre
 3 sensoren kun je je Account Id nummer van Libreview laten halen.
 Druk er op om de instellingen te wijzigen.</p>
-<h2 class="western">Patched Libre</h2>
-<p>Als dit aanstaat, zendt Juggluco elke minuut een stream glucose
-waarde naar xDrip. In xDrip moet je Libre2 (patched) App als hardware
-gegevensbron aangeven. De glucose waarden die xDrip weergeeft zijn
-verschillend van die het ontvangen heeft. Om een of andere reden,
-vernieuwt het zijn glucosewaarde enkel eens in de 5 minuten;
-waarschijnlijk omdat het gemaakt is voor sensoren die slechts eens in
-de 5 minuten een glucosewaarde verzenden. Daarbij genereert xDrip
-haar eigen interpretatie van de verkregen glucosewaarden.</p>
-<p>Juggluco kloons (zie linker midden menu→kloon) kunnen ook naar
-xDrip zenden. 
-</p>
-<p>Nieuwere versies van Juggluco kunnen glucosewaarden direct naar
-xDrip horloges zenden. Om hier gebruik van te maken moet xDrip
-webserver aangevinkt worden in Linker menu→Horloge. Om conflicten
-te voorkomen moet xDrip webservice in xDrip niet ook aanstaan.</p>
+<h2 class="western"><strike>Patched Libre</strike>. Verouderd! Wordt verwijderd uit toekomstige versies. Gebruik inplaats hiervan de Eversense Broadcast.</h2>
+<p>De Patched Libre-broadcast werd in het verleden gebruikt om glucosewaarden naar xDrip te sturen.</p>
 <h2 class="western">EverSense</h2>
 <p style="background: transparent">Nog een glucose broadcast. Hiermee
 kan elke minuut een glucosewaarde naar xDrip worden verzonden. xDrip

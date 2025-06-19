@@ -129,7 +129,7 @@ target_link_options(readlog  PUBLIC   -fopenmp  )
 endif()
 
 target_include_directories(juggluco PRIVATE ${INCLUDESELF} ${INCLUDESELF}/cmdline ${INCLUDESELF}/share ${INCLUDESELF}/include )
-set(jugglucodef -DNOJAVA -DNOTAPP -DDONTSCALESTROKEWIDTH -DDONT_USE_LIBREVIEW=1)
+set(jugglucodef -DNOJAVA -DNOTAPP -DDONTSCALESTROKEWIDTH -DDONT_USE_LIBREVIEW=1 -DLIBRE3=1 -DDEXCOM=1 -DSIBIONICS=1 )
 
 target_compile_definitions( juggluco  PRIVATE  ${jugglucodef} ${extradefs})
 #-D_GLIBCXX_GTHREAD_USE_WEAK=0

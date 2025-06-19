@@ -58,6 +58,7 @@ import static tk.glucodata.util.getcheckbox;
 import static tk.glucodata.util.getlabel;
 import static tk.glucodata.util.getlocale;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Application;
 import android.content.ComponentName;
@@ -65,7 +66,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.os.Build;
+import android.text.Html;
 import android.text.InputType;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -1394,7 +1397,8 @@ private    void mksettings(MainActivity context) {
 setvalues();
 }
 
-static private void exchanges(MainActivity context,View parent) {
+@SuppressLint("UseCompatLoadingForDrawables")
+static private void exchanges(MainActivity context, View parent) {
   parent.setVisibility(GONE);
     final CheckBox xdripbroadcast = new CheckBox(context);
     final CheckBox jugglucobroadcast = new CheckBox(context);
@@ -1461,7 +1465,24 @@ static private void exchanges(MainActivity context,View parent) {
         final boolean usedlibrebroad = Natives.getlibrelinkused();
         libreview.setText(R.string.libreviewname);
         libreview.setChecked(wasxdrip);
+//        String text = "<strike><font color=\'#757575\'>"+ context.getString(R.string.sendtoxdrip) +"</font></strike>";
+//        String text = "<s>"+ context.getString(R.string.sendtoxdrip) +"</s>";
+ //       librelinkbroadcast.setText(Html.fromHtml(text));
         librelinkbroadcast.setText(R.string.sendtoxdrip);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                librelinkbroadcast.setForeground(context.getResources().getDrawable(R.drawable.strike_through_selector, null));
+            } catch(Throwable th) {
+                Log.stack(LOG_ID,"setForeground",th);
+                librelinkbroadcast.setPaintFlags(librelinkbroadcast.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+
+            }
+        }
+        else {
+              librelinkbroadcast.setPaintFlags(librelinkbroadcast.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            }
+        //librelinkbroadcast.getPaint().setStrikeThruText(true);
+
         librelinkbroadcast.setChecked(usedlibrebroad);
         everSensebroadcast.setText(R.string.everSensebroadcast);
         everSensebroadcast.setChecked(Natives.geteverSensebroadcast());
@@ -1504,6 +1525,7 @@ static private void exchanges(MainActivity context,View parent) {
                     if (!xdripdonthing[0]) {
                         xdripdonthing[0] = true;
                         librelinkbroadcast.setChecked(!isChecked);
+                        Applic.argToaster(context,R.string.nolibrelink,Toast.LENGTH_LONG);
                         Broadcasts.setlibrereceivers(context, thelayout[0], librelinkbroadcast, xdripdonthing);
                     }
                 });
@@ -1528,7 +1550,7 @@ static private void exchanges(MainActivity context,View parent) {
         lay = new Layout(context, (l, w, h) -> {
             int[] ret = {w, h};
             return ret;
-        }, new View[]{librelinkbroadcast, everSensebroadcast},new View[]{xdripbroadcast, jugglucobroadcast}, new View[]{webserver, uploader, libreview}, (Build.VERSION.SDK_INT >= 28) ? new View[]{healthconnect,exportview,mirrorview} :new View[]{exportview,mirrorview},
+        }, new View[]{everSensebroadcast,librelinkbroadcast},new View[]{xdripbroadcast, jugglucobroadcast}, new View[]{webserver, uploader, libreview}, (Build.VERSION.SDK_INT >= 28) ? new View[]{healthconnect,exportview,mirrorview} :new View[]{exportview,mirrorview},
                 new View[]{help, ok});
 
     final   int pad=(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0);

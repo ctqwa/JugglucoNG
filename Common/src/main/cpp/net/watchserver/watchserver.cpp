@@ -2039,7 +2039,7 @@ sizear(afterstatistics)+
     return  mkhtml(outdata, origin,R"(<style type="text/css">
     @media print {
         img {border: 1px dotted #555; object-fit:contain; width:210mm; height:auto; margin-top:0mm; margin-bottom:0.8mm;} 
-        body { margin-left: 0.1mm; } 
+        body {margin-left: 0.1mm; } 
         }
     img {border: 1px dotted #555; object-fit:contain; width:100%; height:auto; mmargin-top:0mm; margin-bottom:0.8mm;} 
     body { margin-left: 1mm; } 

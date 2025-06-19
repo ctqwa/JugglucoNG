@@ -382,4 +382,5 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
 <string name="scantranstitle">TRANSMITTER-Datenmatrix scannen</string>
 <string name="scantransmessage">Sibionics 2 Sensor-Datenmatrix erfolgreich gescannt. \nScannen Sie jetzt die Transmitter-Datenmatrix.</string>
  <string name="mirrorscansucces">Verbindung zum linken mittleren Menü → Klon erfolgreich hinzugefügt.</string>
+ <string name="nolibrelink">Verwenden Sie stattdessen EverSense Broadcast. Siehe Hilfe.</string>
 </resources>
