@@ -172,15 +172,22 @@ if(usedtext==&zhtext) {
 
     ))) {
       LOGAR("font NotoSansCJK-Regular failed");
-       if(-1==(font=whitefont=blackfont = nvgCreateFont(avg, "dance-bold",
 #ifdef JUGGLUCO_APP
-       fontpath "DroidSansFallback.ttf"
-#else
- "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"
+       if(-1==(font=whitefont=blackfont = nvgCreateFont(avg, "dance-bold", fontpath "DroidSansFallback.ttf")))  {
+            LOGAR("font DroidSansFallback.ttf failed");
+#else 
+        {
 #endif
-       )))  {
+       if(-1==(font=whitefont=blackfont = nvgCreateFont(avg, "dance-bold", 
+#ifdef JUGGLUCO_APP
+    fontpath "NotoSerifCJK-Regular.ttc"
+#else
+"/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"
+#endif
+))) {
             FATAL("font NotoSerifCJK-Regular.ttc failed");
             }
+      }
       }
 #ifdef JUGGLUCO_APP
     if(-1==(menufont = nvgCreateFont(avg, "regular",

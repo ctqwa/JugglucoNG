@@ -433,6 +433,7 @@ int main(int arg, char **argv)
    typedef char stbtt__check_size16[sizeof(stbtt_int16)==2 ? 1 : -1];
 
    // e.g. #define your own STBTT_ifloor/STBTT_iceil() to avoid math.h
+   #include "logs.hpp"
    #ifndef STBTT_ifloor
    #include <math.h>
    #define STBTT_ifloor(x)   ((int) floor(x))
@@ -1405,7 +1406,10 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
       stbtt_uint32 cff;
 
       cff = stbtt__find_table(data, fontstart, "CFF ");
-      if (!cff) return 0;
+      if (!cff) {
+        LOGAR("CFF not present");
+        return 0;
+        }
 
       info->fontdicts = stbtt__new_buf(NULL, 0);
       info->fdselect = stbtt__new_buf(NULL, 0);

@@ -1,3 +1,8 @@
+/* 
+Origin: https://github.com/nth-eye/qr 
+
+Modification: template <int V> changed to constructor argument by Jaap Korthals Altes
+*/
 
 /*
 BSD 3-Clause License
@@ -29,11 +34,6 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-/* 
-Origin: https://github.com/nth-eye/qr 
-
-Modification: template <int V> changed to constructor argument by Jaap Korthals Altes
 */
 #ifndef QR_H
 #define QR_H

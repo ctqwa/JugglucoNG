@@ -97,7 +97,7 @@ static bool startserver(char *port, passhost_t *hosts,int *hostlen,int *socks,bo
 		if(!ips) {
 			LOGARTAG("no addresses to bind left");
 			if(*shutdownreceiver) {
-				LOGSTRINGTAG("shutdownreceiver return\n");
+				LOGARTAG("shutdownreceiver return");
 				return false;
 				}
 			sleep(1);
@@ -136,10 +136,10 @@ static bool startserver(char *port, passhost_t *hosts,int *hostlen,int *socks,bo
 		}
 	serverloop(sock,hosts,*hostlen,socks);
 	if(*shutdownreceiver) {
-		LOGSTRINGTAG("stop server\n");
+		LOGARTAG("stop server");
 		return true;
 		}
-	LOGSTRINGTAG("restart serverloop\n");
+	LOGARTAG("restart serverloop");
 	sleep(1);
 	goto RESTART;
 	}
@@ -156,7 +156,7 @@ bool receiveractive() {
 void stopreceiver() {
 	LOGGERTAG("stopreceiver %d\n",globalsocket);
 	if(shutdownreceiver) {
-		LOGSTRINGTAG("ask for shutdown receiver\n");
+		LOGARTAG("ask for shutdown receiver");
 		*shutdownreceiver=true;
 		}
 	if(globalsocket>=0) {
@@ -296,7 +296,7 @@ static bool testreceivemagic(passhost_t *pass,int sock) {
 					magicptr=receivemagic;
 					}
 				if(sendni(sock,magicptr,reclen)==reclen) {
-					LOGSTRINGTAG("receivemagic success\n");
+					LOGARTAG("receivemagic success");
 					if(!buf[sendmagicspec.size()-1]) {
 						LOGGERTAG("testreceivemagic zerolast %s\n",pass->getnameif());
 
@@ -467,11 +467,11 @@ globalsocket=serversock;
 				passhost_t& host=hosts[h];
 				if(host.deactivated)
 					continue;
-				if((host.passive())&&!host.hasname&&host.detect) {
+				if(host.passive()&&!host.hasname&&host.detect) {
 					if(!host.addiphasfamport(addrptr)) {
 						continue;
 						}
-					LOGSTRINGTAG("detected\n");		
+					LOGARTAG("detected");		
 					hit=&host;
 					goto RIGHTHOST;
 				 	}
@@ -495,7 +495,7 @@ globalsocket=serversock;
                            continue;
                            }
                          }
-							LOGSTRINGTAG("take \n");
+							LOGARTAG("take ");
 							hit=&host;
 							goto RIGHTHOST;
 							}
@@ -527,12 +527,12 @@ globalsocket=serversock;
 
 //extern void getmyname(int sock); getmyname(new_fd);
 		if(hit->sendpassive) {
-			LOGSTRINGTAG("sendpassive\n");
+			LOGARTAG("sendpassive");
 			char ant=SENDPASSIVE;
 			extern bool sendall(const passhost_t *host);
 			if(hit->receivedatafrom()&&!sendall(hit)) {
 				if(recvni(new_fd, &ant, 1)!=1) {
-				  	LOGSTRINGTAG("No send/recv distinction\n");
+				  	LOGARTAG("No send/recv distinction");
 				  	}
 				else {
 					LOGGERTAG("also receivefrom ant=%d\n",ant);
@@ -546,7 +546,7 @@ globalsocket=serversock;
          else {
             constexpr const char mess[]="Other side should be active only";
             LOGAR(mess);
-				savemessage(hit,mess);
+            savemessage(hit,mess);
             }
 
 			}
@@ -585,7 +585,7 @@ void startreceiver(const char *port,passhost_t *hosts,int &hostlen,int *socks) {
 #ifdef MAIN
 
 void netwakeup() {
-	LOGSTRINGTAG("wakeup\n");
+	LOGARTAG("wakeup");
 	}
 //s/\([A-Z]\+\)/printf(\"\1=%d\\n\",\1);/g
 int main(int argc, char **argv) {
