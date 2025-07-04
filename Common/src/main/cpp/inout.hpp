@@ -415,28 +415,7 @@ auto count() const {
 auto size() const {
 	return count();
 	}
-/*operator T&() {
-	return *((T*) buf);
-	}
 
-bool extend(int make) {
-	auto cur=count();
-	if(cur<make) {
-		auto extra=make*sizeof(T)-len;
-		void *end=(char *)buf+len;
-		void *news=mmap(end, extra, PROT_READ |PROT_WRITE,MAP_ANONYMOUS|MAP_SHARED, -1, 0);
-		if(news==end) {
-			len+=extra;	
-			return true;
-			}
-		else {
-			lerror("mmap");
-			LOGGER("mmap failed returning %p\n",news);
-			}
-		}
-	return false;
-	}
-*/	
 template <typename... Ts>
 void extend(Ts... args) {
 	this->~Mmap();

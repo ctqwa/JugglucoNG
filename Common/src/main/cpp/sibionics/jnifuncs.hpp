@@ -5,6 +5,9 @@ algtype(processAlgorithmContext) vers(processAlgorithmContext);
 algtype(getAlgorithmVersion) vers(getAlgorithmVersion);
 algtype(releaseAlgorithmContext) vers(releaseAlgorithmContext);
 
+algtype(getBinaryStructAlgorithmContext) vers(getBinaryStructAlgorithmContext)=nullptr;
+algtype(setBinaryStructAlgorithmContext) vers(setBinaryStructAlgorithmContext)=nullptr;
+
 
 static bool vers(getJNIfunctions)() {
     static    std::string_view alglib=jniAlglib;
@@ -48,6 +51,20 @@ static bool vers(getJNIfunctions)() {
         return false;
          }
 }
+{    constexpr const char str[]=algjavastr(getBinaryStructAlgorithmContext);
+    vers(getBinaryStructAlgorithmContext)= (algtype(getBinaryStructAlgorithmContext)) dlsym(handle,str);
+     if(!vers(getBinaryStructAlgorithmContext)) {
+         LOGGER("dlsym %s failed: %s\n",str,dlerror());
+        // return false;
+         }
+}
+{    constexpr const char str[]=algjavastr(setBinaryStructAlgorithmContext);
+    vers(setBinaryStructAlgorithmContext)= (algtype(setBinaryStructAlgorithmContext)) dlsym(handle,str);
+     if(!vers(setBinaryStructAlgorithmContext)) {
+         LOGGER("dlsym %s failed: %s\n",str,dlerror());
+        //return false;
+         }
+}
 
     typedef   jint (*OnLoadtype)(JavaVM* vm, void* reserved) ;
     constexpr const char onloadname[]="JNI_OnLoad";
@@ -62,15 +79,27 @@ static bool vers(getJNIfunctions)() {
     LOGAR("after OnLoad");
     return true;
     }
-
+extern  struct JNINativeInterface envbuf;
 double SiContext::vers(process)(int index,double value, double temp) {
-     const auto res= vers(processAlgorithmContext)(subenv,nullptr,reinterpret_cast<jobject>(algcontext),index,value,temp,0.0,targetlow,targethigh);
+    auto context=reinterpret_cast<jobject>(algcontext);
+     const auto res= vers(processAlgorithmContext)(subenv,nullptr,context,index,value,temp,0.0,targetlow,targethigh);
      LOGGER("processAlgorithmContext%d(%p,%d,%f,%f,%f,%f,%f)=%f\n",vers(0),algcontext,index,value,temp,0.0,targetlow,targethigh,res);
+    if(vers(getBinaryStructAlgorithmContext)) {
+        binState.reset();
+       jnidata_t  hierjnidata={&envbuf,&binState};
+       JNIEnv *hiersubenv=(JNIEnv *) &hierjnidata;
+        jbyteArray bar=vers(getBinaryStructAlgorithmContext)(hiersubenv,nullptr,context);
+        data_t *data=(data_t *)bar;
+        binState.setpos(0,data);
+        }
+    else {
+        LOGAR("getBinaryStructAlgorithmContext==null");
+        }
      return res;
     };
-
+/*
 getjson_t vers(getjson);
-setjson_t vers(setjson);
+setjson_t vers(setjson); */
 #ifdef TEST
 AlgorithmContext *vers(initAlgorithm)(const char *shortname) {
     char *version = (char *)vers(getAlgorithmVersion)(subenv,nullptr);
@@ -85,11 +114,10 @@ AlgorithmContext *vers(initAlgorithm)(const char *shortname) {
         return nullptr;
     }
     auto algcontext=reinterpret_cast<AlgorithmContext *>(jalg);
-    // loadjson(sens, sens->vers(statefile).data(),algcontext,setjson); 
      return algcontext;
      }
 #else
-AlgorithmContext *vers(initAlgorithm)(SensorGlucoseData *sens, setjson_t setjson) {
+AlgorithmContext *vers(initAlgorithm)(SensorGlucoseData *sens,scanstate &binState) {
     jobject jalg= vers(getAlgorithmContextFromNative)(subenv,nullptr);
     char *shortname=sens->getinfo()->siBlueToothNum;
     int res = vers(initAlgorithmContext)(subenv,nullptr,jalg, 0, reinterpret_cast<jstring>(shortname));
@@ -120,34 +148,51 @@ AlgorithmContext *vers(initAlgorithm)(SensorGlucoseData *sens, setjson_t setjson
             return nullptr;
             }
        }
-    auto algcontext=reinterpret_cast<AlgorithmContext *>(jalg);
-//     loadjson(sens, sens->vers(statefile).data(),algcontext,setjson); 
-     loadjson(sens, sens->statefile.data(),algcontext,setjson); 
-     return algcontext;
+    if(sens->pollcount()>0) {
+           data_t *saved=binState.get(0); 
+           if(saved) {
+                LOGGER("setBinaryStructAlgorithmContex %p#%d\n",saved,saved->size());
+                vers(setBinaryStructAlgorithmContext)(subenv,nullptr,jalg,(jbyteArray)saved);
+                }
+           else {
+                LOGAR("resetSiIndex()");
+                sens->resetSiIndex();
+                }
+         }
+     return reinterpret_cast<AlgorithmContext *>(jalg);
      }
 #endif
+
 static bool vers(getNativefunctions)() {
-    std::string_view alglib=algLibName;
-    void *handle=openlib(alglib);
-    if(!handle) {
-        LOGGER("dlopen %s failed: %s\n",alglib.data(),dlerror());
-        return false;
-        }
-     const char *getjsonstr=jsonname(get,Ev);
-    vers(getjson)= (getjson_t)dlsym(handle,getjsonstr);
-     if(!vers(getjson)) {
-         LOGGER("dlsym %s failed\n",getjsonstr);
-        return false;
-         }
-     const char *setjsonstr=jsonname(set,EPc);
-    vers(setjson)= (setjson_t)dlsym(handle,setjsonstr);
-     if(!vers(setjson)) {
-         LOGGER("dlsym %s failed\n",setjsonstr);
-        return false;
-         }
-     LOGAR("found Nativefunctions");
-     return true;
+    return true;
     }
+/*static bool vers(getNativefunctions)() {
+   if constexpr (vers(0)==02)   {
+        return true;
+        } 
+   else { 
+        std::string_view alglib=algLibName;
+        void *handle=openlib(alglib);
+        if(!handle) {
+            LOGGER("dlopen %s failed: %s\n",alglib.data(),dlerror());
+            return false;
+            }
+         const char *getjsonstr=jsonname(get,Ev);
+        vers(getjson)= (getjson_t)dlsym(handle,getjsonstr);
+         if(!vers(getjson)) {
+             LOGGER("dlsym %s failed\n",getjsonstr);
+            return false;
+             }
+         const char *setjsonstr=jsonname(set,EPc);
+        vers(setjson)= (setjson_t)dlsym(handle,setjsonstr);
+         if(!vers(setjson)) {
+             LOGGER("dlsym %s failed\n",setjsonstr);
+            return false;
+             }
+         LOGAR("found Nativefunctions");
+         return true;
+         }
+    } */
 
 
 

@@ -527,3 +527,9 @@ std::string_view getdeltaname(float rate) {
 	   }
 
 */
+void SensorGlucoseData::resetSiIndex() {
+                getinfo()->redoAll=true;
+                setSiIndex(0);
+                const int maxint=backup->getupdatedata()->sendnr;
+                setrawstreamstart(maxint,0);
+                }

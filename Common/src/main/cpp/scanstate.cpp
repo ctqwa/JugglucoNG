@@ -23,62 +23,62 @@
 #include <string.h>
 #include "timestr.h"
 data_t *scanstate::fromfile(const char *filename) {
-	Open file(filename,O_RDONLY);
-	if(file<=0)
-		return nullptr;
-	struct stat st;
-        if(fstat(file,&st)==-1)
-		return nullptr;
-	data_t *data= alloc(st.st_size); 
-	if(read(file,data->buf,st.st_size)!=st.st_size) {
-		return nullptr;
-		}
-	return data;	
-	}
+    Open file(filename,O_RDONLY);
+    if(file<=0)
+        return nullptr;
+    struct stat st;
+    if(fstat(file,&st)==-1)
+        return nullptr;
+    data_t *data= alloc(st.st_size); 
+    if(read(file,data->buf,st.st_size)!=st.st_size) {
+        return nullptr;
+        }
+    return data;    
+    }
 
 bool scanstate::makelink(string_view filename) {
-	if(filename.length()<=0)
-		return false;
-	decltype(auto) pos=filename.find_last_of('/');
-	if(pos==filename.npos)
-		return false;
-	pos++;
-	constexpr const char linkend[]="state.lnk";
-	int buflen=pos+sizeof(linkend);
-	char buf[buflen];
-	memcpy(buf,&filename[0],pos);
-	memcpy(buf+pos,linkend,sizeof(linkend));
-//	return writeall(buf,filename.data(),filename.length());
-	return writeall(buf,filename.data()+pos,filename.length()-pos);
+    if(filename.length()<=0)
+        return false;
+    decltype(auto) pos=filename.find_last_of('/');
+    if(pos==filename.npos)
+        return false;
+    pos++;
+    constexpr const char linkend[]="state.lnk";
+    int buflen=pos+sizeof(linkend);
+    char buf[buflen];
+    memcpy(buf,&filename[0],pos);
+    memcpy(buf+pos,linkend,sizeof(linkend));
+//    return writeall(buf,filename.data(),filename.length());
+    return writeall(buf,filename.data()+pos,filename.length()-pos);
 }
 string_view scanstate::makefilename(const string_view sbasedir,const time_t tim) { //Has to be deleted
-	constexpr const char start[]="/state";
-	int baselen= sbasedir.length();
-	if(sbasedir[baselen-1]=='/')
-		baselen--;
-	const string_view::size_type buflen=baselen+timestrlen+sizeof(start);
-	char *filename=new char[buflen];  //*******
-	constexpr int startlen=sizeof(start)-1;
-	memcpy(filename,&sbasedir[0],baselen);
-	memcpy(filename+baselen,start,startlen);
-	timestr(filename+baselen+startlen,tim);
-	LOGGER("makefilename()=%s\n",filename);
-	return {filename,buflen-1};
-	}
+    constexpr const char start[]="/state";
+    int baselen= sbasedir.length();
+    if(sbasedir[baselen-1]=='/')
+        baselen--;
+    const string_view::size_type buflen=baselen+timestrlen+sizeof(start);
+    char *filename=new char[buflen];  //*******
+    constexpr int startlen=sizeof(start)-1;
+    memcpy(filename,&sbasedir[0],baselen);
+    memcpy(filename+baselen,start,startlen);
+    timestr(filename+baselen+startlen,tim);
+    LOGGER("makefilename()=%s\n",filename);
+    return {filename,buflen-1};
+    }
 scanstate::scanstate(string_view prev,SavedApart) : multimmap(4,4*4096) {
-	constexpr int maxpath=512;
-	char buf[maxpath];
-	int dirlen=prev.length();
-	memcpy(buf,prev.data(),dirlen);
-	if(buf[dirlen-1]!='/')
-		buf[dirlen++]='/';
-	strcpy(buf+dirlen,"mess.dat");setpos(MESS, fromfile(buf));
-	strcpy(buf+dirlen,"composite.dat"); setpos(COMP,fromfile(buf));
-	strcpy(buf+dirlen,"attenuation.dat"); setpos(ATTE,fromfile(buf));
-	}
+    constexpr int maxpath=512;
+    char buf[maxpath];
+    int dirlen=prev.length();
+    memcpy(buf,prev.data(),dirlen);
+    if(buf[dirlen-1]!='/')
+        buf[dirlen++]='/';
+    strcpy(buf+dirlen,"mess.dat");setpos(MESS, fromfile(buf));
+    strcpy(buf+dirlen,"composite.dat"); setpos(COMP,fromfile(buf));
+    strcpy(buf+dirlen,"attenuation.dat"); setpos(ATTE,fromfile(buf));
+    }
 
 void scanstate::removefile() {
-	if(unlink(filename.data())!=0) {
-		lerror(		filename.data());
-		};
-	};
+    if(unlink(filename.data())!=0) {
+        lerror(        filename.data());
+        };
+    };

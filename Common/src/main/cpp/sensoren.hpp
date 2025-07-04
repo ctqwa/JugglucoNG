@@ -1099,7 +1099,7 @@ int writeStartime(crypt_t *pass, const int sock, const int sensorindex) {
 #endif
                did |= resstream;
                if(hist->isSibionics()) {
-                  int jsonres=hist->sendjson(pass,sock,ind); //TODO send less often
+                  int jsonres=hist->sendSibionicsState(pass,sock,ind); //TODO send less often
                   if(!jsonres) {
                      return did&0x4;
                      }

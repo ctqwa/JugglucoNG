@@ -27,6 +27,9 @@ struct Num {
   union {
 	  uint32_t mealptr;
 	  uint32_t librenr;
+      struct {
+        bool exclude:1;
+        };
 	  };
   float32_t value;
   uint32_t type;

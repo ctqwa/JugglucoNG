@@ -242,9 +242,9 @@ extern float sitrend2RateOfChange(int sitrend);
 
 extern uint32_t makestarttime(int index,uint32_t eventTime);
 
-#include "sibionics/json.hpp"
-extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const AlgorithmContext *alg,getjson_t getjson );
-extern getjson_t getjson2;
+//#include "sibionics/json.hpp"
+//extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const AlgorithmContext *alg,getjson_t getjson );
+//extern getjson_t getjson2;
 extern jlong glucoseback(uint32_t glval,float drate,SensorGlucoseData *hist) ;
 
 jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *data,int sensorindex)  {
@@ -325,11 +325,11 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
         int reindex=(int)basear[4];
         auto trend=(int)basear[6];
 
-    #ifdef USE_PROCESS
        double newvalue;
        if(algcontext) {
-            if(current>1&&value<3000.0&&(newvalue= process2(index,value,temp))>1.8&&(index%5==0))
+           if(current>1&&value<3000.0&&(newvalue= process2(index,value,temp))>1.8&&(index%5==0)) {
                 sens->getinfo()->pollinterval=newvalue-value;
+                }
            else {
              if(sens->getinfo()->pollinterval<40) 
                     newvalue=value+sens->getinfo()->pollinterval;
@@ -339,15 +339,12 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
            LOGAR("algcontext==null");
             newvalue=value;
             }
-    #else
-        #define     newvalue value
-    #endif
-             const int mgdL=std::round(newvalue*convfactordL);
-             const int trend2=algcontext?algcontext->ig_trend:trend;
-            const float change=sitrend2RateOfChange(trend2);
-            const int abbottrend=sitrend2abbott(trend2);
-          const int totalIndex=sens->siAddedIndex(index);
-            LOGGER("totalIndex=%d index=%d temp=%f value=%f newvalue=%f trend=(%d?) %d %d %1.f itime=%" PRIu64 " %s" ,totalIndex,index,temp,value,newvalue,trend,trend2,abbottrend,change,eventTime,ctime(&eventTime));
+           const int mgdL=std::round(newvalue*convfactordL);
+           const int trend2=algcontext?algcontext->ig_trend:trend;
+           const float change=sitrend2RateOfChange(trend2);
+           const int abbottrend=sitrend2abbott(trend2);
+           const int totalIndex=sens->siAddedIndex(index);
+           LOGGER("totalIndex=%d index=%d temp=%f value=%f newvalue=%f trend=(%d?) %d %d %1.f itime=%" PRIu64 " %s" ,totalIndex,index,temp,value,newvalue,trend,trend2,abbottrend,change,eventTime,ctime(&eventTime));
           if(newvalue>1.8&&newvalue<30) {
                sens->savestream(eventTime,totalIndex,mgdL,abbottrend,change);
                sens->setSiIndex(index+1);
@@ -360,10 +357,10 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
                             backup->resensordata(sensorindex);
                             }
                      auto res=glucoseback(mgdL,change,sens);
-                     if(!(index%5))  {
+/*                     if(!(index%5))  {
                         if(algcontext)
                             savejson(sens,sens->statefile,index,algcontext,getjson2);
-                        }
+                        } */
                      backup->wakebackup(Backup::wakestream);
                      extern void wakewithcurrent();
                      wakewithcurrent();
@@ -374,12 +371,12 @@ jlong SiContext::processData2(SensorGlucoseData *sens,time_t nowsecs,data_t *dat
                        return res;
                       }
                else {
-                   if(!(index%500)) {
+/*                   if(!(index%500)) {
                         if(algcontext) {
-                            savejson(sens,sens->statefile,index,algcontext,getjson2);
+                           // savejson(sens,sens->statefile,index,algcontext,getjson2);
                             backup->wakebackup(Backup::wakestream);
                             }
-                        }
+                        } */
                       sens->receivehistory=nowsecs;
                      }
                const int last=sens->pollcount()-1;

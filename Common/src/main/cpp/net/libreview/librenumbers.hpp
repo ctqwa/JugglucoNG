@@ -185,34 +185,6 @@ class Numbers: public LibreType {
 		return writeentry(buf, "type", "com.abbottdiabetescare.informatics.customnote",label,0.0f,recordnum,tim,del);
 		}
 #include "numcategories.hpp"
-/*
-static float longWeight(uint32_t type) { 
-	if(type>=settings->varcount())
-		return 0.0f;
-	if(settings->data()->librenums[type].kind==2)
-		return 1.0f;
-	return 0.0f;
-	}	
-static float rapidWeight(uint32_t type) { 
-	if(type>=settings->varcount())
-		return 0.0f;
-	if(settings->data()->librenums[type].kind==1)
-		return 1.0f;
-	return 0.0f;
-	}	
-static float carboWeight(int type) { 
-	if(type>=settings->varcount())
-		return 0.0f;
-	if(settings->data()->librenums[type].kind==3)
-		return settings->data()->librenums[type].weight;
-	return 0.0f;
-	}
-static bool isNote(int type) { 
-	if(type>=settings->varcount())
-		return false;
-	return settings->data()->librenums[type].kind==4;
-	}
-	*/
 static std::string_view getmealtype(const Num &num) {
 	if(num.value>50.0f) {
 		time_t tim=num.time;
@@ -324,7 +296,6 @@ template <void (Numbers::*fun)(char *&,const Num &,Libregeg *,bool)>
 	}
 
 template <void (Numbers::*fun)(char *&,const Num &,Libregeg *,bool)>
-//template <void Numbers::fun(char *&,const Num &,Libregeg *,bool)>
  int writeindex(char *buf,std::span<int32_t> indices,Libregeg *ids) {
  	LOGSTRING("writeindex\n");
 	char *ptr=buf;
@@ -337,36 +308,6 @@ template <void (Numbers::*fun)(char *&,const Num &,Libregeg *,bool)>
 		}
 	return ptr-buf;
 	}
-/*	
-static constexpr auto writeallInsulin=writespan<insulinel>;
-static constexpr auto writeallrest=writespan<restel>;
-static constexpr auto writeallfood =writespan<foodel>;
-*/
-
-//Mmap<Libreids> libreids;
-//Mmap<int32_t> librechanged;
-//int32_t &getlibresend()  
-//int32_t &getlibrechangednr()  
-/*
-class Libregeg {
-public:
-const Num*start;
-Libreids *ids;
-.int=int32_t NRlibre;
-const Num &getnum(int pos) const {
-	return start[pos];
-	}
-void addnum(const Num &n,int librenr)  {
-	int index=&n-start;
-	ids[index].nr=librenr;
-	ids[index].modified=false;
-	}
-int addnum(const Num &n,nextlibrenr())  {
-	int librenr=++NRlibre;
-	addnum(n,librenr);
-	return librenr;
-	}
-}; */
 private:
 Libregeg *ids;
 int libreNR;
@@ -418,9 +359,6 @@ void onSuccess() {
  	librenr()=libreNR;
 	LOGGER("next libreNR=%d\n",libreNR);
 	}
-//	int lnr=librenr();
-//	Libregeg ids[nnr];
-//	auto lnr=librenr();
 
 Numbers():ids(new Libregeg[numdatas.size()]),libreNR(librenr()) {
 	if(dontSendNumbers())
@@ -498,11 +436,7 @@ int writeallfood(char *buf) {
 int writeallnotes(char *buf) {
 	return writeallnolast<&Numbers::restel>(buf);
 	}
-//const decltype(&Numbers<LibreType>::writeall<&Numbers<LibreType>::insulinel>) writeallInsulin=Numbers<LibreType>::writeall<&Numbers<LibreType>::insulinel>;
-//const auto writeallrest=writeall<restel>;
-//const auto writeallfood =writeall<foodel>;
 };
-//{"insulinType":"RapidActing","units":20.0,"extendedProperties":{"factoryTimestamp":"2022-09-30T09:10:00.000Z"},"recordNumber":1281,"timestamp":"2022-09-30T11:10:00.000+02:00"},
 
 
 
@@ -640,26 +574,7 @@ int main(int argc, char **argv) {
 
 	buf[len]='\0';
 	puts(buf);
-	//testlibre3();
 	}
 #endif
-/*
-void notelibre3() {
-	using libre=Numbers<libre3>;
-	char buf[1024];
-	time_t tim= 1668690600;
-	char *ptr=buf;
-	//int len=libre::writeinsulin(buf,"RapidActing",13,3585,tim) ;
-
-	//	int len=libre::writefood(ptr,"Snack",60,1028,1670595720,true);
-	int len=libre::writenote(ptr,R"("Bike")",1808,tim,false);
-	buf[len]='\0';
-	puts(buf);
-	}
-int main() {
- notelibre3();
-
-	}
-	*/
 
 

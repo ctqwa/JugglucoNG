@@ -850,6 +850,9 @@ public static native boolean siTransmitterScan(long dataptr,String scancode);
 public static native long percentileEndtime(int days);
 public static native int getAnalysedays( );
 public static native void onCreate();
+public static native void setbloodvar(byte val);
+public static native byte getbloodvar( );
+
 //s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }
 

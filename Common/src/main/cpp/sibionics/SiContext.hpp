@@ -25,17 +25,18 @@
 #include <ctime>
 #include <jni.h>
 #include "config.h"
+#include "scanstate.hpp"
 class SensorGlucoseData;
 #include "AlgorithmContext.hpp"
 template <typename T> struct gegs;
 typedef gegs<signed char> data_t;
 class SiContext {
 private:
+   scanstate binState;
    AlgorithmContext *algcontext;
    bool notchinese;
-    double process2(int index,double value, double temp);
-    double process3(int index,double value, double temp);
-//void	 saveSi3(SensorGlucoseData *sens,int index,uint32_t eventTime,bool save,int value,float temp,bool savejson) ;
+   double process2(int index,double value, double temp);
+   double process3(int index,double value, double temp);
    void  	setNotchinese(SensorGlucoseData *sens);
 public:
    SiContext(SensorGlucoseData *sens);

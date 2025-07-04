@@ -769,12 +769,12 @@ static void savestate(libre2stream *sdata) {
     writeall(name.data(),state,sdata->state->map.size()*sizeof(state[0]));
 
     const char *old;
-        {
+    {
         std::lock_guard<std::mutex> lock(sdata->hist->mutex);
 
         old=getpreviousstate(sensordir).data();
         scanstate::makelink(name);
-        }
+    }
     delete[] name.data();
     unlink(old);
     delete[] old;

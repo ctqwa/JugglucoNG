@@ -278,7 +278,8 @@ char deviceaddress[deviceaddresslen];
 uint16_t libreviewScan;
 uint8_t authlendontuse;
 
-uint8_t reserved:3;
+uint8_t reserved:2;
+bool redoAll:1;
 
 bool streamHistoryDONtuse:1;
 
@@ -320,6 +321,7 @@ union {
  //   uint32_t oldlibreStarttime;
     }; //end union
 uint32_t libreStarttime;
+uint32_t Version;
 
 
 
@@ -1154,7 +1156,8 @@ specstart(spec),
  histpath(baseuit, "data.dat"),
  scanpath(baseuit, "current.dat"),
  trendspath(baseuit, trendsdat),
- statefile(sensordir,"state.json")
+ statefile(sensordir,"state.json"),
+ binstatefile(sensordir,"state.bin")
 
 #ifdef SIHISTORY
  ,statefile3(sensordir,"state3.json")
@@ -1218,6 +1221,7 @@ const char * relstatefile() {
     return absToRel(statefile);
     } */
 pathconcat statefile;
+pathconcat binstatefile;
 
 #ifdef SIHISTORY
 pathconcat statefile3;
@@ -1326,11 +1330,31 @@ bool savepoll(time_t tim,int id,int glu,int trend,float change) {
     return true;
     }
 
-bool savestream(time_t tim,int id,int glu,int trend,float change) {
-    saveglucosedata(polls,getinfo()->pollcount,tim, id, glu, trend, change);
-    return true;
+void savestream(time_t tim,int id,int glu,int trend,float change) {
+    if(getinfo()->redoAll) {
+        getinfo()->redoAll=saveStreamAgain(tim,id,glu,trend,change);
+        return;
+        }
+     else {
+        saveglucosedata(polls,getinfo()->pollcount,tim, id, glu, trend, change);
+        }
     }
 
+bool saveStreamAgain(time_t tim,int id,int glu,int trend,float change) {
+     int index=id-5;
+     while(polls[index].id>id)
+        --index;
+     while(index<getinfo()->pollcount&&polls[index].id<id) {
+        ++index;
+        }
+     polls[index]={static_cast<uint32_t>(tim),id,glu,trend,change};
+     const int count=index+1;
+     if(count<getinfo()->pollcount) {
+        return true;
+        }
+    getinfo()->pollcount=count;
+    return false;
+    }
 void saveglucosedata(Mmap<ScanData> &streamscans,uint32_t &count,time_t tim,int id,int glu,int trend,float change) {
      streamscans[count++]={static_cast<uint32_t>(tim),id,glu,trend,change};
     }
@@ -1727,6 +1751,9 @@ void setupdatechange(int maxind,uint32_t updatestate::*member,uint32_t value ) {
 void setstarthistback(int maxint,uint32_t histchange) {
     setupdatechange(maxint,&updatestate::histstart,histchange);
     }
+void setrawstreamstart(int maxint,uint32_t newvalue) {
+    setupdatechange(maxint,&updatestate::rawstreamstart,newvalue);
+    }
 /*
 DOESN"T work with bitfield members
 template <typename VALUE_T>
@@ -1781,33 +1808,35 @@ sendscan:
 1: also via stream
 2: also via scan
 */
-
-int sendjson(crypt_t *pass,int sock,int ind)  {
+private:
+int sendSistate(const pathconcat *sfile, crypt_t *pass,int sock)  {
+    const char *statename=sfile->data();
+    Readall<unsigned char> stateBytes(statename);
+    if(!stateBytes.data()||!stateBytes.size()) {
+        LOGGER("GLU: %s doesn't exist\n",statename);
+        return 2;
+        }
+    const auto relstate=absToRel(*sfile);
+    LOGGER("statefile=%s\n",statename);
+    if(!senddata(pass,sock,0,stateBytes.data(),stateBytes.size(),relstate)) {
+        LOGGER("GLU: senddata %s failed\n",relstate.data());
+        return 0;
+        }
+    return 1;
+    }
+public:
+int sendSibionicsState(crypt_t *pass,int sock,int ind)  {
     int waslock=getinfo()->lockcount;
     if(getinfo()->update[ind].rawstreamstart<waslock) {
-#ifdef SIHISTORY
-      pathconcat *files[]={&statefile, &statefile3};
-        for(auto *sfile:files)
-#else
-        const auto *sfile = &statefile;
-#endif
-
-      {
-          const char *statename=sfile->data();
-         Readall<unsigned char> json(statename);
-         if(!json.data()||!json.size()) {
-            LOGGER("GLU: %s doesn't exist\n",statename);
-            return 2;
+        int res=sendSistate(&binstatefile,pass,sock);
+        /*
+        if(res==2) {
+            res=sendSistate(&statefile,pass,sock);
+           } */
+        if(res==1) {
+            getinfo()->update[ind].rawstreamstart=waslock;
             }
-         const auto relstate=absToRel(*sfile);
-         LOGGER("statefile=%s\n",statename);
-         if(!senddata(pass,sock,0,json.data(),json.size(),relstate)) {
-            LOGGER("GLU: senddata %s failed\n",relstate.data());
-            return 0;
-            }
-         }
-        getinfo()->update[ind].rawstreamstart=waslock;
-        return 1;    
+        return res;    
         }
     return 2;
     }
@@ -1842,7 +1871,7 @@ int updatestream(crypt_t *pass,int sock,int ind,int sensindex,int sendscan)  {
 
       struct {
           uint16_t endStreamhistory; 
-        uint16_t startedwithStreamhistory; 
+          uint16_t startedwithStreamhistory; 
         } endinfo;
         std::vector<subdata> vect;
         bool wrotehistory=false;
@@ -2032,6 +2061,7 @@ int siAddedIndex(int index) const {
         return index+getinfo()->starthistory;
         }
 
+void resetSiIndex();
 };
 
 struct lastscan_t {

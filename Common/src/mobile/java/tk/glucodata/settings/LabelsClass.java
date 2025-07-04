@@ -226,7 +226,7 @@ void    mklabellayout(View parent ) {
 	recycle.setLayoutManager(lin);
 	Button addnew = new Button(context);
 
-        Spinner spinner=new Spinner(context);
+    Spinner spinner=new Spinner(context);
 	final int minheight= GlucoseCurve.dpToPx(48);
 	spinner.setMinimumHeight(minheight);
 	avoidSpinnerDropdownFocus(spinner);
@@ -338,10 +338,10 @@ static public class LabelListAdapter extends RecyclerView.Adapter<LabelListHolde
     Runnable onsave;
     LabelListAdapter(ArrayList<String> labels,LabelsClass set,Runnable onsave,View parlayout) {
         this.labels=labels;
-	this.parlayout=parlayout;
-	this.onsave=onsave;
+        this.parlayout=parlayout;
+        this.onsave=onsave;
         settings=set;
-    }
+         }
 
     @NonNull
 	@Override

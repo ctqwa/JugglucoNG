@@ -65,9 +65,9 @@ uint32_t makestarttime(int index,uint32_t eventTime) {
 #define savejson(sens,name,  index,alg,getjson )x
 #define glucoseback(glval, drate,hist) 
 #else
-#include "sibionics/json.hpp"
-extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const AlgorithmContext *alg,getjson_t getjson );
-extern getjson_t getjson3;
+//#include "sibionics/json.hpp"
+//extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const AlgorithmContext *alg,getjson_t getjson );
+//extern getjson_t getjson3;
 extern jlong glucoseback(uint32_t glval,float drate,SensorGlucoseData *hist) ;
 #ifndef NOLOG
 void logbytes(std::string_view text,const uint8_t *value,int vallen) {
@@ -182,7 +182,7 @@ jlong SiContext::processData(SensorGlucoseData *sens,time_t nowsecs,int8_t *data
                         backup->resensordata(sensorindex);
                         }
                    auto res=glucoseback(mgdL,change,sens);
-                   if(!(index%5)) savejson(sens,sens->statefile,index,algcontext,getjson3);
+//                   if(!(index%5)) savejson(sens,sens->statefile,index,algcontext,getjson3);
                     backup->wakebackup(Backup::wakestream);
                   extern void wakewithcurrent();
                      wakewithcurrent();
@@ -193,10 +193,10 @@ jlong SiContext::processData(SensorGlucoseData *sens,time_t nowsecs,int8_t *data
                      return res;
                     }
                  else {
-                   if(!infuture&&!(index%500)) {
+/*                   if(!infuture&&!(index%500)) {
                         savejson(sens,sens->statefile,index,algcontext,getjson3);
                         backup->wakebackup(Backup::wakestream);
-                        }
+                        } */
                       sens->receivehistory=nowsecs;
                      }
                   const int last=sens->pollcount()-1;

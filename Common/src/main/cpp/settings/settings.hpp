@@ -281,7 +281,10 @@ struct Tings {
     std::array<char,36> libreviewAccountID;
     char _nullchar1;
     uint8_t librecountry;
-    int16_t empty2;
+    
+    int8_t empty2b;
+    uint8_t bloodvar;
+
     float32_t threshold;
     int32_t floatglucose;
 
@@ -673,6 +676,7 @@ void mklabels() {
         strcpy( varsptr[i].name,usedtext->labels[i].data());
     }
     data()->mealvar=1;
+    data()->bloodvar=6;
     data()->varcount=nrlab;
     mkshorts() ;
 }

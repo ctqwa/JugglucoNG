@@ -9,8 +9,10 @@ typedef  jdouble JNICALL (*algtype(processAlgorithmContext))(JNIEnv *env, jclass
 typedef  jstring JNICALL (*algtype(getAlgorithmVersion))(JNIEnv *env, jclass thiz);
 
 typedef  jint JNICALL (*algtype(releaseAlgorithmContext))(JNIEnv *env, jclass thiz,jobject algContext);
-//    public static native int releaseAlgorithmContext(AlgorithmContext algorithmContext);
-// typedef   jint  JNICALL (*algtype(V120Activation))(JNIEnv *env, jclass thiz,jint i, jboolean z, jbyteArray bArr, jlong j, jint i2, jbyteArray bArr2, jint i3);
+
+typedef jbyteArray  JNICALL (*algtype(getBinaryStructAlgorithmContext))(JNIEnv *env, jclass thiz,jobject algContext);
+
+typedef jint  JNICALL (*algtype(setBinaryStructAlgorithmContext))(JNIEnv *env, jclass thiz,jobject algContext,jbyteArray bar );
 
  typedef   jint  JNICALL (*algtype(V120Activation))(JNIEnv *env, jclass thiz,jint i, jboolean z, jbyteArray bArr, jlong j, jint i2, jbyteArray bArr2, jint i3);
 

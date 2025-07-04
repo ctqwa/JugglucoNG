@@ -148,9 +148,11 @@ int updateone::update() {
         init=false;
         if(sendnums) {
             std::vector<subdata> vect;
-            vect.reserve(2);
+            vect.reserve(3);
             bool nochangenum =true;
             vect.push_back({reinterpret_cast<const senddata_t *>(&nochangenum),offsetof(Tings,nochangenum),sizeof(nochangenum)});
+            constexpr const int  bloodvaroff=offsetof(Tings, bloodvar);
+            vect.push_back({reinterpret_cast<const senddata_t *>( settings->data())+bloodvaroff,bloodvaroff,1});
             constexpr const int  sharedstart=offsetof(Tings, update);
             constexpr const int len=offsetof(Tings,mealvar )+1-sharedstart;
             vect.push_back({reinterpret_cast<const senddata_t *>( settings->data())+sharedstart,sharedstart,len});

@@ -51,55 +51,55 @@ ATTE=2,
 FAKE=3
 };
 class multimmap {
-const int maxdats;
-int freepos;
-public:
-Mmap<unsigned char> map;
-int &datpos(int datnr) {
-    return reinterpret_cast<int*>(map.data())[datnr];
-    }
-template <typename... T> multimmap(int maxdats,T... args):maxdats(maxdats),freepos(datastart()),map(args...) { }
-virtual ~multimmap() {}
+    const int maxdats;
+    int freepos;
+    public:
+    Mmap<unsigned char> map;
+    int &datpos(int datnr) {
+        return reinterpret_cast<int*>(map.data())[datnr];
+        }
+    template <typename... T> multimmap(int maxdats,T... args):maxdats(maxdats),freepos(datastart()),map(args...) { }
+    virtual ~multimmap() {}
 
-int datastart() const {
-    return maxdats*sizeof(int);
-    }
+    int datastart() const {
+        return maxdats*sizeof(int);
+        }
 
-data_t *get(int datnr) {
-    if(isnull(this))
+    data_t *get(int datnr) {
+        if(isnull(this))
+            return nullptr;
+        if(!map.data())
+            return nullptr;
+        int pos=datpos(datnr);
+        if(pos<datastart())
+            return nullptr;
+        data_t *dat=reinterpret_cast<data_t*>(map.data()+pos);
+        if(dat->len>0)
+            return dat;    
         return nullptr;
-    if(!map.data())
-        return nullptr;
-    int pos=datpos(datnr);
-    if(pos<datastart())
-        return nullptr;
-    data_t *dat=reinterpret_cast<data_t*>(map.data()+pos);
-    if(dat->len>0)
-        return dat;    
-    return nullptr;
-    }
-bool good() const {
-    return const_cast<multimmap*>(this)->get(MESS);
-    }
-data_t * alloc(int len) {
-    int was=freepos;
-    data_t *dat=reinterpret_cast<data_t*>(map.data()+was);
-    dat->len=len;
-    freepos+=alignstart<int>(sizeof(data_t)+len);
-    return dat;
-    }
-void reset() {
-    freepos=datastart();
-    memset(map.data(),'\0',freepos);
-    }
-void makenull(int datnr) {
-    datpos(datnr)=0;
-    }
-    
-void setpos(int datnr,data_t *dat) {
-    int pos=reinterpret_cast<unsigned char *>(dat)-map.data();
-    datpos(datnr)=pos;
-    }
+        }
+    bool good() const {
+        return const_cast<multimmap*>(this)->get(MESS);
+        }
+    data_t * alloc(int len) {
+        int was=freepos;
+        data_t *dat=reinterpret_cast<data_t*>(map.data()+was);
+        dat->len=len;
+        freepos+=alignstart<int>(sizeof(data_t)+len);
+        return dat;
+        }
+    void reset() {
+        freepos=datastart();
+        memset(map.data(),'\0',freepos);
+        }
+    void makenull(int datnr) {
+        datpos(datnr)=0;
+        }
+        
+    void setpos(int datnr,data_t *dat) {
+        int pos=reinterpret_cast<unsigned char *>(dat)-map.data();
+        datpos(datnr)=pos;
+        }
     };
 
     class SavedApart {};
@@ -116,8 +116,7 @@ class scanstate: public multimmap {
         LOGSTRING("scanstate\n");
         }
     public:
-//static    string_view getprevious(string_view basedir ) ;
-static    string_view makefilename(const string_view basedir,const time_t tim) ;
+    static    string_view makefilename(const string_view basedir,const time_t tim) ;
     virtual ~scanstate() override {
         delete[] filename.data();;
         }
@@ -129,8 +128,8 @@ static    string_view makefilename(const string_view basedir,const time_t tim) ;
     scanstate(string_view basedir,time_t tim):scanstate(TimeFile{},makefilename(basedir,tim)) {
         }
     scanstate(int block=1): multimmap(4,block*4096) {}
-//    scanstate(string_view basedir) : multimmap(4,getprevious(basedir),4*4096) { }
     scanstate(string_view basedir) : scanstate(TimeFile{}, getpreviousstate(basedir)) { }
     scanstate(string_view prev,SavedApart);
+    using multimmap::multimmap;
     void removefile(); 
 };

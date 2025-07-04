@@ -22,6 +22,7 @@
 
 #pragma once
 #include <unordered_map>
+#include <jni.h>
 #include "scanstate.hpp"
 struct Method {
 string name;

@@ -26,7 +26,7 @@ else {
       GMSWEAR = '19.0.0'
      GMSBASE = '18.7.0'
       MINSDK = 21
-    TARGETSDK = 34
+    TARGETSDK = 35
    CPPSTD = "-std=gnu++26"
        }
 
@@ -86,7 +86,7 @@ android {
         //compileSdk 36
         applicationId "tk.glucodata"
 
-         versionName '9.7.7'
+         versionName '9.8.0'
 //    multiDexEnabled true
 
         buildConfigField 'String', 'BUILD_TIME', 'new java.text.SimpleDateFormat("HH:mm:ss dd-MMM-yyyy").format(new java.util.Date(' + System.currentTimeMillis() + 'L))'
@@ -161,7 +161,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
     //******  Zet op rollout op 100% ******
             dimension 'libreVersion'
             versionCode 732 //LIBRE2ONLY
-         //    versionName '9.7.7-no3'
+         //    versionName '9.8.0-no3'
             versionNameSuffix '-no3'
             buildConfigField 'int', 'libreVersion', '2'
             externalNativeBuild.cmake {
@@ -218,7 +218,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         manifestPlaceholders["minSDK"] = "$minSdk"
         versionCode 734 //WATCH
     //******  Zet op rollout op 100% ******
-        //versionName '9.7.7-wear'
+        //versionName '9.8.0-wear'
         versionNameSuffix '-wear'
         signingConfig signingConfigs.alg
 
@@ -241,7 +241,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 //        minSdk 19
             dimension 'wearos'
         versionCode 734 //WATCH
-        //versionName '9.7.7-small'
+        //versionName '9.8.0-small'
         versionNameSuffix '-small'
         signingConfig signingConfigs.alg
 

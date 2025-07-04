@@ -621,6 +621,17 @@ extern "C" JNIEXPORT jbyte  JNICALL   fromjava(getmealvar)(JNIEnv *env, jclass c
     return settings->data()->mealvar;
     }
 
+
+
+extern "C" JNIEXPORT void  JNICALL   fromjava(setbloodvar)(JNIEnv *env, jclass cl,jbyte val) {
+    settings->data()->bloodvar=val;
+    settings->updated();
+    }
+ 
+extern "C" JNIEXPORT jbyte  JNICALL   fromjava(getbloodvar)(JNIEnv *env, jclass cl) {
+    return settings->data()->bloodvar;
+    }
+
 extern "C" JNIEXPORT jfloat  JNICALL   fromjava(getroundto)(JNIEnv *env, jclass cl) {
     return settings->data()->roundto;
     }
