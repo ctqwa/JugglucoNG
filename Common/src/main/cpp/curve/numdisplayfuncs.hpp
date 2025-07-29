@@ -106,7 +106,7 @@ template <class TX,class TY> void NumDisplay::showNums(JCurve&jcurve, const TX &
         NVGcontext* vg=jcurve.thevg;
 	auto [low,high]=jcurve.extrums[numdatasPos];
 	const Numdata *numdata=this;
-        LOGGER("showNums number= %d",high-low);
+        LOGGER("showNums number= %d\n",high-low);
 	for(const Num *it=low;it!=high;it++) {
 		if((jcurve.shownumbers||(jcurve.showmeals&&it->type==carbotype))&&numdata->valid(it)) {
 			int colorindex= it->type;

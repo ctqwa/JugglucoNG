@@ -30,7 +30,8 @@
 #include "fromjava.h"
 #include "sensoren.hpp"
 extern Sensoren *sensors;
-void toEverSense(JNIEnv *env,const std::span<const ScanData> stream,const int modulo) { 
+double     calibrateONEtest(const SensorGlucoseData *sens,const ScanData &value);
+void toEverSense(JNIEnv *env,const SensorGlucoseData *sens,const std::span<const ScanData> stream,const int modulo) { 
    if(stream.size()) {
        for(const ScanData &el:stream) {
          if(!el.valid()) {
@@ -44,8 +45,15 @@ void toEverSense(JNIEnv *env,const std::span<const ScanData> stream,const int mo
            extern jclass EverSense;
            extern jmethodID  sendGlucoseBroadcast;
            const long long wastime= el.gettime()*1000LL;
-           LOGGER("to EverSense %d %d %f %lld\n",el.getid(),el.getmgdL(),el.ch,el.gettime());
-           env->CallStaticVoidMethod(EverSense,sendGlucoseBroadcast,el.getmgdL(),el.ch,wastime);
+           int mgdL;
+           if(double calibrated= calibrateONEtest(sens,el);!isnan(calibrated)) {
+                mgdL=(int)round(calibrated);
+                }
+           else {
+                mgdL=el.getmgdL();
+                }
+           LOGGER("to EverSense %d %d %f %lld\n",el.getid(),mgdL,el.ch,el.gettime());
+           env->CallStaticVoidMethod(EverSense,sendGlucoseBroadcast,mgdL,el.ch,wastime);
          }
        }
    }
@@ -78,7 +86,7 @@ void sendEverSenseoldthread(const SensorGlucoseData *sens,int startpos,int endpo
    uint32_t  starttime=time(nullptr)-4*60*60;
    const auto newstart=sens->firstnotless({start,end},starttime);
    if(newstart<end) {
-	 toEverSense(env,{newstart,end},modulo);
+	 toEverSense(env,sens,{newstart,end},modulo);
 	 }
       else  {
 	 LOGGER("sendEverSenseold %p>=%p\n",start,end);

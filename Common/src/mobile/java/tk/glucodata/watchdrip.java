@@ -72,12 +72,12 @@ private static String  LOG_ID="watchdrip";
 			if(gl==null)
 					return;
 			long res=gl[1];
-			int glumgdl = (int) (res & 0xFFFFFFFFL);
-			if (glumgdl != 0) {
+			int glumgL = (int) (res & 0xFFFFFFFFL);
+			if (glumgL != 0) {
 				int alarm = (int) ((res >> 48) & 0xFFL);
 				short ratein = (short) ((res >> 32) & 0xFFFFL);
 				float rate = ratein / 1000.0f;
-				var newintent=WearInt.mksendglucoseintent(settings,glumgdl,rate,alarm,  gl[0]*1000L);
+				var newintent=WearInt.mksendglucoseintent(settings,glumgL/10.0,rate,alarm,  gl[0]*1000L);
 				newintent.putExtra( "FUNCTION","update_bg_force");
 				newintent.setPackage(key);
 				Applic.app.sendBroadcast(newintent);

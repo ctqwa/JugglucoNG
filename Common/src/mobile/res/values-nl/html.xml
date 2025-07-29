@@ -1628,8 +1628,11 @@ stream glucose waarde getoond wordt.</font></p>
 <!--***********************************************************************************-->
 <!--***********************************************************************************-->
 <p><a href="https://www.juggluco.nl/Jugglucohelp/be/wearosinfo.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/wearosinfo.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/wearosinfo.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/wearosinfo.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/wearosinfo.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/wearosinfo.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/wearosinfo.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/wearosinfo.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/wearosinfo.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/wearosinfo.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/wearosinfo.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/wearosinfo.html?lang=en">en</a>&emsp;&emsp;</p><h1>WearOS</h1>
-<p style="border: none; padding: 0in"><b>Directe
-sensor-horloge-verbinding</b>: hiermee wordt bepaald of het horloge
+<p style="border: none; padding: 0in"><b>Voer nummers (hoeveelheden) in op horloge:</b> Voer
+hoeveelheden voor insuline, koolhydraten en activiteit in op het
+horloge (tweede menu → <a href="https://www.juggluco.nl/Jugglucohelp/newamount.html">&quot;Hoeveelheid&quot;</a>) in plaats van op de
+telefoon. Als je <a href="https://www.juggluco.nl/Juggluco/index.html#novopens">Novopens</a> met de telefoon wilt scannen, moet je dit niet instellen.</p>
+<p style="border: none; padding: 0in"><b>Directe sensor-horloge-verbinding</b>: hiermee wordt bepaald of het horloge
 rechtstreeks met de sensor moet worden verbonden. Dit kan alleen
 worden gewijzigd als horloge en telefoon zijn gesynchroniseerd.
 Gebruik Kloon-&gt;Sync en Reinit op telefoon en horloge om telefoon
@@ -1721,17 +1724,7 @@ praat te krijgen, doe je het volgende:</p>
 	De stream waarden worden nu van horloge naar telefoon gezonden. Je
 	kunt het controleren in het Kloon schermpje. &quot;Directe
 	sensor-horloge verbinding&quot; kan niet veranderd worden als
-	horloge en telefoon niet in sync zijn;</p></li>
-	<li><p style="border: none; padding: 0in">Als je de hoeveelheden op
-	je horloge in wil voeren en gezonden wil hebben naar je smartphone,
-	moet je de zendrichting in het Kloon schermpje zelf veranderen, door
-	hoeveelheden op je smartphone uit te vinken en op je horloge aan te
-	vinken. Op je telefoon moet “Ontvang van” ook aangevinkt zijn.
-	“<i>Verander hoeveelheden niet</i>” moet uitgezet worden op het
-	horloge en aan op de telefoon. Labels worden altijd in de richting
-	van hoeveelheden gezonden en kunnen alleen op de smartphone
-	veranderd worden. Dus als je een label wilt veranderen moet de
-	richting van smartphone naar horloge gaan.</p></li>
+	horloge en telefoon niet in sync zijn.</p></li>
 </ol>
 <p style="border: none; padding: 0in">Als het horloge een directe
 Bluetooth verbinding heeft met de sensor en haar waarden naar de
@@ -1812,30 +1805,6 @@ kun je het volgende bekijken:</p>
 	moet je eerst een functionerende kloonverbinding tot stand brengen
 	om de gegevens op de telefoon te ontvangen.</p></li>
 </ul>
-<h2 class="western">Invoeren op horloge</h2>
-<p>Als je hoeveelheden insuline, koolhydraten en activiteiten op het
-horloge invoert, kun je dat niet meer op de telefoon doen. Ook het
-scannen van insulinepennen is niet meer mogelijk.</p>
-<p>Hiervoor bestaat momenteel geen knop. Aan beide zijden van de
-kloonverbinding tussen het horloge en de begeleidende telefoon moet
-je wijzigingen aanbrengen in de klooninstellingen. Zorg er eerst voor
-dat de telefoon en het horloge gesynchroniseerd zijn en doe dan het
-volgende:</p>
-<h5 class="western">TELEFOON:</h5>
-<p>Ga naar linker midden menu → Kloon. Druk op de horlogeverbinding
-en vervolgens op <i>Wijzigen</i> .<span style="font-variant: normal">
-</span><span style="font-variant: normal"><span style="font-style: normal">Schakel
-“</span></span><i>Hoeveelheden</i><span style="font-variant: normal">”
-</span>uit en controleer of <i>Ontvang van</i> is aangevinkt. Druk
-hierna op “<i>Opslaan</i>” en vervolgens op “<i>Sluiten</i>”.
-Vink “K<i>loon stuurt hoeveelheden”</i> aan.</p>
-<h5 class="western">HORLOGE:</h5>
-<p>Ga naar het linkermenu → Kloon. Druk op de horlogeverbinding en
-vervolgens op <i>Wijzigen</i>. Vink “<i>Hoeveelheden</i>” aan.
-Stel “<i>Nu</i>” in als het tijdstip tot wanneer alle gegevens al
-op de telefoon aanwezig zijn. Druk hierna op “<i>Opslaan</i>” en
-vervolgens op “<i>Sluiten</i>”. Schakel “<i>kloon stuurt
-hoeveelheden</i>” uit.</p>
 <p style="border: none; padding: 0in"><b>Wijzerplaat</b></p>
 <p style="border: none; padding: 0in">Juggluco voor WearOS bevat een
 wijzerplaat die je huidige glucosewaarde toont naast de tijd en

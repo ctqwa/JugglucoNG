@@ -109,7 +109,7 @@ static void missingalarm(long timmsec)  {
 
         }
 
-static Intent mksendglucoseintent(Settings settings,int mgdl,float rate, int alarm, long timmsec)  {
+static Intent mksendglucoseintent(Settings settings,double mgdl,float rate, int alarm, long timmsec)  {
         Intent intent = new Intent(ACTION_WATCH_COMMUNICATION_SENDER);
     Bundle bundle=new Bundle();
 //    bundle.putInt("phoneBattery",getBatteryLevel()); //Who needs that?

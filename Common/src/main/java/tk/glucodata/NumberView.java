@@ -21,6 +21,7 @@
 
 package tk.glucodata;
 
+import android.widget.LinearLayout;
 import android.app.Activity;
 import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
@@ -60,6 +61,7 @@ import java.util.Locale;
 import tk.glucodata.nums.AllData;
 import tk.glucodata.nums.numio;
 
+import static android.widget.LinearLayout.VERTICAL;
 import static android.view.View.GONE;
 import static android.view.View.INVISIBLE;
 import static android.view.View.TEXT_ALIGNMENT_CENTER;
@@ -95,7 +97,7 @@ Layout datepicker=null;
 TextView dateview;
 DatePicker datepick;
 View newnumview=null;
-Button deletebutton, savebutton ;
+Button deletebutton, savebutton,cancelbutton ;
 long currentnum=0L;
 Spinner spinner;
 EditText valueedit;
@@ -231,8 +233,8 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
 
         deletebutton.setText(R.string.delete);
 
-        Button cancel = new Button(context);
-        cancel.setText(R.string.cancel);
+        cancelbutton = new Button(context);
+        cancelbutton.setText(R.string.cancel);
         savebutton = new Button(context);
         savebutton.setText(R.string.save);
 
@@ -242,7 +244,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
         helpbutton.setOnClickListener(v-> help.helplight(R.string.newamount,context));
         }
     else {
-       if(!useclose) cancel.setVisibility(GONE);
+       if(!useclose) cancelbutton.setVisibility(GONE);
         }
       Layout layout;
 
@@ -255,7 +257,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
    //      getMargins(deletebutton).rightMargin=getMargins(savebutton).leftMargin =(int)(width*0.05f);
 //      getMargins(deletebutton).rightMargin=getMargins(savebutton).leftMargin =(int)(width*0.12f);
           layout = new Layout(context, (lay,w,h) -> { 
-          return new int[]{w,h}; }, new View[]{datebutton,timebutton} ,new View[]{getspinner(context), valueedit}, new View[]{excludebox},new View[]{messagetext,savebutton,deletebutton},new View[]{cancel});
+          return new int[]{w,h}; }, new View[]{datebutton,timebutton} ,new View[]{getspinner(context), valueedit}, new View[]{excludebox},new View[]{messagetext,savebutton,deletebutton},new View[]{cancelbutton});
       }
       else {
  //     getMargins(deletebutton).bottomMargin=getMargins(savebutton).bottomMargin =(int)(width*0.12f);
@@ -343,7 +345,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
               lay.setY(MainActivity.systembarTop*3/4);
             }
 
-            return new int[] {w,h}; },new View[]{helpbutton,getspinner(context), valueedit},new View[]{datebutton, excludebox,mealbutton,source,timebutton},new View[]{cancel,messagetext,deletebutton, savebutton});
+            return new int[] {w,h}; },new View[]{helpbutton,getspinner(context), valueedit},new View[]{datebutton, excludebox,mealbutton,source,timebutton},new View[]{cancelbutton,messagetext,deletebutton, savebutton});
          }
 
         timebutton.setOnClickListener(
@@ -360,9 +362,6 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
 
 
 
-        cancel.setOnClickListener(v -> {
-            context.doonback();
-            });
         deletebutton.setOnClickListener( v-> {
             if(mealview[0]!=null) {
                 removeContentView(mealview[0]);
@@ -476,7 +475,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
         savebutton.setVisibility(GONE);
         messagetext.setVisibility(VISIBLE);
         }
-     context.setonback(() -> {
+     final Runnable closerRun= () -> {
                 if(newmealptr[0]!=0) {
                 if(currentnum!=0&&(currentnum!=numio.newhit)) {
                     Natives.hitsetmealptr(currentnum,newmealptr[0]);
@@ -509,7 +508,13 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
             if(smallScreen)
                 help.hidekeyboard(context);
               }
+            };
+        cancelbutton.setOnClickListener(v -> {
+            MainActivity.poponback();
+            closerRun.run();
             });
+
+     context.setonback(closerRun);
 
     if(tmpmealptr>=0) {
         timebutton.setTextColor( Color.YELLOW);
@@ -721,8 +726,6 @@ public Layout getdateviewal(MainActivity activity, long date, Dater erdate) {
     datepick =new DatePicker(activity);
     datepick.setCalendarViewShown(false);
         Button cancel=new Button(activity);
-//        cancel.setBackgroundResource(R.drawable.button_selector);
-//        cancel.setBackgroundResource(R.drawable.button_selector2);
 
         cancel.setText(R.string.cancel);
         cancel.setOnClickListener(vi -> { 
@@ -841,9 +844,9 @@ void gettimeview(MainActivity activity,Runnable parent) {
     gettimepicker(activity,h,m,numsettime,parent);
     }
     @SuppressWarnings("deprecation")
-Layout buttonlay;
+//Layout buttonlay;
 public void gettimepicker(MainActivity activity,int hourin, int minin, ObjIntConsumer<Integer> timeset,Runnable onclose) {
-final  boolean buttonsunder=true;
+final  boolean buttonsunder=false;
    settime=timeset;
     if(timepicker==null) {
         pick =new TimePicker(activity);
@@ -881,13 +884,19 @@ else {
    layparheight=ViewGroup.LayoutParams.WRAP_CONTENT;
        if(buttonsunder) {
            views=new View[][]{new View[]{pick},new View[]{cancel,ok}};
-          layparwidth=WRAP_CONTENT;
+         layparwidth=WRAP_CONTENT;
            }
        else {
-         layparwidth=MATCH_PARENT;
-          buttonlay=new Layout(activity,new View[] {cancel},new View[]{ok});
-          buttonlay.setLayoutParams(new ViewGroup.LayoutParams(  WRAP_CONTENT , ViewGroup.LayoutParams.MATCH_PARENT));
-         views=new View[][] {new View[] {pick,buttonlay}};
+         //layparwidth=MATCH_PARENT;
+         layparwidth=WRAP_CONTENT;
+        //  buttonlay=new Layout(activity,new View[] {cancel},new View[]{ok});
+        //buttonlay.usebaseline=false;
+         // buttonlay.setLayoutParams(new ViewGroup.LayoutParams(  WRAP_CONTENT , ViewGroup.LayoutParams.MATCH_PARENT));
+         var buttons=new LinearLayout(activity);
+         buttons.setOrientation(VERTICAL);
+         buttons.addView(cancel);
+         buttons.addView(ok);
+         views=new View[][] {new View[] {pick,buttons}};
         };
        };
 //        buttonlay.setBackgroundColor( RED);
@@ -932,11 +941,11 @@ else {
 
   //    timepicker.setPadding(systembarLeft,MainActivity.systembarTop, systembarRight,MainActivity.systembarBottom);
 if(!isWearable) {
-    if(buttonsunder) timepicker.setPadding(systembarLeft,MainActivity.systembarTop, systembarRight,MainActivity.systembarBottom);
-// timepicker.setPadding(systembarLeft,MainActivity.systembarTop, systembarRight,MainActivity.systembarBottom);
+    if(buttonsunder) 
+        timepicker.setPadding(systembarLeft,MainActivity.systembarTop, systembarRight,MainActivity.systembarBottom);
    else  {
          pick.setPadding(systembarLeft,MainActivity.systembarTop,0,MainActivity.systembarBottom);
-        buttonlay.setPadding(0,MainActivity.systembarTop/2, systembarRight,MainActivity.systembarBottom);
+        //buttonlay.setPadding(0,MainActivity.systembarTop/2, systembarRight,MainActivity.systembarBottom);
         }
      }
 

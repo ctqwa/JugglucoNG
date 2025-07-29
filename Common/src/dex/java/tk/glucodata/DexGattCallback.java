@@ -721,8 +721,10 @@ private    void getdata(byte[] value) {
                 final boolean savename=Natives.dexcomProcessData(dataptr, value, timeres);
                 final long res= timeres[1];
                 final long newtime= timeres[0];
-                final int glumgdl = (int) (res & 0xFFFFFFFFL);
-                Log.i(LOG_ID, "dexcomProcessData newtime="+newtime+" res="+res+" "+glumgdl+" mg/dL "+(glumgdl/18.0)+ " mmol/L");                  
+                if(doLog) {
+                    final int glumgL = (int) (res & 0xFFFFFFFFL);
+                    Log.i(LOG_ID, "dexcomProcessData newtime="+newtime+" res="+res+" "+glumgL/18+" mg/dL "+(glumgL/180.0)+ " mmol/L");                  
+                    }
                 handleGlucoseResult(res, newtime);
                 Applic.scheduler.schedule(()->{
                   if(connected) askbackfill();}, 10, TimeUnit.MILLISECONDS);

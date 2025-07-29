@@ -223,7 +223,16 @@ static bool uploadCGM3() {
                         constexpr const int max3entry=300;
                         char buf[max3entry];
 extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server=true);
-                        const char *ptr=writev3entry(buf,el, sensorname,false);
+
+                        const char *ptr;
+                        if(double calibrated=calibrateONEtest(sens,*el);!isnan(calibrated)) {
+                            ScanData newel=*el;
+                            newel.g=(int32_t)round(calibrated);
+                            ptr=writev3entry(buf,&newel, sensorname,false);
+                             }
+                        else  {
+                            ptr=writev3entry(buf,el, sensorname,false);
+                            }
                         const int buflen=ptr-buf;
                         logwriter(buf,buflen);
                         auto res=nightuploadEntries3(buf,buflen);

@@ -29,6 +29,7 @@
 #include "SensorGlucoseData.hpp"
 #include "nums/numdata.hpp"
 #include "sensoren.hpp"
+#include "calibrateValue.hpp"
 extern vector<Numdata*> numdatas;
 
 
@@ -37,10 +38,6 @@ static constexpr const double  maxCalSecs=14*daysecs;
 static double mkweight(double age) {
     return (maxCalSecs-age)/maxCalSecs; 
     } */
-static double mkweight(double age) {
-    return 2.0L/
-        (1.0L + expl(2.3148148148148148L* powl(10,-6) *age));
-    }
 static  const ScanData *firstnotless(const ScanData *scan, const ScanData *endscan,const uint32_t tim) {
     const ScanData scanst{.t=tim};
     auto comp=[](const ScanData &el,const ScanData &se ){return el.t<se.t;};
@@ -312,13 +309,6 @@ void addCalibration(uint32_t tim,int type,Num *num,const Numdata *numdata) {
     th.detach();
     }
 
-double calibrateValue(const CaliPara &cali ,const uint32_t time,const double value) {
-        const double w=mkweight(fabs(time-(double)cali.time));
-        if(w<=0) {
-            return NAN;
-            }
-        return w*(value*cali.a+cali.b)+(1.0-w)*value;
-        }
 double calibrateValue(const CaliPara &cali ,const ScanData &el) {
        return calibrateValue(cali , el.gettime(),el.getmgdL());
     }
@@ -446,8 +436,10 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
             while(cali->time>initer->gettime()) {
                 --cali;
                 if(cali<first) {
+                #ifndef NOLOG
                      time_t tim=initer->gettime();;
                      LOGGER("%s before first calibration %s",sens->shortsensorname()->data(), ctime(&tim));
+                #endif
                      if(allvalues) {
                         int inleft=initer-input+1;
                         ScanData *startpos=outiter-inleft +1;

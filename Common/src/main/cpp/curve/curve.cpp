@@ -2236,7 +2236,7 @@ void    JCurve::startstepNVG(NVGcontext* avg,int width, int height) {
     nvgTextAlign(avg,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
     float rawconv;
     if(double calibrated=calibrateNow(hist,*poll);!isnan(calibrated)) {
-        LOGGER("showvalue %.0f calibrated %.0f\n",poll->getmgdL(),calibrated);
+        LOGGER("showvalue %d calibrated %.0f\n",poll->getmgdL(),calibrated);
         nonconvert=calibrated;
         rawconv= gconvert(poll->getmgdL()*10);
         }
@@ -2253,54 +2253,49 @@ void    JCurve::startstepNVG(NVGcontext* avg,int width, int height) {
 #endif
 #endif
     if(nonconvert<glucoselowest) {
-const                float valuex=getx;
-
-         int gllen=mkshowlow(head, maxhead) ;
+        const  float valuex=getx;
+        int gllen=mkshowlow(head, maxhead) ;
         nvgText(avg,valuex,gety, head, head+gllen);
         }
     else {
         int glucosehighest=hist->getmaxmgdL();
         if(nonconvert>glucosehighest) {
-        float valuex=getx-density*14.0f;
-         int gllen=mkshowhigh(head, maxhead,glucosehighest) ;
+            float valuex=getx-density*14.0f;
+            int gllen=mkshowhigh(head, maxhead,glucosehighest) ;
             nvgText(avg,valuex ,gety, head, head+gllen);
             }
         else {
-#if 0
-            const float convglucose= 27.8f;
-#else
-            const float convglucose= gconvert(nonconvert*10);
-#endif
-#ifdef JUGGLUCO_APP
-#ifndef DONTTALK
-        shownglucose[index].glucosevalue=convglucose;
-        shownglucose[index].glucosetrend=poll->tr;
-#endif
-#endif
-         float valuex=getx-(convglucose>=10.0f?density*20.0f:0.0f);
-         char *value=head+1;
-            int gllen=snprintf(value,maxhead-1,gformat,convglucose);
-         if(gllen<3) {
-            value=head;
-            *value=' ';
-            ++gllen;
-            }
-            nvgText(avg,valuex ,gety, value, value+gllen);
-#ifdef TESTVALUE
-const float trends[]={-3,0};
-            const float rate=trends[index];
-#else
-            const float rate=poll->ch;
-#endif
-            drawarrow(avg,rate,valuex-10*density,gety);
-            if(rawconv>0.0f) {
-                bounds_t bounds;
-                nvgTextBounds(avg, valuex,  gety,value,value+gllen, bounds.array);
-                nvgFontSize(avg,mediumfont );
-                int gllen=snprintf(head,maxhead,gformat,rawconv);
-                nvgText(avg,valuex+bounds.xmax-bounds.xmin+density*6,gety, head, head+gllen);
+            const float convglucose= gconvert(nonconvert*10.0);
+    #ifdef JUGGLUCO_APP
+    #ifndef DONTTALK
+            shownglucose[index].glucosevalue=convglucose;
+            shownglucose[index].glucosetrend=poll->tr;
+    #endif
+    #endif
+             float valuex=getx-(convglucose>=10.0f?density*20.0f:0.0f);
+             char *value=head+1;
+             int gllen=snprintf(value,maxhead-1,gformat,convglucose);
+             if(gllen<3) {
+                value=head;
+                *value=' ';
+                ++gllen;
                 }
-            }
+             nvgText(avg,valuex ,gety, value, value+gllen);
+    #ifdef TESTVALUE
+    const float trends[]={-3,0};
+                const float rate=trends[index];
+    #else
+                const float rate=poll->ch;
+    #endif
+                drawarrow(avg,rate,valuex-10*density,gety);
+                if(rawconv>0.0f) {
+                    bounds_t bounds;
+                    nvgTextBounds(avg, valuex,  gety,value,value+gllen, bounds.array);
+                    nvgFontSize(avg,mediumfont );
+                    int gllen=snprintf(head,maxhead,gformat,rawconv);
+                    nvgText(avg,valuex+bounds.xmax-bounds.xmin+density*6,gety, head, head+gllen);
+                    }
+                }
         }
 
     }

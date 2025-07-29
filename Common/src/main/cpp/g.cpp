@@ -400,6 +400,7 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(getsensorptr)(JNIEnv *env, jclass 
         }
     return reinterpret_cast<jlong>(sdata->hist);
     }
+double     calibrateONEtest(const SensorGlucoseData *sens,const ScanData &value);
 extern "C" JNIEXPORT jlong JNICALL   fromjava(streamfromSensorptr)(JNIEnv *env, jclass cl,jlong sensorptr,int pos) {
     const auto *sens=reinterpret_cast<const SensorGlucoseData*>(sensorptr); 
     const ScanData *start= sens->beginpolls();
@@ -407,9 +408,15 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(streamfromSensorptr)(JNIEnv *env, 
     for(int i=pos;i<len;i++) {
         const ScanData *item=start+i;
         if(item->valid()) {
-            for(++i;i<len&&!start[i].valid();i++)
+            for(++i;i<len&&!start[i].valid();i++) 
                 ;
-            return ((jlong)item->gettime())|(((jlong)item->getmgdL())<<32|((jlong)i)<<48);
+            long mgdL;
+            if(double calibrated=calibrateONEtest(sens,*item);!isnan(calibrated)) {
+                mgdL=(long)round(calibrated);
+                }
+             else
+                mgdL=item->getmgdL();
+            return ((jlong)item->gettime())|(((jlong)mgdL)<<32|((jlong)i)<<48);
             }
         }
     return ((jlong)len)<<48;
@@ -816,12 +823,15 @@ static jlong glucoselong(uint32_t nu,uint32_t glval,float drate,const SensorGluc
         const jlong rate=roundl(((long double)drate)*1000LL);
 
         const double cali=calibrateNow(hist,nu,glval);
+        int mgL;
         if(!isnan(cali)) {
-            glval=(uint32_t)round(cali);
+            mgL=(uint32_t)round(cali*10.0);
             }
+        else 
+            mgL=glval*10;
 
         const jlong alarmcode= getalarmonly(glval,drate,hist);
-        const jlong res= (rate&0xFFFF)<<32|alarmcode|glval;
+        const jlong res= (rate&0xFFFF)<<32|alarmcode|mgL;
         LOGGER("glucoselong=%" PRId64 "\n",res);
         return res;
         }

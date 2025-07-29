@@ -388,7 +388,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
 <string name="calibratepast">Auf Vergangenheit anwenden</string>
 <string name="bloodvar">Blutzucker: </string>
 <string name="calibrate_a">Steigung ändern</string>
-<string name="watchnums">Mengen werden auf der Uhr eingegeben</string>
+<string name="watchnums">Zahlen (Mengen) auf der Uhr eingeben</string>
 <string name="calibrated">Kalibriert</string>
 <string name="delete_calibration">Kalibrierung löschen?</string>
 <string name="hide">Ausblenden</string>

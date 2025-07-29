@@ -57,7 +57,8 @@ char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorn
 		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
 		}
 	addar(outptr,R"(000,"sgv":)");
-	if(auto [ptr,ec]=std::to_chars(outptr,outptr+12,val->getmgdL());ec == std::errc()) {
+    int mgdL=val->getmgdL();
+	if(auto [ptr,ec]=std::to_chars(outptr,outptr+12,mgdL);ec == std::errc()) {
 		outptr=ptr;
 	 	}
 	else {

@@ -1490,22 +1490,26 @@ static bool  inmenu(float x,float y) {
 
 
 extern char hourminstr[hourminstrlen];
+
 int hourmin(const time_t tim,char buf[8]) {
-    struct tm tmbuf;
-     struct tm *stm=localtime_r(&tim,&tmbuf);
-     //snprintf(buf,6,"%02d:%02d",stm->tm_hour,mktmmin(stm));
+   struct tm tmbuf;
+   struct tm *stm=localtime_r(&tim,&tmbuf);
    return  mktime(stm->tm_hour,mktmmin(stm),buf);
-    }
+   }
 void setnowmenu(time_t nu) {
     int timelen=hourmin(nu,hourminstr);
     const int ulen=usedsensors.size();
+
     if(ulen>0) {
+        
         for(int i=0;i<ulen;) {
             const auto *sens=sensors->getSensorData(usedsensors[i++]);
             if(const auto *lastin=sens->lastValidStream()) {
                 for(;i<ulen;i++) {
-                    if(const auto *lastsen=sensors->getSensorData(usedsensors[i])->lastValidStream();lastsen&&(lastsen->t>lastin->t)) {
+                    const auto *nextsens=sensors->getSensorData(usedsensors[i]);
+                    if(const auto *lastsen=nextsens->lastValidStream();lastsen&&(lastsen->t>lastin->t)) {
                         lastin=lastsen;
+                        sens=nextsens;
                         }
                     }
                 if(lastin->t>(nu-maxbluetoothage)) {
@@ -1516,7 +1520,6 @@ void setnowmenu(time_t nu) {
                     else {
                         nonconvert= lastin->g;
                     }
-                //    auto nonconvert= 500;
 const int  trend=lastin->tr;
 //const int  trend=5;
 

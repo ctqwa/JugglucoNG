@@ -2671,6 +2671,10 @@ Uhrzeit auch den per Bluetooth empfangenen aktuellen Glukosewert an.</p>
 <!--***********************************************************************************-->
 <!--***********************************************************************************-->
 <p><a href="https://www.juggluco.nl/Jugglucohelp/be/wearosinfo.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/wearosinfo.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/wearosinfo.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/wearosinfo.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/wearosinfo.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/wearosinfo.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/wearosinfo.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/wearosinfo.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/wearosinfo.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/wearosinfo.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/wearosinfo.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/wearosinfo.html?lang=en">en</a>&emsp;&emsp;</p><h1>Wear OS</h1>
+<p><b>Zahlen (Mengen) auf der Uhr eingeben</b>: Geben Sie Mengen für
+Insulin, Kohlenhydrate und Aktivität auf der Uhr (zweites Menü →
+„Menge“) statt auf dem Telefon ein. Wenn Sie Novopens mit Ihrem
+Telefon scannen möchten, sollten Sie diese Option nicht aktivieren.</p>
 <p><b>Direkte Sensor-Uhr-Verbindung</b>: Legt fest, ob die Uhr direkt
 mit dem Sensor verbunden werden soll. Dies kann nur geändert werden,
 wenn Uhr und Telefon synchronisiert sind. Verwenden Sie Klon-&gt;Sync
@@ -2768,17 +2772,6 @@ wie folgt vor:</p>
 	im Spiegeldialog überprüfen können.&nbsp;Sie können die „Direkte
 	Sensor-Uhr-Verbindung“ nicht ändern, wenn Uhr und Telefon nicht
 	synchron sind.</p></li>
-	<li><p align="left" style="background: transparent">Wenn Sie Mengen
-	von der Uhr zum Telefon senden möchten, sollten Sie die
-	Senderichtung im Spiegeldialog selbst umkehren, indem Sie sie auf
-	dem Telefon deaktivieren und auf der Uhr aktivieren.&nbsp;Am Telefon
-	sollte auch „Empfangen von“ eingestellt sein.&nbsp;Wenn nicht
-	alles genau richtig eingestellt ist, funktioniert es nicht.&nbsp;&quot;Mengen
-	nicht ändern&quot; sollte geändert werden.&nbsp;Die
-	Mengenetiketten&nbsp;werden immer mit den Mengen versendet&nbsp;<i>.&nbsp;</i>Wenn
-	Sie die Richtung der Übertragung von Mengen von der Uhr zum Telefon
-	ändern, können Sie die Beschriftungen nicht ändern.&nbsp;Es
-	sollte nicht zu einfach sein;</p></li>
 </ul>
 <p style="background: transparent">Wenn der Sensor eine direkte
 Bluetooth-Verbindung mit der Uhr hat und seine Werte an ein
@@ -2866,30 +2859,6 @@ beobachten:</p>
 	Klonverbindung herstellen, um die Daten auf dem Telefon zu
 	empfangen.</p></li>
 </ul>
-<h2 class="western"><a name="enteronwatch"></a>Auf der Smartwatch
-eingeben</h2>
-<p>Wenn man auf der Uhr Insulin-, Kohlenhydrat- und Aktivitätsmengen
-eingibt, ist das am Telefon nicht mehr möglich. Auch das Scannen von
-Insulinpens ist nicht mehr möglich.</p>
-<p>Derzeit gibt es hierfür keinen einzigen Button. Auf beiden Seiten
-der Klon-Verbindung zwischen der Uhr und dem Begleittelefon müssen
-Sie Änderungen in den Klon-Einstellungen vornehmen. Stellen Sie
-zunächst sicher, dass Telefon und Uhr synchron sind, und gehen Sie
-dann wie folgt vor:</p>
-<h5 class="western">TELEFON:</h5>
-<p>Gehen Sie zu Menü links in der Mitte→Klon. Drücken Sie auf die
-Uhrverbindung und dann auf <i>Ändern</i> . Deaktivieren Sie <i>Mengen</i>
-und achten Sie darauf, dass „<i>Empfangen von“</i> aktiviert ist.
-Klicken Sie anschließend auf „<i>Speichern</i>“ und dann auf „
-<i>Schließen</i>“. Stellen Sie „<i>Klon sendet Mengen</i>“
-ein.</p>
-<h5 class="western">SMARTWATCH:</h5>
-<p>Gehen Sie zum linken Menü→Klon. Drücken Sie auf die
-Uhrverbindung und dann auf <i>Ändern</i>. Aktivieren Sie „
-<i>Mengen</i>“. Stellen Sie „<i>Jetzt</i>“ als Zeitpunkt ein,
-bis zu dem alle Daten bereits auf dem Telefon vorhanden sind. Klicken
-Sie anschließend auf „<i>Speichern</i>“ und dann auf „
-<i>Schließen</i> “. Deaktivieren Sie „<i>Mirror sendet Mengen</i>“.</p>
 <h2 class="western">Zifferblatt</h2>
 <p style="background: transparent">Juggluco für Wear OS enthält ein
 Zifferblatt, das neben der Uhrzeit auch Ihren aktuellen

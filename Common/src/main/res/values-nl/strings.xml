@@ -382,7 +382,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
 <string name="calibratepast">Toepassen op verleden</string>
 <string name="bloodvar">Bloedglucose:</string>
 <string name="calibrate_a">Helling wijzigen</string>
-<string name="watchnums">Hoeveelheden ingevoerd op horloge</string>
+<string name="watchnums">Voer nummers (hoeveelheden) in op horloge</string>
 <string name="calibrated">Gekalibreerd</string>
 <string name="delete_calibration">Kalibratie verwijderen?</string>
 <string name="hide">Verbergen</string>

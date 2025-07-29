@@ -403,21 +403,18 @@ else {
     }
     }
 protected void handleGlucoseResult(long res,long timmsec) {
-        int glumgdl = (int) (res & 0xFFFFFFFFL);
-        if(glumgdl != 0) {
+//        int glumgdl = (int) (res & 0xFFFFFFFFL);
+        int glumgL = (int) (res & 0xFFFFFFFFL);
+        if(glumgL != 0) {
             int alarm = (int) ((res >> 48) & 0xFFL);
-            {if(doLog) {Log.i(LOG_ID, SerialNumber + " alarm=" + alarm);};};
+            if(doLog) {Log.i(LOG_ID, SerialNumber + " alarm=" + alarm);};;
 
-         /*  float cali=calibrateNow(dataptr,glumgdl); //Already calibrated
-           float mgdlf=isNaN(cali)?glumgdl:cali;
-           float gl = Applic.unit == 1 ? mgdlf / mgdLmult : mgdlf;
-            int mgdl=(int)Math.round(mgdlf); */
 
-           final float gl = Applic.unit == 1 ? glumgdl / mgdLmult : glumgdl;
+           final float gl = Applic.unit == 1 ? glumgL / (mgdLmult*10.0f) : glumgL/10.0f;
 
             short ratein = (short) ((res >> 32) & 0xFFFFL);
             float rate = ratein / 1000.0f;
-            dowithglucose(SerialNumber, glumgdl,gl,rate, alarm, timmsec,sensorstartmsec,showtime,sensorgen);
+            dowithglucose(SerialNumber, (int)Math.round(glumgL/10.0f),gl,rate, alarm, timmsec,sensorstartmsec,showtime,sensorgen);
             charcha[0] = timmsec;
             if(!isWearable) {
                 if(Natives.gethealthConnect( )) {

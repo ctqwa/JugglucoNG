@@ -223,7 +223,7 @@ static void showtreatments(bool night) {
 
 int   listconnections() {
     if(settings->data()->usexdripwebserver) {
-        cout<<"eXport web server turned on (port 17580)\n";
+        cout<<"eXport web server turned on (port "<<settings->data()->httpport<<")\n";
         if(settings->data()->remotelyxdripserver) {
             cout<<"can also be used remotely over http\n";
             }
@@ -351,7 +351,7 @@ uint32_t starttime=0,endtime=UINT32_MAX;
 bool night=true;
 /*
 Not used:
-D E F I J K O Q T U V W Y 
+D E F I J K O Q T U V Y 
 f j q u y 
 */
 const char *autoQR=nullptr;

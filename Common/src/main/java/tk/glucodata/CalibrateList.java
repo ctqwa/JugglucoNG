@@ -56,8 +56,7 @@ import tk.glucodata.Natives;
 import tk.glucodata.util;
 
 import static android.graphics.Color.RED;
-import static android.widget.GridLayout.HORIZONTAL;
-import static android.widget.GridLayout.VERTICAL;
+import static android.widget.LinearLayout.VERTICAL;
 
 public class CalibrateList {
   static private final String LOG_ID ="CalibrateList";

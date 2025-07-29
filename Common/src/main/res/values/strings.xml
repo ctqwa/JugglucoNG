@@ -428,7 +428,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="calibratepast">Apply to past</string>
  <string name="bloodvar">Blood glucose:</string>
  <string name="calibrate_a">Change slope</string>
- <string name="watchnums">Amounts entered on watch</string>
+ <string name="watchnums">Enter numbers (amounts) on watch</string>
  <string name="calibrated">Calibrated</string>
  <string name="delete_calibration">Delete calibration?</string>
  <string name="hide">Hide</string>
