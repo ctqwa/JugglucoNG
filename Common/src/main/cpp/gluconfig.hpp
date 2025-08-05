@@ -21,6 +21,7 @@
 
 #pragma once
 constexpr int32_t glucoselowest=40;
+constexpr int32_t glucoselowestmgL=400;
 //constexpr int32_t glucosehighest=500;
 
 inline bool glnearnull(float rate) {

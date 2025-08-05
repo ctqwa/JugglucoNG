@@ -794,18 +794,17 @@ static void savestate(libre2stream *sdata) {
     }
 
 
-static jlong getalarmonly(const uint32_t glval,float drate,const SensorGlucoseData *hist) {
-    const uint32_t val=glval*10;
-    auto res=glval<glucoselowest?isLowest:(glval>hist->getmaxmgdL()?isHighest:
- (settings->veryhighAlarm(val)?isVeryHigh:(settings->highAlarm(val)?isHigh:(settings->verylowAlarm(val)?isVeryLow:(settings->lowAlarm(val)?isLow:(
-settings->prelowAlarm(val,drate)?isPreLow:
-(settings->prehighAlarm(val,drate)?isPreHigh:
+static jlong getalarmonly(const uint32_t mgL,float drate,const SensorGlucoseData *hist) {
+    auto res=mgL<glucoselowestmgL?isLowest:(mgL>(hist->getmaxmgdL()*10)?isHighest:
+ (settings->veryhighAlarm(mgL)?isVeryHigh:(settings->highAlarm(mgL)?isHigh:(settings->verylowAlarm(mgL)?isVeryLow:(settings->lowAlarm(mgL)?isLow:(
+settings->prelowAlarm(mgL,drate)?isPreLow:
+(settings->prehighAlarm(mgL,drate)?isPreHigh:
 (settings->availableAlarm()&&hist->waiting?isAgain:0))))))));
-    LOGGER("val=%u, high=%d, low=%d res=%" PRId64 "\n",val,settings->highAlarm(val),settings->lowAlarm(val),res);
+    LOGGER("mgL=%u, high=%d, low=%d res=%" PRId64 "\n",mgL,settings->highAlarm(mgL),settings->lowAlarm(mgL),res);
     return res;
     }
-int getalarmcode(const uint32_t glval,float drate,SensorGlucoseData *hist) {
-    int res= getalarmonly(glval,drate,hist)>>48;
+int getalarmcode(const uint32_t mgL,float drate,SensorGlucoseData *hist) {
+    int res= getalarmonly(mgL,drate,hist)>>48;
     hist->waiting=false;
     return res;
     }
@@ -823,14 +822,14 @@ static jlong glucoselong(uint32_t nu,uint32_t glval,float drate,const SensorGluc
         const jlong rate=roundl(((long double)drate)*1000LL);
 
         const double cali=calibrateNow(hist,nu,glval);
-        int mgL;
+        uint32_t mgL;
         if(!isnan(cali)) {
             mgL=(uint32_t)round(cali*10.0);
             }
         else 
             mgL=glval*10;
 
-        const jlong alarmcode= getalarmonly(glval,drate,hist);
+        const jlong alarmcode= getalarmonly(mgL,drate,hist);
         const jlong res= (rate&0xFFFF)<<32|alarmcode|mgL;
         LOGGER("glucoselong=%" PRId64 "\n",res);
         return res;

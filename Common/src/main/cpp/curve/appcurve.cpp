@@ -1387,17 +1387,21 @@ void     processglucosevalue(int sendindex,int newstart) {
                      if(!usedsensors.size())
                          setusedsensors(nutime);
                     int32_t mgdL;
+                    uint32_t mgL;
                     float glu;
                     if(double cali=calibrateNow(hist,*poll);isnan(cali)) {
                         mgdL=poll->getmgdL();
-                        glu= gconvert(mgdL*10);
+                        mgL=mgdL*10;
+                        glu= gconvert(mgL);
                         }
                     else {
+                        double mgLf= cali*10.0;
+                        mgL=(uint32_t)round(mgLf);
                         mgdL=(int32_t)round(cali);
-                        glu= gconvert(cali*10.0);
+                        glu= gconvert(mgLf);
                         }
 
-                     const int alarm=getalarmcode(mgdL,poll->getchange(),hist);
+                     const int alarm=getalarmcode(mgL,poll->getchange(),hist);
                      
                      sensor *senso=sensors->getsensor(sendindex);
                      bool wasnoblue=settings->data()->nobluetooth;

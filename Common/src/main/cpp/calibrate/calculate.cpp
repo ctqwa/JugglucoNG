@@ -227,21 +227,20 @@ static std::tuple<double,double,double> calculate(const SensorGlucoseData *sens,
     printvector("w",w);
     const int nr=x.size();
     const long double totweight=std::reduce(std::begin(w),std::end(w),(long double){});
-    if(nr>=3&&!settings->data()->DoNotCalibrateA) {
+    if(totweight>=4&&!settings->data()->DoNotCalibrateA) {
         const auto [meanstream,count]=mean_mgdL(stream);
         const double sdstream=sd_mgdL(meanstream,count,stream);
         const auto [meancali,countcali]=mean_mgdL(x);
         const double sdcali=sd_mgdL(meancali,countcali,x); //not devided by count-1. Data should be of the same kind
         LOGGER("mean sensor=%.2Lf mean calibratie=%.2Lf\n",meanstream,meancali);
         LOGGER("sd sensor=%.2f sd calibratie=%.2f\n",sdstream,sdcali);
-        if(sdcali>(sdstream*.62)) {
+        if(sdcali>(sdstream*.7)) {
             double preA=getA(w,x,y,nr);
             double a=moderateA(preA,totweight,3.0);
             double preB=getB(w,x,y,nr);
             double b=moderateB(preB,totweight,3.0);
             LOGGER("calibrate: preA=%.2f a=%.2f preB=%.2f b=%.2f\n",preA,a,preB,b);
-            if(a>0.7&&a<1.3)
-                return {a,b,totweight}; 
+            return {a,b,totweight}; 
              }
         }
      else {
