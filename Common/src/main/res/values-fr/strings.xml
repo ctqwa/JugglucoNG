@@ -76,7 +76,7 @@
 <string name="unit">"Unité: "</string>
 <string name="glucoseaxisleft">Axe du glucose à GAUCHE</string>
 <string name="startsapp">Scanner démarre l\'appli</string>
-<string name="sendtoxdrip">Broadcast Libre Patché</string>
+<string name="patchedlibrebroadcast">Broadcast Libre Patché</string>
 <string name="disablecamerakey">Désactiver la clé caméra</string>
 <string name="invertscreen">Inverser l\'écran</string>
 <string name="nfcsound">Son NFC</string>

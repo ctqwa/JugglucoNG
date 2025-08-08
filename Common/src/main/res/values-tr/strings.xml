@@ -76,7 +76,7 @@
  <string name="unit">"Birim: "</string>
  <string name="glucoseaxisleft">Glikoz ekseni Solda</string>
  <string name="startsapp">Tarama, uygulamayı başlatır</string>
- <string name="sendtoxdrip">Yamalı Libre</string>
+ <string name="patchedlibrebroadcast">Yamalı Libre</string>
  <string name="disablecamerakey">Kamera tuşu devre dışı</string>
  <string name="invertscreen">Ekranı Çevir</string>
  <string name="nfcsound">NFC sesi</string>

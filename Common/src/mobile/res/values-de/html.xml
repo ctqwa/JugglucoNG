@@ -2991,10 +2991,9 @@ and Mengen des Freestyle Libre 2 und 3 an Libreview zu senden und die
 Konto-ID zu erhalten, die bei der Aktivierung des Freestyle Libre
 3-Sensors verwendet wird. 
 </p>
-<h2 class="western" align="left"><strike>Patched Libre</strike> Veraltet! Wird aus zukünftigen Versionen entfernt. Wechseln Sie zu Eversense Broadcast.</strike></h2>
-<p>Der Patched Libre Broadcast wurde in der Vergangenheit verwendet, um die Glukosewerte an xDrip zu senden.</p>
+<h2 class="western" align="left">Patched Libre</h2>
+<p>Der patched Libre-Broadcast wurde vom gepatchten Librelink verwendet, um Glukosewerte an xDrip zu senden. So ähnlich wie der EverSense-Broadcast.</p>
 <h2 class="western" align="left">EverSense Broadcast</h2>
-<h2 class="western" align="left">EverSense</h2>
 <p style="background: transparent"><span lang="de-DE">Noch eine
 Glukosebroadcast. Damit kann jede Minute ein Glukosewert an xDrip
 gesendet werden. xDrip ignoriert fast alle davon, da es auf einem

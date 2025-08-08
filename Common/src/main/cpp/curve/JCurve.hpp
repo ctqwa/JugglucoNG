@@ -166,7 +166,7 @@ void setdiffcurrent(bool val) {
      bool           showerror(NVGcontext* avg,const std::string_view str1,const std::string_view str2);
      void           scanwait(NVGcontext* avg);
      void       showscanner(NVGcontext* avg,const SensorGlucoseData *hist,int scanident,time_t nu);
-    template <class LT> void    glucoselines(NVGcontext* avg,const float last,const float smallfontlineheight,const int gmax,const LT &transy);
+    template <class LT> void    glucoselines(NVGcontext* avg,const float last,const float smallfontlineheight,const int gmax,const LT &transy,bool);
     template <class LT>
     void    timelines(NVGcontext* avg,const displaytime *disp, const LT &transx ,uint32_t nu);
     template <class LT> void    epochlines(NVGcontext* avg,uint32_t first,uint32_t last, const LT &transx);

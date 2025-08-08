@@ -77,7 +77,7 @@
  <string name="unit">"Unit: "</string>
  <string name="glucoseaxisleft">Glucose-axis LEFT</string>
  <string name="startsapp">Scanning starts app</string>
- <string name="sendtoxdrip">Patched Libre</string>
+ <string name="patchedlibrebroadcast">Patched Libre</string>
  <string name="disablecamerakey">Disable camera key</string>
  <string name="invertscreen">Invert screen</string>
  <string name="nfcsound">NFC sound</string>
@@ -432,8 +432,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="calibrated">Calibrated</string>
  <string name="delete_calibration">Delete calibration?</string>
  <string name="hide">Hide</string>
- <string name="sensorstreamed">Did stream</string>
- <string name="sensornotstreamed">Did not stream</string>
+ <string name="sensorstreamed"></string>
+ <string name="sensornotstreamed">Nothing yet</string>
  <string name="calibrations">Calibrations</string>
  <string name="allvalues">All values</string>
  <string name="writedown">Write down!</string>

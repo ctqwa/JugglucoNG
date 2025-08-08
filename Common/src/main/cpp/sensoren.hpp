@@ -1123,6 +1123,8 @@ int sendCalibrates(crypt_t *pass, const int sock,int ind,uint16_t &startSendCali
       for(int i = firstsensor; i <= lastsens; i++) {
          LOGGER("sensor %d\n", i);
          if(SensorGlucoseData *hist = getSensorData(i)) {
+            if(hist->error())
+                        continue;
             if(newfirst<0&&(!sensorlist()[i].finished||now<hist->getmaxtime()))  {
                newfirst=i;
                }
@@ -1230,6 +1232,8 @@ int sendCalibrates(crypt_t *pass, const int sock,int ind,uint16_t &startSendCali
             break;
          if(!sensor.finished) {
             if(SensorGlucoseData *hist = getSensorData(i)) {
+                if(hist->error())
+                        continue;
                 int subdid = (hist->*proc)(pass, sock, ind, i,otheralso);
                 if (!subdid) return 0;
                 did |= subdid;
@@ -1241,10 +1245,12 @@ int sendCalibrates(crypt_t *pass, const int sock,int ind,uint16_t &startSendCali
    
 
    int updatescanss(crypt_t *pass, const int sock, const int ind, int &firstsensor,int streamalso) {
+        LOGGER("updatescanss sock=%d ind=%d\n",sock,ind);
       return update(pass, sock, ind, firstsensor, streamalso,&SensorGlucoseData::updatescanalg);
    }
 
    int updatestreams(crypt_t *pass, const int sock, const int ind, int &firstsensor,int scanalso) {
+        LOGGER("updatestreams sock=%d ind=%d\n",sock,ind);
       int res = update(pass, sock, ind, firstsensor,scanalso, &SensorGlucoseData::updatestream);
 
       return res;

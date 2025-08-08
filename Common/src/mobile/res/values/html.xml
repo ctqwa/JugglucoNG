@@ -2509,8 +2509,8 @@ Fit</a>. Other apps again can get assess to data from Google Fit.</p>
 <p>Connect with Libreview to send Freestyle Libre 2 and 3 glucose
 values and amounts to Libreview and to get the account id used during
 Freestyle Libre 3 sensor activation. Touch to change settings.</p>
-<h2 class="western"><strike>Patched Libre</strike>. <b>Deprecated! Will be removed from future versions. Switch to the Eversense Broadcast.</b></h2>
-<p>The Patched Libre broadcast was used in the past to send the glucose values to xDrip. 
+<h2 class="western">Patched Libre</h2>
+<p>The Patched Libre broadcast was used by the patched Librelink to send glucose values to xDrip. Something like the EverSense broadcast does.
 <h2 class="western"><a name="eversense"></a>EverSense</h2>
 <p>Yet another glucose broadcast. It can be used to send every minute
 a glucose value to xDrip. In xDrip you need to set “<i>460G/EverSense</i>”

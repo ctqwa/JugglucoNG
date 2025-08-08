@@ -1,9 +1,9 @@
 
 //#define DONTTALK WEAROS
 
-/*#ifdef WEAROS
+#ifdef WEAROS
 #define NOCUTOFF 1
-#endif */
+#endif 
 
 #ifndef NOLOG
 //#define TEST 1
@@ -1080,7 +1080,7 @@ pair<int,int> JCurve::getextremes(const vector<int> &hists, const pair<const Sca
         }
     return {gmin,gmax};
     }
-template <class LT> void    JCurve::glucoselines(NVGcontext* avg,const float last,const float smallfontlineheight,const int gmax,const LT &transy) {
+template <class LT> void    JCurve::glucoselines(NVGcontext* avg,const float last,const float smallfontlineheight,const int gmax,const LT &transy,bool showlevels) {
     nvgStrokeWidth(avg, glucoseLinesStrokeWidth);
     nvgStrokeColor(avg, *getgray());
     const double yscale=transy(1)-transy(0);
@@ -1119,7 +1119,7 @@ template <class LT> void    JCurve::glucoselines(NVGcontext* avg,const float las
         nvgLineTo( avg, endline,dy);
         nvgStroke(avg);
 #ifdef WEAROS
-        if(dy>startlevel&&dy<endlevel) 
+        if(showlevels&&dy>startlevel&&dy<endlevel) 
 #else
         if(dy>smallfontlineheight) 
 #endif
@@ -1443,7 +1443,13 @@ if(showcurrentdate) {
             -timelen*.85f
         #endif
         ;
-        nvgText(avg, timex,datehigh+statusbarheight, tbuf, tbuf+datlen);
+        const float timey = (datehigh+statusbarheight)
+        #ifdef WEAROS
+        *(used.size()<2?2.5f:1.0f);
+        #endif
+        ;
+
+        nvgText(avg, timex,timey, tbuf, tbuf+datlen);
 
 #ifndef WEAROS    
     if( settings->data()->IOB) {
@@ -1577,7 +1583,7 @@ void    JCurve::showlines(NVGcontext* avg,int gm,int gmax) {
     timelines(avg,&disp,  transx,UINT32_MAX);
     if(disp.tstep>(60*60))
         epochlines(avg,starttime,disp.last,transx);
-    glucoselines(avg,dlast,smallfontlineheight,gmax,transy) ;
+    glucoselines(avg,dlast,smallfontlineheight,gmax,transy,true) ;
     showunsaveredline(avg,dlast,transy(settings->targetlow()));
     int yhigh=transy(settings->targethigh());
     nvgBeginPath(avg);
@@ -1704,7 +1710,7 @@ displaytime disp=getdisplaytime(nu,starttime2,endtime, transx);
     timelines(avg,&disp,  transx,nu);
     if(disp.tstep>(60*60))
         epochlines(avg,starttime2,endtime<nu?endtime:disp.last,transx);
-    glucoselines(avg,dlast,smallfontlineheight,gmax,transy) ;
+    glucoselines(avg,dlast,smallfontlineheight,gmax,transy,(starttime2+duration/3)<nu) ;
 
 //        nvgCircle(avg, posx,posy,foundPointRadius);
 

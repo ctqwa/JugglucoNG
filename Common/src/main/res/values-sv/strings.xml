@@ -71,7 +71,7 @@
   <string name="unit">"Enhet: "</string>
   <string name="glucoseaxisleft">Glukos-axel till vänster</string>
   <string name="startsapp">Skanning startar appen</string>
-  <string name="sendtoxdrip">Patchad Libre</string>
+  <string name="patchedlibrebroadcast">Patchad Libre</string>
   <string name="disablecamerakey">Inaktivera kamera-knapp</string>
   <string name="invertscreen">Vänd skärmen</string>
   <string name="nfcsound">NFC ljud</string>

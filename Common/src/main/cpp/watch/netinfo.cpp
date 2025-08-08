@@ -75,6 +75,7 @@ struct netinfo2:netinfo1 {
 
 int isGalaxyWatch=-1;
 extern updateone &getsendto(int index);
+extern updateone &getsendto(const passhost_t *host);
 // bool mkwearos=false;
 #include <mutex>
 extern std::mutex change_host_mutex;
@@ -660,10 +661,11 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(setmynetinfo)(JNIEnv *env, jcl
         }
     }
     else { 
-        LOGGER("is no watch watchsensor=%d sendstream=%d\n",info->watchsensor, getsendto(index).sendstream);
+        LOGGER("is no watch watchsensor=%d sendstream=%d\n",info->watchsensor,host->isSender()&&getsendto(host).sendstream);
         if(info->watchsensor) {
             settings->data()->nobluetooth=true;
-            getsendto(index).sendstream=false;
+            if(host->isSender())
+                getsendto(host).sendstream=false;
             host->receivefrom= host->receivefrom|2;
             LOGGER("sendstream(%d)=false\n",index);
             }

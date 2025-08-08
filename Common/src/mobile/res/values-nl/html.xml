@@ -2903,9 +2903,9 @@ Fit</a> . Andere apps kunnen weer gegevens van Google Fit krijgen.</p>
 glucose waarden naar Libreview verzonden worden. Voor Freestyle Libre
 3 sensoren kun je je Account Id nummer van Libreview laten halen.
 Druk er op om de instellingen te wijzigen.</p>
-<h2 class="western"><strike>Patched Libre</strike>. Verouderd! Wordt verwijderd uit toekomstige versies. Gebruik inplaats hiervan de Eversense Broadcast.</h2>
-<p>De Patched Libre-broadcast werd in het verleden gebruikt om glucosewaarden naar xDrip te sturen.</p>
-<h2 class="western">EverSense</h2>
+<h2 class="western">Patched Libre</h2>
+<p>De Patched Libre-broadcast werd door de patched Librelink gebruikt om glucosewaarden naar xDrip te sturen.</p>
+<h2 class="western">EverSense broadcast</h2>
 <p style="background: transparent">Nog een glucose broadcast. Hiermee
 kan elke minuut een glucosewaarde naar xDrip worden verzonden. xDrip
 negeert ze bijna allemaal vanwege het vasthouden aan één waarde in

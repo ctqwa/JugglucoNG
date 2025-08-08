@@ -68,14 +68,14 @@ extern void removeCalibration(const Num *num) {
     }
 
 static bool wrongChange(const ScanData *value) {
-        if(value->getchange()>0.7) {
+        if(value->getchange()>=1.0) {
             #ifndef NOLOG
             time_t tim=value->gettime();
             LOGGER("Rises too much %.1f %s",value->getchange(),ctime(&tim));
             #endif
             return true;
             }
-        if(value->getchange()<-0.7) {
+        if(value->getchange()<=-1.0) {
             #ifndef NOLOG
             time_t tim=value->gettime();
             LOGGER("falls too much %.1f %s",value->getchange(),ctime(&tim));
@@ -84,14 +84,35 @@ static bool wrongChange(const ScanData *value) {
             }
        return false;
     }
-
-static bool notSuitable(uint32_t numtim,const ScanData *value,int maxdifference) {
+static int maxtimedifference=6*60;
+static int maxglucosedifference=9;
+static bool         wrongNeighbours(const ScanData *startsen,const ScanData *endsen,const ScanData *value) {
+    const uint32_t startInterval=value->gettime()-maxtimedifference;
+    const int mgdLmin=value->getmgdL()-maxglucosedifference;
+    const int mgdLmax=value->getmgdL()+maxglucosedifference;
+    for(const ScanData *it=value-1;it>=startsen&&it->gettime()>startInterval;--it) {
+        const auto val=it->getmgdL();
+        if(val<mgdLmin||val>mgdLmax) {
+            return true;
+            }
+        }
+    const uint32_t endInterval=value->gettime()+maxtimedifference;
+    for(const ScanData *it=value+1;it<endsen&&it->gettime()<endInterval;++it) {
+        const auto val=it->getmgdL();
+        if(val<mgdLmin||val>mgdLmax) {
+            return true;
+            }
+        }
+    return false;
+    }
+static bool notSuitable(uint32_t numtim,const ScanData *startsen,const ScanData *endsen,const ScanData *value,int maxdifference) {
         const int64_t sensLater=(int64_t)value->gettime()-numtim;
         if(sensLater>maxdifference) {
                 LOGGER("too late sensor %u, blood %d %lld\n",value->gettime(),numtim,sensLater);
                 return true;
                 }
-         return wrongChange(value);
+//         if(wrongChange(value)) return true;
+        return wrongNeighbours(startsen,endsen,value);
         }
 
     constexpr const int maxdifference=3*60;
@@ -140,7 +161,7 @@ const ScanData *findNextStream(const ScanData *startsen,const ScanData *endsen,u
                 return nullptr;
                 }
             }
-        if(notSuitable(numtim,after,maxdifference)) {
+        if(notSuitable(numtim,startsen,endsen,after,maxdifference)) {
             return nullptr;
             }
         #ifndef NOLOG

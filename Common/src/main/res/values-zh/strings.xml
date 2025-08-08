@@ -77,7 +77,7 @@
  <string name="unit">"单位: "</string>
  <string name="glucoseaxisleft">葡萄糖轴左</string>
  <string name="startsapp">扫描启动应用程序</string>
- <string name="sendtoxdrip">修补 Libre 广播</string>
+ <string name="patchedlibrebroadcast">修补 Libre 广播</string>
  <string name="disablecamerakey">禁用相机键</string>
  <string name="invertscreen">反转屏幕</string>
  <string name="nfcsound">NFC 声音</string>

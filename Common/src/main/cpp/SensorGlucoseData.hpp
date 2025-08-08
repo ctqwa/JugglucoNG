@@ -485,9 +485,7 @@ const int historybytes(int perhour=4)  {
         }
     const auto elsize=getelsize();
     LOGAR("historybytes");
-#ifndef SIHISTORY
    if(isSibionics()) return 4*elsize;
-#endif
 //   if(isDexcom()) return 4*elsize;
     const auto days=getinfo()->days;
     if(elsize<10||elsize>20||days<10||days>maxdays) {

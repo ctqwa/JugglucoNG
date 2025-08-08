@@ -1476,10 +1476,8 @@ static private void exchanges(MainActivity context, View parent) {
         final boolean usedlibrebroad = Natives.getlibrelinkused();
         libreview.setText(R.string.libreviewname);
         libreview.setChecked(wasxdrip);
-//        String text = "<strike><font color=\'#757575\'>"+ context.getString(R.string.sendtoxdrip) +"</font></strike>";
-//        String text = "<s>"+ context.getString(R.string.sendtoxdrip) +"</s>";
- //       librelinkbroadcast.setText(Html.fromHtml(text));
-        librelinkbroadcast.setText(R.string.sendtoxdrip);
+        librelinkbroadcast.setText(R.string.patchedlibrebroadcast);
+        /*
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 librelinkbroadcast.setForeground(context.getResources().getDrawable(R.drawable.strike_through_selector, null));
@@ -1491,7 +1489,7 @@ static private void exchanges(MainActivity context, View parent) {
         }
         else {
               librelinkbroadcast.setPaintFlags(librelinkbroadcast.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-            }
+            } */
         //librelinkbroadcast.getPaint().setStrikeThruText(true);
 
         librelinkbroadcast.setChecked(usedlibrebroad);
@@ -1536,7 +1534,7 @@ static private void exchanges(MainActivity context, View parent) {
                     if (!xdripdonthing[0]) {
                         xdripdonthing[0] = true;
                         librelinkbroadcast.setChecked(!isChecked);
-                        Applic.argToaster(context,R.string.nolibrelink,Toast.LENGTH_LONG);
+        //                Applic.argToaster(context,R.string.nolibrelink,Toast.LENGTH_LONG);
                         Broadcasts.setlibrereceivers(context, thelayout[0], librelinkbroadcast, xdripdonthing);
                     }
                 });

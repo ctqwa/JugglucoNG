@@ -392,8 +392,8 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
 <string name="calibrated">Kalibriert</string>
 <string name="delete_calibration">Kalibrierung löschen?</string>
 <string name="hide">Ausblenden</string>
-<string name="sensorstreamed">Gestreamt</string>
-<string name="sensornotstreamed">Nicht gestreamt</string>
+<string name="sensorstreamed"></string>
+<string name="sensornotstreamed">Noch nichts</string>
 <string name="calibrations">Kalibrierungen</string>
  <string name="allvalues">Alle Werte</string>
  <string name="writedown">Aufschreiben!</string>
