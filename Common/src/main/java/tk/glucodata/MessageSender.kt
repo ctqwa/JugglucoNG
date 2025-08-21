@@ -206,7 +206,10 @@ private fun nodeSendmessage(node:Node,path:String,data:ByteArray) {
     sendmessage(SETTINGS_PATH,data)
     } */
     public fun sendbluetooth( node:Node,on:Boolean) {
-        sendbool(BLUETOOTH_PATH,node.id,on)
+         sendbluetooth( node.id,on);
+     }
+    public fun sendbluetooth( name:String,on:Boolean) {
+        sendbool(BLUETOOTH_PATH,name,on)
      }
     private fun sendOnmessages( node:String,on:Boolean) {
         if(doLog) {Log.i(LOG_ID,"sendNameMessageOn($node,$on)");}
@@ -304,6 +307,20 @@ companion object {
     if(doLog) {Log.i(LOG_ID,"end sendDatawithName $ident");}
     return res;
     }
+
+    public fun watchBluetooth(act:MainActivity,sensor:Boolean,nums:Boolean) {
+        val sender = messagesender
+        if (sender == null) {
+            Log.e(LOG_ID, "sendData messagesender==null")
+            return
+            }
+        if(sender.localnode==null) {
+             Log.d(LOG_ID,"localnode==null")
+             return
+             }
+        val name=sender.localnode;
+        Natives.watchBluetooth(name,sensor,nums);
+        }
 
     @Keep
     @JvmStatic

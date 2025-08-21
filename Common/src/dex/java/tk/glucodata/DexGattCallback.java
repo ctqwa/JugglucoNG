@@ -61,6 +61,7 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static tk.glucodata.util.sleep;
 
 public class DexGattCallback extends SuperGattCallback {
 private boolean known=false;
@@ -362,13 +363,6 @@ private void sendcerts() {
     Applic.scheduler.schedule(this::sendcertthread, 0, TimeUnit.MILLISECONDS);
    }
 
-private static void sleep(long mmsec) {
-   try {
-       Thread.sleep(mmsec);
-   } catch (InterruptedException ie) {
-       Thread.currentThread().interrupt();
-   }
-}
 //private String ownDeviceName;
 private boolean newcertificates=false;
 private void sendcertthread() {

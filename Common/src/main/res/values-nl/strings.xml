@@ -391,5 +391,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
 <string name="calibrations">Kalibraties</string>
  <string name="allvalues">Alle waarden</string>
 <string name="writedown">Schrijf op!</string>
+ <string name="switchtowatch">Wissel</string>
+ <string name="last">"Laatste: "</string>
 </resources>
 

@@ -50,22 +50,45 @@ static  const ScanData *firstnotless(const ScanData *scan, const ScanData *endsc
 extern std::mutex caliMutex;
 std::mutex caliMutex;
 extern void setCalibrates(uint16_t sensorindex) ;
-extern void removeCalibration(const Num *num) {
-    if(num->type!=settings->data()->bloodvar)
-        return;
-    const uint32_t tim=num->gettime();
+extern void removeCalibration(const Num *num);
+
+static void reCalcCali(SensorGlucoseData *sens, int fromnr);
+
+static void removeCalibrationThread(const uint32_t tim) {
     vector<int> sens=sensors->sensorsInPeriod(tim-5*60, tim+5*60);
     if(sens.size()) {
         for(int index:sens) {
             SensorGlucoseData *sens=sensors->getSensorData(index);
                 {
                 const std::lock_guard<std::mutex> lock(caliMutex);
-                sens->removeCali(tim);
-                 }
+                int rempos=sens->removeCali(tim);
+                reCalcCali(sens,rempos);
+                }
             }
         setCalibrates(*std::ranges::min_element(sens));
         }
     }
+    /*
+void reCalcCalithread(SensorGlucoseData *sens, int fromnr) {
+    reCalcCali(sens,fromnr);
+    updateCaliUpdated(fromnr);
+    setCalibrates(sens->sensorIndex);
+    wakeupall();
+    }
+
+void recalculate(SensorGlucoseData *sens, int fromnr) {
+    std::thread  th(reCalcCalithread,sens,rempos);
+    }
+    */
+void removeCalibration(uint32_t tim) {
+    std::thread remthread(removeCalibrationThread,tim);
+    remthread.detach();
+    }
+void removeCalibration(const Num *num) {
+    if(num->type!=settings->data()->bloodvar)
+        return;
+    removeCalibration(num->gettime());
+     }
 
 static bool wrongChange(const ScanData *value) {
         if(value->getchange()>=1.0) {
@@ -83,7 +106,7 @@ static bool wrongChange(const ScanData *value) {
             return true;
             }
        return false;
-    }
+    } 
 static int maxtimedifference=6*60;
 static int maxglucosedifference=9;
 static bool         wrongNeighbours(const ScanData *startsen,const ScanData *endsen,const ScanData *value) {
@@ -106,12 +129,12 @@ static bool         wrongNeighbours(const ScanData *startsen,const ScanData *end
     return false;
     }
 static bool notSuitable(uint32_t numtim,const ScanData *startsen,const ScanData *endsen,const ScanData *value,int maxdifference) {
-        const int64_t sensLater=(int64_t)value->gettime()-numtim;
+        const int64_t sensLater=((int64_t)value->gettime())-numtim;
         if(sensLater>maxdifference) {
                 LOGGER("too late sensor %u, blood %d %lld\n",value->gettime(),numtim,sensLater);
                 return true;
                 }
-//         if(wrongChange(value)) return true;
+        if(wrongChange(value)) return true;
         return wrongNeighbours(startsen,endsen,value);
         }
 
@@ -144,18 +167,22 @@ static bool notSuitable(uint32_t numtim,const ScanData *startsen,const ScanData 
     }*/
 
 const ScanData *findNextStream(const ScanData *startsen,const ScanData *endsen,uint32_t numtim) {
+        if(startsen==endsen) {
+            LOGAR("startsen==endsen");
+            return nullptr;
+            }
         const ScanData *after=firstnotless(startsen,endsen,numtim);
         if(after==endsen)  {
             do{
+                if(after==startsen) {
+                    LOGGER("findNextStream no value around %u\n",numtim);
+                    return nullptr;
+                    }
               --after;
-              }while(after>startsen&&!after->valid());
-            if(after==startsen) {
-                LOGGER("findNextStream no value around %u\n",numtim);
-                return nullptr;
-                }
+              }while(!after->valid());
             if((after->gettime()+maxdifference)<numtim) {
         #ifndef NOLOG
-         time_t tim=after->gettime();
+                time_t tim=after->gettime();
                 LOGGER("findNextStream: last value too early %.1f %s",after->getchange(),ctime(&tim));
         #endif
                 return nullptr;
@@ -166,7 +193,7 @@ const ScanData *findNextStream(const ScanData *startsen,const ScanData *endsen,u
             }
         #ifndef NOLOG
          time_t tim=after->gettime();
-        LOGGER("findNextStream: good value %.1f %s",after->getchange(),ctime(&tim));
+        LOGGER("findNextStream: good value %.1f %s",after->getmmolL(),ctime(&tim));
         #endif
          return after;
          }
@@ -180,19 +207,23 @@ bool shouldexclude(const uint32_t time) {
         LOGGER("shouldexclude: no sensors between %u and %u\n",starttime,endtime);
         return true;
         }
+    bool exclude=true;
     for(int index:indices) {
         auto *sens=sensors->getSensorData(index);
         std::span<const ScanData> stream=sens->getPolldata();
-        const ScanData *after= findNextStream(&stream.begin()[0],&stream.end()[0],time);
-        if(!after) {
-            return true;
-            }
+        if(stream.size()&&findNextStream(&stream.begin()[0],&stream.end()[0],time))
+             exclude=false;
 
         }
-    return false; 
+    return exclude; 
     }
-#include <tuple>
-static std::tuple<double,double,double> calculate(const SensorGlucoseData *sens, const uint32_t newtime) {
+
+struct CalcPara {
+    float64_t  a;
+    float64_t  b;
+    float32_t weight;
+    };
+static CalcPara calculate(const SensorGlucoseData *sens, const uint32_t newtime) {
     const auto oldtime=sens->firstpolltime();
     const int bloodvar=settings->data()->bloodvar;
     std::vector<double> y,x,w;
@@ -247,6 +278,10 @@ static std::tuple<double,double,double> calculate(const SensorGlucoseData *sens,
     printvector("y",y);
     printvector("w",w);
     const int nr=x.size();
+    if(nr<1) {
+        constexpr const double nan=NAN;
+        return {nan,nan,(float)NAN};
+        }
     const long double totweight=std::reduce(std::begin(w),std::end(w),(long double){});
     if(totweight>=4&&!settings->data()->DoNotCalibrateA) {
         const auto [meanstream,count]=mean_mgdL(stream);
@@ -261,49 +296,80 @@ static std::tuple<double,double,double> calculate(const SensorGlucoseData *sens,
             double preB=getB(w,x,y,nr);
             double b=moderateB(preB,totweight,3.0);
             LOGGER("calibrate: preA=%.2f a=%.2f preB=%.2f b=%.2f\n",preA,a,preB,b);
-            return {a,b,totweight}; 
+            return {a,b,(float)totweight}; 
              }
-        }
-     else {
-        if(nr<1) {
-            constexpr const double nan=NAN;
-            return {nan,nan,nan};
-            }
         }
      double preB=distance(w,x,y, nr)/totweight;
      double b =moderateB(preB,totweight,3.0);
      LOGGER("calibrate: preB=%.2f b=%.2f\n",preB,b);
-     return {1.0,b,totweight};
+     return {1.0,b,(float)totweight};
     }
 
-static void addCali(SensorGlucoseData *sens, const uint32_t newtime,const Num *num, const Numdata *numdata) {
+static void reCalcCali(SensorGlucoseData *sens, int fromnr) {
+    int caliNr=sens->getinfo()->caliNr;
+    if(fromnr>=caliNr) {
+        return;
+        } 
+    LOGGER("reCalcCali %s %d-%d\n",sens->shortsensorname()->data(),fromnr,caliNr);
+    auto *caliPara=sens->getinfo()->caliPara;
+    for(int it=fromnr;it<caliNr;++it) {
+        const auto [a,b,weight]=calculate(sens,  caliPara[it].time);
+        if(isnan(a)) {
+            LOGGER("reCalcCali %d a is nan\n",it);
+            continue;
+            }
+        if(isnan(b)) {
+            LOGGER("reCalcCali %d b is nan\n",it);
+            continue;
+            }
+        caliPara[it].weight=weight;
+        caliPara[it].a=a;
+        caliPara[it].b=b;
+        }
+    }
+static void changeCali(SensorGlucoseData *sens, const uint32_t oldtime,const uint32_t newtime,const Num *num, const Numdata *numdata) {
+    int rempos=-1;
+    if(oldtime)
+        rempos=sens->removeCali(oldtime);
     const auto [a,b,weight]=calculate(sens,  newtime);
     if(isnan(a)) {
-        LOGAR("addCali a is nan");
+        LOGAR("changeCali a is nan");
+        if(rempos>=0)
+            reCalcCali(sens,rempos);
         return;
         }
     if(isnan(b)) {
-        LOGAR("addCali b is nan");
+        LOGAR("changeCali b is nan");
+        if(rempos>=0)
+            reCalcCali(sens,rempos);
         return;
         }
       {
     const std::lock_guard<std::mutex> lock(caliMutex);
     if(num<numdata->end()&&num->gettime()==newtime) {
-        sens->addCali(newtime,weight,a,b);
+        int calpos=sens->addCali(newtime,weight,a,b);
+        if(rempos>=0&&oldtime<=newtime)
+            reCalcCali(sens,rempos);
+         else {
+            if(calpos>=0)
+                reCalcCali(sens,calpos+1);
+            }
         }
    else {
-       LOGGER("addCali %u not longer present\n",newtime);
+       LOGGER("changeCali %u not longer present\n",newtime);
+        if(rempos>=0)
+            reCalcCali(sens,rempos);
         }
       }
     }
-extern void addCalibration(uint32_t tim,int type) ;
-void threadCalibration(uint32_t tim,const Num *num,const Numdata *numdata) {
+
+void threadCalibration(uint32_t oldtime,uint32_t tim,const Num *num,const Numdata *numdata) {
     //sleep(60*5);
     vector<int> sens=sensors->sensorsInPeriod(tim-5*60, tim+5*60);
     if(sens.size()) {
         LOGGER("threadCalibration: %d sensors\n",sens.size());
         for(int index:sens) {
-            addCali(sensors->getSensorData(index),tim,num,numdata);
+            changeCali(sensors->getSensorData(index),oldtime,tim,num,numdata);
             }
         setCalibrates(*std::ranges::min_element(sens));
         extern void render(); 
@@ -330,10 +396,32 @@ void addCalibration(uint32_t tim,int type,Num *num,const Numdata *numdata) {
         num->exclude=true;
         return;
         }
-    std::thread  th(threadCalibration,tim,num,numdata);
+    std::thread  th(threadCalibration,0u,tim,num,numdata);
     th.detach();
     }
 
+void changeCalibration(uint32_t oldtime,bool oldexclude,uint32_t tim,int type,Num *num,const Numdata *numdata) {
+    if(type!=settings->data()->bloodvar)
+        return;
+    if(num->exclude) {
+        if(!oldexclude)
+            removeCalibration(oldtime);
+        LOGGER("addCalibration exclude %u\n",num->gettime());
+        return;
+        }
+
+    if(shouldexclude(num->gettime()))  {
+        if(!oldexclude)
+            removeCalibration(oldtime);
+        LOGGER("addCalibration %u set exclude=true\n",num->gettime());
+        num->exclude=true;
+        return;
+        }
+    if(oldexclude)
+        oldtime=0;
+    std::thread  th(threadCalibration,oldtime,tim,num,numdata);
+    th.detach();
+    }
 double calibrateValue(const CaliPara &cali ,const ScanData &el) {
        return calibrateValue(cali , el.gettime(),el.getmgdL());
     }
@@ -377,7 +465,7 @@ double     calibrateONE(const SensorGlucoseData *sens,const uint32_t time, const
     const auto *info=sens->getinfo();
     const uint32_t nr=info->caliNr;
     if(!nr)  {
-        LOGGER("calibrateONE(%s,%u,%.1f) no calibrators\n",sens->shortsensorname(),time,value);
+        LOGGER("calibrateONE(%s,%u,%.1f) no calibrators\n",sens->shortsensorname()->data(),time,value);
         return NAN;
         }
     const CaliPara *first = info->caliPara;
@@ -387,7 +475,7 @@ double     calibrateONE(const SensorGlucoseData *sens,const uint32_t time, const
     if(const CaliPara *cali=getCaliBefore( first,first+nr,time)) {
         return calibrateValue(*cali,time,value);
         }
-    LOGGER("calibrateONE(%s,%u,%.1f) no calibrator before time\n",sens->shortsensorname(),time,value);
+    LOGGER("calibrateONE(%s,%u,%.1f) no calibrator before time\n",sens->shortsensorname()->data(),time,value);
     return NAN;
     }
 extern double     calibrateONE(const SensorGlucoseData *sens,const ScanData &value);
@@ -400,8 +488,8 @@ double     calibrateONEtest(const SensorGlucoseData *sens,const ScanData &value)
      return calibrateONE(sens,value);
      }
 
-void showCalis(const char *name,const CaliPara *first,const uint32_t nr) {
 #ifndef NOLOG
+void showCalis(const char *name,const CaliPara *first,const uint32_t nr) {
     const int totlen=25+(24+12+2*8+10)*nr;
     char buf[totlen];
     int bufpos=0;
@@ -411,8 +499,8 @@ void showCalis(const char *name,const CaliPara *first,const uint32_t nr) {
         bufpos+=snprintf(buf+bufpos,totlen-bufpos,"\n%u a=%.2f b=%.2f %u",cali.time,cali.a,cali.b,cali.time);
         }
     LOGGERN(buf,bufpos);
-#endif
     }
+#endif
 std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGlucoseData *sens,const ScanData *input,ScanData *calibrated,int nr,bool allvalues) {
     const auto *info=sens->getinfo();
     const CaliPara *first= info->caliPara;
@@ -426,7 +514,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
         else
             return {};
         }
-    showCalis(sens->shortsensorname()->data(),first,caliNr);
+    //showCalis(sens->shortsensorname()->data(),first,caliNr);
 
     const CaliPara *end = info->caliPara+caliNr;
     const ScanData *initer=input+nr-1;
@@ -536,5 +624,9 @@ int     caliPosAfter(const SensorGlucoseData *sens,const uint32_t time) {
     LOGGER("caliPosAfter(%s,%u) no calibrator before time\n",sens->shortsensorname(),time);
     return 0;
     }
+
+
+
+
 
 

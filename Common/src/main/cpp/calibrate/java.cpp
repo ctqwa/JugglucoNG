@@ -38,9 +38,8 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(removeCalibrator)(JNIEnv *env, 
         return false;
     auto *sensor=reinterpret_cast<SensorGlucoseData*>(sensorptr);
     if(sensor->getinfo()->removeCaliPos(pos)) {
-           setCalibrates(sensor->sensorIndex);
-           wakeupall();
-           return true;
+        setCalibrates(sensor->sensorIndex);
+        return true;
         }
     return false;
     }

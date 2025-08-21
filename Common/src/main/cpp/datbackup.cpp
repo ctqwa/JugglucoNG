@@ -103,9 +103,19 @@ int updateone::update() {
     if(getsock()<0)
         return 0;
     crypt_t *pass=getcrypt();
+
     bool sendsensors=(sendstream||sendscans) ;
     int ret =0;
     LOGGER("updateone::update starttime=%d\n",starttime);
+#ifdef WEAROS
+    if(blueWatch) {
+        extern bool sendBlueWatch(crypt_t *pass,const int sock,int8_t stream,int8_t nums);
+        if(!sendBlueWatch(pass,getsock(),sendstream,sendnums)) 
+            return 0;
+         backup->getupdatedata()->allhosts[allindex].receivefrom=3;
+         blueWatch=false;
+        }
+#endif
     if(starttime) {
         if(sendnums) {
             if(nums[0].lastlastpos==0&&nums[1].lastlastpos==0) {

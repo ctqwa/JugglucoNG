@@ -387,7 +387,7 @@
     <string name="eusibionics">EU Sibionics - com.sisensing.sijoy</string>
     <string name="chsibionics">Chinese Sibionics - com.sisensing.sisensingcgm</string>
     <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
-    <string name="sibionics2">Sibionics 2 - com.sisensing.eco</string>
+    <string name="sibionics2">Sibionics 2/Split - com.sisensing.eco</string>
     <string name="datapresent">"Data present: "</string>
     <string name="overwrite">Overwrite?</string>
     <string name="autoqr">Auto QR</string>
@@ -437,4 +437,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="calibrations">Calibrations</string>
  <string name="allvalues">All values</string>
  <string name="writedown">Write down!</string>
+ <string name="switchtowatch">Switch</string>
+ <string name="last">"Last: "</string>
 </resources>

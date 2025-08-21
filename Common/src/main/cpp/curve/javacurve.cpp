@@ -97,7 +97,7 @@ jclass JNIApplic,JNIString;
 #ifdef OLDEVERSENSE
 #ifndef  WEAROS
 jclass EverSense;
-jmethodID  sendGlucoseBroadcast=nullptr,jtoGarmin=nullptr, jGarmindeletelast=nullptr;
+jmethodID  sendGlucoseBroadcast=nullptr,jtoGarmin=nullptr, jGarmindeletelast=nullptr,jswitchbluetooth=nullptr;
 #endif
 #endif
 #ifdef WEAROS
@@ -210,7 +210,9 @@ if(cl) {
    if(!(jGarmindeletelast=env->GetStaticMethodID(JNIApplic,"Garmindeletelast","(III)V"))) {
       LOGAR(R"(jGarmindeletelast=env->GetStaticMethodID(JNIApplic,"Garmindeletelast","(III)V") failed)" "");
       }
-
+   if(!(jswitchbluetooth=env->GetStaticMethodID(JNIApplic,"switchbluetooth","(Ljava/lang/String;[BZ)Z"))) {
+      LOGAR(R"(jswitchbluetooth=env->GetStaticMethodID(JNIApplic,"switchbluetooth","(Ljava/lang/String;[BZ)Z") failed)" "");
+      }
 #endif
    if(!(jbluePermission=env->GetStaticMethodID(JNIApplic,"bluePermission","()I"))) {
       LOGAR(R"(jbluePermission=env->GetStaticMethodID(JNIApplic,"bluePermission","()I") failed)" "");

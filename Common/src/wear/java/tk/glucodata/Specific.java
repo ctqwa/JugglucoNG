@@ -29,6 +29,12 @@ import static tk.glucodata.Applic.backgroundcolor;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getlabel;
+import static tk.glucodata.Log.doLog;
+import static android.view.View.GONE;
+
+import android.content.Context;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 
 import android.annotation.SuppressLint;
 import android.text.method.ScrollingMovementMethod;
@@ -46,7 +52,14 @@ import androidx.wear.widget.CurvedTextView;
 import androidx.wear.widget.WearableLinearLayoutManager;
 import androidx.wear.widget.WearableRecyclerView;
 
+import static tk.glucodata.util.getbutton;
+import static tk.glucodata.util.getcheckbox;
+import static tk.glucodata.util.getlabel;
+
+import static tk.glucodata.Applic.isWearable;
 public class Specific {
+final static private String LOG_ID="Specific";
+
 static void start(Object context) { }
 
 static    void splash(AppCompatActivity act) {
@@ -168,5 +181,114 @@ static void   blockedNum(MainActivity  act) {
 static public boolean useclose=false;
 static public void setclose(boolean val) {
    useclose=val;
+
+
+
+
+   }
+
+static private void logmsec(String message,long start) {
+    if(doLog) {
+        long after= System.currentTimeMillis()-start;
+        Log.i(LOG_ID,message+" "+after);
+        }
+    }
+static void switchChoice(MainActivity act) {
+    var stream=getcheckbox(act, R.string.streamname,true);
+    var amounts=getcheckbox(act, R.string.amountsname,true);
+    var ok=getbutton(act,R.string.ok);
+    var cancel=getbutton(act,R.string.cancel);
+   
+    long laststream=Natives.lastglucosetime();
+    var streamtime=getlabel(act,act.getString(R.string.last)+util.timestring(laststream));
+    long lastnums=Natives.getnumlasttime( );
+    var numstime=getlabel(act,act.getString(R.string.last)+util.timestring(lastnums));
+    Layout layout = new Layout(act, (l, w, h) -> {
+        int[] ret={w,h};
+        return ret;
+        },new View[]{ok},new View[]{stream},new View[]{streamtime},new View[]{amounts},new View[]{numstime},new View[]{cancel});
+        
+
+   layout.setBackgroundColor(Applic.backgroundcolor);
+   act.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
+   act.setonback(() -> {
+        removeContentView(layout);
+        });
+   cancel.setOnClickListener(v -> {
+        MainActivity.doonback();
+        });
+   ok.setOnClickListener(v -> {
+           MainActivity.doonback();
+           boolean takestream=stream.isChecked();
+           boolean takeamounts=amounts.isChecked();
+           if(takestream||takeamounts) {
+               MainActivity.doonback();
+               MessageSender.Companion.watchBluetooth(act,takestream,takeamounts);
+               if(takestream)
+                   act.setbluetoothmain( true); //takes long
+               act.requestRender();
+               }
+        });
+    }
+static void wearnosensors(MainActivity act) {
+    BluetoothManager mBluetoothManager = (BluetoothManager) act.getSystemService(Context.BLUETOOTH_SERVICE);
+    BluetoothAdapter mBluetoothAdapter=null;
+    if(mBluetoothManager  == null) {
+            var mess="mBluetoothManager)==null";
+            Log.e(LOG_ID,mess);
+            bluediag.showsensormessage(mess,act);
+       }
+    else {
+        mBluetoothAdapter = mBluetoothManager.getAdapter();
+        if(mBluetoothAdapter ==null) {
+            var mess="mBluetoothManager.getAdapter()==null";
+            Log.e(LOG_ID,mess);
+
+            bluediag.showsensormessage(mess,act);
+            return;
+        }
+    }
+ var blueenabled=mBluetoothAdapter.isEnabled();
+ var bluestate= getlabel(act,blueenabled?act.getString(R.string.bluetoothenabled): act.getString(R.string.bluetoothdisabled));
+ final boolean wasused= Natives.getusebluetooth();
+ var usebluetooth=getcheckbox(act, R.string.use_bluetooth,wasused);
+    usebluetooth.setOnCheckedChangeListener(
+         (buttonView,  isChecked) -> {
+             {if(doLog) {Log.i(LOG_ID,"usebluetooth "+isChecked);};};
+             if(isChecked!=wasused) {
+                 act.doonback();
+                 act.setbluetoothmain( isChecked);
+                 act.requestRender();
+                 bluediag.start(act);
+             }
+         });
+    var switcher=getbutton(act,R.string.switchtowatch);
+    var close=getbutton(act,R.string.closename);
+   if(!useclose)
+      close.setVisibility(GONE);
+   if(wasused||!blueenabled) {
+       switcher.setVisibility(GONE);
+       }
+   else {
+       switcher.setOnClickListener(v -> {
+           switchChoice(act);
+
+        });
+    }
+  Layout layout = new Layout(act, (l, w, h) -> {
+        int[] ret={w,h};
+        return ret;
+        },new View[]{switcher},new View[]{bluestate},new View[]{usebluetooth},new View[]{close});
+    act.setonback(() -> {
+            removeContentView(layout);
+            });
+
+    close.setOnClickListener(v -> {
+         act.doonback();
+         });
+
+   layout.setBackgroundColor(Applic.backgroundcolor);
+   act.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
+
    }
 };

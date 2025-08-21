@@ -1312,20 +1312,27 @@ void    JCurve::showButton(NVGcontext* avg,float xpos,float ypos,std::string_vie
 
 void    JCurve::showHideButton(NVGcontext* avg) {
     const std::string_view str=usedtext->unhide;  
-    const float xaf=statusbarright?statusbarright:mediumfont;
-
-    float xpos=dleft+dwidth-xaf;
-    float ypos=dtop+dheight;
     nvgFontSize(avg,headsize/4 );
-
+    nvgFillColor(avg, *getblack());
+    float ypos=dtop+dheight;
     const char *start=&str[0];
     const char *ends=str.end();
-    nvgFillColor(avg, *getblack());
+#ifdef WEAROS
+    float xpos=dwidth*.5;
+    nvgTextAlign(avg,NVG_ALIGN_CENTER|NVG_ALIGN_BOTTOM);
+    nvgTextBounds(avg, xpos,ypos ,start ,ends, (float *)&hidepos);
+    nvgText(avg, xpos,ypos,start,ends);
+    hidepos.left-=mediumfont;
+    hidepos.right+=mediumfont;
+    hidepos.bottom+=mediumfont;
+    hidepos.top-=mediumfont;
+#else
+    const float xaf=statusbarright?statusbarright:mediumfont;
+    float xpos=dleft+dwidth-xaf;
+
     nvgTextAlign(avg,NVG_ALIGN_LEFT|NVG_ALIGN_BOTTOM);
     nvgTextBounds(avg, xpos,ypos ,start ,ends, (float *)&hidepos);
     float w=hidepos.right-hidepos.left;
-//    float h=hidepos.bottom-hidepos.top;
-
     float xoff=-w;
     float yoff=0;
     nvgText(avg, xpos+xoff,ypos+yoff,start,ends);
@@ -1333,6 +1340,7 @@ void    JCurve::showHideButton(NVGcontext* avg) {
     hidepos.right+=xoff+mediumfont;
     hidepos.bottom+=yoff+mediumfont;
     hidepos.top+=yoff-mediumfont;
+    #endif
     }
 template <typename  TI,typename TE> void    JCurve::textbox(NVGcontext* avg,const TI &title,const TE &text) {
     float w=dwidth*0.6;

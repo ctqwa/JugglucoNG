@@ -158,7 +158,7 @@ void setdiffcurrent(bool val) {
      void   sidenum(NVGcontext* avg,const float posx,const float posy,const char *buf,const int len,const bool hit);
      bool    glucosepointinfo(NVGcontext* avg,time_t tim,uint32_t value,   float posx, float posy);
      bool    glucosepoint(NVGcontext* avg,time_t tim,uint32_t value,   float posx, float posy);
-    template <class TX,class TY> bool    showScan(NVGcontext* avg,const ScanData *low,const ScanData *high,  const TX &transx,  const TY &transy,const int colorindex);
+    template <class TX,class TY> void    showScan(NVGcontext* avg,const ScanData *low,const ScanData *high,  const TX &transx,  const TY &transy,const int colorindex);
      void    makecircle(NVGcontext* avg,float posx,float posy);
     template <class TX,class TY> void    histcurve(NVGcontext* avg,const SensorGlucoseData  * hist, const int32_t firstpos, const int32_t lastpos,const TX &xtrans,const TY &ytrans,const int colorindex);
     std::pair<float,float>    drawtrender(NVGcontext* avg,const std::array<uint16_t,16> &trend,const float x,const float y,const float w,const float h);

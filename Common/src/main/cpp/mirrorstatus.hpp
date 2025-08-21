@@ -41,8 +41,6 @@ struct mirrorstatus_t {
 	struct {
 		pid_t tid=0;
 		bool activereceivethread=false;
-		//bool hassocket;
-//		bool ingetcom=false;
 	 	bool ininterpret=false;
 		bool ingetcom() {
 			return tid!=0;
@@ -58,7 +56,6 @@ struct mirrorstatus_t {
 		} receive;
 
 	struct {
-//		bool hassocket;
 		bool running=false;
 		bool locked=false;
 		void start() {

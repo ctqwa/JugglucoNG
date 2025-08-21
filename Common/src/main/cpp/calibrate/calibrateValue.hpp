@@ -27,8 +27,11 @@ inline double mkweight(double age) {
         (1.0L + expl(2.3148148148148148L* powl(10,-6) *age));
     }
 inline double calibrateValue(const CaliPara &cali ,const uint32_t time,const double value) {
-        const double w=mkweight(fabs(time-(double)cali.time));
-        if(w<=0) {
+        if(time<=cali.time) {
+            return value*cali.a+cali.b;
+            }
+        const double   w=mkweight(time-cali.time);
+        if(w<=0.0) {
             return NAN;
             }
         return w*(value*cali.a+cali.b)+(1.0-w)*value;

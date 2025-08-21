@@ -277,7 +277,7 @@ void tobluetooth(int hostnr,bool sender,int *sockin, int *sockother,std::binary_
    while(true) { 
         int inlen=recvni(sock,buf,maxbuf);
        LOGGERTAG("tobluetooth recvni(%d,...)=%d\n",sock,inlen);
-     if(inlen<=0||(status.recv=true&&!(status.sendmessage=sendmessage(phonehost,phonesender,buf,inlen))))  {
+     if(inlen<=0||((status.recv=true)&&!(status.sendmessage=sendmessage(phonehost,phonesender,buf,inlen))))  {
          if(inlen>0)
             LOGGERTAG("sendmessage failed %d %d #%d\n",phonehost,phonesender,inlen);
          if(*sockother!=-1) {

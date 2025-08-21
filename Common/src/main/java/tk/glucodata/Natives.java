@@ -849,7 +849,7 @@ public static native boolean set2Schedule( );
 public static native void setSoundType(int val);
 public static native int getSoundType( );
 
-public static native boolean siTransmitterScan(long dataptr,String scancode);
+//public static native boolean siTransmitterScan(long dataptr,String scancode);
 public static native long percentileEndtime(int days);
 public static native int getAnalysedays( );
 public static native void onCreate();
@@ -880,6 +880,17 @@ public static native boolean getAllValues( );
 
 public static native void setResetSibionics2(long dataptr,boolean val);
 public static native boolean getResetSibionics2(long dataptr);
+public static native long str2sensorptr(String sensor);
+public static native void setSensorptrResetSibionics2(long sensorptr,boolean val);
+public static native boolean getSensorptrResetSibionics2(long sensorptr);
+public static native int getSensorptrSiSubtype(long sensorptr);
+public static native void setSensorptrSiSubtype(long sensorptr,int type);
+public static native int getSensorptrLibreVersion(long sensorptr);
+public static native boolean siSensorptrTransmitterScan(long sensorptr,String scancode);
+public static native String sensorptr2str(long sensorptr);
+public static native void watchBluetooth(String name,boolean sensor,boolean watch);
+public static native long getnumlasttime( );
+
 //s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }
 

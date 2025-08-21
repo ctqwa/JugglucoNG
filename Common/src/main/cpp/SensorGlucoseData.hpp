@@ -71,12 +71,7 @@ extern int writeStartime(crypt_t *pass, const int sock, const int sensorindex);
     extern int getgetsendnr();
 
 constexpr const int maxcaliNr=50;
-constexpr int maxdays=
-#ifdef TESTLONGSI
-50;
-#else
-35;
-#endif
+constexpr int maxdays=46;
 
 constexpr const int maxdaysDex=12;
 constexpr const int stdMaxDaysSI=24;
@@ -364,7 +359,7 @@ void updateCaliUpdated(uint32_t val) {
 
 
 
-void addCali(uint32_t tim, float weight,double a, double b) {
+int addCali(uint32_t tim, float weight,double a, double b) {
         if(caliNr<maxcaliNr) {
             LOGGER("%d addCali(%u,%f,%f)\n",caliNr,tim,a,b);
             int it=caliNr-1;
@@ -394,10 +389,12 @@ void addCali(uint32_t tim, float weight,double a, double b) {
                 }
 
             caliPara[it]={tim,weight,a,b};
+            return it;
             }
         else {
             LOGGER("Can't add %d==maxcaliNr addCali(%u,%f,%f)\n",caliNr,tim,a,b);
-              }
+            return -1;
+            }
         }
 
 bool removeCaliPos(int pos) {
@@ -416,16 +413,18 @@ bool removeCaliPos(int pos) {
                 }
         return true;
         }
-void removeCali(uint32_t tim) {
+int  removeCali(uint32_t tim) {
      CaliPara *last=caliPara+caliNr-1;
      if(last->time==tim) {
         LOGGER("removeCali(%u) last\n",tim);
         do {
             --caliNr;
             } while(caliNr>0&&caliPara[caliNr-1].time==tim);
-        return;
+        return caliNr;
         }
      for(CaliPara *iter=last-1;iter>=caliPara;--iter) {
+        if(iter->time>tim)
+                continue;
         if(iter->time==tim) {
                 CaliPara *first=iter-1;
                 while(first>=caliPara&&first->time==tim)
@@ -437,10 +436,12 @@ void removeCali(uint32_t tim) {
                 memmove(first,first+rmlen,reinterpret_cast<uint8_t*>(last)-reinterpret_cast<uint8_t*>(iter));
                 caliNr-=rmlen;
                 updateCaliUpdated(removedpos);
-                return;
+                return removedpos;
                 }
+          LOGGER("removeCali(%u) not found\n",tim);
+          return iter-caliPara+1;
         }
-      LOGGER("removeCali(%u) not found\n",tim);
+      return 0;
       }
 
 
@@ -1290,7 +1291,7 @@ if(error()) {
     return;
     }
 if(isSibionics2())
-    getinfo()->days=30;
+    getinfo()->days=45;
 if(const ScanData *last=lastpoll()) {
     if(last->g) {
         lastlifecount=last->id;;
@@ -2219,11 +2220,11 @@ int updateCali(crypt_t *pass,int sock,int ind,int sensorindex)  {
      getinfo()->caliUpdated[ind]=wascaliNr;
      return 1;
  }
-void addCali(uint32_t tim,float weight,double a, double b) {
-        getinfo()->addCali(tim,weight,a,b);
+int addCali(uint32_t tim,float weight,double a, double b) {
+        return getinfo()->addCali(tim,weight,a,b);
         }
-void removeCali(uint32_t tim) {
-        getinfo()->removeCali(tim);
+int removeCali(uint32_t tim) {
+        return getinfo()->removeCali(tim);
         }
 bool hide=false;
 };

@@ -630,7 +630,7 @@ extern vector<NumDisplay*> numdatas;
 
 
 void endstep(NVGcontext* avg) ;
-template <class TX,class TY> bool    JCurve::showScan(NVGcontext* avg,const ScanData *low,const ScanData *high,  const TX &transx,  const TY &transy,const int colorindex) {
+template <class TX,class TY>   void  JCurve::showScan(NVGcontext* avg,const ScanData *low,const ScanData *high,  const TX &transx,  const TY &transy,const int colorindex) {
 
     nvgFillColor(avg,*getcolor(colorindex));
     nvgBeginPath(avg);
@@ -654,7 +654,6 @@ template <class TX,class TY> bool    JCurve::showScan(NVGcontext* avg,const Scan
             }
         }
     nvgFill(avg);
-    return true;
     }
     //            nvgCircle(avg, posx,posy,;
     
@@ -1772,9 +1771,8 @@ displaytime disp=getdisplaytime(nu,starttime2,endtime, transx);
         for(int i=histlen-1;i>=0;i--) {
             const int index=hists[i];
             int colorindex=segcolor(index,1);
-             if(!showScan(avg,scanranges[i].first,scanranges[i].second,transx,transy,colorindex))
-                return 1;
-             }
+            showScan(avg,scanranges[i].first,scanranges[i].second,transx,transy,colorindex);
+            }
          }
 
     LOGGER("before showsnums catnr=%d\n",catnr);

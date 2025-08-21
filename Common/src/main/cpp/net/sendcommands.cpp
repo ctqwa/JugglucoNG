@@ -322,6 +322,15 @@ bool sendStartSendCalibrate(crypt_t *pass,const int sock,const uint16_t sensorin
     LOGGERTAG("sendStartSendCalibrate sock=%d sensorindex=%hd\n",sock,sensorindex);
     return senduint16(pass,sock,sStartSendCalibrate,sensorindex);
     }
+bool sendBlueWatch(crypt_t *pass,const int sock,int8_t stream,int8_t nums) {
+    LOGGERTAG("sendBlueWatch sock=%d stream=%d nums=%d\n",sock,stream,nums);
+    bluewatchstruct data{
+         .com=sBlueWatch,
+         .stream=stream,
+         .nums=nums
+         };
+    return sendcommand(pass,sock,reinterpret_cast<uint8_t*>(&data),sizeof(data));
+    }
 
 bool sendshowglucose(crypt_t *pass,const int sock,const uint16_t sensorindex) {
 	struct renderstruct rend{sglucose,sensorindex};

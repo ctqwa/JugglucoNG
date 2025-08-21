@@ -476,11 +476,34 @@ extern bool streamHistory() ;
 #ifdef SIBIONICS
 extern bool siInit(bool);
 #endif
+extern "C" JNIEXPORT jlong JNICALL   fromjava(str2sensorptr)(JNIEnv *env, jclass cl,jstring jsensor) {
+    if(!sensors) {
+        LOGAR("ERROR: sensors==null");
+        return 0LL;
+      }
+    constexpr const  int shortsensorlen=11;
+    jint getlen= env->GetStringUTFLength( jsensor);
+    if(getlen!=shortsensorlen) {
+        LOGGER("sensorlen=%d\n",getlen);
+        }    
+    char sensor[shortsensorlen+1];
+    env->GetStringUTFRegion( jsensor, 0,shortsensorlen, sensor);
+    sensor[sizeof(sensor)-1]='\0';
+
+    int sensorindex=sensors->sensorindexshort(sensor);
+    if(sensorindex<0) {
+      LOGGER("ERROR: %s unknown sensor\n",sensor);
+      return 0LL;
+      }
+    SensorGlucoseData *sens= sensors->getSensorData(sensorindex);
+    sens->sensorerror=false;
+    return reinterpret_cast<jlong>(sens);
+    }
 
 extern "C" JNIEXPORT jlong JNICALL   fromjava(getdataptr)(JNIEnv *env, jclass cl,jstring jsensor) {
     if(!sensors) {
       LOGAR("ERROR: sensors==null");
-        return 0LL;
+      return 0LL;
       }
     constexpr const  int shortsensorlen=11;
     jint getlen= env->GetStringUTFLength( jsensor);
@@ -593,7 +616,25 @@ extern "C" JNIEXPORT void JNICALL  fromjava(setDeviceAddress)(JNIEnv *env, jclas
         }
    LOGGER("setDeviceAddress(%s)\n", deviceaddress);
    }
-
+extern "C" JNIEXPORT int JNICALL   fromjava(getSensorptrLibreVersion)(JNIEnv *envin, jclass cl,jlong sensorptr) {
+    const SensorGlucoseData *sens=reinterpret_cast<const SensorGlucoseData *>(sensorptr);
+    if(!sens) {
+        return -1;
+        }
+    if(sens->isSibionics()) {
+        return 0x10;
+        }
+    if(sens->isDexcom()) {
+        return 0x40;
+        }
+    if(sens->isLibre3()) {
+        return 3;
+        }
+    if(sens->isLibre3()) {
+        return 2;
+        }
+    return 0;
+    }
 extern "C" JNIEXPORT int JNICALL   fromjava(getLibreVersion)(JNIEnv *envin, jclass cl,jlong dataptr) {
     if(!dataptr)
         return 0;
@@ -606,6 +647,14 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(getSensorName)(JNIEnv *envin, jc
     const SensorGlucoseData *usedhist=reinterpret_cast<streamdata *>(dataptr)->hist ; 
     if(!usedhist)
         return nullptr;
+    const char *name=usedhist->shortsensorname()->data();
+    LOGGER("getSensorName()=%s\n",name);
+    return envin->NewStringUTF(name);
+    }
+extern "C" JNIEXPORT jstring JNICALL   fromjava(sensorptr2str)(JNIEnv *envin, jclass cl,jlong sensorptr) {
+    if(!sensorptr)
+        return nullptr;
+    const SensorGlucoseData *usedhist=reinterpret_cast<const SensorGlucoseData *>(sensorptr); 
     const char *name=usedhist->shortsensorname()->data();
     LOGGER("getSensorName()=%s\n",name);
     return envin->NewStringUTF(name);

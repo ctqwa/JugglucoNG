@@ -93,7 +93,7 @@ longserialnumber
 /*
 Sibionics2:
 */
-private static void asktransmitter(MainActivity act,String name,long dataptr) {
+private static void asktransmitter(MainActivity act,String name,long sensorptr) {
     var title=getlabel(act,R.string.scantranstitle);
     var message=getlabel(act, R.string.scantransmessage);
     var cancel=getbutton(act,R.string.cancel);
@@ -112,13 +112,12 @@ private static void asktransmitter(MainActivity act,String name,long dataptr) {
            },new View[]{title},new View[]{message},new View[]{cancel,reset,ok});
     ok.setOnClickListener(v-> {
         removeContentView(layout);
-        Natives.setResetSibionics2(dataptr,reset.isChecked());
-        scanner(act,REQUEST_BARCODE_SIB2,dataptr);
+        Natives.setSensorptrResetSibionics2(sensorptr,reset.isChecked());
+        scanner(act,REQUEST_BARCODE_SIB2,sensorptr);
         });   
    MainActivity.setonback(() -> {
       removeContentView(layout);
-      Natives.finishSensor(dataptr);
-      Natives.freedataptr(dataptr);
+      Natives.finishfromSensorptr(sensorptr);
       SensorBluetooth.sensorEnded(name);
       });
     layout.setBackgroundResource(R.drawable.dialogbackground);
@@ -128,13 +127,8 @@ private static void asktransmitter(MainActivity act,String name,long dataptr) {
    act.addContentView(layout, new ViewGroup.LayoutParams(WRAP_CONTENT,WRAP_CONTENT));
     }
 
-private static void selectType(String name,long dataptr,MainActivity act) {
-    int subtype=Natives.getSiSubtype(dataptr);
-    /*
-    if(subtype==3) {
-        Natives.freedataptr(dataptr);
-        return;
-        } */
+private static void selectType(String name,long sensorptr,MainActivity act) {
+    int subtype=Natives.getSensorptrSiSubtype(sensorptr);
 
     var group=new RadioGroup(act);
     int id=0;
@@ -160,26 +154,10 @@ private static void selectType(String name,long dataptr,MainActivity act) {
       int type=group.getCheckedRadioButtonId();
       Log.i(LOG_ID,"getCheckedRadioButtonId()="+type);
       if(type>=0) {
-          Natives.setSiSubtype(dataptr,type);
+          Natives.setSensorptrSiSubtype(sensorptr,type);
           if(type==3) {
-          /*
-                Confirm.ask2(act,act.getString(R.string.scantranstitle) ,act.getString( R.string.scantransmessage) , 
-                ()-> {
-                        scanner(act,REQUEST_BARCODE_SIB2,dataptr);
-                        },
-                () -> {
-                    Natives.finishSensor(dataptr);
-                    Natives.freedataptr(dataptr);
-                    SensorBluetooth.sensorEnded(name);
-                    }
-
-                );
-                */
-                asktransmitter(act,name,dataptr);
-
+                asktransmitter(act,name,sensorptr);
             }
-           else {
-              }
             }
 
       });
@@ -191,7 +169,7 @@ private static void selectType(String name,long dataptr,MainActivity act) {
     }
 
 static long wasdataptr=0L;
-static void connectSensor(final String scantag,MainActivity act,int request,long dataptr2)  {
+static void connectSensor(final String scantag,MainActivity act,int request,long sensorptr2)  {
      if(!isWearable) {
         switch(request) {
             case REQUEST_BARCODE:{
@@ -203,14 +181,12 @@ static void connectSensor(final String scantag,MainActivity act,int request,long
                     String name=Natives.addSIscangetName(scantag);
                     if(name!=null)  {
                        MainActivity.tocalendarapp=true;
-                       var dataptr= Natives.getdataptr(name);
-                       int type=Natives.getLibreVersion(dataptr);
+                       var sensorptr= Natives.str2sensorptr(name);
+                       int type=Natives.getSensorptrLibreVersion(sensorptr);
                        {if(doLog) {Log.i(LOG_ID,"type="+type);};};
                        if(type== 0x10) {
-                            selectType(name,dataptr,act);
+                            selectType(name,sensorptr,act);
                             }
-                       else
-                            Natives.freedataptr(dataptr);
                        var res=SensorBluetooth.updateDevices();
                        SuperGattCallback.glucosealarms.setLossAlarm();
                        Applic.wakemirrors();
@@ -224,12 +200,11 @@ static void connectSensor(final String scantag,MainActivity act,int request,long
                     }
                  }break;
                case REQUEST_BARCODE_SIB2: {
-                    if(Natives.siTransmitterScan(dataptr2,scantag)) {
-                        Natives.freedataptr(dataptr2);
+                    if(Natives.siSensorptrTransmitterScan(sensorptr2,scantag)) {
                         return;
                         }
                     else {
-                        transmitterScanCancelled(dataptr2);
+                        transmitterScanCancelled(sensorptr2);
                         }
 
                     }
@@ -238,33 +213,32 @@ static void connectSensor(final String scantag,MainActivity act,int request,long
           wrongtag(); 
          }
 
-static void transmitterScanCancelled(long dataptr2) {
-            if(dataptr2!=0L) {
-                Natives.finishSensor(dataptr2);
-                var serial=Natives.getSensorName(dataptr2);
-                Natives.freedataptr(dataptr2);
+static void transmitterScanCancelled(long sensorptr2) {
+            if(sensorptr2!=0L) {
+                Natives.finishfromSensorptr(sensorptr2);
+                var serial=Natives.sensorptr2str(sensorptr2);
                 if(serial!=null)  {
                     Log.i(LOG_ID,"transmitterScanCancelled "+serial);
                     SensorBluetooth.sensorEnded(serial);
                     }
                  }
             else {
-                Log.i(LOG_ID,"transmitterScanCancelled dataptr==0");
+                Log.i(LOG_ID,"transmitterScanCancelled sensorptr==0");
                 }
            }
 
 
 
-public static void scanner(MainActivity act,int type,long dataptr) {
+public static void scanner(MainActivity act,int type,long sensorptr) {
     if (!isWearable) {
         if(!Natives.getGoogleScan())
-            scanZXingAlg(act,type,dataptr);
+            scanZXingAlg(act,type,sensorptr);
         else {
             try {
-                scanGoogle(act,type,dataptr);
+                scanGoogle(act,type,sensorptr);
                 } catch (Throwable th) {
                     Log.stack(LOG_ID, "scanGoogle", th);
-                    scanZXingAlg(act,type,dataptr);
+                    scanZXingAlg(act,type,sensorptr);
                     }
            }
       }
@@ -272,7 +246,7 @@ public static void scanner(MainActivity act,int type,long dataptr) {
 public static void scan(MainActivity act,int type) {
     scanner(act,type,0L);
     }
-private static void scanGoogle(MainActivity act,int type,long dataptr) {
+private static void scanGoogle(MainActivity act,int type,long sensorptr) {
      if(!isWearable) {
         if(doLog) {Log.i(LOG_ID, "before scan");};
         final var options =  new com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions.Builder().setBarcodeFormats( com.google.mlkit.vision.barcode.common.Barcode.FORMAT_DATA_MATRIX, com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE).build();
@@ -282,14 +256,14 @@ private static void scanGoogle(MainActivity act,int type,long dataptr) {
                var rawValue = barcode.getRawValue();
                var message="Scanned: "+rawValue;
                if(doLog) {Log.i(LOG_ID,message);};
-               connectSensor(rawValue,act,type,dataptr);
+               connectSensor(rawValue,act,type,sensorptr);
                })
            .addOnCanceledListener(
                () -> {
                     var message="Scan cancelled";
                     if(doLog) {Log.i(LOG_ID,message);};
                     Toast.makeText(act, message, Toast.LENGTH_LONG).show();
-                    transmitterScanCancelled(dataptr);
+                    transmitterScanCancelled(sensorptr);
                      // Task canceled
                    })
        .addOnFailureListener(
@@ -299,7 +273,7 @@ private static void scanGoogle(MainActivity act,int type,long dataptr) {
             Toast.makeText(act, message, Toast.LENGTH_SHORT).show();  
             if(useZXing) {
                 Toast.makeText(act, "Move to zXing", Toast.LENGTH_SHORT).show();
-                scanZXingAlg(act,type,dataptr);
+                scanZXingAlg(act,type,sensorptr);
                 }
         
          // Task failed with an exception

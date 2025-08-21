@@ -385,6 +385,9 @@ Deliś</a>.</p>
 Артем</a>.</p>
 <p>Juggluco’yu Türkçe’ye çeviren <a href="mailto:beyazbulut14@gmail.com?subject=Juggluco\'nun%20%C3%A7evirisi">beyazbulut14@gmail.com</a>
 </p>
+<p><br></p>
+<p><br></p>
+<p><br></p>
 ]]>
 </string>
 <string name="addconnection" >
@@ -2869,7 +2872,7 @@ Herhangi bir dil kodu seçilmediğinde, sistem dili kullanılır.</p>
 </string>
 <string name="loghelp" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/loghelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/loghelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/loghelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/loghelp.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Log</h1>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/loghelp.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/loghelp.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/loghelp.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/loghelp.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/loghelp.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Log</h1>
 <p style="line-height: 100%; margin-bottom: 0cm">Juggluco\'nun günlük
 versiyonudur. Günlük dosyaları şu şekilde oluşturulabilir:
 /data/data/tk.glucodata/files/logs</p>
@@ -2917,7 +2920,7 @@ Görünümü kapatın.</p>
 </string>
 <string name="sensormirror" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/sensormirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/sensormirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/sensormirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sensormirror.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Sensör Bilgisi</h1>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/sensormirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/sensormirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/sensormirror.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/sensormirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/sensormirror.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Sensör Bilgisi</h1>
 <p><a href="https://www.juggluco.nl/">Juggluco</a> akış
 değerlerinin klonu olarak işlev gördüğünde sensörler hakkında
 bilgi verir.</p>
@@ -2968,7 +2971,7 @@ görüntüleneceğini seçebilirsiniz.</p>
 </string>
 <string name="QRmirror" >
 <![CDATA[
-<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/QRmirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><h1>QR Klon</h1>
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/QRmirror.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/QRmirror.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/QRmirror.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/QRmirror.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/QRmirror.html?lang=en">en</a>&emsp;&emsp;</p><h1>QR Klon</h1>
 <p style="line-height: 100%; margin-bottom: 0cm">Diğer telefonda <i>S</i><i>ol
 </i><i>M</i><i>enü → Fotoğraf</i> ile QR kodunu tarayarak klon
 bağlantısının diğer tarafını yapılandırabilirsiniz.</p>

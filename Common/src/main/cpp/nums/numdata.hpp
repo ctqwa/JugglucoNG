@@ -54,6 +54,7 @@ void    setnumchanged();
 class Numdata;
 extern void removeCalibration(const Num *num);
 extern void addCalibration(uint32_t time,int  type, Num *num,const Numdata*);
+extern void changeCalibration(uint32_t oldtime,bool oldexclude,uint32_t time,int  type, Num *num,const Numdata*);
 extern   void Garmindeletelast(int base,int pos,int end );
 typedef std::conditional<sizeof(long long) == sizeof(int64_t), long long, int64_t >::type identtype; //to get rid of %lld warning
 constexpr size_t nummmaplen=77056;//  ((sizeof(size_t)==4)?64ul*1024ul*1024ul:(1024ul*1024*1024ul))/sizeof(Num);
@@ -635,7 +636,9 @@ void numsavepos(int pos, uint32_t time, float32_t value, uint32_t type,uint32_t 
             mealptr=0;
             }
         Num &num=at(pos);
-        removeCalibration(&num);
+//        removeCalibration(&num);
+        uint32_t oldtime=num.time;
+        uint32_t oldexclude=num.exclude;
         addlibrenumsdeleted(&num,pos);
         num={.time=time,.mealptr=mealptr,.value=value,.type=type};
         if(pos>=getlibreSolid()) {
@@ -648,7 +651,7 @@ void numsavepos(int pos, uint32_t time, float32_t value, uint32_t type,uint32_t 
         nightBack(pos);
         updatepos(pos,getlastpos()); //ADDED
         setchangetimes(pos,pos+1);
-        addCalibration( time, type,&num,this);
+        changeCalibration(oldtime, oldexclude,time, type,&num,this);
         }
     setnumchanged();
      }
@@ -902,7 +905,9 @@ void    libremovelarger(int from,int to,int movelen) { //to>from
 
 public:
 void numchange(const Num *hit, uint32_t time, float32_t value, uint32_t type,uint32_t mealptr) {
-    removeCalibration(hit);
+//    removeCalibration(hit);
+    uint32_t oldtime=hit->time;
+    uint32_t oldexclude=hit->exclude;
     const int oldpos=hit-startdata();
     LOGGERTAG("Start numchange oldpos=%d\n",oldpos);
     addlibrenumsdeleted(hit,oldpos);
@@ -975,7 +980,7 @@ void numchange(const Num *hit, uint32_t time, float32_t value, uint32_t type,uin
     nightBack(pos);
     updatepos(pos,lastupdate);
     setnumchanged();
-    addCalibration( time, type,num,this);
+    changeCalibration(oldtime,oldexclude, time, type,num,this);
     }
 void prunenums() {
     LOGGER("start prunenums %lld\n",ident);

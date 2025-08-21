@@ -97,46 +97,52 @@ extern "C" JNIEXPORT void JNICALL   fromjava(siSaveDeviceName)(JNIEnv *env, jcla
   backup->wakebackup(Backup::wakeall);
   // sendstreaming(sens);  
    }
+extern "C" JNIEXPORT void  JNICALL   fromjava(setSensorptrResetSibionics2)(JNIEnv *env, jclass cl,jlong sensorptr,jboolean val) {
+    if(!sensorptr)
+        return;
+    reinterpret_cast<SensorGlucoseData *>(sensorptr)->getinfo()->reset=val;
+    }
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getSensorptrResetSibionics2)(JNIEnv *env, jclass cl,jlong sensorptr) {
+    if(!sensorptr)
+        return false;
+    return reinterpret_cast<SensorGlucoseData *>(sensorptr)->getinfo()->reset;
+    }
 
 extern "C" JNIEXPORT void  JNICALL   fromjava(setResetSibionics2)(JNIEnv *env, jclass cl,jlong dataptr,jboolean val) {
     if(!dataptr)
         return;
     sistream  *stream=reinterpret_cast<sistream *>(dataptr);
     auto *sens=stream->hist;
-   if(val) {
-        if(sens->isSibionics()&&!sens->getinfo()->notchinese)
-              stream->sicontext.setNotchinese(sens);
-          }
    sens->getinfo()->reset=val;
     }
+/*
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getResetSibionics2)(JNIEnv *env, jclass cl,jlong dataptr) {
     if(!dataptr)
         return false;
     return reinterpret_cast<streamdata *>(dataptr)->hist->getinfo()->reset;
-    }
+    } */
 
-extern "C" JNIEXPORT jboolean JNICALL   fromjava(siTransmitterScan)(JNIEnv *env, jclass cl,jlong dataptr,jstring jscancode) {
-    if(!dataptr) {
-        LOGAR("siTransmitterScan dataptr==null");
+extern "C" JNIEXPORT jboolean JNICALL   fromjava(siSensorptrTransmitterScan)(JNIEnv *env, jclass cl,jlong sensorptr,jstring jscancode) {
+    if(!sensorptr) {
+        LOGAR("siSensorptrTransmitterScan sensorptr==null");
         return false;
         }
     const jint getlen= env->GetStringUTFLength( jscancode);
     if(getlen!=59) {
-        LOGGER("siTransmitterScan len==%d\n",getlen);
+        LOGGER("siSensorptrTransmitterScan len==%d\n",getlen);
         return false;
         }
    const char *scancode = env->GetStringUTFChars( jscancode, NULL);
    if(!scancode) {
-        LOGAR("siTransmitterScan  GetStringUTFChars()=null");
+        LOGAR("siSensorptrTransmitterScan  GetStringUTFChars()=null");
         return false;
         }
    if(!std::ranges::contains_subrange(std::string_view(scancode,getlen),sibionicsRecognition)) {
-        LOGGER("siTransmitterScan  not %s in %s\n",sibionicsRecognition.data(),scancode);
+        LOGGER("siSensorptrTransmitterScan  not %s in %s\n",sibionicsRecognition.data(),scancode);
         return false;
         }
 
-    streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
-    auto *sens= sdata->hist;
+   auto *sens=reinterpret_cast<SensorGlucoseData *>(sensorptr);
    auto *info=sens->getinfo();
    info->siToken='%';
 
@@ -145,12 +151,18 @@ extern "C" JNIEXPORT jboolean JNICALL   fromjava(siTransmitterScan)(JNIEnv *env,
    memcpy(name,scancode+getlen-namlen,namlen);
    info->siDeviceNamelen=namlen;
    name[namlen]='\0';
-   LOGGER("siTransmitterScan %s\n",name);
+   LOGGER("siSensorptrTransmitterScan %s\n",name);
   sendstreaming(sens);  
   backup->resendResetDevices();
   backup->wakebackup(Backup::wakeall);
    return true;
    }
+/*
+extern "C" JNIEXPORT jboolean JNICALL   fromjava(siTransmitterScan)(JNIEnv *env, jclass cl,jlong dataptr,jstring jscancode) {
+    streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
+    auto *sens= sdata->hist;
+    return fromjava(siSensorptrTransmitterScan)(env,cl,(jlong)sens,jscancode);
+   } */
 extern "C" JNIEXPORT jstring JNICALL   fromjava(siGetDeviceName)(JNIEnv *env, jclass cl,jlong dataptr) {
     if(!dataptr)
         return nullptr;
@@ -180,37 +192,6 @@ extern "C" JNIEXPORT void JNICALL   fromjava(EverSenseClear)(JNIEnv *env, jclass
     if(auto *sens=reinterpret_cast<streamdata *>(dataptr)->hist)
         sens->setbroadcastfrom(INT16_MAX);
     }
-extern "C" JNIEXPORT jlong JNICALL   fromjava(SIprocessData)(JNIEnv *envin, jclass cl,jlong dataptr, jbyteArray bluetoothdata,jlong mmsec) {
-if(!dataptr) {
-   LOGAR("SIprocessData dataptr==null");
-   return 0LL;
-    }
- sistream *sdata=reinterpret_cast<sistream *>(dataptr);
-  SensorGlucoseData *sens=sdata->hist;
-  if(!sens) {
-      LOGAR("SIprocessData SensorGlucoseData==null");
-      return 0LL;
-     }
-  uint32_t timsec=mmsec/1000L;
- data_t *bluedata=fromjbyteArray(envin,bluetoothdata);
- destruct _destbluedata([bluedata]{data_t::deleteex(bluedata);});
-   if(sens->notchinese()) {
-      if(sens->getinfo()->reset) {
-            LOGAR("SIprocessData reset");
-            return 10LL;
-            }
-         
-     const jlong res=sdata->sicontext.processData2(sens,timsec,bluedata,sdata->sensorindex);
-         LOGGER("processData2=%lld\n",res);
-         return res;
-       }
-   else   
-   {
-         const jlong res= sdata->sicontext.processData(sens,timsec,bluedata->data(),bluedata->size(),sdata->sensorindex);
-         LOGGER("processData=%lld\n",res);
-         return res;
-     }
-}
 extern std::string_view libdirname;
 #include "sibionics/json.hpp"
 void *openlib(std::string_view libname) {
@@ -513,6 +494,43 @@ void SiContext::release() {
 SiContext::~SiContext() {
     release();
     };
+
+
+extern "C" JNIEXPORT jlong JNICALL   fromjava(SIprocessData)(JNIEnv *envin, jclass cl,jlong dataptr, jbyteArray bluetoothdata,jlong mmsec) {
+if(!dataptr) {
+   LOGAR("SIprocessData dataptr==null");
+   return 0LL;
+    }
+ sistream *sdata=reinterpret_cast<sistream *>(dataptr);
+  SensorGlucoseData *sens=sdata->hist;
+  if(!sens) {
+      LOGAR("SIprocessData SensorGlucoseData==null");
+      return 0LL;
+     }
+  uint32_t timsec=mmsec/1000L;
+ data_t *bluedata=fromjbyteArray(envin,bluetoothdata);
+ destruct _destbluedata([bluedata]{data_t::deleteex(bluedata);});
+
+  if(sens->getinfo()->reset) {
+        if(!sens->getinfo()->notchinese||!V120Reset) {
+            sdata->sicontext.setNotchinese(sens);
+            }
+        LOGAR("SIprocessData reset");
+        return 10LL;
+        }
+   if(sens->notchinese()) {
+         const jlong res=sdata->sicontext.processData2(sens,timsec,bluedata,sdata->sensorindex);
+         LOGGER("processData2=%lld\n",res);
+         return res;
+       }
+   else   
+   {
+         const jlong res= sdata->sicontext.processData(sens,timsec,bluedata->data(),bluedata->size(),sdata->sensorindex);
+         LOGGER("processData=%lld\n",res);
+         return res;
+     }
+}
+
 #else
 bool siInit() {return false;}
 #endif

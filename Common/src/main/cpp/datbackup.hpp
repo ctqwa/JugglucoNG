@@ -113,11 +113,9 @@ extern uint32_t lastuptodate[];
 //extern int tmpsocks[maxallhosts][passhost_t::maxip];
 extern std::vector<crypt_t *>crypts;
 struct updateone {
-//    struct sockaddr host;
     int ind;
     int allindex;
     int startsensors;//vanwaaraf sensors.dat updaten
-//    char port[6];
 
     uint8_t backupupdated;
     uint8_t reserved1;
@@ -132,7 +130,10 @@ struct updateone {
     bool sendnums;
     bool sendstream;
     bool sendscans;
-    bool restore:5;
+    bool restore:4;
+
+    bool blueWatch:1;
+
     bool sendNight:1;
     bool sendLibre:1;
     bool sendjugglucoid:1;
@@ -565,6 +566,7 @@ void clearhost(int index) {
         }
 
     sensors->updateinit(index);
+
     host.startsensors=0;
     host.firstsensor=0;
     host.updatesettings=0;
@@ -574,8 +576,9 @@ void clearhost(int index) {
     host.starttime=0;
     host.starttimeindex=UINT16_MAX;
     host.resetdevices=false;
-//    host.dontuseopen=false;
     host.sendjugglucoid=false;
+
+    host.blueWatch=false;
     host.sendNight=false;
     host.sendLibre=false;
 

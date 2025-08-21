@@ -199,6 +199,7 @@ static private int[] libre3scan(GlucoseCurve curve,MainActivity main, Vibrator v
               {if(doLog) {Log.i(LOG_ID,"No Libre 3 Android <8");};};
               ret=0xF9;
               }
+    curve.requestRender();
     return new int[]{ret,value};
     }
 static public synchronized void scan(GlucoseCurve curve,Tag tag) {

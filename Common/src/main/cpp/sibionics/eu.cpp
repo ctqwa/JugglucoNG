@@ -150,6 +150,32 @@ auto makeauthbytes(const char * address,int hema) {
    uitar.used=uitlen;
    return uitar;
    }
+extern "C" JNIEXPORT jint JNICALL   fromjava(getSensorptrSiSubtype)(JNIEnv *env, jclass cl,jlong sensorptr) {
+   if(!sensorptr) {
+       LOGAR("getSensorptrSiSubtype sensorptr==0");
+       return -1;
+       }
+   return reinterpret_cast<const SensorGlucoseData*>(sensorptr)->siSubtype();
+   }
+extern "C" JNIEXPORT void JNICALL   fromjava(setSensorptrSiSubtype)(JNIEnv *env, jclass cl,jlong sensorptr,jint type) {
+   if(!sensorptr) {
+       LOGAR("setSiSubtype dataptr==0");
+       return;
+       }
+   LOGGER("setSensorptrSiSubtype %d\n",type);
+   auto *usedhist=reinterpret_cast<SensorGlucoseData*>(sensorptr);
+   usedhist->getinfo()->siType=type;
+   if(type!=3) {
+        usedhist->getinfo()->reset=false;
+        }
+   LOGGER("after usedhist->getinfo()->siType %d\n",type);
+   sendsiScan(usedhist);
+   LOGAR("sendsiScan(usedhist)");
+   if(backup)
+       backup->wakebackup(Backup::wakeall);
+   LOGAR("wakebackup(Backup::wakeall)");
+
+   }
 extern "C" JNIEXPORT jint JNICALL   fromjava(getSiSubtype)(JNIEnv *env, jclass cl,jlong dataptr) {
    if(!dataptr) {
        LOGAR("getSiSubtype dataptr==0");
@@ -162,6 +188,7 @@ extern "C" JNIEXPORT jint JNICALL   fromjava(getSiSubtype)(JNIEnv *env, jclass c
        }
    return  usedhist->siSubtype();
    }
+   /*
 extern "C" JNIEXPORT void JNICALL   fromjava(setSiSubtype)(JNIEnv *env, jclass cl,jlong dataptr,jint type) {
    if(!dataptr) {
        LOGAR("setSiSubtype dataptr==0");
@@ -182,7 +209,7 @@ extern "C" JNIEXPORT void JNICALL   fromjava(setSiSubtype)(JNIEnv *env, jclass c
    LOGAR("wakebackup(Backup::wakeall)");
 
    }
-
+*/
 extern "C" JNIEXPORT jbyteArray JNICALL   fromjava(siAuthBytes)(JNIEnv *env, jclass cl,jlong dataptr) {
    if(!dataptr) {
        LOGAR("siAuthBytes dataptr==null");

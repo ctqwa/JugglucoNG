@@ -1443,17 +1443,25 @@ Bluetooth.</p>
 <string name="wearosinfo" >
 <![CDATA[
 <p><a href="https://www.juggluco.nl/Jugglucohelp/be/wearosinfo.html">be</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/de/wearosinfo.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/fr/wearosinfo.html">fr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/it/wearosinfo.html">it</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/wearosinfo.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pl/wearosinfo.html">pl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/pt/wearosinfo.html">pt</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/ru/wearosinfo.html">ru</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/tr/wearosinfo.html">tr</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/uk/wearosinfo.html">uk</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/zh/wearosinfo.html">zh</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/wearosinfo.html?lang=en">en</a>&emsp;&emsp;</p><h1>Wear OS</h1>
-<p><strong>Enter numbers (amounts) on watch:</strong>
-Enter amounts for Insulin, carbohydrate and activity on the watch
-(second menu→ “<a href="https://www.juggluco.nl/Jugglucohelp/newamount.html">Amount</a>”)
+<p><strong>Enter numbers (amounts) on watch:</strong> Enter amounts
+for Insulin, carbohydrate and activity on the watch (second menu→
+“<a href="https://www.juggluco.nl/Jugglucohelp/newamount.html">Amount</a>”)
 instead of the phone. If you want to scan <a href="https://www.juggluco.nl/Juggluco/index.html#novopens">Novopens</a>
-with the phone, you should not set this.</p>
+with the phone, you should not set this. If you forgot your phone,
+you can do the same on your watch, with left menu→Sensor→<a href="https://www.juggluco.nl/JugglucoWearOS/switch.html">Switch</a>.</p>
 <p><strong>Direct sensor-watch connection</strong>: This determines
 whether the watch should be directly connected with the sensor. This
 can only be changed when watch and phone are in sync. Use
 Mirror-&gt;Sync and Reinit on phone and watch, to sync phone and
-watch.</p>
-<p><strong>Init watch app</strong>: You no longer need to press this button. It now happens automatically.</p>
+watch. If you forgot to turn on “Direct sensor-watch connection”,
+before running out of the house wearing only your watch, you can
+press left menu→Sensor→<a href="https://www.juggluco.nl/JugglucoWearOS/switch.html">Switch</a>
+on your watch to directly connect the sensor with the watch. When
+phone and watch are again in Bluetooth reach, a message is sent to
+the phone to stop connecting with the sensor and reverse the direction of the mirror
+connection.</p>
+<p><strong>Init watch app</strong>: You no longer need to press this
+button. It now happens automatically.</p>
 <p><strong>Defaults</strong>: This sets the connection settings to
 its default values. This has to do with the settings that can be
 changed in Left menu-&gt;<a href="https://www.juggluco.nl/Jugglucohelp/connectionoverview.html">Mirror</a>
@@ -2510,7 +2518,8 @@ Fit</a>. Other apps again can get assess to data from Google Fit.</p>
 values and amounts to Libreview and to get the account id used during
 Freestyle Libre 3 sensor activation. Touch to change settings.</p>
 <h2 class="western">Patched Libre</h2>
-<p>The Patched Libre broadcast was used by the patched Librelink to send glucose values to xDrip. Something like the EverSense broadcast does.
+<p>There is nothing wrong with the Patched Libre broadcast itself, but xDrip modifies the values when it receives them from the Patched Libre broadcast. Because users only use this broadcast this way, I planned to remove the broadcast.</p>
+<p>xDrip doesn’t modify values when it receives glucose values from the EverSense broadcast or if the web server in Juggluco is used as a Nightscout data source.</p>
 <h2 class="western"><a name="eversense"></a>EverSense</h2>
 <p>Yet another glucose broadcast. It can be used to send every minute
 a glucose value to xDrip. In xDrip you need to set “<i>460G/EverSense</i>”

@@ -124,4 +124,12 @@ public static  RadioButton getradiobutton(Context context, int res) {
 static public String getlanguage(Context context) {
 	return context.getString(R.string.language);
 	} */
+        
+static void sleep(long mmsec) {
+   try {
+       Thread.sleep(mmsec);
+   } catch (InterruptedException ie) {
+       Thread.currentThread().interrupt();
+   }
+}
 }

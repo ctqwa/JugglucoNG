@@ -48,4 +48,6 @@ public class Specific {
 	static public final boolean useclose = true;
 
 	static public  void setclose(boolean c) { }
+
+static void wearnosensors(Object act) { };
 };

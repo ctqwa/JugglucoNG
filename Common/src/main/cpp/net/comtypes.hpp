@@ -44,6 +44,7 @@ constexpr uint16_t swakeupstream=18;
 constexpr uint16_t sglucose=19;
 constexpr uint16_t sresetdevices=20;
 constexpr uint16_t sStartSendCalibrate=21;
+constexpr uint16_t sBlueWatch=22;
 constexpr uint16_t stest=99;
 
 
@@ -72,7 +73,8 @@ inline static constexpr const char *comlabels[]={
 "swakeupstream",
 "sglucose",
 "sresetdevices",
-"sStartSendCalibrate"
+"sStartSendCalibrate",
+"sBlueWatch"
 };
 
 #endif
@@ -98,6 +100,11 @@ struct renderstruct {
 struct uint16_t_arg_struct {
      uint16_t  com;
      uint16_t arg;
+     };
+struct bluewatchstruct {
+     uint16_t  com;
+     int8_t stream;
+     int8_t nums;
      };
 
 struct askfile {

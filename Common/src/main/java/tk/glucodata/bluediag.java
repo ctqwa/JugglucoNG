@@ -133,7 +133,7 @@ void setrow(long[] times, TextView[]  timeviews, TextView info) {
         }
     }
 
-private static void showsensormessage(String text,MainActivity act) {
+static void showsensormessage(String text,MainActivity act) {
     var width=GlucoseCurve.getwidth();
     int height = GlucoseCurve.getheight();
     var close=getbutton(act, R.string.closename);
@@ -162,7 +162,7 @@ private static void showsensormessage(String text,MainActivity act) {
                  act.setbluetoothmain( isChecked);
                  act.requestRender();
                  MainActivity.doonback();
-                 start(act);
+                 bluediag.start(act);
              }
          });
 
@@ -228,7 +228,7 @@ void showinfo(final SuperGattCallback gatt,MainActivity act) {
                 gatt.close();
                 SensorBluetooth.startscan();
                  act.doonback();
-                 start(act);
+                 bluediag.start(act);
 
                 });
             }
@@ -299,7 +299,7 @@ void confirmFinish(SuperGattCallback gat) {
                 SensorBluetooth.sensorEnded(serial);
                 activity.requestRender();
                 activity.doonback();
-                start(activity);
+                bluediag.start(activity);
                 }
                 }).
         setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
@@ -340,7 +340,7 @@ static void nosensors(MainActivity act) {
                  act.setbluetoothmain( isChecked);
                  act.requestRender();
                  act.doonback();
-                 start(act);
+                 bluediag.start(act);
              }
          });
     var close=getbutton(act,R.string.closename);
@@ -538,11 +538,11 @@ if(!isWearable) {
                  act.setbluetoothmain( !blueused);
                  act.requestRender();
                  act.doonback();
-                 start(act);
+                 bluediag.start(act);
              }
              else {
                  if (isChecked != wasuse)
-                     start(act);
+                     bluediag.start(act);
              }
          }
          );
@@ -826,7 +826,7 @@ static void start(MainActivity act) {
        final ArrayList<SuperGattCallback> gatts=SensorBluetooth.mygatts();
        if(gatts == null || gatts.size() == 0) {
           if(isWearable)
-              nosensors(act);
+              Specific.wearnosensors(act);
           else
               MirrorSensors.show(act);
           return;

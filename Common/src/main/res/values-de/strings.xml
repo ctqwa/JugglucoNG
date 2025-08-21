@@ -397,4 +397,6 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
 <string name="calibrations">Kalibrierungen</string>
  <string name="allvalues">Alle Werte</string>
  <string name="writedown">Aufschreiben!</string>
+ <string name="switchtowatch">Wechseln</string>
+ <string name="last">"Letzte: "</string>
 </resources>

@@ -853,5 +853,24 @@ static public void startMain() {
         keeprunning.theservice.startActivity( intent);
         }
       }
+
+@Keep
+static boolean switchbluetooth(String name,byte[] netinfo,boolean watchBluetooth) {
+if(!isWearable) {
+    if(netinfo!=null) {
+        var sender=tk.glucodata.MessageSender.getMessageSender();
+        if(sender!=null) {
+            sender.sendnetinfo(name,netinfo);
+            sender.sendbluetooth(name,watchBluetooth);
+            var main=MainActivity.thisone;
+            boolean here= !watchBluetooth;
+            Applic.setbluetooth(main==null?Applic.app:main,here);
+            return true;
+            }
+        }
+      }
+    return false;
+   }
+
 }
 

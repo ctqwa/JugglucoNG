@@ -41,6 +41,9 @@ import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.UUID;
 
+import java.util.concurrent.TimeUnit;
+
+import static tk.glucodata.util.sleep;
 
 public class SiGattCallback extends SuperGattCallback {
 
@@ -79,6 +82,7 @@ static int siNR=0;
          }
     }
 
+  boolean connected=false;
     @SuppressLint("MissingPermission")
     @Override
     public void onConnectionStateChange(BluetoothGatt bluetoothGatt, int status, int newState) {
@@ -97,8 +101,10 @@ static int siNR=0;
                 Log.e(LOG_ID, "bluetoothGatt.discoverServices()  failed");
 			      disconnect();
             }
+            connected=true;
             Natives.EverSenseClear(dataptr);
         } else {
+            connected=false;
             if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 		   if(!autoconnect) {
 			   bluetoothGatt.close();
@@ -257,11 +263,31 @@ private void   activate() {
    }
 private boolean   writeReset() {
    if(hasNotChinese) {
-      return write2(Natives.getSIResetBytes());
+       if(write2(Natives.getSIResetBytes())) {
+           Log.i(LOG_ID,"writeReset successful");
+           return true;
+           }
+       else {
+           Log.i(LOG_ID,"writeReset failed");
+           return false;
+           }
       }
    return true;
    }
 
+private void tryer(Supplier<Boolean> worked) {
+            if(worked.get())
+                return;
+            Applic.scheduler.schedule(() -> { 
+                 for(int i=0;i<16;i++) {
+                      if(!connected) {
+                           {if(doLog) {Log.i(LOG_ID,"tryer stops not connected");};};
+                          return;
+                          }
+                      if(worked.get()) return; 
+                      sleep(20) ;
+                     } }, 20, TimeUnit.MILLISECONDS);
+            }
 private boolean novalue=false;
 
 @SuppressLint("MissingPermission")
@@ -275,13 +301,15 @@ private void   processchanged(byte[] value) {
    long timmsec=System.currentTimeMillis();
   long res=Natives.SIprocessData(dataptr, value,timmsec);
   if(res==10L) {
-       if(writeReset()) {
-           Log.i(LOG_ID,"writeReset successful");
-           Natives.setResetSibionics2(dataptr,false);
-           }
-       else {
-           Log.i(LOG_ID,"writeReset failed");
-           }
+       tryer(()->writeReset());
+       Natives.setResetSibionics2(dataptr,false);
+       novalue=true;
+       Applic.app.getHandler().postDelayed( ()->   {
+               if(novalue) {
+                  Log.e(LOG_ID,"1: postDelayed disconnect");
+                  disconnect();
+                  novalue=false;
+                  }},3*60*1000L);
        return;
        }
   if(res==2L) {
@@ -301,7 +329,7 @@ private void   processchanged(byte[] value) {
           novalue=true;
           Applic.app.getHandler().postDelayed( ()->   {
                if(novalue) {
-                  Log.e(LOG_ID,"2: postDelayed disconnect");
+                  Log.e(LOG_ID,"3: postDelayed disconnect");
                   disconnect();
                   novalue=false;
                   }},5*60*1000L);

@@ -136,6 +136,10 @@ extern "C" JNIEXPORT jboolean JNICALL fromjava(receivedbackup)(JNIEnv *env, jcla
 		return numdata->receivedbackup();
 	return true;
 	}
+extern uint32_t getnumlasttime();
+extern "C" JNIEXPORT jlong JNICALL fromjava(getnumlasttime)(JNIEnv *env, jclass thiz) {
+    return  getnumlasttime()*1000LL;
+	}
 	/*
 extern "C" JNIEXPORT void JNICALL fromjava(resendtowatch)(JNIEnv *env, jclass thiz) {
 	for(Numdata *num:numdatas) 

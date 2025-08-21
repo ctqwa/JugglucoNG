@@ -18,16 +18,16 @@ import android.content.Intent;
 
 class ZXing {
     final static String LOG_ID="ZXing";
-    static long wasdataptr=0L;
-    static void scanZXingAlg(Activity act,int type,long dataptr) {
+    static long wassensorptr=0L;
+    static void scanZXingAlg(Activity act,int type,long sensorptr) {
          if(!isWearable&&useZXing) {
              IntentIntegrator intentIntegrator = new IntentIntegrator(act);
              intentIntegrator.setPrompt(Applic.app.getString(R.string.photomessage));
              intentIntegrator.setOrientationLocked(true); 
              intentIntegrator.setDesiredBarcodeFormats( DATA_MATRIX, QR_CODE);
              intentIntegrator.setRequestCode(type);
-//             intentIntegrator.addExtra("dataptr",dataptr); //does
-             wasdataptr=dataptr;
+//             intentIntegrator.addExtra("sensorptr",sensorptr); //does
+             wassensorptr=sensorptr;
              intentIntegrator.initiateScan(); 
              }
           }
@@ -35,10 +35,10 @@ class ZXing {
     static void zXingResult(int resultCode, Intent data,MainActivity act,int type) {
          if(!isWearable&&useZXing) {
                 try {
-            //      var dataptr=data.getLongExtra("dataptr",0L); //is not there
-                   long dataptr=wasdataptr;
-                   wasdataptr=0L;
-                   Log.i(LOG_ID,"zXingResult(" +resultCode+",data) dataptr="+dataptr);
+            //      var sensorptr=data.getLongExtra("sensorptr",0L); //is not there
+                   long sensorptr=wassensorptr;
+                   wassensorptr=0L;
+                   Log.i(LOG_ID,"zXingResult(" +resultCode+",data) sensorptr="+sensorptr);
                    IntentResult intentResult = IntentIntegrator.parseActivityResult(resultCode, data);
                    if(intentResult != null) {
                       final var scan=intentResult.getContents();
@@ -47,15 +47,15 @@ class ZXing {
                        else {
                             Log.i(LOG_ID,"Scan: "+scan);
                             Toaster(scan);
-                            connectSensor(scan,act,type,dataptr);
+                            connectSensor(scan,act,type,sensorptr);
                             return;
                          }
                       }
                      else {
                         Log.i(LOG_ID,"intentResult == null"); 
                         }
-                  if(dataptr!=0L) 
-                      Sibionics.transmitterScanCancelled(dataptr);
+                  if(sensorptr!=0L) 
+                      Sibionics.transmitterScanCancelled(sensorptr);
                    }
             catch(Throwable th) {
                 Log.stack(LOG_ID,"zXingResult",th);
