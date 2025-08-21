@@ -51,4 +51,7 @@ static public boolean useclose=false;
 static public void setclose(boolean val) {
    useclose=val;
    }
+static void wearnosensors(MainActivity act) {
+    Switch.wearnosensors(act);
+    }
 };

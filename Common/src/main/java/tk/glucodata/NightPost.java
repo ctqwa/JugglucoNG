@@ -178,7 +178,9 @@ static private String token="";
 
 static JSONObject  readJSONObject(HttpURLConnection urlConnection)  throws IOException, JSONException {
     String ant=getstring(urlConnection);
-    Log.format("%s: readJSONObject len=%d %s",LOG_ID,ant.length(),ant);
+    if(doLog) {
+        Log.format("%s: readJSONObject len=%d %s",LOG_ID,ant.length(),ant);
+        }
      return new JSONObject(ant);
     }
 

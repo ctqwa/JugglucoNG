@@ -560,12 +560,21 @@ void setnumchanged() {
     settings->data()->timenumchanged=time(nullptr);
     }
 #include "net/makerandom.hpp"
+
+static void mkdeviceID(std::array<char,36> &uit) {
+        char *databuf=uit.data();
+        char buf[16];
+        makerandom(buf,16);
+        const uint16_t *small=(const uint16_t*)(buf+6);
+        snprintf(databuf,37,"%08x-%04x-%04x-%04x-%012llx",*((uint32_t *)(buf+12)),small[0],small[1],small[2],*((uint64_t *)buf)&0xFFFFFFFFFFFFLL);
+        } 
+        /*
 static void mkdeviceID(std::array<char,36> &uit) {
         char buf[16];
         makerandom(buf,16);
         const uint16_t *small=(const uint16_t*)(buf+6);
         snprintf(uit.data(),37,"%08x-%04x-%04x-%04x-%012llx",*((uint32_t *)(buf+12)),small[0],small[1],small[2],*((uint64_t *)buf)&0xFFFFFFFFFFFFLL);
-        }
+        } */
 std::array<char,36> &getDeviceID(bool libre3) {
 	auto &deviceID= libre3?settings->data()->libre3viewDeviceID:settings->data()->libreviewDeviceID;
     if(!deviceID[0])
