@@ -2187,21 +2187,21 @@ int getglucosestr(double nonconvert,char *glucosestr,int maxglucosestr,int gluco
                     }
                 else {
                    int state=sens->getinfo()->patchState;
-                if(state&&state!=4){
-                    const auto format= state>4?usedtext->endedformat:usedtext->notreadyformat;
-                    static char buf[256];
-                    int len=snprintf(buf,sizeof(buf)-1,format.data(),sens->showsensorname().data(),state);
-                    nvgTextBox(avg,  getx, gety, getboxwidth(getx),buf, buf+len);
-                    shownglucose[index].errortext=buf;
-                    } 
-                else {
-                    char buf[usedtext->noconnectionerror.size()+17];
-                    int senslen= sens->showsensorname().size();
-                    memcpy(buf,sens->showsensorname().data(),senslen);
-                    memcpy(buf+senslen,usedtext->noconnectionerror.data(), usedtext->noconnectionerror.size());
-                    nvgTextBox(avg,  getx, gety, getboxwidth(getx),buf, buf+usedtext->noconnectionerror.size()+senslen);
-                    shownglucose[index].errortext=usedtext->noconnectionerror.data();
-                    }
+                    if(state&&state!=4){
+                        const auto format= state>4?usedtext->endedformat:usedtext->notreadyformat;
+                        static char buf[256];
+                        int len=snprintf(buf,sizeof(buf)-1,format.data(),sens->showsensorname().data(),state);
+                        nvgTextBox(avg,  getx, gety, getboxwidth(getx),buf, buf+len);
+                        shownglucose[index].errortext=buf;
+                        } 
+                    else {
+                        char buf[usedtext->noconnectionerror.size()+17];
+                        int senslen= sens->showsensorname().size();
+                        memcpy(buf,sens->showsensorname().data(),senslen);
+                        memcpy(buf+senslen,usedtext->noconnectionerror.data(), usedtext->noconnectionerror.size());
+                        nvgTextBox(avg,  getx, gety, getboxwidth(getx),buf, buf+usedtext->noconnectionerror.size()+senslen);
+                        shownglucose[index].errortext=usedtext->noconnectionerror.data();
+                        }
                     }
                }
                 return 0;

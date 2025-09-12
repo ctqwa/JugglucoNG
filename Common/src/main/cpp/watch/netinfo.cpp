@@ -571,7 +571,7 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(setmynetinfo)(JNIEnv *env, jcl
     passhost_t *allhosts=update->allhosts;
    int index=host-allhosts;
    const char *infolabel=usedversion?info->newlabel:reinterpret_cast<const netinfo *>(info)->label;
-   LOGGERTAG("setmynetinfo %s usedversion=%d infolabel=%s galaxy=%d\n",id,usedversion,infolabel,galaxy);
+   LOGGERTAG("setmynetinfo %s usedversion=%d infolabel=%s galaxy=%d watchsensor=%d\n",id,usedversion,infolabel,galaxy,info->watchsensor);
     host->setname(infolabel);
    if(!usedversion) {
        namehost hostnamer(&info->ip);
@@ -655,19 +655,25 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(setmynetinfo)(JNIEnv *env, jcl
                 }
         }
     else {
+        settings->data()->nobluetooth=true;
         const bool sendnums=!info->sendnums;
         if(host->isSender()) {
              const updateone &updat=getsendto(host);
-             if(updat.blueWatch)
+             if(updat.blueWatch) {
+                LOGAR("setmynetinfo  blueWatch=true");
                 return true;
-             if(!updat.sendstream&&updat.sendnums==sendnums)
+                }
+             if(!updat.sendstream&&updat.sendnums==sendnums) {
+                    LOGAR("setmynetinfo no need");
                     return true;
+                    }
             }
         else {
-            if(!sendnums)
+            if(!sendnums)  {
+                LOGAR("setmynetinfo no send stream or nums");
                 return true;
+                }
             }
-        settings->data()->nobluetooth=true;
         char portstr[7];
         snprintf(portstr,6,"%d",port); 
         const int len=host->nr;

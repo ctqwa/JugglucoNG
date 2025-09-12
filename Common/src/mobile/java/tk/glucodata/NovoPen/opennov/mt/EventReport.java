@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static tk.glucodata.Log.doLog;
 
 
 /**
@@ -59,7 +60,7 @@ public class EventReport extends BaseMessage {
                 byte[] rawdoses=new byte[totmem];
                 buffer.get(rawdoses,0,totmem);
                 int doseslen=doses.size();
-                showbytes("dose"+doseslen,rawdoses);
+                {if(doLog){showbytes("dose"+doseslen,rawdoses);};}
                 doses.add(new OpContext.Doses(referencetime,rawdoses));
 
                 return er;

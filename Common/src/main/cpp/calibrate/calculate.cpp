@@ -108,11 +108,20 @@ static bool wrongChange(const ScanData *value) {
        return false;
     } 
 static int maxtimedifference=6*60;
-static int maxglucosedifference=9;
+//static int maxglucosedifference=9;
+//Should also have a smaller influenc when calibrated with a larger value
+/*static constexpr const float getMaxglucosedifference(float val) {
+    return 0.0272727f*(val - 70.0f) + 9.0f;
+    } */
+static constexpr const auto getMaxglucosedifference(auto val) {
+    return 9;
+    }
 static bool         wrongNeighbours(const ScanData *startsen,const ScanData *endsen,const ScanData *value) {
     const uint32_t startInterval=value->gettime()-maxtimedifference;
-    const int mgdLmin=value->getmgdL()-maxglucosedifference;
-    const int mgdLmax=value->getmgdL()+maxglucosedifference;
+    const auto theval=value->getmgdL();
+    const auto maxglucosedifference=getMaxglucosedifference(theval);
+    const auto mgdLmin=theval-maxglucosedifference;
+    const auto mgdLmax=theval+maxglucosedifference;
     for(const ScanData *it=value-1;it>=startsen&&it->gettime()>startInterval;--it) {
         const auto val=it->getmgdL();
         if(val<mgdLmin||val>mgdLmax) {
@@ -211,8 +220,16 @@ bool shouldexclude(const uint32_t time) {
     for(int index:indices) {
         auto *sens=sensors->getSensorData(index);
         std::span<const ScanData> stream=sens->getPolldata();
-        if(stream.size()&&findNextStream(&stream.begin()[0],&stream.end()[0],time))
-             exclude=false;
+        if(stream.size()) {
+            if(const ScanData *el=findNextStream(&stream.begin()[0],&stream.end()[0],time)) {
+                const int mgdL=el->getmgdL();
+                if(mgdL>=sens->getminmgdL()&&mgdL<=sens->getmaxmgdL())
+                    exclude=false;
+                 else {
+                    LOGGER("shouldexclude: %d out of range\n",mgdL);
+                    }
+                }
+          }
 
         }
     return exclude; 
@@ -231,6 +248,8 @@ static CalcPara calculate(const SensorGlucoseData *sens, const uint32_t newtime)
     const ScanData *startsen=&stream.begin()[0];
     const int mindistance=30*60;
     uint32_t nexttime=UINT_MAX;
+    const int minmgdL=sens->getminmgdL();
+    const int maxmgdL=sens->getmaxmgdL();
     for(const Numdata *numdata:numdatas) {
         const ScanData *endsen=&stream.end()[0];
         const Num* endnum=numdata->firstAfter(newtime);
@@ -254,14 +273,22 @@ static CalcPara calculate(const SensorGlucoseData *sens, const uint32_t newtime)
                 const ScanData *after=findNextStream(startsen,endsen,numtim);
                 if(!after)
                     continue;
-
+                
                 double weight=mkweight(newtime-numtim);
                 if(weight<=0.0)
                     continue;
                 nexttime=numtim-mindistance;
                 endsen=after;
-
-                const double streamvalue=after->getmgdL();
+                const int mgdL= after->getmgdL();
+                const double streamvalue=mgdL;
+                if(mgdL<minmgdL) {
+                    LOGGER("calibrate calculate %d too low\n",mgdL);
+                    continue;
+                    }
+                if(mgdL>maxmgdL) {
+                    LOGGER("calibrate calculate %d too high\n",mgdL);
+                    continue;
+                    }
                 #ifndef NOLOG
                 char buf1[27],buf2[27];
                 time_t tnumtim=numtim;
@@ -506,7 +533,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
     const CaliPara *first= info->caliPara;
     const auto caliNr=info->caliNr;
     if(!caliNr) {
-        LOGGER("%s: No calibrations\n",sens->shortsensorname()->data());
+        LOGGER("makecalibrated %s: No calibrations\n",sens->shortsensorname()->data());
         if(allvalues) {
             memcpy(calibrated,input,nr*sizeof(input[0]));
             return {calibrated,calibrated+nr};
@@ -515,7 +542,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
             return {};
         }
     //showCalis(sens->shortsensorname()->data(),first,caliNr);
-
+    
     const CaliPara *end = info->caliPara+caliNr;
     const ScanData *initer=input+nr-1;
     ScanData *outiter=calibrated+nr-1;
@@ -523,7 +550,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
         --initer;
         --outiter;
         if(initer<input) {
-            LOGGER("%s: no valid stream values\n",sens->shortsensorname()->data());
+            LOGGER("makecalibrated %s: no valid stream values\n",sens->shortsensorname()->data());
             return {};
             }
         }
@@ -536,7 +563,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
     if(cali==first) {
     #ifndef NOLOG
         time_t tim=zoek.time;
-        LOGGER("%s %u not in interval %s\n",sens->shortsensorname()->data(),zoek.time,ctime(&tim));
+        LOGGER("makecalibrated %s %u not in interval %s\n",sens->shortsensorname()->data(),zoek.time,ctime(&tim));
 #endif
         if(allvalues) {
             memcpy(calibrated,input,nr*sizeof(input[0]));
@@ -546,7 +573,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
             return {};
         }
     --cali;
-    LOGGER("%s: calibrator %u for %u\n",sens->shortsensorname()->data(),cali->time,zoek.time);
+    LOGGER("makecalibrated %s: calibrator %u for %u\n",sens->shortsensorname()->data(),cali->time,zoek.time);
     ScanData *endout=outiter+1; 
     for(;initer>=input;--initer) {
        if(initer->valid()) {
@@ -578,6 +605,7 @@ std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGluco
                 outiter--->g=calvalue;
               }
         }
+    LOGGER("end makecalibrated len=%d\n",endout-outiter-1);
      return {outiter+1,endout};
     }
 std::pair<const ScanData*,const ScanData*>      makecalibratedback(const SensorGlucoseData *sens,const ScanData *input,ScanData *calibrated,int nr,bool allvalues) {

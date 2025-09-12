@@ -172,10 +172,10 @@ private final static String LOG_ID="OpenNovMessage";
     public byte[] getAcceptConfig() {
         if (context.hasConfiguration()) {
             var dat = DataApdu.builder().invokeId(context.invokeId).dataPayload(EventRequest.builder().currentTime(0).type(MDC_NOTI_CONFIG).replyLen(4).reportId(context.getConfiguration().getId()).reportResult(0).build().encode()).dchoice(SCONFIRMED_EVENT_REPORT_CHOSEN).build().encode();
-            showbytes("getAcceptConfig DataApdu", dat);
+            {if(doLog){showbytes("getAcceptConfig DataApdu", dat);};}
             var res =  //DataApdu encode
             Apdu.builder().at(Apdu.ApduType.PrstApdu).choicePayload(dat).build().encode();
-            showbytes("getAcceptConfig res", res);
+            {if(doLog){showbytes("getAcceptConfig res", res);};}
             return res;
         } else {
             return null;

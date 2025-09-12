@@ -85,13 +85,14 @@ static    private BluetoothManager mBluetoothManager=null;
     }
 
 static public void reconnectall() {
+   Log.i(LOG_ID,"reconnectall");
    final var wasblue=blueone;
    if(wasblue !=null) {
        boolean shouldnotscan=true;
        final var now=System.currentTimeMillis();
         for(var cb: wasblue.gattcallbacks)     {
-            shouldnotscan=shouldnotscan&&cb.reconnect(now);
-          }
+            shouldnotscan=(cb.reconnect(now)&&shouldnotscan);
+            }
        if(!shouldnotscan)  {
             if(wasblue.mBluetoothManager!=null) {
                  wasblue.stopScan(false);
@@ -112,23 +113,23 @@ static void othersworking(SuperGattCallback current ,long timmsec) {
   }
 
  public boolean connectToActiveDevice(long delayMillis) {
- {if(doLog) {Log.i(LOG_ID, "connectToActiveDevice("+delayMillis+")");};};
+    if(doLog) {Log.i(LOG_ID, "connectToActiveDevice("+delayMillis+")");};
     if(!bluetoothIsEnabled()) {
         Applic.Toaster(R.string.enable_bluetooth);
         return false;
         }
-        boolean scan=false;
-        for(var cb: gattcallbacks)    
-            if(!cb.connectDevice(delayMillis))  {
-               scan=true;
-               }
-     if(scan) {
-          return startScan(delayMillis);
+    boolean scan=false;
+    for(var cb: gattcallbacks)    
+        if(!cb.connectDevice(delayMillis))  {
+           scan=true;
+           }
+    if(scan) {
+        return startScan(delayMillis);
         }
-      return false;
-        }
+    return false;
+    }
  public boolean connectToActiveDevice(SuperGattCallback cb,long delayMillis) {
-    {if(doLog) {Log.i(LOG_ID,"connectToActiveDevice("+cb.SerialNumber+"," + delayMillis+")");};};
+    if(doLog) {Log.i(LOG_ID,"connectToActiveDevice("+cb.SerialNumber+"," + delayMillis+")");};
     if(!cb.connectDevice(delayMillis)&&!mScanning) {
         return startScan(delayMillis);
         }
@@ -275,7 +276,7 @@ class Scanner21 implements Scanner  {
               }
              }
          };
-private static final  boolean filter=true;
+private static final  boolean alwaysfilter=false;
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     Scanner21() {
         ScanSettings.Builder builder = new ScanSettings.Builder();
@@ -297,7 +298,7 @@ private int scanTries=0;
         if(mBluetoothLeScanner!=null) {
            if(doLog) {Log.i(LOG_ID,"Scanner21.start");};
            List<ScanFilter> mScanFilters=new ArrayList<>();
-           if(filter&&scanTries++%2==1) {
+           if(alwaysfilter||scanTries++%2==0) {
                if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
                for(var cb: gattcallbacks)   {
                    if(doLog) {
@@ -314,6 +315,7 @@ private int scanTries=0;
                       }
                    else {
                       if(mScanFilters!=null) {
+                          if(doLog) {Log.i(LOG_ID,"filter "+service.toString());};
                           ScanFilter.Builder builder2 = new ScanFilter.Builder();
                           builder2.setServiceUuid(new ParcelUuid(service));
                           mScanFilters.add(builder2.build());
@@ -588,20 +590,21 @@ public void connectDevice(String id,long delayMillis) {
           }
         }
 public boolean connectDevices(long delayMillis) {
+    Log.i(LOG_ID,"connectDevices "+delayMillis);
     if(!bluetoothIsEnabled()) {
         Applic.Toaster(R.string.enable_bluetooth);
         return false;
         }
-        boolean scan=false;
-        for(var cb: gattcallbacks)    {
+    boolean scan=false;
+    for(var cb: gattcallbacks)    {
         if(checkandconnect( cb,delayMillis))
             scan=true;
-        }
-        if(scan) {
+    }
+    if(scan) {
         return startScan(delayMillis);
-        }
-      return false;
-        }
+    }
+  return false;
+    }
 boolean updateDevicers() {
     if(!Natives.getusebluetooth()) {
         {if(doLog) {Log.d(LOG_ID,"updateDevicers !getusebluetooth()");};};
@@ -727,13 +730,16 @@ SuperGattCallback getGattCallback(String name, long dataptr) {
             if(vers==0x40) {
                 return new DexGattCallback(name, dataptr);
                 }
+        if(vers==0x20) {
+            return new AccuGattCallback(name, dataptr);
+            }
             }
         if(tk.glucodata.BuildConfig.SiBionics==1) {
             if(vers==0x10) {
                 return new SiGattCallback(name, dataptr);
                 }
             }
-        }
+    }
     return  new MyGattCallback(name,dataptr);
     }
 private boolean addDevice(String str,long dataptr) {
@@ -778,7 +784,9 @@ static public boolean resetDeviceOrFree(long ptr,String name) {
     if(blueone!=null) {
         return blueone.resetDevicer(ptr,name);
         }
-        Natives.freedataptr(ptr);
+    else
+        Natives.updateUsedSensors( );
+    Natives.freedataptr(ptr);
     return false;
     }
 private boolean resetDevicer(String str,long[] ptrptr) {
@@ -790,7 +798,7 @@ private boolean resetDevicer(String str,long[] ptrptr) {
         stopScan(false);
     for(int i=0;i<gattcallbacks.size();i++) {
         if(str.equals(gattcallbacks.get(i).SerialNumber)) {
-            {if(doLog) {Log.d(LOG_ID,"reset free "+str);};};
+            if(doLog) {Log.d(LOG_ID,"reset free "+str);};
             SuperGattCallback  cb= gattcallbacks.get(i);
             ptrptr[0]=cb.resetdataptr();
             return checkandconnect(cb,0);
@@ -813,6 +821,9 @@ static private boolean resetDevicePtr(String str,long[] ptrptr) {
     {if(doLog) {Log.v(LOG_ID,"resetDevice("+str+")");};};
     if(blueone!=null) {
         return blueone.resetDevicer(str,ptrptr);
+        }
+    else {
+        Natives.updateUsedSensors( );
         }
     return false;
     }
@@ -878,10 +889,16 @@ private void addBluetoothStateReceiver() {
                 {if(doLog) {Log.v(LOG_ID,"BLUETOOTH switched OFF");};};
                 // wasScanning=mScanning; 
                 SensorBluetooth.this.stopScan(false);
-            for(var cb: gattcallbacks)  
-                cb.close();
-            if(keepBluetooth) mBluetoothAdapter.enable();
-            } else if (intExtra == BluetoothAdapter.STATE_ON) {
+                for(var cb: gattcallbacks)  {
+                    if(cb.constatchange[1]<cb.constatchange[0] ) {
+                        cb.constatchange[1] = System.currentTimeMillis();
+                        cb.constatstatusstr="Bluetooth off"; //"
+                        }
+                    cb.close();
+                    }
+                if(keepBluetooth) mBluetoothAdapter.enable();
+                } 
+            else if (intExtra == BluetoothAdapter.STATE_ON) {
                 {if(doLog) {Log.v(LOG_ID,"BLUETOOTH switched ON");};};
                 if(!isWearable) {
                     Applic.app.numdata.startall();

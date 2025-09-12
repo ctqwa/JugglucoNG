@@ -136,7 +136,7 @@ static public void show(MainActivity act) {
         if(tk.glucodata.BuildConfig.SiBionics==1) {
          aboutview.setText(R.string.photo);
         aboutview.setOnClickListener(v ->
-              Sibionics.scan(act,REQUEST_BARCODE));
+              PhotoScan.scan(act,REQUEST_BARCODE));
             }
         else  {
            aboutview.setOnClickListener(v ->{

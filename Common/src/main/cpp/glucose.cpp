@@ -165,7 +165,7 @@ int SensorGlucoseData::updatescan(crypt_t *pass,int sock,int ind,int sensorindex
                   LOGGER("pollcount=%d siScan=%d\n",pollcount(), getinfo()->update[ind].siScan);
           std::vector<subdata> vect;
           vect.reserve(2);
-          vect.push_back({meminfo.data(),0,offsetof(Info,lastLifeCountReceived)});
+          vect.push_back({meminfo.data(),0,offsetof(Info,lastHistoricLifeCountReceivedPos)});
           vect.push_back({meminfo.data()+offsetof(Info,siIdlen),offsetof(Info,siIdlen),sizeof(Info::siIdlen)+ sizeof(Info::siId) });
            if(!senddata(pass,sock,vect, infopath)) {
               LOGAR("GLU: senddata info.data failed");
@@ -182,6 +182,7 @@ int SensorGlucoseData::updatescan(crypt_t *pass,int sock,int ind,int sensorindex
             }
         return 2;
         }
+    else {
     if(isSibionics()) {
         LOGGER("GLU: Sibionics updatescan ind=%d sensorindex=%d\n",ind,sensorindex);
         if(!getinfo()->update[ind].siScan&&getinfo()->siIdlen>16&&getinfo()->siId[0]&&(siSubtype()!=3||getinfo()->siDeviceNamelen>3)) {
@@ -212,7 +213,36 @@ int SensorGlucoseData::updatescan(crypt_t *pass,int sock,int ind,int sensorindex
                 }
             }
         return 2;
-    } else {
+    } else  {
+        if(isAccuChek()) {
+             if(!getinfo()->update[ind].siScan&&getinfo()->siIdlen>16&&getinfo()->siId[0]) {
+                std::vector<subdata> vect;
+                vect.reserve(4);
+                vect.push_back({meminfo.data(),0,offsetof(Info,lastHistoricLifeCountReceivedPos)});
+                vect.push_back({meminfo.data()+offsetof(Info,lockcount),offsetof(Info,lockcount),sizeof(Info::lockcount)});
+
+                constexpr const int accuCheksize=sizeof(uint16_t);
+                constexpr const int offdevice=offsetof(Info,deviceaddress)-accuCheksize;
+                vect.push_back({meminfo.data()+offdevice,offdevice,accuCheksize});
+
+                vect.push_back({meminfo.data()+offsetof(Info,siIdlen),offsetof(Info,siIdlen),sizeof(Info::siIdlen)+ sizeof(Info::siId) });
+                 if(!senddata(pass,sock,vect, infopath)) {
+                    LOGSTRING("GLU: senddata info.data failed\n");
+                    return 0;
+                     }
+                getinfo()->update[ind].siScan=true;
+                return 5;
+                }
+            else {
+                  if(getinfo()->update[ind].sendstreaming) {
+                        getinfo()->update[ind].sendstreaming=false;
+                        return 5;
+                        }
+                 }
+              return 2;
+              }
+        else {
+
     bool did=false;
     constexpr const int startinfolen=offsetof(Info, pollcount);
     alignas(alignof(Info)) uint8_t infoptr[startinfolen];
@@ -342,6 +372,8 @@ int SensorGlucoseData::updatescan(crypt_t *pass,int sock,int ind,int sensorindex
         return 1;
           }
     return 2;
+       }
+       }
        }
     }
 template <typename It,typename T>

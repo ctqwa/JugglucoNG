@@ -65,7 +65,7 @@ static int siNR=0;
         if (doLog) {
             BluetoothGattCharacteristic characteristic = bluetoothGattDescriptor.getCharacteristic();
             byte[] value = bluetoothGattDescriptor.getValue();
-            Log.showbytes("onDescriptorWrite char: " + characteristic.getUuid().toString() + " desc: " + bluetoothGattDescriptor.getUuid().toString()+" status="+status, value);
+            {if(doLog){Log.showbytes("onDescriptorWrite char: " + characteristic.getUuid().toString() + " desc: " + bluetoothGattDescriptor.getUuid().toString()+" status="+status, value);};}
         }
         if (status == BluetoothGatt.GATT_SUCCESS) {
             if(Natives.siNotchinese(dataptr))
@@ -125,7 +125,7 @@ static int siNR=0;
 				   }
 			   }
 	 	}
-	   constatstatus = status;
+	   setConStatus(status);
 	   constatchange[1] = tim;
 	   }
     }

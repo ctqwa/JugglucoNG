@@ -263,9 +263,9 @@ static public synchronized void scan(GlucoseCurve curve,Tag tag) {
                         curve.render.badscan =0xff;
                         curve.requestRender();
                         {if(doLog) {Log.d(LOG_ID,"Read Tag");};};
-                        /*showbytes("uid",uid);
-                        showbytes("info",info);
-                        showbytes("data",data); */
+                        {if(doLog){/*showbytes("uid",uid);};}
+                        {if(doLog){showbytes("info",info);};}
+                        {if(doLog){showbytes("data",data); */};}
                         int uit = Natives.nfcdata(uid, info, data);
                         value = uit & 0xFFFF;
                         Log.format("glucose=%.1f\n",(float)value/mgdLmult);

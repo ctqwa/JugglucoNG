@@ -447,10 +447,10 @@ std::pair<int,SensorGlucoseData *> makeDexComSensorindex(const char *pin,std::st
           int uitit=0;
            for(const char *iter=gegs.data();uitit<11;++iter) {
               if(iter==end) {
-            return {-1,nullptr};
-            }
+                return {-1,nullptr};
+              }
               if(isprint(*iter)) {
-            name[uitit++]=*iter;
+                name[uitit++]=*iter;
             }
               }
            }
@@ -481,7 +481,70 @@ std::pair<int,SensorGlucoseData *> makeDexComSensorindex(const char *pin,std::st
    sen->halfdays=maxdaysDex*2;
    return {ind,getSensorData(ind)} ;
    }
+private:
+static  bool dexcomEnd(const char *endcode) {
+         if(!memcmp(endcode-7,"240",3)) {
+            const char *pin=endcode-4;
+            for(auto *iter=pin;iter<endcode;++iter) {
+               if(!isdigit(*iter))
+                  return false;
+               }
+           return true;
+           }
+       return false;
+       }
 #endif
+
+//Scanned: 01040156300880101125031317260203211R000162641
+//(01)04015630088010 11 250313 17 260203(21)1R000162641    
+struct accuScan {
+    char controlHaak;
+    char s01[2];
+    char num[14];
+    char tus1[2];
+    char proYear[2];
+    char proMonth[2];
+    char proDay[2];
+    char tus2[2];
+    char exYear[2];
+    char exMonth[2];
+    char exDay[2];
+    char s21[2];
+    char name[11];
+    };
+std::pair<int,SensorGlucoseData *> makeAccuCheckSensorindex(std::string_view scanned,uint32_t now) {
+    if(scanned.size()!=46) {
+        return {-1,nullptr};
+        }
+   std::string_view name=scanned.substr(scanned.size()-16,16);
+#ifndef NOLOG
+   const accuScan *accu=reinterpret_cast<  const accuScan *>(scanned.data());
+   LOGGER("AccuChek %.11s %.16s expiration year %.2s month %.2s day %.2s\n",accu->name,name.data(),accu->exYear,accu->exMonth,accu->exDay);
+#endif
+   if(sensor *sensgegs = findsensorm(name.data()) ) {
+       LOGGER("known sensor %s\n",sensgegs->showsensorname());
+       const int   sensindex= sensgegs - sensorlist();
+       SensorGlucoseData *sens=getSensorData(sensindex) ;
+       sensgegs->finished=0;
+       auto *info= sens->getinfo();
+       info->accuChek=true;
+       sendsiScan(sens);
+
+       info->lastscantime=now;
+       if(!info->pollcount) info->starttime=now; //Not needed
+       void resensordata(int sensorindex) ;
+       resensordata(sensindex);
+       return {sensindex,sens};
+       }
+   const pathconcat sensordir(inbasedir,name);
+   SensorGlucoseData::mkdatabaseAccu(sensordir,scanned,now );
+   const int ind=addsensor(name);
+   sensor *sen=getsensor(ind);
+   sen->initialized=true;
+   sen->halfdays=maxdaysAccu*2;
+   return {ind,getSensorData(ind)} ;
+    }
+public:
 #ifdef SIBIONICS
 std::pair<int,SensorGlucoseData *> makeSIsensorindex(std::string_view gegsSI,uint32_t now) {
 
@@ -492,19 +555,14 @@ std::pair<int,SensorGlucoseData *> makeSIsensorindex(std::string_view gegsSI,uin
    const auto *endcode=gegsSI.end();
 /*   bool hasnum=std::search(gegsSI.begin(),endcode,sibionicsRecognition.begin(),sibionicsRecognition.end())!=endcode;  */
    if(!hasnum) {   
-      std::string_view si="(SI)";
-  //    if(gegsSI.size()<36||std::search(gegsSI.begin(),endcode,si.begin(),si.end())==endcode)  
+     std::string_view si="(SI)";
      if(gegsSI.size()<36||!std::ranges::contains_subrange(gegsSI,si)) {
-         if(!memcmp(endcode-7,"240",3)) {
-            const char *pin=endcode-4;
-            for(auto *iter=pin;iter<endcode;++iter) {
-               if(!isdigit(*iter))
-                  return {-1,nullptr};
-                  
-               }
-            return makeDexComSensorindex(pin,gegsSI,now);
+        if(dexcomEnd(endcode)) {
+            auto res=makeDexComSensorindex(endcode-4,gegsSI,now);
+            if(res.first>=0)
+                return res;
             }
-         return {-1,nullptr};
+         return makeAccuCheckSensorindex(gegsSI,now);
          }
       }
  if(gegsSI.size()==59) {

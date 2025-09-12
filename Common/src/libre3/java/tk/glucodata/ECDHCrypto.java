@@ -71,7 +71,7 @@ public	boolean setPatchCertificate(byte[] input)  {
 		{if(doLog) {Log.i(LOG_ID,"setPatchCertificate input=null");};};
 		return false;
 		}
-       showbytes(LOG_ID+"setPatchCertificate#"+input.length,input);
+       {if(doLog){showbytes(LOG_ID+"setPatchCertificate#"+input.length,input);};}
 	int res= Natives.processint(4, input, null);
 	info("end setPatchCertificate "+res);
 	return res==1;

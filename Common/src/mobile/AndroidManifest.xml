@@ -16,6 +16,7 @@
 <queries>
     <package android:name="com.google.android.apps.healthdata" />
 </queries>
+
     <queries>
         <intent>
             <action android:name="com.librelink.app.ThirdPartyIntegration.GLUCOSE_READING" />

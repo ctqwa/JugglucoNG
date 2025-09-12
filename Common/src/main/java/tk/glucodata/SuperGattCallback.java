@@ -120,9 +120,12 @@ public boolean reconnect(long now) {
     if(charcha[1]<old&&connectTime<(now-60*1000))  {
         try {
             if(doLog) {Log.i(LOG_ID,"reconnect "+SerialNumber);};
+            constatstatusstr = "Loss of signal";
+            constatchange[1] = now;
             final var thegatt= mBluetoothGatt;
-            if(thegatt!=null) 
+            if(thegatt!=null)  {
                 thegatt.disconnect();
+                }
             } 
         catch(Throwable th) {
             Log.stack(LOG_ID,"reconnect",th);
@@ -134,14 +137,17 @@ public boolean reconnect(long now) {
      return true;
     }
 
+void    setConStatus(int status) {
+        constatstatusstr = "Status="+status;
+        }
 void shouldreconnect(long now) {
-      final var old=now-showtime+20;
+    final var old=now-showtime+20;
     if(starttime<old&&charcha[0]<old&&connectTime<(now-60*1000))
         reconnect(old);
     }
 
     long[] constatchange = {0L, 0L};
-    int constatstatus = -1;
+    String constatstatusstr = "";
     String handshake = "";
     long[] wrotepass = {0L, 0L};
     long[] charcha = {0L, 0L};
@@ -444,6 +450,10 @@ public void searchforDeviceAddress() {
          return "";
          }
      public long resetdataptr() {
+        if(constatchange[1]<constatchange[0] ) {
+            constatchange[1] = System.currentTimeMillis();
+            constatstatusstr="resetdataptr"; 
+            }
          Natives.freedataptr(dataptr);
          close();
          dataptr = Natives.getdataptr(SerialNumber);
@@ -504,7 +514,7 @@ public void searchforDeviceAddress() {
             }
         }
     else {
-        {if(doLog) {Log.i(LOG_ID,"mBluetoothGatt==null");};};
+        {if(doLog) {Log.i(LOG_ID,"close mBluetoothGatt==null");};};
         }
 
     }
@@ -556,9 +566,10 @@ public void searchforDeviceAddress() {
                             }
                         }
 
-                    setpriority(cb.mBluetoothGatt);
-                {if(doLog) {Log.i(LOG_ID,SerialNumber+" after connectGatt");};};
-            connectTime= System.currentTimeMillis();
+                setpriority(cb.mBluetoothGatt);
+                {if(doLog) {Log.i(LOG_ID,SerialNumber+" after connectGatt ="+cb.mBluetoothGatt);};};
+                cb.mBluetoothGatt.connect();
+                connectTime= System.currentTimeMillis();
                 } catch (SecurityException se) {
                     var mess = se.getMessage();
                     mess = mess == null ? "" : mess;
@@ -652,7 +663,7 @@ private boolean used_priority=false;
              Log.e(LOG_ID, SerialNumber +" "+"bluetoothGatt1.writeDescriptor(descriptor))  failed");
              return success;
              }
-          showbytes(LOG_ID+" "+SerialNumber +" "+    "enableNotification ",type);
+          {if(doLog){showbytes(LOG_ID+" "+SerialNumber +" "+    "enableNotification ",type);};}
           if(!bluetoothGatt1.setCharacteristicNotification(bluetoothGattCharacteristic, type[0]!=0)) {
              Log.e(LOG_ID, SerialNumber +" "+"setCharacteristicNotification("+bluetoothGattCharacteristic.getUuid().toString()+",true) failed");
              return false;

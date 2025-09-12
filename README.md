@@ -1,6 +1,6 @@
 ![value](valuemmolL.png)
 # Juggluco
-Displays Freestyle Libre 2 and 3, Sibionics GS1Sb and Dexcom G7 and ONE+ output
+Displays Freestyle Libre 2 and 3, Sibionics GS1Sb, AccuChek SmartGuide and Dexcom G7 and ONE+ output
 
 Juggluco is an app that receives glucose values via Bluetooth from Freestyle Libre 2, 2+, 3 and 3+, Chinese market Sibionics GS1Sb and Dexcom G7 and ONE+ sensors. Juggluco can scan NovoPen® 6 and NovoPen Echo® Plus.
 

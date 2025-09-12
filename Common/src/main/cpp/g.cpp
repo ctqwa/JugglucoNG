@@ -454,6 +454,9 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(getSensorStartmsec)(JNIEnv *env, j
     const streamdata *sdata=reinterpret_cast<const streamdata *>(dataptr);
     return sdata->hist->getstarttime()*1000LL; 
     }
+extern "C" JNIEXPORT void JNICALL   fromjava(updateUsedSensors)(JNIEnv *env, jclass cl) {
+    setusedsensors();
+    }
 
 static void finishsensor(SensorGlucoseData*sensorptr,int sensorindex) {
     LOGGER("finishSensor %s\n",sensorptr->showsensorname().data());
@@ -547,6 +550,14 @@ else
          data= new libre3stream(sensorindex,sens);
          }
       else {
+#ifdef DEXCOM
+        if(sens->isAccuChek()) {
+                 LOGGER("getdataptr(%s) AccuChek\n",sensor);
+                 data=new accustream(sensorindex,sens);
+                }
+        else 
+#endif
+        {
          LOGGER("getdataptr(%s) Libre2\n",sensor);
          data=new libre2stream(sensorindex,sens);
          if(streamHistory()) {
@@ -554,6 +565,7 @@ else
                sens->getinfo()->startedwithStreamhistory=std::max(sens->getinfo()->endhistory,1);
                }
             }
+         }
          }
         }
       }
@@ -698,7 +710,7 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(getDeviceAddress)(JNIEnv *envin,
       LOGAR("deviceaddress()==null");
       return nullptr;
       }
-    if((getnew&&!usedhist->scannedAddress&&!usedhist->isLibre())) {
+    if(usedhist->isAccuChek()||(getnew&&!usedhist->scannedAddress&&!usedhist->isLibre())) {
       LOGAR("getDeviceAddress() !libre getnew");
       return nullptr;
       }

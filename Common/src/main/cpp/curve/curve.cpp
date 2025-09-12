@@ -795,7 +795,7 @@ time_t ttim=tim;
 pair<int32_t,int32_t> histPositions(const SensorGlucoseData  * hist, const uint32_t starttime, const uint32_t endtime) {
     int32_t firstmog=hist->getstarthistory();
     int32_t lastmog= hist->getAllendhistory()-1;
-    LOGGER("histPositions first=%u last=%u\n",firstmog,lastmog);
+    LOGGER("histPositions first=%d last=%d\n",firstmog,lastmog);
     if(firstmog>=lastmog)
         return {firstmog,lastmog};
     uint32_t begin=hist->getstarttime();
@@ -1656,7 +1656,7 @@ int    JCurve::displaycurve(NVGcontext* avg,time_t nu) {
 
 //        if(showhistories)
       const auto senso=his;
-      if(!senso->isDexcom()||(showhistories&&settings->data()->dexcomPredict))
+      if(senso->isLibre()||(showhistories&&settings->data()->dexcomPredict))
             histpositions[i]= histPositions(his, starttime2,  endtime); 
        else
             histpositions[i]= {0,0}; 
@@ -1670,11 +1670,14 @@ int    JCurve::displaycurve(NVGcontext* avg,time_t nu) {
         for(int i=histlen-1;i>=0;i--) {
             const int index= hists[i];
             const auto *sens=sensors->getSensorData(index);
-            const int nr=pollranges[i].second-pollranges[i].first;
-            ScanData*calidata=new ScanData[nr];
-            calibrated[i].reset(calidata);
-//            new (calibrated+i) std::unique_ptr<ScanData []>(calidata);
-            caliSpans[i]=califunc(sens,pollranges[i].first,calidata,nr,allvalues);
+            if(const int nr=pollranges[i].second-pollranges[i].first;nr>0) {
+                ScanData*calidata=new ScanData[nr];
+                calibrated[i].reset(calidata);
+                caliSpans[i]=califunc(sens,pollranges[i].first,calidata,nr,allvalues);
+                }
+             else {
+                caliSpans[i]={};
+                }
             }
          }
      else {

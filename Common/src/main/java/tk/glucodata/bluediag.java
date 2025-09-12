@@ -21,17 +21,6 @@
 
 
 package tk.glucodata;
-/*
-long[] constatchange={0L,0L};
-int constatstatus=-1;
-long[] wrotepass={0L,0L};
-long[] charcha={0L,0L};
-@Override 
-public void onCharacteristicChanged(BluetoothGatt bluetoothGatt, BluetoothGattCharacteristic bluetoothGattCharacteristic) {
-
-
-Last success:        Last failure:     Fail Info
-*/
 
 import android.app.Activity;
 import androidx.appcompat.app.AlertDialog;
@@ -261,7 +250,7 @@ void showinfo(final SuperGattCallback gatt,MainActivity act) {
            //address.setTextColor(CYAN);
            // address.setTextColor(YELLOW);
         }
-    constatus.setText(gatt.constatstatus>=0?("Status="+gatt.constatstatus):"");
+    constatus.setText(gatt.constatstatusstr);
     setrow(gatt.constatchange,contimes,constatus);
     keyinfo.setText(gatt.handshake);
     setrow(gatt.wrotepass,keytimes,keyinfo);
@@ -350,13 +339,18 @@ static void nosensors(MainActivity act) {
       close.setVisibility(GONE);
 
     var help=getbutton(act,R.string.helpname);
+
+    var streamhistory=getcheckbox(act,R.string.streamhistory,Natives.getStreamHistory());
+    streamhistory.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setStreamHistory(isChecked) );
+    if(!Natives.optionStreamHistory()||!wasused)
+        streamhistory.setVisibility(GONE);
 help.setOnClickListener(v-> helplight(R.string.sensorhelp,act));
   Layout layout = new Layout(act, (l, w, h) -> {
       l.setX((width-w)/2);
       l.setY((height-h)/2);
         int[] ret={w,h};
         return ret;
-        },new View[]{bluestate},new View[]{usebluetooth},new View[]{help,close});
+        },new View[]{bluestate},new View[]{usebluetooth},new View[]{streamhistory},new View[]{help,close});
     act.setonback(() -> {
             removeContentView(layout);
             });
@@ -725,26 +719,28 @@ private void showall() {
     if(blue!=null&&blue.scantime!=0L) {
          long lasttime=0;
          final List<Pair> messages = new ArrayList<>();
-         put(messages,blue.scantime,": Start search for sensors\n");
          final ArrayList<SuperGattCallback> gatts=SensorBluetooth.mygatts();
+         boolean found=false;
          if(gatts==null) {
              {if(doLog) {Log.i(LOG_ID,"showall gatts==null");};};
              }
          else {
          for(SuperGattCallback gatt:gatts) {
-             if(gatt.foundtime>=blue.scantime) {
-            if(gatt.foundtime>lasttime)
-               lasttime=gatt.foundtime;
-            final String name=gatt.mygetDeviceName();
-            put(messages,gatt.foundtime,": Found "+name +"\n");
-            }
-               }
+            if(gatt.foundtime>=blue.scantime) {
+                if(gatt.foundtime>lasttime)
+                   lasttime=gatt.foundtime;
+                final String name=gatt.mygetDeviceName();
+                found=true;
+                put(messages,gatt.foundtime,": Found "+name +"\n");
+                }
+              }
           }
+        if(!found)
+             put(messages,blue.scantime,": Start search for sensors\n");
       if(lasttime==0L||lasttime>(System.currentTimeMillis()-5*60*1000)) {
          if(blue.scantimeouttime>blue.scantime)
             put(messages,blue.scantimeouttime, ": timeout\n");
-         if(blue.stopscantime>=blue.scantime)
-            put(messages,blue.stopscantime, ": Stop searching\n");
+//         if(blue.stopscantime>=blue.scantime) put(messages,blue.stopscantime, ": Stop searching\n");
          Collections.sort(messages, new onkey());
          
          StringBuilder builder= new StringBuilder();

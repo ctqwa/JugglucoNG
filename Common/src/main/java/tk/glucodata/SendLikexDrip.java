@@ -64,6 +64,7 @@ private static String getSource(int sensorgen) {
         return switch(sensorgen) {
             case 3 -> "Libre3";
             case 0x40 -> "G7";
+            case 0x20 -> "AccuChek";
             case 0x10 -> "GS1Sb";
             default -> "Libre2";
             };

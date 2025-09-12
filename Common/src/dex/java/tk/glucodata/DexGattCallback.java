@@ -109,7 +109,7 @@ private void docmd0(BluetoothGatt bluetoothGatt) {
         BluetoothGattCharacteristic characteristic = bluetoothGattDescriptor.getCharacteristic();
         if (doLog) {
             byte[] value = bluetoothGattDescriptor.getValue();
-            Log.showbytes("onDescriptorWrite char: " + characteristic.getUuid().toString() + " desc: " + bluetoothGattDescriptor.getUuid().toString() + " status=" + status, value);
+            {if(doLog){Log.showbytes("onDescriptorWrite char: " + characteristic.getUuid().toString() + " desc: " + bluetoothGattDescriptor.getUuid().toString() + " status=" + status, value);};}
         }
        if(characteristic.equals(charact[2])) {
              if(status == BluetoothGatt.GATT_SUCCESS)
@@ -219,7 +219,7 @@ private boolean connected=false;
                 }
             }
         } else {
-            constatstatus = status;
+            setConStatus(status);
             constatchange[1] = tim;
             if(bondstate == BluetoothDevice.BOND_BONDING) {
                    {if(doLog) {Log.i(LOG_ID, "BOND_BONDING");};};
@@ -478,7 +478,7 @@ private void saveDeviceName() {
              this.known=true;
              }
          }
-private static boolean    createBond(BluetoothDevice device) {
+static boolean    createBond(BluetoothDevice device) {
     //if(Build.VERSION.SDK_INT<26) 
     {
         try {
@@ -514,10 +514,10 @@ private boolean removedBond=false;
         switch (phase) {
             case RequestAuth: { 
                 byte[] aes = new byte[8];
-                Log.showbytes("random8 ", random8);
+                {if(doLog){Log.showbytes("random8 ", random8);};}
                 boolean aesSu = Natives.dex8AES(dataptr, random8, 0, aes, 0);
-                Log.showbytes("dex8AES ", aes);
-                Log.showbytes("value ", value);
+                {if(doLog){Log.showbytes("dex8AES ", aes);};}
+                {if(doLog){Log.showbytes("value ", value);};}
                 boolean verified = equalpart(aes, value, 1);
                 {if(doLog) {Log.i(LOG_ID,  SerialNumber +" "+ mActiveDeviceAddress + " dex8AES =" + aesSu + (verified ? " verified" : " not verified"));};};
                if(!verified) {
@@ -541,7 +541,7 @@ private boolean removedBond=false;
                 byte[] dataaes = new byte[9];
                 Natives.dex8AES(dataptr, value, 9, dataaes, 1);
                 dataaes[0] = 0x04;
-                Log.showbytes("dex8AES data ", dataaes);
+                {if(doLog){Log.showbytes("dex8AES data ", dataaes);};}
                 tryer(()-> write(1, dataaes));
                 }
             ;
@@ -744,7 +744,8 @@ private    void getdata(byte[] value) {
 
     @Override // android.bluetooth.BluetoothGattCallback
     public void onCharacteristicChanged(@NonNull BluetoothGatt gatt, @NonNull BluetoothGattCharacteristic bluetoothGattCharacteristic, @NonNull byte[] value) {
-        Log.showbytes("DexGattCallback onCharacteristicChanged UUID: " + bluetoothGattCharacteristic.getUuid().toString(), value);
+        if(doLog)
+            {if(doLog){Log.showbytes("DexGattCallback onCharacteristicChanged UUID: " + bluetoothGattCharacteristic.getUuid().toString(), value);};}
         if (bluetoothGattCharacteristic.equals(charact[2])) {
             Natives.dexbackfill(dataptr, value);
             return;
@@ -902,14 +903,14 @@ private    void getdata(byte[] value) {
         final var cha = charact[nr];
 
         if (!cha.setValue(data)) {
-            Log.showbytes(LOG_ID + ": " +charuuid[nr].toString() + " cha.setValue failed", data);
+            {if(doLog){Log.showbytes(LOG_ID + ": " +charuuid[nr].toString() + " cha.setValue failed", data);};}
             return false;
         }
         if (!mBluetoothGatt.writeCharacteristic(cha)) {
-            Log.showbytes(LOG_ID + ": " +charuuid[nr].toString()  + " writeCharacteristic failed", data);
+            {if(doLog){Log.showbytes(LOG_ID + ": " +charuuid[nr].toString()  + " writeCharacteristic failed", data);};}
             return false;
         }
-        Log.showbytes(LOG_ID + " writeCharacteristic: " + charuuid[nr].toString(), data);
+        {if(doLog){Log.showbytes(LOG_ID + " writeCharacteristic: " + charuuid[nr].toString(), data);};}
         return true;
     }
 

@@ -234,6 +234,7 @@ for(int it=0;it<len;) {
             ret=true;
             }
             break;
+#ifdef            JUGGLUCO_APP
             case sBlueWatch:
                 {comlen=sizeof(bluewatchstruct);
                 addlen(it,comlen);
@@ -244,6 +245,7 @@ for(int it=0;it<len;) {
                 ret=setBlueWatch(host,bluewatch->stream,bluewatch->nums);
                 }
                 break;
+#endif
             case sStartSendCalibrate:
                 {comlen=sizeof(uint16_t_arg_struct);
             addlen(it,comlen);

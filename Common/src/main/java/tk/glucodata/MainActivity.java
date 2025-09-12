@@ -649,7 +649,7 @@ synchronized void   startnfc(Tag tag) {
             if(techs.length>0) {
                 switch(techs[0] ) {
                     case "android.nfc.tech.IsoDep":
-                            showbytes("tag", tag.getId());
+                            {if(doLog){showbytes("tag", tag.getId());};}
                             tk.glucodata.NovoPen.Scan.onTag(this,tag);
                             return;
                     }

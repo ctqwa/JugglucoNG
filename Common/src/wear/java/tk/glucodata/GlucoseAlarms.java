@@ -43,6 +43,9 @@ public    void handlealarm() {
          tk.glucodata.glucosecomplication.GlucoseValue.updateall();
 
         long wastime = MyGattCallback.lastfoundL;
+        if(wastime==0L) {
+            wastime=Natives.lastglucosetime();
+            }
         final long tryagain = nu + Notify.glucosetimeout;
         long nexttime=tryagain;
 

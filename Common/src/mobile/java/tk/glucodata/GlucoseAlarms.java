@@ -29,54 +29,57 @@ import static tk.glucodata.Natives.hasalarmloss;
 public class GlucoseAlarms extends SuperGlucoseAlarms {
     final private static String LOG_ID="GlucoseAlarms";
 public GlucoseAlarms(Application context) {
-	super(context);
-	}
+    super(context);
+    }
 
-public	void handlealarm() {
-		SensorBluetooth.reconnectall();
-		final var view=Floating.floatview;
-		if(view!=null) {
-			view.postInvalidate();
-			}
-		final boolean haslossalarm=hasalarmloss();
-	    long wastime = MyGattCallback.lastfoundL;
+public    void handlealarm() {
+    SensorBluetooth.reconnectall();
+    final var view=Floating.floatview;
+    if(view!=null) {
+        view.postInvalidate();
+        }
+    final boolean haslossalarm=hasalarmloss();
+    long wastime = MyGattCallback.lastfoundL;
+    if(wastime==0L) {
+        wastime=Natives.lastglucosetime();
+        }
 
-	final long nu = System.currentTimeMillis();
-		boolean shouldwake = Natives.shouldwakesender();
-		final long tryagain = nu + Notify.glucosetimeout;
+    final long nu = System.currentTimeMillis();
+        boolean shouldwake = Natives.shouldwakesender();
+        final long tryagain = nu + Notify.glucosetimeout;
 
-	long nexttime=tryagain;
-		if(!haslossalarm) {
-			Notify.onenot.oldnotification(wastime);
-			}
-		else  {
-			final long afterwait = waitmmsec() + wastime;
-			if(afterwait > nu) {
-				if(doLog) {Log.i(LOG_ID, "handlealarm notify");};;
-				Notify.onenot.oldnotification(wastime);
-				SuperGattCallback.previousglucose=null;
-				nexttime = (afterwait < tryagain)  ? afterwait : tryagain;
-			} else {
-				if(!saidloss) {
-					if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};;
-					long lasttime=Natives.lastglucosetime( );
-					if(lasttime!=0L)
-						wastime=lasttime;
-					Notify.onenot.lossalarm(wastime);
-					 if(SuperGattCallback.doWearInt)  {
-						WearInt.missingalarm(nu /*SIC, that what xDrip is doing*/);
-						}
-					saidloss = true;
-					}
-			}
-			}
-		LossOfSensorAlarm.setalarm(Applic.app, nexttime);
-		if (shouldwake) {
-			MessageSender.sendwakestream();
-			Natives.wakestreamsender();
-			}
-		GlucoseWidget.oldvalue(wastime);
-	}
+    long nexttime=tryagain;
+        if(!haslossalarm) {
+            Notify.onenot.oldnotification(wastime);
+            }
+        else  {
+            final long afterwait = waitmmsec() + wastime;
+            if(afterwait > nu) {
+                if(doLog) {Log.i(LOG_ID, "handlealarm notify");};;
+                Notify.onenot.oldnotification(wastime);
+                SuperGattCallback.previousglucose=null;
+                nexttime = (afterwait < tryagain)  ? afterwait : tryagain;
+            } else {
+                if(!saidloss) {
+                    if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};;
+                    long lasttime=Natives.lastglucosetime( );
+                    if(lasttime!=0L)
+                        wastime=lasttime;
+                    Notify.onenot.lossalarm(wastime);
+                     if(SuperGattCallback.doWearInt)  {
+                        WearInt.missingalarm(nu /*SIC, that what xDrip is doing*/);
+                        }
+                    saidloss = true;
+                    }
+            }
+            }
+        LossOfSensorAlarm.setalarm(Applic.app, nexttime);
+        if (shouldwake) {
+            MessageSender.sendwakestream();
+            Natives.wakestreamsender();
+            }
+        GlucoseWidget.oldvalue(wastime);
+    }
 
 
 

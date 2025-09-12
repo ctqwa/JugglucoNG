@@ -113,7 +113,7 @@ public class MyGattCallback extends SuperGattCallback {
 	}
 static void showCharacter(String label, BluetoothGattCharacteristic characteristic) {
 	byte[] value=characteristic.getValue();
-        Log.showbytes(label + " UUID: " + characteristic.getUuid().toString(), value);
+        {if(doLog){Log.showbytes(label + " UUID: " + characteristic.getUuid().toString(), value);};}
     }
 @Override // android.bluetooth.BluetoothGattCallback
 	public void onDescriptorWrite(BluetoothGatt bluetoothGatt, BluetoothGattDescriptor bluetoothGattDescriptor, int status) {
@@ -131,19 +131,6 @@ static void showCharacter(String label, BluetoothGattCharacteristic characterist
 			writeBLELogin();
 		}
 	}
-/*
-void reconnect() {
-	{if(doLog) {Log.i(LOG_ID,SerialNumber+" reconnect");};};
-	var gatt=mBluetoothGatt;
-	if(gatt!=null) {
-		gatt.disconnect();
-		gatt.close();
-		mBluetoothGatt = null;
-		}
-	var sensorbluetooth=SensorBluetooth.blueone;
-	if(sensorbluetooth!=null)
-		sensorbluetooth.connectToActiveDevice(this, 0);
-	}	 */
 	@SuppressLint("MissingPermission")
 	@Override
 	public void onConnectionStateChange(BluetoothGatt bluetoothGatt, int status, int newState) {
@@ -196,14 +183,14 @@ void reconnect() {
 						}
 					conphase = 0;
 				}
-				constatstatus = status;
+				setConStatus(status);
 				constatchange[1] = tim;
 			}
 		} catch (Throwable e) {
 			Log.stack(LOG_ID, SerialNumber+" onConnectionStateChange", e);
 			if (Build.VERSION.SDK_INT > 30 && !Applic.mayscan())
 				Applic.Toaster(R.string.turn_on_nearby_devices_permission);
-			constatstatus = status;
+			setConStatus(status);
 			constatchange[1] = tim;
 			if(bluetoothGatt!=null)
 				bluetoothGatt.disconnect();
@@ -756,16 +743,16 @@ public boolean matchDeviceName(String deviceName,String address) {
 public UUID getService() {
    return mADCCustomServiceUUID;
    }
-
-@Override
+/*@Override
 public void setGattOptions(BluetoothGatt gatt) {
-	/*
-        {if(doLog) {Log.i(LOG_ID,"setGattOptions(BluetoothGatt gatt) setPreferredPhy PHY_LE_1M_MASK");};};
+	if(Build.VERSION.SDK_INT >= 26 ) {
+        if(doLog) {Log.i(LOG_ID,"setGattOptions(BluetoothGatt gatt) setPreferredPhy PHY_LE_2M_MASK");};
         gatt.setPreferredPhy(
-         BluetoothDevice.PHY_LE_1M_MASK,
-         BluetoothDevice.PHY_LE_1M_MASK,
-         BluetoothDevice.PHY_OPTION_NO_PREFERRED); */
-        }
+         BluetoothDevice.PHY_LE_2M_MASK,
+         BluetoothDevice.PHY_LE_2M_MASK,
+         BluetoothDevice.PHY_OPTION_NO_PREFERRED); 
+         }
+        } */
 
 }
 

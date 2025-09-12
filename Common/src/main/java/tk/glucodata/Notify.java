@@ -733,7 +733,7 @@ void overwriteglucose(int kind) {
 private final boolean makeicon=!isWearable&&tk.glucodata.BuildConfig.minSDK>=23;
 private final StatusIcon icons=makeicon?new StatusIcon():null;
 static int getMaxGlucose(int sensorgen) {
-    if(sensorgen==0x40)
+    if(sensorgen==0x40||sensorgen==0x20)
         return 400;
      return 500;
     }

@@ -389,14 +389,16 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
                 }
                 newmealptr[0]=0;
         //        Natives.closemeal(newmealptr[0]);
-            newnumview.setVisibility(GONE);
+             final var nview=newnumview;
+             if(nview!=null)
+                nview.setVisibility(GONE);
             if(!isWearable)
                 hidekeyboard();
             if(smallScreen)
                 help.hidekeyboard(act);
                 
             ((Applic) act.getApplication()). redraw();
-              act.poponback();
+              MainActivity.poponback();
 
              if(Menus.on) {
                 if(deletebutton.getVisibility()==GONE) {
@@ -501,8 +503,10 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
                 }
             }
 
-            GlucoseCurve.reopener();
-           newnumview.setVisibility(GONE);
+           GlucoseCurve.reopener();
+           final var nview=newnumview;
+           if(nview!=null)
+               nview.setVisibility(GONE);
            if(!isWearable)  {
                hidekeyboard();
             if(smallScreen)

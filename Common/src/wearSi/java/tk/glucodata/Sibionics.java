@@ -1,1 +1,0 @@
-../../../../nosi/java/tk/glucodata/Sibionics.java

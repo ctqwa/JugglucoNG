@@ -498,7 +498,7 @@ void startlibrelink(String lang) {
                                 if(!isWearable) {
                                     MainActivity activity = (MainActivity) getContext();
                                     if(SiBionics==1)
-                                        Sibionics.scan(activity,REQUEST_BARCODE);
+                                        PhotoScan.scan(activity,REQUEST_BARCODE);
                                     else
                                         doabout(activity);
                                     }

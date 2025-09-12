@@ -70,7 +70,7 @@ import tk.glucodata.R;
 public class Scan {
 	static final private String LOG_ID="Scan";
 	static public void onTag(MainActivity act, Tag tag) {
-		showbytes("onTag", tag.getId());
+		{if(doLog){showbytes("onTag", tag.getId());};}
 		var vibrator = getvibrator(act);
 		startvibration(vibrator);
 		var openNov = new OpenNov();

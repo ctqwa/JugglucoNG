@@ -21,7 +21,7 @@ if(false) {
 
    }
 else {
-      ndkver = '29.0.13846066'
+      ndkver = '29.0.14033849'
       APPCOMPAT = '1.7.1'
       GMSWEAR = '19.0.0'
      GMSBASE = '18.7.2'
@@ -30,7 +30,7 @@ else {
    CPPSTD = "-std=gnu++26"
        }
 
-CMAKEVERSION = "3.31.6"
+CMAKEVERSION = "4.1.1"
 android {
  buildFeatures.buildConfig = true
  namespace "tk.glucodata"
@@ -86,7 +86,7 @@ android {
         //compileSdk 36
         applicationId "tk.glucodata"
 
-         versionName '10.1.2'
+         versionName '10.2.2'
 //    multiDexEnabled true
 
         buildConfigField 'String', 'BUILD_TIME', 'new java.text.SimpleDateFormat("HH:mm:ss dd-MMM-yyyy").format(new java.util.Date(' + System.currentTimeMillis() + 'L))'
@@ -160,8 +160,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         libreOld {
     //******  Zet op rollout op 100% ******
             dimension 'libreVersion'
-            versionCode 769 //LIBRE2ONLY
-         //    versionName '10.1.2-no3'
+            versionCode 784 //LIBRE2ONLY
+         //    versionName '10.2.2-no3'
             versionNameSuffix '-no3'
             buildConfigField 'int', 'libreVersion', '2'
             externalNativeBuild.cmake {
@@ -174,7 +174,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 //       minSdk 23
             dimension 'libreVersion'
         versionNameSuffix '-li3'
-        versionCode 770 //LIBRE3
+        versionCode 785 //LIBRE3
     //******  Zet op rollout op 100% ******
 
                buildConfigField 'int', 'libreVersion', '3'
@@ -189,7 +189,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         si {
       dimension 'SiBionics'
         versionNameSuffix '-si'
-        versionCode 770 
+        versionCode 785 
        buildConfigField 'int', 'SiBionics', '1'
        externalNativeBuild.cmake {
          cppFlags "   -DSIBIONICS=1 "
@@ -198,7 +198,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         }
         nosi {
             dimension 'SiBionics'
-         versionCode 769 
+         versionCode 784 
          versionNameSuffix '-nosi'
           buildConfigField 'int', 'SiBionics', '0'
           externalNativeBuild.cmake {
@@ -216,9 +216,9 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         minSdkVersion 26
         buildConfigField 'int', 'minSDK', "$minSdk"
         manifestPlaceholders["minSDK"] = "$minSdk"
-        versionCode 771 //WATCH
+        versionCode 786 //WATCH
     //******  Zet op rollout op 100% ******
-        //versionName '10.1.2-wear'
+        //versionName '10.2.2-wear'
         versionNameSuffix '-wear'
         signingConfig signingConfigs.alg
 
@@ -240,8 +240,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 
 //        minSdk 19
             dimension 'wearos'
-        versionCode 771 //WATCH
-        //versionName '10.1.2-small'
+        versionCode 786 //WATCH
+        //versionName '10.2.2-small'
         versionNameSuffix '-small'
         signingConfig signingConfigs.alg
 
@@ -596,7 +596,7 @@ dependencies {
   implementation 'com.android.support:support-annotations:28.0.0'
 
     implementation "androidx.appcompat:appcompat:$APPCOMPAT"
-    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.activity:activity:1.11.0'
     implementation 'androidx.core:core:1.17.0'
    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
@@ -613,10 +613,10 @@ dependencies {
   // implementation 'com.google.android.gms:play-services-wearable:10.2.0' Needed for China? https://developer.android.com/training/wearables/creating-app-china#data-layer
 
 
-    wearImplementation 'androidx.activity:activity-ktx:1.10.1'
+    wearImplementation 'androidx.activity:activity-ktx:1.11.0'
     wearImplementation 'androidx.constraintlayout:constraintlayout:2.2.1'
-    wearImplementation 'com.google.android.material:material:1.12.0'
-    wearImplementation 'androidx.databinding:viewbinding:8.12.1'
+    wearImplementation 'com.google.android.material:material:1.13.0'
+    wearImplementation 'androidx.databinding:viewbinding:8.13.0'
     wearImplementation 'androidx.core:core-ktx:1.17.0'
 
 

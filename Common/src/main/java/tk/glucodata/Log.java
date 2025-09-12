@@ -136,7 +136,7 @@ public static void v(String one,String two) 	{ if(doLog) {if(Applic.Nativesloade
 public static void i(String one,String two) 	{ if(doLog) {if(Applic.Nativesloaded) {log("I",one,two);} else android.util.Log.i(one,two);}};
 public static void  showbytes(String mess,byte[] ar) {
 	if(doLog)
-		Natives.showbytes(mess,ar);
+		{if(doLog){Natives.showbytes(mess,ar);};}
 	}
 
 

@@ -33,7 +33,7 @@ private static final String LOG_ID="Libre3";
 public static byte[] firstnfc(Tag tag) {
 	final byte[] firstcom={(byte)0x02,(byte)0xA1,(byte)0x7A};
          var res=AlgNfcV.wholenfccmd(tag,firstcom );
-	 showbytes("NFC res: ",res);
+	 {if(doLog){showbytes("NFC res: ",res);};}
 	return res;
 	 }
 

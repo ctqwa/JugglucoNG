@@ -74,6 +74,9 @@ constexpr const int maxcaliNr=50;
 constexpr int maxdays=46;
 
 constexpr const int maxdaysDex=12;
+
+constexpr const int maxdaysAccu=14;
+
 constexpr const int stdMaxDaysSI=24;
 constexpr const int maxdaysSI=
 
@@ -225,7 +228,7 @@ uint16_t lastHistoricLifeCountReceivedPos;
 union {
 struct { 
    int len;
-    signed char data[8];
+   signed char data[8];
     } ident;
 struct {
       uint16_t wearduration2;
@@ -271,7 +274,8 @@ double pollinterval;
 uint32_t lockcount;
 int8_t streamingIsEnabled;
 int8_t patchState;
-uint16_t reserved4:15;
+uint16_t reserved4:14;
+uint16_t accuChek:1;
 bool auth12:1;
 char deviceaddress[deviceaddresslen];
 uint16_t libreviewScan;
@@ -549,6 +553,8 @@ int getSensorgen2() const {
                 return 0x40;
         if(isSibionics())
                 return 0x10;
+        if(isAccuChek())
+                return 0x20;
         if(getinfo()->interval==interval5)
                 return 3;
          return 2;
@@ -578,7 +584,7 @@ const int32_t maxpos() const {
   }
 
  int streamperhour() const {
-      if(isDexcom()) 
+      if(isAccuChek()||isDexcom())
         return 12;
     else return 60;
      }
@@ -660,7 +666,7 @@ const int perhour() const {
     return 60/getmininterval();
     }
 int getweardurationMIN() const {
-   const int wear=(isLibre2()||isDexcom())?getinfo()->wearduration:getinfo()->wearduration2;
+   const int wear=(isLibre2()||isDexcom()||isAccuChek())?getinfo()->wearduration:getinfo()->wearduration2;
    if(wear)
          return wear;
    return 14*24*60;
@@ -670,7 +676,7 @@ int getweardurationSEC() const {
    }
 
 int getWarmupMIN() const {
-   const int warmup=(isLibre2()||isDexcom())?getinfo()->warmup:getinfo()->warmup2;
+   const int warmup=(isLibre2()||isAccuChek()||isDexcom())?getinfo()->warmup:getinfo()->warmup2;
    if(warmup)
          return warmup;
    return 60;
@@ -692,7 +698,7 @@ int expectedWearDuration() const {
             };
         return (maxSIhours*60-19)*60;
         }
-    if(isLibre3())
+    if(isLibre3()||isAccuChek())
         return getweardurationSEC();
     return getweardurationSEC()+12*60*60;
     }
@@ -940,7 +946,7 @@ bool hasbluetooth() const {
     return getinfo()->bluestart!=bluestartunknown;
     }
 bool canusestreaming() const {
-     return  isSibionics()||isLibre3()||hasbluetooth()||isDexcom();
+     return  isAccuChek()||isSibionics()||isLibre3()||hasbluetooth()||isDexcom();
  //    return  hasbluetooth();
     }
 const std::string_view othershortsensorname() const {
@@ -1065,16 +1071,19 @@ E07A-000T3YL1R50
     return getinfo()->dexcom;
     }
  bool isLibre3() const {
-    return !isSibionics()&&!isDexcom()&&(getinfo()->interval==interval5);
+    return !isAccuChek()&&!isSibionics()&&!isDexcom()&&(getinfo()->interval==interval5);
     }
  bool isLibre2() const {
-   return !(isSibionics()||isDexcom()||getinfo()->interval==interval5);
+   return !(isAccuChek()||isSibionics()||isDexcom()||getinfo()->interval==interval5);
    }
 bool isLibre() const {
-    return !(isSibionics()||isDexcom());
+    return !(isSibionics()||isDexcom()||isAccuChek());
+    }
+bool isAccuChek() const {
+    return getinfo()->accuChek;
     }
 int streaminterval() const {
-    const int res=isDexcom()?5:1;
+    const int res=(isDexcom()||isAccuChek())?5:1;
     LOGGER("streaminterval()=%d\n",res);
     return res;
     }
@@ -1145,6 +1154,27 @@ static bool mkdatabaseSI(string_view sensordir,string_view sensorgegs,uint32_t n
     return true;
     }
 #endif
+static bool mkdatabaseAccu(string_view sensordir,string_view sensorgegs,uint32_t now) {
+   LOGGER("mkdatabaseAccu %s,%s\n",sensordir.data(),sensorgegs.data());
+    mkdir(sensordir.data(),0700);
+    pathconcat infoname(sensordir,infopdat);
+    if(access(infoname,F_OK)!=-1)  {
+        Readall<uint8_t> inf(infoname);
+        if(inf.data()&&inf.size()>=sizeof(Info)) {
+            const Info *in=reinterpret_cast<const Info*>(inf.data());
+            if(in->pollcount&&in->starttime>1700000000&&in->dupl>0&&in->accuChek)
+                return false;
+            }
+        }
+    uint32_t start=now;
+//    Info inf{.starttime=(uint32_t)0,.lastscantime=(uint32_t)start,.starthistory=0,.endhistory=0,.scancount=0,.startid=0,.interval=interval5,.dupl=3,.days=maxdaysAccu ,.warmup=60,.wearduration=20160,.lastLifeCountReceived=1,.accuChek=true,.pollcount=0};
+    Info inf{.starttime=(uint32_t)start,.lastscantime=(uint32_t)start,.starthistory=0,.endhistory=0,.scancount=0,.startid=0,.interval=interval5,.dupl=3,.days=maxdaysAccu ,.warmup=60,.wearduration=20160,.lastLifeCountReceived=1,.pollcount=0,.accuChek=true};
+    inf.siIdlen=sensorgegs.size();
+    memcpy(inf.siId,sensorgegs.data(),inf.siIdlen);
+    writeall(infoname,&inf,sizeof(inf));
+
+    return true;
+    };
 
 #ifdef DEXCOM
 static bool mkdatabaseDex(string_view sensordir,string_view sensorgegs,uint32_t now) {
@@ -1310,7 +1340,7 @@ if(const ScanData *last=lastpoll()) {
             }
         }
     }
-   if(!(isSibionics()||isDexcom())) {
+   if(!(isAccuChek()||isSibionics()||isDexcom())) {
       LOGGER("getinfo()->lastHistoricLifeCountReceivedPos=%d\n", getinfo()->lastHistoricLifeCountReceivedPos);
       if(!getinfo()->lastHistoricLifeCountReceivedPos) getinfo()->lastHistoricLifeCountReceivedPos=12;
       LOGGER("SensorGlucoseData %s %s scansize=%zu\n",sensordir.data(),scanpath.data(),scansize);
@@ -1451,6 +1481,10 @@ bool savepoll(time_t tim,int id,int glu,int trend,float change) {
         }
     saveglucosedata(polls,getinfo()->pollcount,tim, id, glu, trend, change);
     return true;
+    }
+
+void savestreamonly(time_t tim,int id,int glu,int trend,float change) {
+    saveglucosedata(polls,getinfo()->pollcount,tim, id, glu, trend, change);
     }
 
 void savestream(time_t tim,int id,int glu,int trend,float change) {
@@ -2056,13 +2090,22 @@ int updatestream(crypt_t *pass,int sock,int ind,int sensindex,int sendscan)  {
             }
          }
         else {
-         if(isDexcom()&&!getinfo()->update[ind].siStream&&pollcount()) {
-               updateStarttime=true;
-           LOGAR("updateStream send starttime");
-               vect.push_back({reinterpret_cast<const senddata_t *>(&getinfo()->starttime),offsetof(Info,starttime),4});
-               vect.push_back({reinterpret_cast<const senddata_t *>(getinfo()->DexDeviceName),offsetof(Info,DexDeviceName),12});
-               vect.push_back({reinterpret_cast<const senddata_t *>(getinfo()->deviceaddress),offsetof(Info,deviceaddress),deviceaddresslen});
+         if(isAccuChek()) {
+             if(!getinfo()->update[ind].siStream&&pollcount()) {
+                 updateStarttime=true;
+                 LOGAR("updateStream send starttime");
+                 vect.push_back({reinterpret_cast<const senddata_t *>(&getinfo()->starttime),offsetof(Info,starttime),4});
+                 }
             }
+         else {
+             if(isDexcom()&&!getinfo()->update[ind].siStream&&pollcount()) {
+                   updateStarttime=true;
+               LOGAR("updateStream send starttime");
+                   vect.push_back({reinterpret_cast<const senddata_t *>(&getinfo()->starttime),offsetof(Info,starttime),4});
+                   vect.push_back({reinterpret_cast<const senddata_t *>(getinfo()->DexDeviceName),offsetof(Info,DexDeviceName),12});
+                   vect.push_back({reinterpret_cast<const senddata_t *>(getinfo()->deviceaddress),offsetof(Info,deviceaddress),deviceaddresslen});
+                }
+              }
          if(wrotehistory) {
                vect.push_back({reinterpret_cast<const senddata_t *>(&endinfo),offsetof(Info,endStreamhistory),sizeof(endinfo)});
                }
@@ -2178,11 +2221,14 @@ int previousstream=-1;
 
 public:
 int getmaxmgdL() const {
-        if(isDexcom())
+        if(isDexcom()||isAccuChek())
                 return 400;
         if(isSibionics())
                 return 450;
          return 500;
+        }
+int getminmgdL() const {
+        return 40;
         }
 void setSiAdd2Index(int32_t add) {
         setstarthistory(add );
@@ -2227,6 +2273,13 @@ int removeCali(uint32_t tim) {
         return getinfo()->removeCali(tim);
         }
 bool hide=false;
+
+int getLastIndex() const {
+        if(const ScanData *last=lastValidStream()) {
+                return last->getid();
+                }
+        return -1;
+        }
 };
 
 struct lastscan_t {

@@ -890,7 +890,10 @@ public static native boolean siSensorptrTransmitterScan(long sensorptr,String sc
 public static native String sensorptr2str(long sensorptr);
 public static native void watchBluetooth(String name,boolean sensor,boolean watch);
 public static native long getnumlasttime( );
-
+public static native byte[] accuAskValues(long dataptr);
+public static native long accuProcessData(long dataptr,byte[] value,long mmsec);
+public static native void accuSetStartTime(long dataptr,byte[] value);
+public static native void updateUsedSensors( );
 //s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }
 

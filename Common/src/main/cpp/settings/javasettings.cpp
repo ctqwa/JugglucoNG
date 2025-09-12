@@ -1420,9 +1420,13 @@ uint16_t sign1;
 uint8_t units[2];
 uint32_t sign2;
 bool rightsign()const {
-    if(sign2!=8) {
+    if((sign2&0xFFFFFF)!=8) {
         LOGGER("sign2=%d!=8\n",sign2);
         return false;
+        }
+    const int error=sign2&0xFF000000;
+    if(error) {
+        LOGGER("rightsign message=%d\n",error);
         }
     if(sign1==0x00FF)
         return true;
@@ -1501,15 +1505,15 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(oldnovopenvalue)(JNIEnv *env, 
     if(!pen||!pen->lasttime)  {
         return false;
         }
-     jsize lens=env->GetArrayLength(jrawdoses);
-       uint8_t*  bytes=reinterpret_cast<uint8_t *>(   env->GetPrimitiveArrayCritical(jrawdoses,nullptr));
-      LOGGER("jrawdoses=%p\n",bytes);
-       if(!bytes) {
+    jsize lens=env->GetArrayLength(jrawdoses);
+    uint8_t*  bytes=reinterpret_cast<uint8_t *>(   env->GetPrimitiveArrayCritical(jrawdoses,nullptr));
+    LOGGER("jrawdoses=%p\n",bytes);
+    if(!bytes) {
         LOGSTRING("GetByteArrayElements(jrawdoses,nullptr)==null\n");
         return -1;
-             }
-       destruct _dest([env,bytes,jrawdoses]() {
-          env->ReleasePrimitiveArrayCritical(jrawdoses, bytes, JNI_ABORT);
+       }
+    destruct _dest([env,bytes,jrawdoses]() {
+        env->ReleasePrimitiveArrayCritical(jrawdoses, bytes, JNI_ABORT);
         });
     
     const dose_t *dose=reinterpret_cast<const dose_t *>(bytes+lens-sizeof(dose_t));
@@ -1523,14 +1527,14 @@ extern "C" JNIEXPORT jint  JNICALL   fromjava(savenovopen)(JNIEnv *env, jclass c
         }
     pen->type=type;
 
-     jsize lens=env->GetArrayLength(jrawdoses);
-       uint8_t*  bytes=reinterpret_cast<uint8_t *>(   env->GetPrimitiveArrayCritical(jrawdoses,nullptr));
-      LOGGER("jrawdoses=%p#%d\n",bytes,lens);
-       if(!bytes) {
-        LOGSTRING("GetPrimitiveArrayCritical(jrawdoses,nullptr)==null\n");
-        return -1;
-             }
-       destruct _dest([env,bytes,jrawdoses]() {
+    jsize lens=env->GetArrayLength(jrawdoses);
+    uint8_t*  bytes=reinterpret_cast<uint8_t *>(   env->GetPrimitiveArrayCritical(jrawdoses,nullptr));
+    LOGGER("jrawdoses=%p#%d\n",bytes,lens);
+    if(!bytes) {
+            LOGSTRING("GetPrimitiveArrayCritical(jrawdoses,nullptr)==null\n");
+            return -1;
+            }
+    destruct _dest([env,bytes,jrawdoses]() {
           env->ReleasePrimitiveArrayCritical(jrawdoses, bytes, JNI_ABORT);
         });
     jint ret= savedoses(pen,referencetime,bytes,lens);
@@ -1562,7 +1566,7 @@ extern "C" JNIEXPORT jlong  JNICALL   fromjava(novopentype)(JNIEnv *env, jclass 
         constexpr const auto comp=[](const NovoPen &el,const NovoPen &se ){
         return strcmp(el.serial,se.serial)<0;
         };
-        auto *hit=std::upper_bound(start,end, zoek,comp); //first element larger than jserial
+    auto *hit=std::upper_bound(start,end, zoek,comp); //first element larger than jserial
     if(hit>start) {    
         auto *prehit=hit-1;    
         if(!strcmp(prehit->serial,serial)) {

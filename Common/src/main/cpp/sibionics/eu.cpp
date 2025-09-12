@@ -159,7 +159,7 @@ extern "C" JNIEXPORT jint JNICALL   fromjava(getSensorptrSiSubtype)(JNIEnv *env,
    }
 extern "C" JNIEXPORT void JNICALL   fromjava(setSensorptrSiSubtype)(JNIEnv *env, jclass cl,jlong sensorptr,jint type) {
    if(!sensorptr) {
-       LOGAR("setSiSubtype dataptr==0");
+       LOGAR("setSiSubtype sensorptr==0");
        return;
        }
    LOGGER("setSensorptrSiSubtype %d\n",type);

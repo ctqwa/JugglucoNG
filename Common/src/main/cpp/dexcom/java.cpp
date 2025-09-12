@@ -48,7 +48,7 @@ Composed(19,19,0,11,[
   Digit(1,1,10,"",[],"Info",1,1)],"",[],"",1,1);
   */
 
-static int rate2changeindex(float rate) {
+int rate2changeindex(float rate) {
         if (rate <= -2.0f) {
             return 1;
         }

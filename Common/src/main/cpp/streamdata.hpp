@@ -19,6 +19,11 @@ struct streamdata {
 struct libre3stream:streamdata {
 	libre3stream(int sensindex,SensorGlucoseData *sens): streamdata(3, sensindex,sens){};
 	};
+#ifdef DEXCOM
+struct accustream:streamdata {
+	accustream(int sensindex,SensorGlucoseData *sens): streamdata(0x20, sensindex,sens){};
+	};
+#endif
 #ifdef SIBIONICS
 #include "sibionics/SiContext.hpp"
 struct sistream:streamdata {
@@ -30,6 +35,7 @@ struct sistream:streamdata {
 #ifdef DEXCOM
 #include "dexcom/DexContext.hpp"
 struct dexcomstream:streamdata {
+   
 
 	DexContext dexcontext;
 	dexcomstream(int sensindex,SensorGlucoseData *sens): streamdata(0x40, sensindex,sens),dexcontext(sens){};

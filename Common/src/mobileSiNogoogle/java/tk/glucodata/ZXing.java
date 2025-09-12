@@ -5,7 +5,7 @@ import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Applic.useZXing;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.REQUEST_BARCODE;
-import static tk.glucodata.Sibionics.connectSensor;
+import static tk.glucodata.PhotoScan.connectSensor;
 import static tk.glucodata.watchdrip.tostring;
 
 import static com.google.zxing.integration.android.IntentIntegrator.DATA_MATRIX;
@@ -55,7 +55,7 @@ class ZXing {
                         Log.i(LOG_ID,"intentResult == null"); 
                         }
                   if(sensorptr!=0L) 
-                      Sibionics.transmitterScanCancelled(sensorptr);
+                      PhotoScan.transmitterScanCancelled(sensorptr);
                    }
             catch(Throwable th) {
                 Log.stack(LOG_ID,"zXingResult",th);
