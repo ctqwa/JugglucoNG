@@ -34,46 +34,6 @@
 #include "glucose.hpp"
 #include "../calibrate/calculate.hpp"
 extern int rate2changeindex(float rate);
-/*
-struct AccuData {
-    uint8_t start[2];//= {0x0D,0x43};
-    uint16_t preGlu:12;
-    uint16_t divideGlu:4;
-    uint16_t min;
-    uint8_t two;
-    uint16_t trend:11;
-    uint16_t sign:1;
-    uint16_t divideTrend:4;
-    uint8_t unknown2;
-    uint8_t CGMQuality;
-    uint8_t rest[2];
-public:
-
-float divided(int value) const {
-    switch(divide) {
-        case 0xF: value/10.0f;
-        case 0xE: value/100.0f;
-        default: return value;
-        }
-    }
-    float getTrend() const {
-        if(sign) {
-            return  divided(trend-2048);
-            }
-        return  divided(trend);
-        }
-    float mgdL() const {
-        if(0xF000&preGlu)  {
-            return (0xFFF&preGlu)*.1f;
-            }
-        return preGlu;
-        }
-    uint32_t getTime(uint32_t starttime) const {
-        return starttime+min*60;
-        }
-    }__attribute__ ((packed));
-
-*/
 
 struct indexCmd {
     uint8_t start[3] {(uint8_t)0x01,(uint8_t)0x03,(uint8_t)0x01};
@@ -94,7 +54,6 @@ struct AccuData {
     uint8_t CGMQuality;
     uint8_t rest[3];
 
-//static float divider(float value,decltype(AccuData::divideTrend) divi)  {
 static float divider(float value,decltype(AccuData::divideTrend) divi)  {
     switch(divi) {
         case 0xF: return value*.1f;;
@@ -102,13 +61,6 @@ static float divider(float value,decltype(AccuData::divideTrend) divi)  {
         default: return value;
         }
     }
-/*float divided(int value) const {
-    switch(divide) {
-        case 0xF: return value*.1f;;
-        case 0xE: return value*.01f;
-        default: return value;
-        }
-    }*/
 public:
     float getTrend() const {
         if(sign) {
@@ -153,8 +105,6 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(accuProcessData)(JNIEnv *env, jcla
         LOGGER("accuProcessData size  value %d < AccuData %d\n",arlen,sizeof(AccuData));
         return 0LL;
         }
-      const CritAr  bluedata(env,value);
-
      accustream *sdata=reinterpret_cast<accustream *>(dataptr);
      SensorGlucoseData *sens=sdata->hist;
       if(!sens) {
@@ -162,9 +112,24 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(accuProcessData)(JNIEnv *env, jcla
           return 1LL;
          }
     const uint32_t timsec=mmsec/1000L;
+    const CritAr  bluedata(env,value);
     const AccuData *accu=reinterpret_cast<const AccuData *>(bluedata.data());
-    if(accu->start[0]!=0x0D||accu->start[1]!=0x43)
-        return 0LL;
+    if(accu->start[0]!=0x0D||accu->start[1]!=0x43) {
+//        0E C3 FF 07  AF 46  08 02  FF 07 FF 07  EA 5C
+        const uint8_t *start=accu->start;
+        if(start[0]==0x0E&&start[1]==0xC3) {
+            constexpr const auto isFF07{[](const uint8_t *data){
+                return  data[0]==0xFF&&data[1]==0x07;
+                }};
+          //  if(isFF07(start+2)&&start[6]==8&&start[7]==2&&isFF07(start+8)&&isFF07(start+10)) {
+            if(isFF07(start+2)&&isFF07(start+8)&&isFF07(start+10)) {
+                LOGGER("accuProcessData sensor error id=%d\n",accu->min);
+                sens->sensorerror=true;
+                return 0LL;
+               }
+            }
+        return 1LL;
+        }
     const uint32_t starttime=sens->getinfo()->starttime;
     uint32_t eventTime=accu->getTime(starttime);
     if(eventTime>timsec) {
@@ -174,9 +139,10 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(accuProcessData)(JNIEnv *env, jcla
         }
     float mgdLf=accu->mgdL();
     uint32_t mgdL= std::round(mgdLf);
-    if(mgdL<40||mgdL>400) {
+    if(mgdL<40||mgdL>400) { //Ever used?
         LOGGER("accuProcessData: ERROR min=%d value %d mg/dL %.1f mmol/L\n",accu->min,mgdL,mgdLf/18.0);
         if((timsec-eventTime)<maxbluetoothage) {
+            sens->sensorerror=true;
             return 0LL;
             }
         return 1LL;
@@ -187,7 +153,7 @@ extern "C" JNIEXPORT jlong JNICALL   fromjava(accuProcessData)(JNIEnv *env, jcla
     #ifndef NOLOG
     time_t tim=eventTime;
     const char *label=abbotttrend<6?GlucoseNow::trendString[abbotttrend]:"Error";
-    LOGGER("accuProcessData glucose id=%d %.1f mmol/L rate=%.1f label=%s %s",accu->min, mgdLf/18.0f,change,label,ctime(&tim));
+    LOGGER("accuProcessData glucose id=%d %.1f mg/dL %.1f mmol/L rate=%.2f label=%s CGMQuality=%d %s",accu->min, mgdLf, mgdLf/18.0f,change,label,accu->CGMQuality,ctime(&tim));
     #endif
 
     sens->savestreamonly(eventTime,accu->min,mgdL,abbotttrend, change);

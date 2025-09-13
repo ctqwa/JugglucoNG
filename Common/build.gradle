@@ -86,7 +86,7 @@ android {
         //compileSdk 36
         applicationId "tk.glucodata"
 
-         versionName '10.2.2'
+         versionName '10.2.3'
 //    multiDexEnabled true
 
         buildConfigField 'String', 'BUILD_TIME', 'new java.text.SimpleDateFormat("HH:mm:ss dd-MMM-yyyy").format(new java.util.Date(' + System.currentTimeMillis() + 'L))'
@@ -160,8 +160,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         libreOld {
     //******  Zet op rollout op 100% ******
             dimension 'libreVersion'
-            versionCode 784 //LIBRE2ONLY
-         //    versionName '10.2.2-no3'
+            versionCode 787 //LIBRE2ONLY
+         //    versionName '10.2.3-no3'
             versionNameSuffix '-no3'
             buildConfigField 'int', 'libreVersion', '2'
             externalNativeBuild.cmake {
@@ -174,7 +174,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 //       minSdk 23
             dimension 'libreVersion'
         versionNameSuffix '-li3'
-        versionCode 785 //LIBRE3
+        versionCode 788 //LIBRE3
     //******  Zet op rollout op 100% ******
 
                buildConfigField 'int', 'libreVersion', '3'
@@ -189,7 +189,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         si {
       dimension 'SiBionics'
         versionNameSuffix '-si'
-        versionCode 785 
+        versionCode 788 
        buildConfigField 'int', 'SiBionics', '1'
        externalNativeBuild.cmake {
          cppFlags "   -DSIBIONICS=1 "
@@ -198,7 +198,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         }
         nosi {
             dimension 'SiBionics'
-         versionCode 784 
+         versionCode 787 
          versionNameSuffix '-nosi'
           buildConfigField 'int', 'SiBionics', '0'
           externalNativeBuild.cmake {
@@ -216,9 +216,9 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         minSdkVersion 26
         buildConfigField 'int', 'minSDK', "$minSdk"
         manifestPlaceholders["minSDK"] = "$minSdk"
-        versionCode 786 //WATCH
+        versionCode 789 //WATCH
     //******  Zet op rollout op 100% ******
-        //versionName '10.2.2-wear'
+        //versionName '10.2.3-wear'
         versionNameSuffix '-wear'
         signingConfig signingConfigs.alg
 
@@ -240,8 +240,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 
 //        minSdk 19
             dimension 'wearos'
-        versionCode 786 //WATCH
-        //versionName '10.2.2-small'
+        versionCode 789 //WATCH
+        //versionName '10.2.3-small'
         versionNameSuffix '-small'
         signingConfig signingConfigs.alg
 
