@@ -32,7 +32,7 @@ import static java.util.Objects.nonNull;
 import static tk.glucodata.Applic.app;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Log.doLog;
-import static tk.glucodata.MyGattCallback.showCharacter;
+import static tk.glucodata.Libre2GattCallback.showCharacter;
 import static tk.glucodata.Natives.dexKnownSensor;
 import static tk.glucodata.Natives.getalarmclock;
 

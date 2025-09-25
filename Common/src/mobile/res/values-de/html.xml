@@ -1531,7 +1531,9 @@ Verbindung zu Uhren herzustellen.</p>
   <h1>Neue Menge</h1>
   <p>Mit „<i>Neue Menge</i>“ können Sie mit einem Etikett verknüpfte Zahlen eingeben. Sie können Etiketten im linken Menü→Einstellungen→<a href="https://www.juggluco.nl/Jugglucohelp/de/labelhelp.html">Zahlenetiketten</a> festlegen . Die mit einem bestimmten Etikett eingegebenen <i>Mengen</i> werden in der durch das Etikett bestimmten Höhe in der Grafik angezeigt.</p>
   <p>Sie können die Menge später durch langes Drücken ändern. Sie können es auch aus der Liste der eingegebenen Mengen unter Menü links in der Mitte→Liste auswählen.</p>
-  <p>Es ist auch möglich, <strong>Insulindosisdaten</strong> vom <a href="https://www.juggluco.nl/Juggluco/index.html#novopens">NovoPen® 6 oder NovoPen Echo® Plus</a> durch Scannen des NFC-Stifts zu empfangen. Nach dem Scannen können Sie ändern, unter welches Etikett die Dosen in Juggluco gespeichert werden, und die Dosen auf Dosen beschränken, die nach <strong>einem</strong> bestimmten Datum und einer bestimmten Uhrzeit erfolgen. Wenn im Speicher des Stifts Hunderte von Dosen vorhanden sind, kann es mehr als 30 Sekunden dauern, bis sie alle über NFC von Juggluco empfangen werden.</p><p>Unter Linkes Menü-&gt;Einstellungen-&gt;<a href="https://www.juggluco.nl/Jugglucohelp/de/labelhelp.html">Zahlenetiketten</a> wird außerdem festgelegt, unter welches Etikett Sie die Kohlenhydrate einer Mahlzeit eingeben. Unter „<i>Neue Menge“</i> wird für diese Bezeichnung die Schaltfläche „<strong>Mahlzeit“</strong> angezeigt. Wenn Sie auf die Schaltfläche <a href="https://www.juggluco.nl/Jugglucohelp/de/mealhelp.html">„Mahlzeit“</a> tippen, gelangen Sie zu einem Bildschirm, auf dem Sie eine Mahlzeit aus ihren Bestandteilen zusammenstellen können. Anschließend wird der Kohlenhydratgehalt berechnet oder Sie können den Kohlenhydratgehalt angeben und dann wird die benötigte Menge einer Zutat berechnet.</p>
+  <p>Es ist auch möglich, <strong>Insulindosisdaten</strong> vom <a href="https://www.juggluco.nl/Juggluco/index.html#novopens">NovoPen® 6 oder NovoPen Echo® Plus</a> durch Scannen des NFC-Stifts zu empfangen. Nach dem Scannen können Sie ändern, unter welches Etikett die Dosen in Juggluco gespeichert werden, und die Dosen auf Dosen beschränken, die nach <strong>einem</strong> bestimmten Datum und einer bestimmten Uhrzeit erfolgen. Wenn im Speicher des Stifts Hunderte von Dosen vorhanden sind, kann es mehr als 30 Sekunden dauern, bis sie alle über NFC von Juggluco empfangen werden.</p>
+<p>Einige Blutzuckermessgeräte können Blutzuckermessungen an Juggluco senden. Siehe linkes Menü → Einstellungen → Daten austauschen → <b><a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeterList.html">Blutzuckermessgeräte</a></b></p>
+  <p>Unter Linkes Menü-&gt;Einstellungen-&gt;<a href="https://www.juggluco.nl/Jugglucohelp/de/labelhelp.html">Zahlenetiketten</a> wird außerdem festgelegt, unter welches Etikett Sie die Kohlenhydrate einer Mahlzeit eingeben. Unter „<i>Neue Menge“</i> wird für diese Bezeichnung die Schaltfläche „<strong>Mahlzeit“</strong> angezeigt. Wenn Sie auf die Schaltfläche <a href="https://www.juggluco.nl/Jugglucohelp/de/mealhelp.html">„Mahlzeit“</a> tippen, gelangen Sie zu einem Bildschirm, auf dem Sie eine Mahlzeit aus ihren Bestandteilen zusammenstellen können. Anschließend wird der Kohlenhydratgehalt berechnet oder Sie können den Kohlenhydratgehalt angeben und dann wird die benötigte Menge einer Zutat berechnet.</p>
 <p><b>Ausschließen</b>: Aktivieren Sie <i>„Ausschließen“</i>, damit Juggluco diese Blutzuckermessung von der <a href="https://www.juggluco.nl/Jugglucohelp/calibrationhelp.html">Kalibrierung</a> ausschließt, weil der Glukosespiegel steigt oder fällt oder der Sensor sich noch in der Aufwärmphase befindet.
 </p>
 <p>
@@ -3146,6 +3148,100 @@ Kalibrierung gelangen Sie zur Kalibrierungszeit. Durch Berühren von
 <p style="line-height: 100%; margin-bottom: 0in"><b>Einstellungen</b>:
 Anderer Weg, um zum linken Menü -&gt; Einstellungen -&gt;
 Kalibrierung zu gelangen.</p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+]]>
+</string>
+<string name="GlucoseMeter" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/GlucoseMeter.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/GlucoseMeter.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeter.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Blutzuckermessgerät</h1>
+<p style="line-height: 100%; margin-bottom: 0cm">Juggluco fügt nur
+Glukosewerte hinzu, deren Zeitstempel nach dem angegebenen Datum und
+der angegebenen Uhrzeit liegt. Ändern Sie das Datum und die Uhrzeit,
+wenn bereits frühere Glukosewerte in Juggluco vorhanden sind.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Wählen Sie die
+Etikette für Blutzucker.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Beim ersten Mal
+müssen Sie das Blutzuckermessgerät in den PAIRING-Modus bringen,
+indem Sie beispielsweise die Taste des ausgeschalteten Messgeräts
+lange drücken, bis ein blaues Licht blinkt.</p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+]]>
+</string>
+<string name="GlucoseMeterList" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/GlucoseMeterList.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/GlucoseMeterList.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeterList.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Liste der
+Blutzuckermessgeräte</h1>
+<p style="line-height: 100%; margin-bottom: 0cm">Juggluco kann
+Blutzuckermesswerte von einigen Blutzuckermessgeräten per Bluetooth
+empfangen.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Wenn Sie ein Contour
+Next ONE haben, können Sie es zu Juggluco hinzufügen, indem Sie die
+Datenmatrix auf dem Blutzuckermessgerät mit dem linken Menü →
+Foto scannen. 
+</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Bei anderen
+Messgeräten müssen Sie auf „<i><b>Geräte suchen</b></i>“
+drücken und auf das Gerät drücken, wenn es gefunden wurde.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Es wird ein
+Bildschirm angezeigt, auf dem Sie die Bezeichnung für den Blutzucker
+auswählen und angeben müssen, ab welchem Datum und welcher Uhrzeit
+Sie Glukosemessungen erhalten möchten.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Beim ersten Mal
+müssen Sie das Blutzuckermessgerät in den PAIRING-Modus bringen,
+indem Sie beispielsweise die Taste des ausgeschalteten Messgeräts
+lange drücken, bis ein blaues Licht blinkt.</p>
+<br>
+<p style="line-height: 100%; margin-bottom: 0cm">Juggluco zeigt hier
+die bereits mit Juggluco verwendeten Blutzuckermessgeräte an.</p>
+<p><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Für jedes Blutzuckermessgerät werden der Gerätename und die Geräteadresse angezeigt, die auch in den Android-Einstellungen unter „Verbundene Geräte“ eingesehen werden können.</font></font></p>
+<p><b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Letzte</font></font></b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">: Zeitpunkt des letzten von diesem Blutzuckermessgerät empfangenen Blutzuckerwerts.</font></font></p>
+<p><b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Verbunden/Getrennt:</font></font></b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;"> letztes Mal Verbunden/Getrennt.</font></font></p>
+<p><b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Keine neuen Daten: </font></font></b><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Zu diesem Zeitpunkt gab es einen erfolgreichen Austausch mit dem Blutzuckermessgerät, aber es lagen keine neuen Daten vor.</font></font></span></p>
+<p><b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Neue Daten: </font></font></b><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Zu diesem Zeitpunkt wurden neue Daten empfangen.</font></font></span></p>
+<p style="line-height: 100%; margin-bottom: 0cm"><b><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Aktiv</font></font></b><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">:
+ </font></font></span><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Wenn Sie „ </font></font></span><i><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Aktiv“</font></font></span></i><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;"> deaktivieren 
+, stellt Juggluco keine Verbindung mehr zum </font></font></span><span style="font-weight: normal"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Blutzuckermessgerät her.</font></font></span></p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+]]>
+</string>
+<string name="DeviceList" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/DeviceList.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/DeviceList.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/DeviceList.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Blutzuckermessgeräte</h1>
+<p>Sucht nach Blutzuckermessgeräten. Gefundene Geräte werden hier
+angezeigt. Verbundene Geräte werden nicht gefunden. Beim ersten Mal müssen Geräte in den Pairing-Modus
+gebracht werden, beispielsweise indem Sie das Gerät durch langes
+Drücken der Taste starten, bis ein blaues Licht blinkt.</p>
+<p>Wenn das Gerät angezeigt wird, drücken Sie darauf und wählen
+Sie die Variable Blutzucker. Wenn bereits Glukosewerte dieses
+Messgeräts in Juggluco vorhanden sind, können Sie festlegen, dass
+nur Glukosedaten eines späteren Datums hinzugefügt werden, um
+Duplikate zu vermeiden.</p>
+<p>Drücken Sie „<i>Speichern“</i>, um dieses Blutzuckermessgerät
+zu verwenden, oder „<i>Abbrechen“</i>, um es nicht zu verwenden.</p>
+<p>Wenn Sie ein Contour next ONE Blutzuckermessgerät besitzen,
+können Sie die Datenmatrix auch mit dem linken Menü → Foto
+scannen, anstatt sie aus dieser Liste auszuwählen.</p>
 <p><br/>
 <br/>
 

@@ -21,11 +21,7 @@
 
 package tk.glucodata;
 
-import androidx.activity.OnBackPressedCallback;
-import androidx.activity.OnBackPressedDispatcher;
 import static android.content.Intent.EXTRA_PERMISSION_GROUP_NAME;
-import static android.graphics.Color.BLUE;
-import static android.graphics.Color.WHITE;
 import static android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS;
 import static android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM;
 import static android.view.View.GONE;
@@ -48,7 +44,6 @@ import static tk.glucodata.GlucoseCurve.STEPBACK;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.showbytes;
 import static tk.glucodata.Natives.getInvertColors;
-import static tk.glucodata.Natives.hasData;
 import static tk.glucodata.Natives.hasNeedScan;
 import static tk.glucodata.Natives.setShownintro;
 import static tk.glucodata.Natives.wakelibreview;
@@ -68,7 +63,6 @@ import android.content.Intent;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.nfc.NfcAdapter;
@@ -78,11 +72,8 @@ import android.os.Bundle;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
-import android.text.format.DateFormat;
 import android.util.DisplayMetrics;
-import android.view.GestureDetector;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
@@ -134,15 +125,17 @@ private void startall() {
      if(!started) {
         startdisplay();
         netinitstep();
-        if(!isWearable||Natives.hasData())  {
-           final int unit=Natives.getunit();
-           if(!(unit==1||unit==2)) {
-          Applic.postDelayed(()->tk.glucodata.settings.Settings.set(this),1000L);
-          }
-         }
-        else {
-           Specific.initScreen(this);
-           }
+        if(isWearable) {
+            if(Natives.hasData())  {
+               final int unit=Natives.getunit();
+               if(!(unit==1||unit==2)) {
+                      Applic.postDelayed(()->tk.glucodata.settings.Settings.set(this),1000L);
+                      }
+                }
+            else {
+               Specific.initScreen(this);
+               }
+            }
        }
    }
 boolean askNotify() {
@@ -196,7 +189,16 @@ private void startdisplay() {
              requestRender();
              if(getlibrary.showintro) {
                getlibrary.showintro=false;
-               help.help(R.string.introhelp,this,l->setShownintro(true));
+               MainActivity act=this;
+               act.lightBars(false);
+               help.help(R.string.introhelp,act,
+                   l->{ setShownintro(true);
+                       act.lightBars(!Natives.getInvertColors()); 
+                       final int unit=Natives.getunit();
+                       if(!(unit==1||unit==2)) {
+                              tk.glucodata.settings.Settings.set(act);
+                            }
+                      }); 
                }
                }
             return windowInsets;
@@ -329,11 +331,11 @@ void showSystemBarsAppearance() {
    } */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-    if(android.os.Build.VERSION.SDK_INT >= 21) {
-         Log.i(LOG_ID,"sdk 21 or larger") ;
-        }
-    else
-        Log.i(LOG_ID,"smaller than sdk 21") ;
+        if(android.os.Build.VERSION.SDK_INT >= 21) {
+             Log.i(LOG_ID,"sdk 21 or larger") ;
+            }
+        else
+            Log.i(LOG_ID,"smaller than sdk 21") ;
 
         if(isWearable) {
            Specific.splash(this);
@@ -859,12 +861,7 @@ public static int getscreenwidth(Context context) {
     return screenwidth;
     }
 //static public ViewGroup settings=null;
-@Override
-public void onConfigurationChanged(Configuration newConfig) {
-    super.onConfigurationChanged(newConfig);
-    {if(doLog) {Log.i(LOG_ID,"onConfigurationChanged height=" +newConfig.screenHeightDp+" width=" +newConfig.screenWidthDp + " sw="+newConfig.smallestScreenWidthDp);};};
-
-
+void removeconfig() {
     screenwidth=0;
     if(Applic.Nativesloaded) {
         if(app.needsnatives() ) {
@@ -875,9 +872,13 @@ public void onConfigurationChanged(Configuration newConfig) {
                 }
           }
       }
-
-
-}
+    }
+@Override
+public void onConfigurationChanged(Configuration newConfig) {
+    super.onConfigurationChanged(newConfig);
+    {if(doLog) {Log.i(LOG_ID,"onConfigurationChanged height=" +newConfig.screenHeightDp+" width=" +newConfig.screenWidthDp + " sw="+newConfig.smallestScreenWidthDp);};};
+        removeconfig();
+   }
 public void requestRender() {
     if(curve!=null)
         curve.requestRender();
@@ -1013,7 +1014,7 @@ public void onRequestPermissionsResult(int requestCode, String[] permissions, in
                 }
             } return; */
         case LOCATION_PERMISSION_REQUEST_CODE:
-            {if(doLog) {Log.i(LOG_ID,"onRequestPermissionsResult(LOCATION_PERMISSION_REQUEST_CODE "+granted);};};
+            {if(doLog) {Log.i(LOG_ID,"onRequestPermissionsResult(LOCATION_PERMISSION_REQUEST_CODE) "+granted);};};
             if(granted) {
                 if(systemlocation())
                    hasLocationContinue();

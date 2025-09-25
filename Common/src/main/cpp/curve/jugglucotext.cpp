@@ -74,9 +74,17 @@ const jugglucotext engtext {
 	.history="History",
 //	.historyinfo="Once per 15 minutes.\nRemembered on the sensor for 8 hours.\nScanning transfers them to this program.\nSensor: ", 
 //	.history3info="Once per 5 minutes.\nRemembered on the sensor for 14 days.\nTransferred by Bluetooth to this program.\nSensor: ",
+#ifndef WEAROS
+	.sensorstarted= "Started:\t\t\t\t\t\t",
+#else
 	.sensorstarted= "Started:",
+#endif
 	.lastscanned="Last scanned:",
+#ifndef WEAROS
+	.laststream="Last stream:\t\t",
+#else
 	.laststream="Last stream:",
+#endif
 	.sensorends="Ends officially: ",
 	.sensorexpectedend="Expected end: ",
 #endif //INJUGGLUCO

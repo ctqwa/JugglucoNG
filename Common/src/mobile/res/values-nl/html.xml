@@ -2553,6 +2553,7 @@ opgeslagen en de doses beperken tot doses van <b>na</b> een bepaalde
 datum en tijd. Wanneer er honderden doses in het geheugen van de pen
 aanwezig zijn, kan het ruim 30 seconden duren voordat ze allemaal via
 NFC door Juggluco worden ontvangen.</p>
+<p>Sommige bloedglucosemeters kunnen vingerprikbloedglucosemetingen via Bluetooth naar Juggluco sturen. Zie linkermenu → Instellingen → Deel gegevens → <b><a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeterList.html">Glucosemeters</a></b></p>
 <p>Onder Linkermenu -&gt; Instellingen -&gt; <a href="https://www.juggluco.nl/Jugglucohelp/nl/labelhelp.html">Nummer
 labels</a> staat ook aangegeven onder welk label je de koolhydraten
 van een maaltijd invoert. In <i>Hoeveelheid</i> wordt voor dit label
@@ -3021,6 +3022,95 @@ te tikken, verwijdert je de kalibratie.</p>
 <p style="line-height: 100%; margin-bottom: 0in"><b>Instellingen</b>:
 Een andere manier om naar linker menu →Instellingen→Kalibratie te
 gaan.</p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+]]>
+</string>
+<string name="GlucoseMeter" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/GlucoseMeter.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/GlucoseMeter.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeter.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Glucosemeter</font></font></h1>
+<p style="line-height: 100%; margin-bottom: 0cm"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Juggluco voegt alleen glucosewaarden toe met een tijdstempel later dan de opgegeven datum en tijd. Wijzig de datum en tijd naar een latere datum en tijd als er al eerdere glucosewaarden in Juggluco aanwezig zijn.</font></font></p>
+<p style="line-height: 100%; margin-bottom: 0cm"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">Selecteer het label voor bloedglucose.</font></font></p>
+<p style="line-height: 100%; margin-bottom: 0cm"><font dir="auto" style="vertical-align: inherit;"><font dir="auto" style="vertical-align: inherit;">De eerste keer moet je de glucosemeter in de PAIRING modus zetten, bijvoorbeeld door lang op de knop van de uitgeschakelde meter te drukken totdat er een blauw lampje knippert.</font></font></p>
+<p><br></p>
+<p><br></p>
+]]>
+</string>
+<string name="GlucoseMeterList" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/GlucoseMeterList.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/GlucoseMeterList.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeterList.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Lijst met
+glucosemeters</h1>
+<p style="line-height: 100%; margin-bottom: 0cm">Juggluco kan via
+Bluetooth bloedglucosetestmetingen ontvangen van sommige
+bloedglucosemeters.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Als je een Contour
+Next ONE hebt, kun je deze toevoegen aan Juggluco door de datamatrix
+op de glucosemeter te scannen met het linkermenu → Foto. 
+</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Voor andere meters
+moet je op \'<i><b>Apparaten zoeken</b></i>\' drukken en op het
+apparaat drukken wanneer het is gevonden.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Er verschijnt een
+scherm waarin je het label voor bloedglucose moet selecteren en moet
+aangeven vanaf welke datum en tijd je de glucosemetingen wilt
+ontvangen.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">De eerste keer moet
+je de glucosemeter in de KOPPELINGS modus zetten, bijvoorbeeld door
+lang op de knop van de uitgeschakelde meter te drukken, totdat er een
+blauw lampje knippert.</p>
+<br>
+<p>Juggluco toont hier de glucosemeters die reeds met Juggluco worden
+gebruikt.</p>
+<p>Voor elke glucosemeter worden de apparaatnaam en het apparaatadres
+weergegeven. Deze kun je ook bekijken onder ‘Verbonden apparaten’
+in de Android-instellingen.</p>
+<p><b>Laatste:</b> tijdstip van de laatste glucosewaarde ontvangen
+van deze glucosemeter.</p>
+<p><b>Verbonden/Verbinding verbroken: </b>laatste keer
+verbonden/verbinding verbroken</p>
+<p><b>Geen nieuwe gegevens: </b><span style="font-weight: normal">Op
+dit moment was er een succesvolle uitwisseling met de glucosemeter,
+maar er waren geen nieuwe gegevens;</span></p>
+<p><b>Nieuwe gegevens: </b><span style="font-weight: normal">op dat
+moment nieuwe gegevens ontvangen.</span></p>
+<p style="line-height: 100%; margin-bottom: 0cm"><b>Actief</b><span style="font-weight: normal">:
+Als </span><span style="font-weight: normal">je</span><span style="font-weight: normal">
+het vinkje bij “</span><i><span style="font-weight: normal">Actief”</span></i>
+<span style="font-weight: normal">weghaalt , maakt Juggluco geen
+verbinding meer met de glucosemeter.</span></p>
+<p><br/>
+<br/>
+
+</p>
+<p><br/>
+<br/>
+
+</p>
+]]>
+</string>
+<string name="DeviceList" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/DeviceList.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/DeviceList.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/DeviceList.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Glucosemeters</h1>
+<p>Scant naar glucosemeters. Gevonden apparaten worden hier
+weergegeven. Verbonden apparaten worden niet gevonden. De eerste keer
+moet de glucose meter in PAIRING mode gebracht worden, bijvoorbeeld
+door het apparaat te starten door de knop lang ingedrukt te houden
+totdat een blauw lampje knippert.</p>
+<p>Wanneer het apparaat wordt weergegeven, druk je erop en selecteer
+je de bloedglucosevariabele. Als de glucosewaarden van deze meter al
+in Juggluco aanwezig zijn, kun je aangeven dat alleen glucosegegevens
+van een latere datum worden toegevoegd om duplicaten te voorkomen.</p>
+<p>Klik op <i>Opslaan</i> om deze glucosemeter te gebruiken, of <i>op
+Annuleren</i> om hem niet te gebruiken.</p>
+<p>Als je een Contour next ONE glucosemeter hebt, kun je de
+datamatrix ook scannen met het linkermenu → Foto in plaats van deze
+uit deze lijst te selecteren.</p>
 <p><br/>
 <br/>
 

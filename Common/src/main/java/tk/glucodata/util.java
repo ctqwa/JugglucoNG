@@ -43,7 +43,13 @@ import static tk.glucodata.Log.doLog;
 import androidx.appcompat.app.AppCompatDelegate;
 
 public class util {
-private	static DateFormat dformat = DateFormat.getDateTimeInstance(DateFormat.DEFAULT,DateFormat.DEFAULT);
+private	static DateFormat dformat;
+static void mkdataFormat() {
+    dformat = DateFormat.getDateTimeInstance(DateFormat.DEFAULT,DateFormat.DEFAULT);
+    };
+static {
+    mkdataFormat(); 
+    };
 static public String timestring(long tim) {
 		return dformat.format(new Date(tim));
 		}

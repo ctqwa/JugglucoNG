@@ -393,5 +393,13 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
 <string name="writedown">Schrijf op!</string>
  <string name="switchtowatch">Wissel</string>
  <string name="last">"Laatste: "</string>
+<string name="bloodafter">"Voeg alleen glucosemetingen toe van na: "</string>
+<string name="specifyblood">"Selecteer eerst het bloedglucose label"</string>
+<string name="meterlist">"Glucosemeters"</string>
+<string name="finddevices">"Apparaten zoeken"</string>
+<string name="nonewdata">"Geen nieuwe gegevens"</string>
+<string name="newdata">"Nieuwe gegevens"</string>
+<string name="isconnected">Verbonden</string>
+<string name="isdisconnected">Verbinding verbroken</string>
 </resources>
 

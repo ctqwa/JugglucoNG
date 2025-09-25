@@ -633,7 +633,14 @@ strconcat getsensortext(const SensorGlucoseData *hist) {
             }
         else {
             histgegs gegs(hist);
-            return gegs.getsensorhelp("","<h1>","</h1>","<br><br>","<br>","");
+            return gegs.getsensorhelp("","<h1>","</h1>","<br><br>",
+            #ifdef WEAROS
+            "<br>"
+            #else
+            "\t\t"
+//            "&emsp;&emsp;&emsp;"
+            #endif
+            ,"");
             }
         }
 
@@ -643,7 +650,15 @@ static void showhistory(SensorGlucoseData *hist,const float tapx, const float ta
                         histgegs gegs(hist);
 
 extern void callshowsensorinfo(const char *text,SensorGlucoseData *hist);
-                        callshowsensorinfo(gegs.getsensorhelp("","<h1>","</h1>","<br><br>","<br>","").data(),hist);
+                        callshowsensorinfo(gegs.getsensorhelp("","<h1>","</h1>","<br><br>",
+            #ifdef WEAROS
+            "<br>"
+            #else
+            "\t\t"
+           // "&emsp;&emsp;&emsp;"
+            #endif
+
+                        ,"").data(),hist);
 
 #ifndef DONTTALK
                         if(speakout) gegs.speak();

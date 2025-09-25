@@ -24,7 +24,7 @@ else {
       ndkver = '29.0.14033849'
       APPCOMPAT = '1.7.1'
       GMSWEAR = '19.0.0'
-     GMSBASE = '18.7.2'
+     GMSBASE = '18.8.0'
       MINSDK = 21
     TARGETSDK = 35
    CPPSTD = "-std=gnu++26"
@@ -86,7 +86,7 @@ android {
         //compileSdk 36
         applicationId "tk.glucodata"
 
-         versionName '10.2.3'
+         versionName '10.3.1'
 //    multiDexEnabled true
 
         buildConfigField 'String', 'BUILD_TIME', 'new java.text.SimpleDateFormat("HH:mm:ss dd-MMM-yyyy").format(new java.util.Date(' + System.currentTimeMillis() + 'L))'
@@ -160,8 +160,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         libreOld {
     //******  Zet op rollout op 100% ******
             dimension 'libreVersion'
-            versionCode 787 //LIBRE2ONLY
-         //    versionName '10.2.3-no3'
+            versionCode 799 //LIBRE2ONLY
+         //    versionName '10.3.1-no3'
             versionNameSuffix '-no3'
             buildConfigField 'int', 'libreVersion', '2'
             externalNativeBuild.cmake {
@@ -174,7 +174,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 //       minSdk 23
             dimension 'libreVersion'
         versionNameSuffix '-li3'
-        versionCode 788 //LIBRE3
+        versionCode 800 //LIBRE3
     //******  Zet op rollout op 100% ******
 
                buildConfigField 'int', 'libreVersion', '3'
@@ -189,7 +189,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         si {
       dimension 'SiBionics'
         versionNameSuffix '-si'
-        versionCode 788 
+        versionCode 800 
        buildConfigField 'int', 'SiBionics', '1'
        externalNativeBuild.cmake {
          cppFlags "   -DSIBIONICS=1 "
@@ -198,7 +198,7 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         }
         nosi {
             dimension 'SiBionics'
-         versionCode 787 
+         versionCode 799 
          versionNameSuffix '-nosi'
           buildConfigField 'int', 'SiBionics', '0'
           externalNativeBuild.cmake {
@@ -216,9 +216,9 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
         minSdkVersion 26
         buildConfigField 'int', 'minSDK', "$minSdk"
         manifestPlaceholders["minSDK"] = "$minSdk"
-        versionCode 789 //WATCH
+        versionCode 801 //WATCH
     //******  Zet op rollout op 100% ******
-        //versionName '10.2.3-wear'
+        //versionName '10.3.1-wear'
         versionNameSuffix '-wear'
         signingConfig signingConfigs.alg
 
@@ -240,8 +240,8 @@ flavorDimensions = ['wearos','libreVersion','SiBionics', 'DexCom','Google']
 
 //        minSdk 19
             dimension 'wearos'
-        versionCode 789 //WATCH
-        //versionName '10.2.3-small'
+        versionCode 801 //WATCH
+        //versionName '10.3.1-small'
         versionNameSuffix '-small'
         signingConfig signingConfigs.alg
 
@@ -517,8 +517,8 @@ buildTypes {
         includeInApk true
         includeInBundle true
     }
-    compileSdk 36
-    buildToolsVersion '36.0.0'
+    compileSdkVersion 'android-36.1'
+    buildToolsVersion '36.1.0'
     buildFeatures {
         aidl true
     }
@@ -603,6 +603,7 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.10'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.2.10'
     implementation "com.google.android.gms:play-services-base:$GMSBASE"
+//    implementation "com.google.android.gms:play-services-base:18.8.0"
  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2'
   mobileImplementation 'androidx.health.connect:connect-client:1.1.0-rc03'
 //  mobileImplementation files('/n/ojka/Downloads/ciq-companion-app-sdk-2.0.3.aar');

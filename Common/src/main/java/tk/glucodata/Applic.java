@@ -103,6 +103,7 @@ static public final boolean isRelease= BuildConfig.isRelease==1;
 //static public final boolean isRelease= !BuildConfig.DEBUG;
 static final String JUGGLUCOIDENT=isWearable?"juggluco":"jugglucowatch";
 public static final Locale usedlocale=US;
+static boolean setremoveviews=false;
 //final public static boolean usemeal=Natives.usemeal();
 // boolean usebluetooth=true;
 final private static String LOG_ID="Applic";
@@ -197,6 +198,8 @@ public void sendlabels() {
     }
 void setcurve(GlucoseCurve curve) {
     this.curve=curve;
+    if(setremoveviews)
+        curve.removeviews();
     }
 //void savestate() { if(blue!=null) blue.savestate(); }
 public static String curlang=null;
@@ -241,7 +244,7 @@ public void onConfigurationChanged(Configuration newConfig) {
 
 static private void setjavahour24(boolean val) {
     Applic.hour24=val;
-    Notify.timef = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT);
+    Notify.mkDateformat();
     hasSystemtimeformat=DateFormat.is24HourFormat(app)==hour24;
       if(!isWearable) {
          var main=MainActivity.thisone;
@@ -382,6 +385,10 @@ void initbluetooth(boolean usebluetooth,Context context,boolean frommain) {
             }
         }
     SensorBluetooth.start(usebluetooth);
+
+    if(!isWearable) {
+        BluetoothGlucoseMeter.startDevices();
+        }
     }
 static boolean possiblybluetooth(Context context) {
     {if(doLog) {Log.i(LOG_ID,"possiblybluetooth");};};
@@ -500,7 +507,7 @@ void domintime() {
         }
     }
 }
-    static final ScheduledExecutorService scheduler =Executors.newScheduledThreadPool(1);
+    static final ScheduledExecutorService scheduler =Executors.newScheduledThreadPool(2);
 
 void setmintime() {
     try {

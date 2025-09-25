@@ -104,6 +104,7 @@ EditText valueedit;
 TextView source=null;
 Button timebutton,datebutton;
 void deleteviews() {
+    Log.i(LOG_ID,"deleteviews()");
     closenumview();
     spinner=null;
     if(newnumview!=null) {
@@ -117,11 +118,13 @@ void deleteviews() {
     if(timepicker!=null) {
         removeContentView(timepicker);
         timepicker=null;
+        Log.i(LOG_ID,"timepicker=null");
         }
     if(keyboard!=null) {
         removeContentView(keyboard);
         keyboard=null;
         }
+   cal = Calendar.getInstance();
     }
 /*
 /*
@@ -853,6 +856,7 @@ public void gettimepicker(MainActivity activity,int hourin, int minin, ObjIntCon
 final  boolean buttonsunder=false;
    settime=timeset;
     if(timepicker==null) {
+        Log.i(LOG_ID,"new gettimepicker");
         pick =new TimePicker(activity);
 //        pick.setIs24HourView( android.text.format.DateFormat.is24HourFormat(activity));
         Button cancel=new Button(activity);
@@ -938,6 +942,7 @@ else {
           layout.setPadding(0,(int)(GlucoseCurve.metrics.density*5.0),0,(int)(GlucoseCurve.metrics.density*2.0));
     }
     else {
+        Log.i(LOG_ID,"old gettimepicker");
     timepicker.requestLayout();
     timepicker.setVisibility(VISIBLE);
     timepicker.bringToFront();

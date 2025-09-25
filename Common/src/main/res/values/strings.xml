@@ -439,4 +439,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="writedown">Write down!</string>
  <string name="switchtowatch">Switch</string>
  <string name="last">"Last: "</string>
+ <string name="bloodafter">"Only add glucose readings from after: "</string>
+ <string name="specifyblood">"First select the label for blood glucose"</string>
+ <string name="meterlist">"Glucose Meters"</string>
+ <string name="finddevices">"Find devices"</string>
+ <string name="nonewdata">"No new data"</string>
+ <string name="newdata">"New data"</string>
+<string name="isconnected">Connected</string> 
+<string name="isdisconnected">Disconnected</string> 
+
 </resources>

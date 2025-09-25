@@ -57,12 +57,15 @@ static View.AccessibilityDelegate  accessDeli=new View.AccessibilityDelegate () 
 private static final String LOG_ID="Layout";
 
  private   void reserve(int nr) {
-        rowend=new int[nr];
-        notgone=new int[nr];
-        baselines = new int[nr];
+    rowend=new int[nr];
+    notgone=new int[nr];
+    baselines = new int[nr];
     maxwidths=new int[nr];
     matchparent=new View[nr];
     }
+
+
+
     View[] matchparent;
     float basefromiddle;
     int[] maxwidths=null;
@@ -221,15 +224,9 @@ int totHeight;
 int maxHeight; 
 @Override
 protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-       
-//        measureChildren(WRAP_CONTENT, WRAP_CONTENT);
-//        measureChildren(widthMeasureSpec, heightMeasureSpec);
-
-
    totHeight =  getPaddingTop() + getPaddingBottom();
-    // {if(doLog) {Log.i(LOG_ID,"heightpadding="+totHeight);};};
-    maxHeight=0; 
-    rowmax=-1;
+   maxHeight=0; 
+   rowmax=-1;
    for(int i=0,start=0;i<rownr;i++) {
          int height= rowgeo(start, i,widthMeasureSpec, heightMeasureSpec);
          if(height>maxHeight) {
@@ -249,12 +246,9 @@ protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     if(totHeight< getSuggestedMinimumHeight())
         totHeight = getSuggestedMinimumHeight();
     maxWidth = Math.max(maxWidth, getSuggestedMinimumWidth());
-    // {if(doLog) {Log.i(LOG_ID,"maxWidth="+maxWidth);};};
    int    prevrw = resolveSizeAndState(maxWidth, widthMeasureSpec, 0);
-    // {if(doLog) {Log.i(LOG_ID,"Width="+prevrw);};};
 
      int prevrh=resolveSizeAndState(totHeight, heightMeasureSpec, 0);
-     // {if(doLog) {Log.i(LOG_ID,"totHeight="+totHeight+" prevrh="+prevrh);};};
         int[] make=placer.place(this,prevrw,prevrh);
     if(make!=null&&make.length==2)
         setMeasuredDimension(make[0],make[1]);
@@ -383,14 +377,16 @@ final int layrow(final int top,final int start,final int row,final int maxheight
     }
     @Override
 protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        // Log.format("onLayout(,%d,%d,%d,%d) width=%d getWidth=%d\n",l,t,r,b,r-l,getWidth());
-    int top=getPaddingTop()+t;
-//        int start=getPaddingLeft()+l;
+
+    //Log.format("onLayout(,left=%d,top=%d,right=%d,bottom=%d) width=%d getWidth=%d\n",l,t,r,b,r-l,getWidth());
+    int top=getPaddingTop();
+    int ptop=t;
     int start=0;
     int height=b-t;
     int heightleft=height-totHeight;
     int yspace= (rownr>1&&heightleft>0)?(heightleft/(rownr-1)):0;
     for(int i=0;i<rownr;i++) {
+        //Log.i(LOG_ID,"row="+i+" top="+top);
         if(i==rowmax) 
             top=layrow(top,start,i,maxHeight+heightleft);
         else {
@@ -449,10 +445,10 @@ public static ViewGroup.MarginLayoutParams getMargins(View view) {
    view.setLayoutParams(margins);
    return margins;
    }
-/*  @Override
+/*
+ @Override
     public int getBaseline() {
-        return getMeasuredHeight()/2;
-    } */
-
+        return 0;
+    }  */
 
 }

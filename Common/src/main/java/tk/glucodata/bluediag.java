@@ -80,7 +80,13 @@ class bluediag {
 
 static  boolean returntoblue=false;
 final static private String LOG_ID="bluediag";
-private static final DateFormat fname=             new SimpleDateFormat("MM-dd HH:mm:ss", Locale.US );
+private static  DateFormat fname;
+public static void mktimeformat() {
+        fname= new SimpleDateFormat("MM-dd HH:mm:ss", Locale.US );
+        }
+static {
+        mktimeformat();
+        }
 public static String datestr(long tim) {
     return fname.format(tim);
     }

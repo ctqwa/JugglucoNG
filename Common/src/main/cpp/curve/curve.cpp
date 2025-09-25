@@ -2,6 +2,7 @@
 //#define DONTTALK WEAROS
 
 #ifdef WEAROS
+#define NOLEFT
 #define NOCUTOFF 1
 #endif 
 
@@ -71,7 +72,13 @@ using namespace std::literals;
 #include "jugglucotext.hpp"
 #include "JCurve.hpp"
 #include "misc.hpp"
-
+static bool getLevelLeft() {
+#ifdef NOLEFT
+    return false;
+#else
+    return settings->data()->levelleft;
+#endif
+    }
 extern std::pair<const ScanData*,const ScanData*>      makecalibrated(const SensorGlucoseData *sens,const ScanData *input,ScanData *calibrated,int nr,bool allvalues);
 extern std::pair<const ScanData*,const ScanData*>      makecalibratedback(const SensorGlucoseData *sens,const ScanData *input,ScanData *calibrated,int nr,bool allvalues);
 extern double     calibrateNow(const SensorGlucoseData *sens,const ScanData &value);
@@ -1094,7 +1101,7 @@ template <class LT> void    JCurve::glucoselines(NVGcontext* avg,const float las
     float startld;
     nvgTextAlign(avg,NVG_ALIGN_CENTER|NVG_ALIGN_MIDDLE);
 
-    if(settings->data()->levelleft) {
+    if(getLevelLeft()) {
         startld = timelen*.4;
         }
     else  {
@@ -1104,7 +1111,7 @@ template <class LT> void    JCurve::glucoselines(NVGcontext* avg,const float las
   const    uint32_t startl=0;
   
     const float endline=last;
-    LOGGER("glucoselines: unit=%f unit2=%f step=%d (%g) startl=%d (%g)\n",unit,unit2,step,::gconvert(step,glunit),startl,::gconvert(startl,glunit));
+//    LOGGER("glucoselines: unit=%f unit2=%f step=%d (%g) startl=%d (%g)\n",unit,unit2,step,::gconvert(step,glunit),startl,::gconvert(startl,glunit));
 #ifdef WEAROS
    const auto endlevel=dheight-smallfontlineheight;
    const auto startlevel=2.5*smallfontlineheight;
@@ -1548,7 +1555,7 @@ if(timdis>0&&((duration/timdis)<grens)) {
         localtime_r(&showstarttime,&tmbufstart);
         timelen=sprintf(tbuf,"%s %02d-%02d-%d",usedtext->daylabel[tmbufstart.tm_wday],tmbufstart.tm_mday,tmbufstart.tm_mon+1,1900+tmbufstart.tm_year);
 //        timelen=daystr(showstarttime,tbuf);
-        xpos= settings->data()->levelleft?timelen*.75:0;
+        xpos= getLevelLeft()?timelen*.75:0;
         nvgTextAlign(avg,NVG_ALIGN_LEFT|NVG_ALIGN_TOP);
         nvgText(avg,xpos ,datehigh+statusbarheight, tbuf, tbuf+timelen);
 #endif
@@ -2165,7 +2172,7 @@ void    JCurve::startstepNVG(NVGcontext* avg,int width, int height) {
 #ifndef DONTTALK
         shownglucose.resize(1);
 #endif
-        LOGAR("!success&&!otherproblem) ");
+        LOGAR("showlastsstream: !success&&!otherproblem");
         int newgetx=getx-headsize/3;
         nvgTextAlign(avg,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
         nvgFontSize(avg,headsize/4 );
@@ -2182,6 +2189,7 @@ void    JCurve::startstepNVG(NVGcontext* avg,int width, int height) {
             }
         else { 
              if(usebluetoothoff) {
+                LOGAR("showlastsstream: usebluetoothoff");
                 nvgTextBox(avg,newgetx ,gety, getboxwidth(newgetx),usedtext->useBluetoothOff.begin(), usedtext->useBluetoothOff.end());
 #ifndef DONTTALK
                 shownglucose[i].glucosevalue=0;

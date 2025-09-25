@@ -34,6 +34,8 @@ public:
 		strbuf[uitlen]='\0';
 		len=uitlen;
 		}
+    template <typename T> hexstr(const T *data):hexstr(reinterpret_cast<const uint8_t *>(data),sizeof(T)) { }
+    template <typename T> hexstr(const T &data):hexstr(&data) { }
 	hexstr(const data_t *data):hexstr((const uint8_t*)data->data(),data->size()) {
 		}
 	~hexstr() {

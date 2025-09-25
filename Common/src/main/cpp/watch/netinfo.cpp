@@ -750,6 +750,7 @@ extern "C" JNIEXPORT  jbyteArray  JNICALL   fromjava(bytesettings)(JNIEnv *env, 
     return uit;
     }
 
+extern void setallunit(int unit);
 extern "C" JNIEXPORT  jboolean  JNICALL   fromjava(ontbytesettings)(JNIEnv *env, jclass cl,jbyteArray  jar) {
 //    Tings *set=settings->data();
     sendsettings ssbuf;
@@ -760,7 +761,7 @@ extern "C" JNIEXPORT  jboolean  JNICALL   fromjava(ontbytesettings)(JNIEnv *env,
         return false;
         }
     env->GetByteArrayRegion(jar, 0, lens,reinterpret_cast<jbyte *>(&ssbuf));
-    settings->setunit(ssbuf.unit);
+    setallunit(ssbuf.unit);
 
     LOGGERTAG("ontbytesettings unit=%d\n",ssbuf.unit);
     return true;

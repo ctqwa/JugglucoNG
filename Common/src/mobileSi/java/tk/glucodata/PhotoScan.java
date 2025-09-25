@@ -178,8 +178,9 @@ static void connectSensor(final String scantag,MainActivity act,int request,long
                     return;
                     }
                  else {
-                    String name=Natives.addSIscangetName(scantag);
-                    if(name!=null)  {
+                    int[] indexptr={-1};
+                    String name=Natives.addSIscangetName(scantag,indexptr);
+                    if(name!=null&&name.length()>0)  {
                        MainActivity.tocalendarapp=true;
                        var sensorptr= Natives.str2sensorptr(name);
                        int type=Natives.getSensorptrLibreVersion(sensorptr);
@@ -202,6 +203,17 @@ static void connectSensor(final String scantag,MainActivity act,int request,long
                        Applic.wakemirrors();
                        return;
                        }
+                  else {
+                     final int index=indexptr[0];
+                     if(index>=0) {
+                       if(Natives.staticnum()) {
+                           help.help(R.string.staticnum, act);
+                            }
+                        else
+                            MeterConfig.config(act,index,null,null); 
+                        return;
+                        }
+                     }
                     }
                  }break;
                case REQUEST_BARCODE_SIB2: {

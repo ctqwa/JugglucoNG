@@ -527,6 +527,7 @@ private void handleMSLibre3SecurityNotificationsEnabledEvent() {
             else  {
                 {if(doLog) {Log.i(LOG_ID, SerialNumber + ": "+"exportedKAuth!=null");};};
                 isPreAuthorized=true;
+                sendSecurityCommand(17);
                 }
             }
         }

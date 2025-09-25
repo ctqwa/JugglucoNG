@@ -24,7 +24,7 @@ package tk.glucodata;
 import static android.bluetooth.BluetoothGatt.GATT_SUCCESS;
 import static tk.glucodata.Applic.hasNotChinese;
 import static tk.glucodata.Log.doLog;
-import static tk.glucodata.MyGattCallback.showCharacter;
+import static tk.glucodata.Libre2GattCallback.showCharacter;
 
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothGatt;

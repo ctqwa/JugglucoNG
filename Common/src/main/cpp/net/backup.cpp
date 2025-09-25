@@ -491,18 +491,24 @@ globalsocket=serversock;
 						if(host.deactivated)
 							continue;
 						if((host.passive())&&host.hasname&&!memcmp(host.getname(),name,passhost_t::maxnamelen)) { 
-                     if(!host.noip) {
-                        bool nothostreg=!host.hasip(addrptr)&&(!host.detect||!host.addiphasfamport(addrptr));
-                        if(nothostreg) {
-                           serverprint("label %s host %d wrong ip",name,h);
-                           LOGGERTAG("%s\n",servererrorbuf);
-                           continue;
-                           }
-                         }
-							LOGARTAG("take ");
-							hit=&host;
-							goto RIGHTHOST;
-							}
+                             if(!host.noip) {
+                                bool nothostreg=!host.hasip(addrptr)&&(!host.detect||!host.addiphasfamport(addrptr));
+                                if(nothostreg) {
+                                   serverprint("label %s host %d wrong ip",name,h);
+                                   LOGGERTAG("%s\n",servererrorbuf);
+                                   continue;
+                                   }
+                                 }
+                               else {
+                                     if((!host.hasip(addrptr))&&host.detect) {
+                                        host.addiphasfamport(addrptr);
+                                        }
+                                     
+                                    }
+                                LOGARTAG("take ");
+                                hit=&host;
+                                goto RIGHTHOST;
+                                }
 						}
 					}
 				else {

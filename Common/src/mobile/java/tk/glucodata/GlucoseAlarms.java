@@ -39,7 +39,7 @@ public    void handlealarm() {
         view.postInvalidate();
         }
     final boolean haslossalarm=hasalarmloss();
-    long wastime = MyGattCallback.lastfoundL;
+    long wastime = SuperGattCallback.lastfoundL;
     if(wastime==0L) {
         wastime=Natives.lastglucosetime();
         }

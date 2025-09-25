@@ -25,19 +25,23 @@ typedef float float32_t;
 struct Num {
   uint32_t time;
   union {
-	  uint32_t mealptr;
-	  uint32_t librenr;
+      uint32_t mealptr;
+      uint32_t librenr;
       struct {
-	    uint32_t calibration:31;
+        uint32_t calibration:31;
         bool exclude:1;
         };
-	  };
+      };
   float32_t value;
   uint32_t type;
  const uint32_t gettime() const {
- 	return time;
-	};
+     return time;
+    };
   bool calibrator(int t) const {
         return t==type&&!exclude;
+        }
+  bool nearprevious() const {
+        const Num *prev=this-1;
+        return prev->type==type&&prev->value==value&&((time-prev->time)<3*60);
         }
   };

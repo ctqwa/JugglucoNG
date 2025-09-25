@@ -166,7 +166,8 @@ static void show(MainActivity act) {
           new View[]{sensors.viewgroup,buttons});
      layout.usebaseline=false;
     layout.setBackgroundResource(R.drawable.dialogbackground);
-    layout.setPadding((int)(GlucoseCurve.metrics.density*10),0,(int)(GlucoseCurve.metrics.density*5),0);
+    //layout.setPadding((int)(GlucoseCurve.metrics.density*10),0,(int)(GlucoseCurve.metrics.density*5),0);
+    layout.setPadding(0,0,(int)(GlucoseCurve.metrics.density*5),0);
     act.addContentView(layout, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
     MainActivity.setonback(() -> {
             isVisible=false;

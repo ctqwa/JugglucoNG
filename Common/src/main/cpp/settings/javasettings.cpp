@@ -1445,6 +1445,7 @@ float getvalue() const {
 };
 
 #include "nums/numdata.hpp"
+extern void    setnumchanged(uint32_t tim);
 int savedoses(NovoPen *pen,uint32_t reftime,uint8_t *bytes,int len) {
     int type=pen->type;
     auto lasttime=pen->lasttime;
@@ -1496,7 +1497,7 @@ int savedoses(NovoPen *pen,uint32_t reftime,uint8_t *bytes,int len) {
         nexttime=time;
         ++savednr;
         }
-    setnumchanged();
+    setnumchanged(now);
     backup->wakebackup(Backup::wakenums);    
     return savednr;
     }
@@ -1892,3 +1893,6 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(onCreate)(JNIEnv *env, jclass cl) 
     #endif
     
     }
+
+
+

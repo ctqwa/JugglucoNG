@@ -1025,6 +1025,7 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasSibionics)(JNIEnv *env, jcl
           }
    return false;
     }  */
+extern bool hasGlucoseMeters();
 extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasNeedScan)(JNIEnv *env, jclass cl) {
     setusedsensors();
     const int len= usedsensors.size();
@@ -1033,7 +1034,7 @@ extern "C" JNIEXPORT jboolean  JNICALL   fromjava(hasNeedScan)(JNIEnv *env, jcla
          if(sensors->needsScan(index))
                 return true;
           }
-   return false;
+   return hasGlucoseMeters();
     } 
 #ifndef WEAROS
 extern "C" JNIEXPORT jlongArray JNICALL   fromjava(activeSensorPtrs)(JNIEnv *env, jclass cl) {

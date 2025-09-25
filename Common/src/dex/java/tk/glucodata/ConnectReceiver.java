@@ -31,15 +31,20 @@ public class ConnectReceiver extends BroadcastReceiver {
 static final private String LOG_ID="ConnectReceiver";
         @Override
   public void onReceive(Context context, Intent intent) {
-      {if(doLog) {Log.i(LOG_ID,"onReceive ");};};
       var blue=SensorBluetooth.blueone;
       if(blue!=null) {
-        String id=intent.getAction();
-        if(id!=null) {
-           blue.connectDevice(id,0);
-	   //SuperGattCallback.glucosealarms.handlealarmOnly();
+            String id=intent.getAction();
+            if(doLog) {Log.i(LOG_ID,"onReceive "+id);};
+            if(id!=null) {
+                  blue.connectNamedDevice(id,0);
+                  return;
+                  }
            }
-         }
+      else {
+          if (doLog) {
+              Log.i(LOG_ID, "onReceive no active Sensor");
+              }
+       }
 
       }
 

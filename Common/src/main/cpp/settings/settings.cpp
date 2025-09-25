@@ -556,8 +556,11 @@ void initjuggluco(std::string_view dirfiles) {
         extern void setupnetwork();
         setupnetwork();
     }
+void setnumchanged(uint32_t tim) {
+    settings->data()->timenumchanged=tim;
+    }
 void setnumchanged() {
-    settings->data()->timenumchanged=time(nullptr);
+    setnumchanged(time(nullptr));
     }
 #include "net/makerandom.hpp"
 

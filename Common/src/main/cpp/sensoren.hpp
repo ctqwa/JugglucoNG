@@ -261,7 +261,7 @@ public:
 //   infoblockptr()=reinterpret_cast<infoblock*>(map.data());
 //   sensorlist()=map.data()+1;
    }
-
+private:
    void setmaxhistory(int max) {
      LOGGER("setmaxhistory(%d)\n",max);
       SensorGlucoseData **tmphist = new SensorGlucoseData *[max]();
@@ -288,6 +288,7 @@ void   removeunused() {
 
          }
       }
+public:
 void   deletelast() {
   if(const int l=last();l>=0&&l<maxhist) {
       auto *old=hist[l];
@@ -558,8 +559,7 @@ std::pair<int,SensorGlucoseData *> makeSIsensorindex(std::string_view gegsSI,uin
      std::string_view si="(SI)";
      if(gegsSI.size()<36||!std::ranges::contains_subrange(gegsSI,si)) {
         if(dexcomEnd(endcode)) {
-            auto res=makeDexComSensorindex(endcode-4,gegsSI,now);
-            if(res.first>=0)
+            if(const auto res=makeDexComSensorindex(endcode-4,gegsSI,now);res.first>=0)
                 return res;
             }
          return makeAccuCheckSensorindex(gegsSI,now);
@@ -875,8 +875,8 @@ template <typename F>
       sensorlist()[ind].present = 1;
       uint32_t maxtime = thishist->getmaxtime();
       if(maxtime < nu) {
-         if(thishist->isDexcom()&&thishist->pollcount()<maxdexcount&&(nu-sensorlist()[ind].endtime)< youngsensorsecs) {
-            return true;
+         if(((thishist->isAccuChek()&&thishist->pollcount()<4000)||(thishist->isDexcom()&&thishist->pollcount()<maxdexcount))&&(nu-sensorlist()[ind].endtime)< youngsensorsecs) {
+         return true;
             }
          else {
              LOGGER("%s finished was %d set to 1\n", sensorlist()[ind].name, sensorlist()[ind].finished);

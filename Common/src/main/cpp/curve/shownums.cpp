@@ -81,7 +81,7 @@ template <typename F> void JCurve::numscreen(NVGcontext* vg, const F & col)  {
 		float xmid=second(numcontrol);
 		float xwidth=colwidth(numcontrol);
 		col(vg,l,l+xwidth-smallsize);
-		col(vg,xmid+smallsize,xmid+xwidth);
+		col(vg,xmid+smallsize,xmid+xwidth-smallsize);
 		}
 	}
 template <typename F> void JCurve::numscreenback(NVGcontext* vg, const F & col)  {
@@ -96,7 +96,7 @@ template <typename F> void JCurve::numscreenback(NVGcontext* vg, const F & col) 
 	else {
 		float xmid=second(numcontrol);
 		float xwidth=colwidth(numcontrol);
-		col(vg,nr,xmid+smallsize,xmid+xwidth);
+		col(vg,nr,xmid+smallsize,xmid+xwidth-smallsize);
 		col(vg,nr,l,l+xwidth-smallsize);
 		}
 	}

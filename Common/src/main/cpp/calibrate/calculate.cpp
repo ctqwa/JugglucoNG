@@ -293,7 +293,7 @@ static CalcPara calculate(const SensorGlucoseData *sens, const uint32_t newtime)
                 char buf1[27],buf2[27];
                 time_t tnumtim=numtim;
                 time_t tsenstim=after->gettime();
-                LOGGER("calculate: num %.1f %.23s stream %.1f %.23s\n",num->value,ctime_r(&tnumtim,buf1),gconvert(streamvalue*10),ctime_r(&tsenstim,buf2));
+                LOGGER("calculate: num %.1f %.24s stream %.1f %s",num->value,ctime_r(&tnumtim,buf1),gconvert(streamvalue*10),ctime_r(&tsenstim,buf2));
                 #endif
                 y.push_back(backconvert(num->value)*.1f);
                 w.push_back(weight);
@@ -389,37 +389,84 @@ static void changeCali(SensorGlucoseData *sens, const uint32_t oldtime,const uin
         }
       }
     }
-
-void threadCalibration(uint32_t oldtime,uint32_t tim,const Num *num,const Numdata *numdata) {
-    //sleep(60*5);
-    vector<int> sens=sensors->sensorsInPeriod(tim-5*60, tim+5*60);
-    if(sens.size()) {
-        LOGGER("threadCalibration: %d sensors\n",sens.size());
+static void calibrateIndices(const vector<int> &sens,uint32_t oldtime,uint32_t tim,const Num *num,const Numdata *numdata) {
         for(int index:sens) {
+            LOGGER("calibrateIndices %d\n",index);
             changeCali(sensors->getSensorData(index),oldtime,tim,num,numdata);
             }
         setCalibrates(*std::ranges::min_element(sens));
         extern void render(); 
         render(); 
         backup->wakebackup(Backup::wakenums);
-
+    }
+static void threadCalibration(uint32_t oldtime,uint32_t tim,const Num *num,const Numdata *numdata) {
+    vector<int> sens=sensors->sensorsInPeriod(tim-5*60, tim+5*60);
+    if(sens.size()) {
+        LOGGER("threadCalibration: %d sensors\n",sens.size());
+        calibrateIndices(sens, oldtime, tim,num,numdata);
         }
     else {
         LOGGER("threadCalibration: no sensors at %u\n",tim);
         }
      
     }
+extern Numdata *getherenums();
+static void calibrateLastThread() {
+    const int bloodvar=settings->data()->bloodvar;
+    time_t now=time(nullptr);
+#ifndef NOLOG
+    vector<int> sensindices=sensors->sensorsInPeriod(now-60*24*60*60, now);
+#else
+    vector<int> sensindices=sensors->sensorsInPeriod(now-60*60, now);
+#endif
+    if(sensindices.size()<=0) {
+        LOGAR("calibrateLast  no sensors");
+        return;
+        }
+    uint32_t previoustime=0;
+    for(auto index:sensindices) {
+        LOGGER("calibrateLastThread sensor %d\n",index);
+        auto tim=sensors->getSensorData(index)->getinfo()->lastCalibrated();
+        if(tim>previoustime)
+            previoustime=tim;
+        }
+    const Numdata *numdata=getherenums();
+    const Num *start=numdata->begin();
+    const Num *ends=numdata->end();
+    for(const Num*it=ends-1;it>=start;--it) {
+        if(!numdata->valid(it))
+            continue;
+        if(it->gettime()<previoustime) {
+            LOGGER("calibrateLast %u before previoustime %u\n",it->gettime(),previoustime);
+            return;
+            }
+        if(it->calibrator(bloodvar)) {
+            calibrateIndices(sensindices, 0, it->gettime(),it,numdata);
+            return;
+            }
+        }
+    LOGAR("calibrateLast no not excluded blood measurement");
+    }
+
+void calibrateLast() {
+    if(settings->data()->bloodvar>=maxvarnr) {
+        LOGAR("calibrateLast bloodvar not set");
+        return;
+        }
+    std::thread  th(calibrateLastThread);
+    th.detach();
+    }
 extern void addCalibration(uint32_t tim,int type,Num *num,const Numdata *numdata) ;
 void addCalibration(uint32_t tim,int type,Num *num,const Numdata *numdata) {
     if(type!=settings->data()->bloodvar)
         return;
     if(num->exclude) {
-        LOGGER("addCalibration exclude %u\n",num->gettime());
+        LOGGER("addCalibration exclude %u\n",tim);
         return;
         }
 
-    if(shouldexclude(num->gettime()))  {
-        LOGGER("addCalibration %u set exclude=true\n",num->gettime());
+    if(shouldexclude(tim))  {
+        LOGGER("addCalibration %u set exclude=true\n",tim);
         num->exclude=true;
         return;
         }
@@ -433,14 +480,14 @@ void changeCalibration(uint32_t oldtime,bool oldexclude,uint32_t tim,int type,Nu
     if(num->exclude) {
         if(!oldexclude)
             removeCalibration(oldtime);
-        LOGGER("addCalibration exclude %u\n",num->gettime());
+        LOGGER("addCalibration exclude %u\n",tim);
         return;
         }
 
-    if(shouldexclude(num->gettime()))  {
+    if(shouldexclude(tim))  {
         if(!oldexclude)
             removeCalibration(oldtime);
-        LOGGER("addCalibration %u set exclude=true\n",num->gettime());
+        LOGGER("addCalibration %u set exclude=true\n",tim);
         num->exclude=true;
         return;
         }

@@ -117,6 +117,7 @@ import tk.glucodata.Libreview;
 import tk.glucodata.Log;
 import tk.glucodata.MainActivity;
 import tk.glucodata.Menus;
+import tk.glucodata.MeterList;
 import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.NumAlarm;
@@ -184,21 +185,46 @@ public static void set(MainActivity act) {
         thisone.makesettingsin(act);
 
     }
+private class Closerun implements Runnable {
+ public  void run() {
+        int unit=mmolL.isChecked()?1:(mgdl.isChecked()?2:0);
+        if(unit==0) {
+           activity.setonback(this);
+           Applic.argToaster(activity, R.string.setunitfirst,Toast.LENGTH_SHORT);
+           return;
+           }
+        hidekeyboard();
+        finish();
+         activity.lightBars(!getInvertColors( ));
+        if(tk.glucodata.Menus.on)
+            tk.glucodata.Menus.show(activity);
+        }
+    };
 private void makesettingsin(MainActivity act) {
         activity=act;
 
         colorwindowbackground=Applic.backgroundcolor;
        mksettings(activity);
-
-    activity.setonback(() -> {
-
+       final var  closerun=new Closerun(); 
+       /*
+    final Runnable[] closerun=new Runnable[1]; //to get rid of may not be initialize nonsense
+    closerun[0]=() -> {
+        int unit=mmolL.isChecked()?1:(mgdl.isChecked()?2:0);
+        if(unit==0) {
+           act.setonback(closerun[0]);
+           Applic.argToaster(act, R.string.setunitfirst,Toast.LENGTH_SHORT);
+           return;
+           }
         hidekeyboard();
         finish();
            act.lightBars(!getInvertColors( ));
         if(tk.glucodata.Menus.on)
             tk.glucodata.Menus.show(activity);
 
-        });
+        };
+    act.setonback(closerun[0]);
+        */
+    act.setonback(closerun);
 }
 private void makesettings(MainActivity act) {
     Applic.app.getHandler().postDelayed( ()->{ makesettingsin(act);},1);
@@ -958,14 +984,6 @@ static private void displaysettings(MainActivity context,Settings settings) {
         tlow.setText(float2string(Natives.targetlow()));
         thigh.setText(float2string(Natives.targethigh()));
 
-    CheckBox levelleft= new CheckBox(context);
-    levelleft.setText(R.string.glucoseaxisleft);
-    levelleft.setChecked(Natives.getlevelleft());
-
-    levelleft.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
-             Natives.setlevelleft(isChecked);
-            });
-
     var colbut=getbutton(context,R.string.colors);
    var help=getbutton(context,R.string.helpname);
   help.setOnClickListener(v->{help(R.string.displayhelp,context); });
@@ -1039,7 +1057,7 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
         lay = new Layout(context, (l, w, h) -> {
                   int[] ret={w,h};
                  return ret;
-               },new View[]{colbut},graphrow,targetrow,new View[] {hour12},new View[]{scalelabel}, new View[]{fixatex},new View[]{fixatey},new View[]{threslabel,threshold},new View[] {levelleft},new View[]{fixed},new View[]{iob}/*,new View[]{Scans},new View[]{History},new View[]{Stream},new View[]{Calibrated},new View[]{Amounts}*/,new View[]{setuseclose},new View[]{close},new View[]{langspin});
+               },new View[]{colbut},graphrow,targetrow,new View[] {hour12},new View[]{scalelabel}, new View[]{fixatex},new View[]{fixatey},new View[]{threslabel,threshold},new View[]{fixed},new View[]{iob}/*,new View[]{Scans},new View[]{History},new View[]{Stream},new View[]{Calibrated},new View[]{Amounts}*/,new View[]{setuseclose},new View[]{close},new View[]{langspin});
          }
       else {    
 //      var iob=getcheckbox(context,"IOB",Natives.getIOB());
@@ -1054,6 +1072,15 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
                 int ori= (isChecked?SCREEN_ORIENTATION_REVERSE_LANDSCAPE:SCREEN_ORIENTATION_LANDSCAPE);
                 Natives.setScreenOrientation(ori);
                 });
+
+    CheckBox levelleft= new CheckBox(context);
+    levelleft.setText(R.string.glucoseaxisleft);
+    levelleft.setChecked(Natives.getlevelleft());
+
+    levelleft.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
+             Natives.setlevelleft(isChecked);
+            });
+
         Layout.getMargins(colbut).leftMargin=Layout.getMargins(close).rightMargin=(int)( .15f*GlucoseCurve.getwidth());
         lay = new Layout(context, (l, w, h) -> {
                   int[] ret={w,h};
@@ -1215,8 +1242,13 @@ private    void mksettings(MainActivity context) {
     //bluetooth.setChecked(blueused);
     var alarmbut=getbutton(context,R.string.alarms);
         alarmbut.setOnClickListener(v->{
-        alarmsettings(context,settinglayout);
-        });
+            int unit=mmolL.isChecked()?1:(mgdl.isChecked()?2:0);
+            if(unit==0) {
+                Applic.argToaster(context, R.string.setunitfirst,Toast.LENGTH_SHORT);
+               return;
+               }
+            alarmsettings(context,settinglayout);
+            });
 
 
 
@@ -1395,14 +1427,17 @@ private    void mksettings(MainActivity context) {
         new tk.glucodata.setNumAlarm().mkviews(context,settinglayout);
         });
     displayview.setOnClickListener(v-> {
-     displaysettings(context,this);
-     });
+        int unit=mmolL.isChecked()?1:(mgdl.isChecked()?2:0);
+        if(unit==0) {
+            Applic.argToaster(context, R.string.setunitfirst,Toast.LENGTH_SHORT);
+           return;
+           }
+         displaysettings(context,this);
+         });
         }
     else {
-
         settinglayout.setVisibility(VISIBLE);
-
-    settinglayout.bringToFront();
+        settinglayout.bringToFront();
     }
 
 setvalues();
@@ -1477,20 +1512,6 @@ static private void exchanges(MainActivity context, View parent) {
         libreview.setText(R.string.libreviewname);
         libreview.setChecked(wasxdrip);
         librelinkbroadcast.setText(R.string.patchedlibrebroadcast);
-        /*
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                librelinkbroadcast.setForeground(context.getResources().getDrawable(R.drawable.strike_through_selector, null));
-            } catch(Throwable th) {
-                Log.stack(LOG_ID,"setForeground",th);
-                librelinkbroadcast.setPaintFlags(librelinkbroadcast.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-
-            }
-        }
-        else {
-              librelinkbroadcast.setPaintFlags(librelinkbroadcast.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-            } */
-        //librelinkbroadcast.getPaint().setStrikeThruText(true);
 
         librelinkbroadcast.setChecked(usedlibrebroad);
         everSensebroadcast.setText(R.string.everSensebroadcast);
@@ -1556,11 +1577,12 @@ static private void exchanges(MainActivity context, View parent) {
       getMargins(ok).rightMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*15.0);
 
 
+        var meters = getbutton(context, R.string.meterlist);
         lay = new Layout(context, (l, w, h) -> {
             int[] ret = {w, h};
             return ret;
         }, new View[]{everSensebroadcast,librelinkbroadcast},new View[]{xdripbroadcast, jugglucobroadcast}, new View[]{webserver, uploader, libreview}, (Build.VERSION.SDK_INT >= 28) ? new View[]{healthconnect,exportview,mirrorview} :new View[]{exportview,mirrorview},
-                new View[]{help, ok});
+                new View[]{help,meters, ok});
 
     final   int pad=(int)(tk.glucodata.GlucoseCurve.metrics.density*10.0);
         lay.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop*3/4,MainActivity.systembarRight+pad,MainActivity.systembarBottom*7/8+(int)(tk.glucodata.GlucoseCurve.metrics.density*5.0));
@@ -1570,6 +1592,8 @@ static private void exchanges(MainActivity context, View parent) {
                 c.dialogs.showexport(context,c.getWidth(),c.getHeight(),lay);
             }
         });
+        meters.setOnClickListener(v->{
+            MeterList.show(context,lay); });
       }
 
     thelayout[0] = lay;

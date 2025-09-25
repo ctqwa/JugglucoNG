@@ -66,6 +66,7 @@ typedef  NVGcolor  color_t;
 #endif
 #include "broadcasts.hpp"
 #include "novopens.hpp"
+#include "GlucoseMeter.hpp"
 extern int showui;
 struct Settings;
 extern Settings *settings;
@@ -401,7 +402,47 @@ struct Tings {
     int32_t soundtype;
     int32_t reserved3;
     float64_t loadtime;
+    uint32_t glucoseMeterNR;
+    uint32_t reserved4;
+    GlucoseMeter  glucosemeters[maxglucosemeters];
 
+template <typename Self>
+auto *getGlucoseMeter(this Self&& self,int index)  {
+    decltype(&self.glucosemeters[0]) meter=nullptr;
+    if(index>=0&&index< self.glucoseMeterNR) {
+        meter=&self.glucosemeters[index];
+        }
+    return meter;
+    }
+template <typename Self>
+auto *getGlucoseMeter(this Self&& self,const std::string_view deviceName)  {
+    const int len=std::min(static_cast<int>(deviceName.size())+1, maxDeviceName);
+    const int tot=self.glucoseMeterNR; 
+    for(int i=0;i<tot;++i) {
+        if(!memcmp(deviceName.data(),self.glucosemeters[i].deviceName,len)) {
+            return &self.glucosemeters[i];
+            }
+        }
+    return static_cast<decltype(&self.glucosemeters[0])>(nullptr);
+     }
+template <typename Self>
+auto *newGlucoseMeter(this Self&& self,std::string_view deviceName)  {
+    const int len=std::min(static_cast<int>(deviceName.size())+1, maxDeviceName);
+    const int nr=self.glucoseMeterNR;
+    if(nr<maxglucosemeters) {
+        memcpy(self.glucosemeters[nr].deviceName,deviceName.data(),len);
+        self.glucoseMeterNR=nr+1;
+        return &self.glucosemeters[nr];
+        }
+    return static_cast<decltype(&self.glucosemeters[0])>(nullptr);
+    }
+template <typename Self>
+auto *giveGlucoseMeter(this Self&& self,std::string_view deviceName)  {
+     auto *meter=self.getGlucoseMeter(deviceName);
+     if(!meter)
+        meter=self.newGlucoseMeter(deviceName);
+     return meter;
+     }
 void defaultshows() {
     showcalibrated=false;
     showscans=true;
@@ -768,6 +809,7 @@ Settings(const char *settingsname,const char *base,const char *country): Mmap(se
                                      data()->update=1;
                                      mklabels();
                                      mkalarms();
+                                     data()->logcat=true;
                       #ifdef WEAROS
                                      data()->orientation=1;
                       #else
@@ -931,6 +973,7 @@ bool usemmolL() const {
     return data()->unit==1;
     }
 void setunit(int unit) {
+    LOGGER("setunit(%d)\n",unit);
     if((data()->unit=unit)==1) {
         convertmult= convertmultmmol;
         gformat="%.1f";

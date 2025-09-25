@@ -75,7 +75,7 @@ constexpr int maxdays=46;
 
 constexpr const int maxdaysDex=12;
 
-constexpr const int maxdaysAccu=14;
+constexpr const int maxdaysAccu=15;
 
 constexpr const int stdMaxDaysSI=24;
 constexpr const int maxdaysSI=
@@ -329,7 +329,11 @@ CaliPara caliPara[maxcaliNr];
 uint32_t caliNr;
 uint32_t caliUpdated[std::max(maxsendtohost,8)];
 
-
+uint32_t lastCalibrated() const {
+        if(!caliNr)
+                return 0;
+        return caliPara[caliNr-1].time;
+        }
 int     caliPosAfter(const uint32_t time) {
     const uint32_t nr=caliNr;
     if(!nr)  {
@@ -716,7 +720,7 @@ uint32_t getmaxtime() const {
     #endif
         }
     else */
-   const int hours= isSibionics1()?maxSIhours:getinfo()->days*24;
+   const int hours= isSibionics1()?maxSIhours:((isAccuChek()?maxdaysAccu:getinfo()->days)*24);
     return hours*60*60+getstarttime();
     }
 uint32_t getstarttime() const {

@@ -39,10 +39,9 @@ public class Natives  {
 static  {
        try {
 	android.util.Log.d(LOG_ID,"before LoadLibrary");
-           System.loadLibrary("g");
+        System.loadLibrary("g");
 	android.util.Log.d(LOG_ID,"after LoadLibrary");
    	Applic.Nativesloaded=true;
-
        }
 
     catch(       Throwable  error) {
@@ -760,7 +759,7 @@ public static native String siGetDeviceName(long dataptr);
 public static native long SIprocessData(long dataptr, byte[] bluetoothdata,long mmsec);
 public static native String getSiBluetoothNum(long dataptr);
 public static native byte[] siAsknewdata(long dataptr);
-public static native String addSIscangetName(String jgegs);
+public static native String addSIscangetName(String jgegs,int[] indexptr);
 public static native boolean hasNeedScan( );
 //public static native String getShowSensorName(long dataptr);
 
@@ -893,8 +892,39 @@ public static native long getnumlasttime( );
 public static native byte[] accuAskValues(long dataptr);
 public static native long accuProcessData(long dataptr,byte[] value,long mmsec);
 public static native void accuSetStartTime(long dataptr,byte[] value);
-public static native void updateUsedSensors( );
-//s/^extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
+public static native void updateUsedSensors();
+public static native byte[] careSenseTimeCMD();
+
+public static native int GlucoseMeterGetLastPos(int meterIndex);
+public static native boolean GlucoseMeterSetLastPos(int meterIndex,int newpos);
+public static native int GlucoseMeterGetIndex(String deviceName);
+
+public static native boolean GlucoseMeterSave(int meterIndex,byte[] value);
+public static native boolean GlucoseMeterProcessContext(int meterIndex,byte[] value);
+public static native boolean GlucoseMeterSaveTime(int meterIndex,byte[] value);
+
+public static native int[] getActiveGlucoseMeters( );
+public static native String GlucoseMeterDeviceName(int meterIndex);
+public static native String GlucoseMeterDeviceAddress(int meterIndex);
+public static native boolean GlucoseMeterSetDeviceAddress(int meterIndex,String address);
+
+public static native byte[] getGlucoseMeterNewCMD(int meterIndex);
+
+//public static native void calibrateLast();
+
+public static native boolean recordCharacteristicChanged(byte[] value);
+
+
+
+public static native long GlucoseMeterGetLastTime(int meterIndex);
+public static native void GlucoseMeterSetLastTime(int meterIndex,long lasttime);
+public static native boolean GlucoseMeterSetActive(int meterIndex,boolean active);
+
+public static native boolean GlucoseMeterGetActive(int meterIndex);
+public static native int GlucoseMeterCount();
+
+public static native int GlucoseMeterHasIndex(String deviceName);
+//s/^[	 ]*extern.*JNIEXPORT[         ]*\([a-zA-Z]*\)[ ]*JNICALL[      ]*fromjava(\([^)]*\)) *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1 \2(\3);/g
 }
 
 

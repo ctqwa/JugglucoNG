@@ -49,7 +49,7 @@ public  void setLossAlarm() {
          saidloss = false;
          final long nu = System.currentTimeMillis();
          SuperGattCallback.lastfoundL=nu;
-//         MyGattCallback.oldtime = nu + Notify.glucosetimeout;
+//         Libre2GattCallback.oldtime = nu + Notify.glucosetimeout;
          LossOfSensorAlarm.setalarm(Applic.app, nu + waitmmsec());
        }
 }
@@ -59,7 +59,7 @@ public void setagealarm(final long numsec,long showtime) {
 
     saidloss = false;
     SuperGattCallback.lastfoundL=numsec;
-   // MyGattCallback.oldtime = numsec + showtime;
+   // Libre2GattCallback.oldtime = numsec + showtime;
     var oldtime = numsec + showtime;
     LossOfSensorAlarm.setalarm(Applic.app, oldtime);
     }

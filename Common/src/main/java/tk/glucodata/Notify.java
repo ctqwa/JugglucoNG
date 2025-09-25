@@ -1077,6 +1077,9 @@ final private     int numalarmid=81432;
 
 
 static DateFormat timef = DateFormat.getTimeInstance(DateFormat.SHORT);
+public static void mkDateformat() {
+    timef = DateFormat.getTimeInstance(DateFormat.SHORT);
+    };
 
 Notification.Builder  NumNotBuilder=null;
     @SuppressWarnings("deprecation")

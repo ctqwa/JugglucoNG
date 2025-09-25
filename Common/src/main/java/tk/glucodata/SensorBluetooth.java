@@ -42,6 +42,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import androidx.annotation.RequiresApi;
 
@@ -66,7 +68,7 @@ static void    setAutoconnect(boolean val) {
 public static SensorBluetooth blueone=null;
 public static void startscan() {
     if(blueone!=null)
-        blueone.startScan(0L);
+        blueone.scanStarter(0L);
     }
     private static final String LOG_ID = "SensorBluetooth";
     private static final int scantimeout = 390000;
@@ -96,7 +98,7 @@ static public void reconnectall() {
        if(!shouldnotscan)  {
             if(wasblue.mBluetoothManager!=null) {
                  wasblue.stopScan(false);
-                 wasblue.startScan(0L);
+                 wasblue.scanStarter(0L);
                  }
              }
         }
@@ -112,8 +114,8 @@ static void othersworking(SuperGattCallback current ,long timmsec) {
        }
   }
 
- public boolean connectToActiveDevice(long delayMillis) {
-    if(doLog) {Log.i(LOG_ID, "connectToActiveDevice("+delayMillis+")");};
+private boolean connectToAllActiveDevices(long delayMillis) {
+    if(doLog) {Log.i(LOG_ID, "connectToAllActiveDevices("+delayMillis+")");};
     if(!bluetoothIsEnabled()) {
         Applic.Toaster(R.string.enable_bluetooth);
         return false;
@@ -124,14 +126,14 @@ static void othersworking(SuperGattCallback current ,long timmsec) {
            scan=true;
            }
     if(scan) {
-        return startScan(delayMillis);
+        return scanStarter(delayMillis);
         }
     return false;
     }
  public boolean connectToActiveDevice(SuperGattCallback cb,long delayMillis) {
     if(doLog) {Log.i(LOG_ID,"connectToActiveDevice("+cb.SerialNumber+"," + delayMillis+")");};
     if(!cb.connectDevice(delayMillis)&&!mScanning) {
-        return startScan(delayMillis);
+        return scanStarter(delayMillis);
         }
     return false;
     }
@@ -236,27 +238,16 @@ class Scanner21 implements Scanner  {
         @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
         @Override
         public void onScanResult(int callbackType, ScanResult scanResult) {
-            {if(doLog) {Log.d(LOG_ID,"onScanResult");};};
+            if(doLog) {Log.d(LOG_ID,"onScanResult");};
             processScanResult(scanResult);
-            /*
-            if(!resultbusy) {
-            resultbusy=true;
-            processScanResult(scanResult);
-            resultbusy=false;
-            } */
-        }
+           }
 
         @Override
         public void onBatchScanResults(List<ScanResult> list) {
-            //if(!resultbusy)
-            {
-        //        resultbusy=true;
-                {if(doLog) {Log.v(LOG_ID,"onBatchScanResults");};};
-               final var len=list.size();
-                for(int i=0;i < len&& !processScanResult(list.get(i));++i)
+             if(doLog) {Log.v(LOG_ID,"onBatchScanResults");};
+             final var len=list.size();
+             for(int i=0;i < len&& !processScanResult(list.get(i));++i)
                                ;
-        //        resultbusy=false;
-                 }
              }
     @Override
     public void onScanFailed(int errorCode) {
@@ -271,7 +262,7 @@ class Scanner21 implements Scanner  {
           if(errorCode != SCAN_FAILED_ALREADY_STARTED) {
             SensorBluetooth.this.stopScan(false);
             if(errorCode != SCAN_FAILED_FEATURE_UNSUPPORTED) {
-               SensorBluetooth.this.startScan(scaninterval) ;
+               SensorBluetooth.this.scanStarter(scaninterval) ;
                }
               }
              }
@@ -302,20 +293,22 @@ private int scanTries=0;
                if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
                for(var cb: gattcallbacks)   {
                    if(doLog) {
-                         Log.d(LOG_ID,"serial number: " + cb.SerialNumber);
                          final var address=Natives.getDeviceAddress(cb.dataptr,false);
                          if(address!= null) {
-                              Log.d(LOG_ID,"address: " + address);
-                          }
+                              Log.d(LOG_ID,"serial number: " + cb.SerialNumber+" address: " + address);
+                             }
+                        else {
+                             Log.d(LOG_ID,"serial number: " + cb.SerialNumber+" no filter");
+                             }
                          }
                    final var service=cb.getService();
                    if(service==null) {
-                      if(doLog) {Log.i(LOG_ID,"getService should return UUID");};
+                      if(doLog) {Log.i(LOG_ID,"SCAN: getService should return UUID");};
                       mScanFilters=null;
                       }
                    else {
                       if(mScanFilters!=null) {
-                          if(doLog) {Log.i(LOG_ID,"filter "+service.toString());};
+                          if(doLog) {Log.i(LOG_ID,"SCAN: filter "+service.toString());};
                           ScanFilter.Builder builder2 = new ScanFilter.Builder();
                           builder2.setServiceUuid(new ParcelUuid(service));
                           mScanFilters.add(builder2.build());
@@ -325,6 +318,8 @@ private int scanTries=0;
               }
            else {
                   mScanFilters=null;
+                  if(doLog) {Log.i(LOG_ID,"SCAN: start no filter ");};
+
                   }
             try {
                  this.mBluetoothLeScanner.startScan(mScanFilters, mScanSettings, mScanCallback);
@@ -367,7 +362,7 @@ class ArchScanner  implements Scanner {
            }
     @SuppressLint("MissingPermission")
     public boolean start()  {
-       {if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};};
+       if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
        switch(gattcallbacks.size()) {
              case 0: Log.e(LOG_ID,"nothing to scan for");return false;
             case 1:
@@ -416,28 +411,35 @@ long scantime=0L;
 final private Runnable scanRunnable = new Runnable() {
    @Override 
    public void run() {
-    {if(doLog) {Log.i(LOG_ID,"scanRunnable");};};
+       if(doLog) {Log.i(LOG_ID,"scanRunnable");};;
        scantime=System.currentTimeMillis();
-      
        SensorBluetooth sensorBluetooth = SensorBluetooth.this;
        if (bluetoothIsEnabled() && gattcallbacks.size() != 0) {
            if (!scanner.init()) {
                  return;
                }
-       if(scanner.start()) {
-         mScanning = true;
-          Applic.app.getHandler().postDelayed(sensorBluetooth.mScanTimeoutRunnable, scantimeout);
-          }
-      else {
-                  {if(doLog) {Log.d(LOG_ID,"Start scan failed");};};
-      return;
-               }
-   }        
-         }
+           if(scanner.start()) {
+               mScanning = true;
+               if(scanOnUI) {
+                  Applic.app.getHandler().postDelayed(mScanTimeoutRunnable, scantimeout);
+                  }
+             else {
+                timeoutFuture=Applic.scheduler.schedule(mScanTimeoutRunnable, scantimeout, TimeUnit.MILLISECONDS);
+                }
+              }
+            else {
+                  if(doLog) {Log.d(LOG_ID,"Start scan failed");};
+                  return;
+                 }
+           }        
+     }
 
  };
-private     boolean startScan(long delayMillis) {
-      {if(doLog) {Log.i(LOG_ID,"startScan("+delayMillis+")");};};
+
+  static private final   boolean scanOnUI=false;
+ScheduledFuture<?> scanFuture=null,timeoutFuture=null;
+private     boolean scanStarter(long delayMillis) {
+      {if(doLog) {Log.i(LOG_ID,"scanStarter("+delayMillis+")");};};
       var main=MainActivity.thisone;
         if(!((main==null&&Applic.mayscan())||(main!=null&&main.finepermission())) ) {
           Applic.Toaster((Build.VERSION.SDK_INT > 30)?R.string.turn_on_nearby_devices_permission: R.string.turn_on_location_permission );
@@ -449,19 +451,37 @@ private     boolean startScan(long delayMillis) {
         return false;
         }
          scanstart=true;    
-    if(delayMillis>0)
-        Applic.app.getHandler().postDelayed(scanRunnable , delayMillis);
-    else
-        Applic.app.getHandler().post(scanRunnable);
+
+    if(scanOnUI) {
+        if(delayMillis>0)
+            Applic.app.getHandler().postDelayed(scanRunnable , delayMillis);
+        else
+            Applic.app.getHandler().post(scanRunnable);
+        }
+    else {
+        scanFuture=Applic.scheduler.schedule(scanRunnable, delayMillis, TimeUnit.MILLISECONDS);
+        }
     return false;
     }
 long stopscantime=0L;
 private static final int startincreasedwait=300000;
 private int increasedwait=startincreasedwait;
 private void stopScan(boolean retry) {
-        {if(doLog) {Log.d(LOG_ID,"Stop scanning "+(retry?"retry":"don't retry"));};};
-        Applic.app.getHandler().removeCallbacks(this.scanRunnable);
-        Applic.app.getHandler().removeCallbacks(this.mScanTimeoutRunnable);
+        if(doLog) {Log.d(LOG_ID,"Stop scanning "+(retry?"retry":"don't retry"));};
+        if(scanOnUI) {
+            Applic.app.getHandler().removeCallbacks(this.scanRunnable);
+            Applic.app.getHandler().removeCallbacks(this.mScanTimeoutRunnable);
+            }
+       else {
+             if(scanFuture!=null) {
+                scanFuture.cancel(true);
+                scanFuture=null;
+                }
+             if(timeoutFuture!=null) {
+                timeoutFuture.cancel(true);
+                timeoutFuture=null;
+                }
+           }
         if (this.mScanning) {
             stopscantime=System.currentTimeMillis();
             this.mScanning = false;
@@ -477,7 +497,7 @@ private void stopScan(boolean retry) {
                                }
                             }
                         }
-                    startScan( waitscan);
+                    scanStarter( waitscan);
                     }
                 }
         }
@@ -579,11 +599,11 @@ static <T> int indexOf(final T[] ar,final T el) {
     return -1;
     }
 
-public void connectDevice(String id,long delayMillis) {
+public void connectNamedDevice(String id,long delayMillis) {
       for(var cb: gattcallbacks)    {
          if(id.equals(cb.SerialNumber)) {
             if(!cb.connectDevice(delayMillis))  {
-                 startScan(delayMillis);
+                 scanStarter(delayMillis);
                }
              return;
             }
@@ -601,7 +621,7 @@ public boolean connectDevices(long delayMillis) {
             scan=true;
     }
     if(scan) {
-        return startScan(delayMillis);
+        return scanStarter(delayMillis);
     }
   return false;
     }
@@ -688,7 +708,7 @@ boolean updateDevicers() {
         addReceivers();
         return connectDevices(0);
         }
-//           startScan(0);
+//           scanStarter(0);
     }
 
 static boolean updateDevices() {
@@ -699,17 +719,17 @@ static boolean updateDevices() {
     }
 
 boolean checkandconnect(SuperGattCallback  cb,long delay) {
-    {if(doLog) {Log.i(LOG_ID,"checkandconnect("+cb.SerialNumber+","+ delay+")");};};
-    if (cb.mActiveDeviceAddress != null) {
+    if(doLog) {Log.i(LOG_ID,"checkandconnect("+cb.SerialNumber+","+ delay+")");};
+    if(cb.mActiveDeviceAddress != null) {
         if(BluetoothAdapter.checkBluetoothAddress(cb.mActiveDeviceAddress)) {
             {if(doLog) {Log.i(LOG_ID, cb.SerialNumber+" checkBluetoothAddress(" +cb.mActiveDeviceAddress +") succeeded");};};
             cb.mActiveBluetoothDevice = mBluetoothAdapter.getRemoteDevice(cb.mActiveDeviceAddress);
             connectToActiveDevice(cb, delay);
             return false;
           }     
-        {if(doLog) {Log.i(LOG_ID, cb.SerialNumber+" checkBluetoothAddress(" +cb.mActiveDeviceAddress +") failed");};};
-         cb.setDeviceAddress(null);
-        }
+       if(doLog) {Log.i(LOG_ID, cb.SerialNumber+" checkBluetoothAddress(" +cb.mActiveDeviceAddress +") failed");};
+       cb.setDeviceAddress(null);
+       }
 
     var main=MainActivity.thisone;
     if((main==null&&Applic.mayscan())||main.finepermission()) {
@@ -730,17 +750,17 @@ SuperGattCallback getGattCallback(String name, long dataptr) {
             if(vers==0x40) {
                 return new DexGattCallback(name, dataptr);
                 }
-        if(vers==0x20) {
-            return new AccuGattCallback(name, dataptr);
-            }
+            if(vers==0x20) {
+                return new AccuGattCallback(name, dataptr);
+                }
             }
         if(tk.glucodata.BuildConfig.SiBionics==1) {
             if(vers==0x10) {
                 return new SiGattCallback(name, dataptr);
                 }
             }
-    }
-    return  new MyGattCallback(name,dataptr);
+        }
+    return  new Libre2GattCallback(name,dataptr);
     }
 private boolean addDevice(String str,long dataptr) {
     {if(doLog) {Log.d(LOG_ID,"addDevice "+str);};};
@@ -819,19 +839,20 @@ static public boolean resetDevice(String str) {
     }
 static private boolean resetDevicePtr(String str,long[] ptrptr) {
     {if(doLog) {Log.v(LOG_ID,"resetDevice("+str+")");};};
-    if(blueone!=null) {
-        return blueone.resetDevicer(str,ptrptr);
-        }
-    else {
+    if(!Natives.getusebluetooth()) {
         Natives.updateUsedSensors( );
+        return false;
         }
-    return false;
+    if(blueone==null) {
+           blueone=new tk.glucodata.SensorBluetooth();
+          }
+    return blueone.resetDevicer(str,ptrptr);
     }
 
 
 static public   void goscan() { 
     if(blueone!=null) {
-        blueone.connectToActiveDevice(0);
+        blueone.connectToAllActiveDevices(0);
         }
     }
 
@@ -858,7 +879,8 @@ static void start(boolean usebluetooth) {
                 }
             }
         else {
-             blueone.connectDevices(0);
+            if(hasSensors)
+                 blueone.connectDevices(0);
             }
         }
     }
@@ -903,8 +925,8 @@ private void addBluetoothStateReceiver() {
                 if(!isWearable) {
                     Applic.app.numdata.startall();
                     }
-//                if(wasScanning) { SensorBluetooth.this.startScan(250L); }
-                SensorBluetooth.this.connectToActiveDevice(500);
+//                if(wasScanning) { SensorBluetooth.this.scanStarter(250L); }
+                SensorBluetooth.this.connectToAllActiveDevices(500);
             }
             }
         }
@@ -1052,8 +1074,7 @@ private boolean initializeBluetooth() {
                         if(cb.mActiveDeviceAddress!=null)  {
                             if (BluetoothAdapter.checkBluetoothAddress(cb.mActiveDeviceAddress)) {
                                 Log.i(LOG_ID,"checkBluetoothAddress("+cb.mActiveDeviceAddress+") succeeded") ;
-
-                            cb.mActiveBluetoothDevice = mBluetoothAdapter.getRemoteDevice(cb.mActiveDeviceAddress);
+                                cb.mActiveBluetoothDevice = mBluetoothAdapter.getRemoteDevice(cb.mActiveDeviceAddress);
                             } else {
                                 Log.i(LOG_ID,"checkBluetoothAddress("+cb.mActiveDeviceAddress+") failed") ;
                                 cb.setDeviceAddress(null);
@@ -1061,7 +1082,7 @@ private boolean initializeBluetooth() {
                             }
                         }
                     addReceivers();
-                    return connectToActiveDevice(0);
+                    return connectToAllActiveDevices(0);
                     }
                 else
                     if(doLog) {Log.i(LOG_ID,"initializeBluetooth no gattcallbacks");};

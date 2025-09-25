@@ -1250,5 +1250,6 @@ void removeviews() {
             removeContentView(searchcontrol);
             searchcontrol=null;
             }
+       Applic.setremoveviews=false;
        }
 }

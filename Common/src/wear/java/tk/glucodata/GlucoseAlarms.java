@@ -42,7 +42,7 @@ public    void handlealarm() {
             }
          tk.glucodata.glucosecomplication.GlucoseValue.updateall();
 
-        long wastime = MyGattCallback.lastfoundL;
+        long wastime = SuperGattCallback.lastfoundL;
         if(wastime==0L) {
             wastime=Natives.lastglucosetime();
             }

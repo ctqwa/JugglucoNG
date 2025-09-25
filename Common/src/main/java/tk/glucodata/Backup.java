@@ -589,22 +589,8 @@ static public String changehostError(MainActivity act,int pos) {
       layout.setPadding((int)(GlucoseCurve.metrics.density*4.0),0,(int)(GlucoseCurve.metrics.density*10.0),(int)(GlucoseCurve.metrics.density*4));
          }
       else {
-         Button qr;
-         if(BuildConfig.minSDK>=20) {
-            qr=getbutton(act,"QR");
-            qr.setOnClickListener(v->  {
-                  final int pos=saver.getAsInt();
-                  if(pos>=0) {
-                    String jsonstr=getbackJson(pos);
-                    QRmake.show(act,jsonstr);
-                    }
-                 });
-                 }
-           else {
-               qr=null;
-                }
          getMargins(delete).leftMargin=getMargins(save).rightMargin=(int)(GlucoseCurve.metrics.density*20.0f);
-        var withqr=BuildConfig.minSDK>=20?new View[]{qr,Password, editpass, visible}:new View[]{Password, editpass, visible};
+        var withqr=BuildConfig.minSDK>=20?new View[]{Password, editpass, visible}:new View[]{Password, editpass, visible};
          layout = new Layout(act, (l, w, h) -> {
             hideSystemUI(act);
             final int[] ret = {w, h};
@@ -749,21 +735,7 @@ static public String changehostError(MainActivity act,int pos) {
       var modify=getbutton(act,R.string.modify);
 
 
-   //      var help=getbutton(act,R.string.helpname);
       var info=new TextView(act);
-      /*
-        info.setVerticalScrollBarEnabled(true);
-        info.setMovementMethod(new ScrollingMovementMethod());
-        info.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
-        TypedArray a = info.getContext().getTheme().obtainStyledAttributes(new int[0]);
-         try {
-              @SuppressLint("DiscouragedPrivateApi") Method initializeScrollbars = android.view.View.class.getDeclaredMethod("initializeScrollbars", TypedArray.class);
-              initializeScrollbars.invoke(info, a);
-          } catch(Throwable e) {
-            Log.stack(LOG_ID,"initializeScrollbars",e);
-          }
-                 a.recycle();     
-                 */
       final int pad=(int)(GlucoseCurve.metrics.density*7.0);
       if(!isWearable) info.setPadding(pad,0,pad,0);
 
@@ -773,22 +745,7 @@ static public String changehostError(MainActivity act,int pos) {
                 hostadapt.notifyItemChanged(pos);
                }
                 );
-                /*
-      if(isWearable) {
-         modify.setPadding((int) (GlucoseCurve.metrics.density*23),0,0,0);
-         deactive.setPadding(0,0, (int) (GlucoseCurve.metrics.density*40),0);
-         } */
-   /*   if(isWearable) {
-         int minw=width/3;
-         modify.setMinimumWidth(minw);
-         modify.setMinWidth(minw);
-         deactive.setMinimumWidth(0);
-         deactive.setMinWidth(0);
-         //modify.setPadding(0,0,0,0);
-   //        deactive.setPadding(0,0, 0,0);
-         } */
       sethtml(info, mirrorStatus(pos));
-      //if(!useclose) close.setVisibility(INVISIBLE);
 
       ViewGroup layall;
 
@@ -814,16 +771,30 @@ static public String changehostError(MainActivity act,int pos) {
            modmar.leftMargin=(int)(GlucoseCurve.metrics.density*10);
            var closemar=Layout.getMargins(close);
            closemar.rightMargin=(int)(GlucoseCurve.metrics.density*10);;
+           View[] firstrow;
+           if(BuildConfig.minSDK>=20) {
+                Button qr=getbutton(act,"QR");
+                qr.setOnClickListener(v->  {
+                      if(pos>=0) {
+                            String jsonstr=getbackJson(pos);
+                            QRmake.show(act,jsonstr);
+                            }
+                     });
+                    firstrow=new View[]{modify,deactive,qr,close} ;
+                     }
+               else {
+                     firstrow= new View[]{modify,deactive,close} ;
+                    }
                                                                                                 
            Layout layout=new Layout(act, (l, w, h) -> {
-            var x=GlucoseCurve.getwidth()-MainActivity.systembarRight-w;
-            if(x<MainActivity.systembarLeft)
-               x=MainActivity.systembarLeft;
-            l.setX(GlucoseCurve.getwidth()-MainActivity.systembarRight-w);
-            l.setY(MainActivity.systembarTop);
-            final int[] lret={w,h};
-            return lret;
-            },new View[]{modify,deactive,close} , new View[]{info});
+                var x=GlucoseCurve.getwidth()-MainActivity.systembarRight-w;
+                if(x<MainActivity.systembarLeft)
+                   x=MainActivity.systembarLeft;
+                l.setX(GlucoseCurve.getwidth()-MainActivity.systembarRight-w);
+                l.setY(MainActivity.systembarTop);
+                final int[] lret={w,h};
+                return lret;
+                },firstrow , new View[]{info});
           // info.setPadding(pad,0,pad,0);
             layout.setBackgroundResource(R.drawable.dialogbackground);
    //          layout.setRotation(90);
@@ -908,7 +879,18 @@ static public String changehostError(MainActivity act,int pos) {
       recycle.setLayoutManager(lin);
 
       CheckBox staticnum = new CheckBox(act);
-      staticnum.setOnCheckedChangeListener( (buttonView,  isChecked)-> Natives.setstaticnum(isChecked));
+      staticnum.setOnCheckedChangeListener( (buttonView,  isChecked)-> {
+        Natives.setstaticnum(isChecked);
+        if(!isWearable) {
+            if(isChecked) {
+                BluetoothGlucoseMeter.stopDevices();
+                }
+            else {
+                BluetoothGlucoseMeter.startDevices();
+                }
+            }
+        });
+
       staticnum.setText(R.string.dontchangeamounts);
       staticnum.setChecked(Natives.staticnum());
       if(!isWearable) {
@@ -1046,10 +1028,9 @@ static public String changehostError(MainActivity act,int pos) {
        public HostViewHolder(View view,View parent) {
          super(view);
          view.setOnClickListener(v -> {
-         int pos=getAbsoluteAdapterPosition();
-         showhostinfo((MainActivity)(v.getContext()),parent,pos);
-   //    changehostview((MainActivity)(v.getContext()),pos);
-         });
+             int pos=getAbsoluteAdapterPosition();
+             showhostinfo((MainActivity)(v.getContext()),parent,pos);
+             });
 
        }
 

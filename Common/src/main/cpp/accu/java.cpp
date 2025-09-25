@@ -33,6 +33,7 @@
 #include "hexstr.hpp"
 #include "glucose.hpp"
 #include "../calibrate/calculate.hpp"
+#include "shortfloat.hpp"
 extern int rate2changeindex(float rate);
 
 struct indexCmd {
@@ -44,37 +45,24 @@ struct indexCmd {
 
 struct AccuData {
     uint8_t start[2];//= {0x0D,0x43};
-    uint16_t preGlu:12;
-    uint16_t divideGlu:4;
+    shortfloat mgdLvalue;
     uint16_t min;
     uint8_t two;
-    uint16_t trend:11;
-    uint16_t sign:1;
-    uint16_t divideTrend:4;
+    shortfloat trend;
     uint8_t CGMQuality;
     uint8_t rest[3];
 
-static float divider(float value,decltype(AccuData::divideTrend) divi)  {
-    switch(divi) {
-        case 0xF: return value*.1f;;
-        case 0xE: return value*.01f;
-        default: return value;
-        }
-    }
 public:
     float getTrend() const {
-        if(sign) {
-            return  divider(trend-2048,divideTrend);
-            }
-        return  divider(trend,divideTrend);
+        return trend;
         }
     float mgdL() const {
-        return divider(preGlu,divideGlu);
+        return mgdLvalue;
         }
     uint32_t getTime(uint32_t starttime) const {
         return starttime+min*60;
         }
-    }__attribute__ ((packed)) ;
+    }  __attribute__ ((packed));
  extern void wakewithcurrent();
 /*
 float makearrow(const SensorGlucoseData *sens,float mgdL,uint32_t was)  {

@@ -34,6 +34,7 @@
 #include "sibionics/AlgorithmContext.hpp"
 #include "datbackup.hpp"
 #include "jnisubin.hpp"
+#include "jniclass.hpp"
 extern void    sendstreaming(SensorGlucoseData *hist);
 
 extern bool siInit();
@@ -51,7 +52,8 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(getSiBluetoothNum)(JNIEnv *envin
     return envin->NewStringUTF(name);
     } 
 
-extern "C" JNIEXPORT jstring JNICALL   fromjava(addSIscangetName)(JNIEnv *env, jclass cl,jstring jgegs) {
+extern int newGlucoseMeter(std::string_view scangegs);
+extern "C" JNIEXPORT jstring JNICALL   fromjava(addSIscangetName)(JNIEnv *env, jclass cl,jstring jgegs,jintArray jindexptr) {
   if(!jgegs) {
         LOGAR("addSIscangetName(null)");
         return nullptr;
@@ -63,7 +65,8 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(addSIscangetName)(JNIEnv *env, j
     }
    destruct   dest([jgegs,gegs,env]() {env->ReleaseStringUTFChars(jgegs, gegs);});
    const size_t gegslen= env->GetStringUTFLength( jgegs);
-   auto [sensindex,sens]= sensors->makeSIsensorindex({gegs,gegslen},time(nullptr));
+  std::string_view scangegs{gegs,gegslen};
+   auto [sensindex,sens]= sensors->makeSIsensorindex(scangegs,time(nullptr));
    if(sens) {
       const char *name=sens->shortsensorname()->data();
       LOGGER("addSIscangetName(%s)=%s\n",gegs,name);
@@ -71,6 +74,12 @@ extern "C" JNIEXPORT jstring JNICALL   fromjava(addSIscangetName)(JNIEnv *env, j
       backup->resendResetDevices();
       backup->wakebackup(Backup::wakeall);
       return env->NewStringUTF(name);
+      }
+   else {
+     if(int meterIndex=newGlucoseMeter(scangegs);meterIndex>=0) {
+         CritArSave<jint> indexptr(env,jindexptr);
+         *indexptr.data()=meterIndex;
+         }
       }
    return nullptr;
    }

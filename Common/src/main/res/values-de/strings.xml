@@ -399,4 +399,13 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
  <string name="writedown">Aufschreiben!</string>
  <string name="switchtowatch">Wechseln</string>
  <string name="last">"Letzte: "</string>
+ <string name="bloodafter">"Nur Glukosewerte hinzufügen ab:"</string>
+<string name="specifyblood">Zuerst das Etikett für Blutzucker angeben"</string>
+<string name="meterlist">"Blutzuckermessgeräte"</string>
+<string name="finddevices">"Geräte suchen"</string>
+<string name="nonewdata">"Keine neuen Daten"</string>
+<string name="newdata">"Neue Daten"</string>
+<string name="isconnected">Verbunden</string>
+<string name="isdisconnected">Getrennt</string>
 </resources>
+

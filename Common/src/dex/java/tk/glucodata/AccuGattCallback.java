@@ -39,7 +39,7 @@ import static tk.glucodata.Applic.app;
 import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.showbytes;
-import static tk.glucodata.MyGattCallback.showCharacter;
+import static tk.glucodata.Libre2GattCallback.showCharacter;
 import static tk.glucodata.Natives.dexKnownSensor;
 import static tk.glucodata.Natives.getalarmclock;
 
@@ -79,46 +79,27 @@ static private final String LOG_ID="AccuGattCallback";
 private final UUID GenericAttributeServiceUUID= UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
 
 private final UUID GenericAccessServiceUUID=UUID.fromString("00001800-0000-1000-8000-00805f9b34fb");
-    private final UUID DeviceNameCharUUID = UUID.fromString("00002a00-0000-1000-8000-00805f9b34fb");
-    private final UUID AppearanceCharUUID=UUID.fromString("00002a01-0000-1000-8000-00805f9b34fb");
 
-
-//public static final UUID SIG_SERVICE_DEVICE_INFO = UUID.fromString("0000180a-0000-1000-8000-00805f9b34fb"); 
-    private final UUID ManufacturerNameCharUUID = UUID.fromString("00002a29-0000-1000-8000-00805f9b34fb");
-    private final UUID modelnumberCharUUID=UUID.fromString("00002a24-0000-1000-8000-00805f9b34fb");
-    private final UUID SerialNumberCharUUID = UUID.fromString("00002a25-0000-1000-8000-00805f9b34fb");
-    private final UUID HardwareRevisionStringCharUUID=UUID.fromString("00002a27-0000-1000-8000-00805f9b34fb");
-    private final UUID FirmwareRevisionStringCharUUID=UUID.fromString("00002a26-0000-1000-8000-00805f9b34fb");
-    private final UUID SystemIDCharUUID=UUID.fromString("00002a23-0000-1000-8000-00805f9b34fb");
-
-private final UUID CGMserviceUUID=UUID.fromString("0000181f-0000-1000-8000-00805f9b34fb");
-    private final UUID CGMMeasurementCharUUID=UUID.fromString("00002aa7-0000-1000-8000-00805f9b34fb");
-    private final UUID CGMFeatureCharUUID=UUID.fromString("00002aa8-0000-1000-8000-00805f9b34fb");
-    private final UUID CGMStatusCharUUID=UUID.fromString("00002aa9-0000-1000-8000-00805f9b34fb");
-    private final UUID CGMSessionStartTimeCharUUID=UUID.fromString("00002aaa-0000-1000-8000-00805f9b34fb");
-    private final UUID GMSessionRunTimeCharUUID=UUID.fromString("00002aab-0000-1000-8000-00805f9b34fb");
-   private final UUID RecordAccessControlPointCharUUID=UUID.fromString("00002a52-0000-1000-8000-00805f9b34fb");
-    private final UUID CGMcontrolCharUUID=UUID.fromString("00002aac-0000-1000-8000-00805f9b34fb");
 */
-    private final String DeviceNameCharUUID ="00002a00-0000-1000-8000-00805f9b34fb";
-    private final String AppearanceCharUUID="00002a01-0000-1000-8000-00805f9b34fb";
+    static private final String DeviceNameCharUUID ="00002a00-0000-1000-8000-00805f9b34fb";
+    static private final String AppearanceCharUUID="00002a01-0000-1000-8000-00805f9b34fb";
 
 
 //public static final String SIG_SERVICE_DEVICE_INFO ="0000180a-0000-1000-8000-00805f9b34fb"; 
-    private final String ManufacturerNameCharUUID ="00002a29-0000-1000-8000-00805f9b34fb";
-    private final String modelnumberCharUUID="00002a24-0000-1000-8000-00805f9b34fb";
-    private final String SerialNumberCharUUID ="00002a25-0000-1000-8000-00805f9b34fb";
-    private final String HardwareRevisionStringCharUUID="00002a27-0000-1000-8000-00805f9b34fb";
-    private final String FirmwareRevisionStringCharUUID="00002a26-0000-1000-8000-00805f9b34fb";
-    private final String SystemIDCharUUID="00002a23-0000-1000-8000-00805f9b34fb";
+    static  final String ManufacturerNameCharUUID ="00002a29-0000-1000-8000-00805f9b34fb";
+    static private final String modelnumberCharUUID="00002a24-0000-1000-8000-00805f9b34fb";
+    static private final String SerialNumberCharUUID ="00002a25-0000-1000-8000-00805f9b34fb";
+    static private final String HardwareRevisionStringCharUUID="00002a27-0000-1000-8000-00805f9b34fb";
+    static private final String FirmwareRevisionStringCharUUID="00002a26-0000-1000-8000-00805f9b34fb";
+    static private final String SystemIDCharUUID="00002a23-0000-1000-8000-00805f9b34fb";
 
-    private final String CGMMeasurementCharUUID="00002aa7-0000-1000-8000-00805f9b34fb";
-    private final String CGMFeatureCharUUID="00002aa8-0000-1000-8000-00805f9b34fb";
-    private final String CGMStatusCharUUID="00002aa9-0000-1000-8000-00805f9b34fb";
-    private final String CGMSessionStartTimeCharUUID="00002aaa-0000-1000-8000-00805f9b34fb";
-    private final String CGMSessionRunTimeCharUUID="00002aab-0000-1000-8000-00805f9b34fb";
-   private final String RecordAccessControlPointCharUUID="00002a52-0000-1000-8000-00805f9b34fb";
-    private final String CGMcontrolCharUUID="00002aac-0000-1000-8000-00805f9b34fb";
+    static private final String CGMMeasurementCharUUID="00002aa7-0000-1000-8000-00805f9b34fb";
+    static private final String CGMFeatureCharUUID="00002aa8-0000-1000-8000-00805f9b34fb";
+    static private final String CGMStatusCharUUID="00002aa9-0000-1000-8000-00805f9b34fb";
+    static private final String CGMSessionStartTimeCharUUID="00002aaa-0000-1000-8000-00805f9b34fb";
+    static private final String CGMSessionRunTimeCharUUID="00002aab-0000-1000-8000-00805f9b34fb";
+   static private final String RecordAccessControlPointCharUUID="00002a52-0000-1000-8000-00805f9b34fb";
+    static private final String CGMcontrolCharUUID="00002aac-0000-1000-8000-00805f9b34fb";
 
 private  BluetoothGattCharacteristic DeviceNameChar;
 private  BluetoothGattCharacteristic AppearanceChar;
@@ -267,11 +248,12 @@ private boolean connected=false;
 
   private boolean isBonded=false;
 
-static String bondString(int bonded) {
+static public String bondString(int bonded) {
     return  switch(bonded) {
         case BOND_NONE-> "BOND_NONE";
         case BOND_BONDING-> "BOND_BONDING";
         case BOND_BONDED-> "BOND_BONDED";
+        case BluetoothDevice.ERROR-> "BOND ERROR";
         default->"BOND Unknown";
         };
     }

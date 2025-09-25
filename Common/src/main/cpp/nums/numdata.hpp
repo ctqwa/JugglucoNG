@@ -35,9 +35,7 @@
 #include <filesystem>
 #include "inout.hpp"
  #include <assert.h>
-#ifdef LOCKNUM
 #include  <mutex>
-#endif
 #include "settings/settings.hpp"
 #include "net/backup.hpp"
 #include "datbackup.hpp"
@@ -529,7 +527,7 @@ Num* firstAfter(const uint32_t endtime)  {
      Num *beg=  begin();
      Num *en= end();
     auto comp=[](const Num &el,const Num &se ){return el.time<se.time;};
-      return std::upper_bound(beg,en, zoek,comp);
+    return std::upper_bound(beg,en, zoek,comp);
     }
 const Num* firstAfter(const uint32_t endtime)  const {
     return const_cast<Numdata*>(this)->firstAfter(endtime);
@@ -586,11 +584,29 @@ void setchangetimes(int pos,int end,const uint32_t tim=time(nullptr)) {
     for(int i=pos;i<end;i++)
         changetimes[i]=tim;
     }
-void numsaveonly( const uint32_t time, const float32_t value, const uint32_t type,const uint32_t mealptrin) {
+static constexpr const uint32_t mindistancesecs=90;
+bool nearprevious(const Num *num,const uint32_t time, const float32_t value, const uint32_t type) const {
+    if(num<=begin())
+        return false;
+    const Num *prev=num-1;
+    return prev->type==type&&prev->value==value&&((time-prev->time)<mindistancesecs);
+    }
+bool nearnext(const Num *next,const uint32_t time, const float32_t value, const uint32_t type) const {
+    return next->type==type&&next->value==value&&((next->time-time)<mindistancesecs);
+    }
+std::mutex nummutex;
+Num * numsaveonly( const uint32_t time, const float32_t value, const uint32_t type,const uint32_t mealptrin) {
+    std::lock_guard<std::mutex> lck(nummutex);
     Num *num=firstAfter(time);
+    if(nearprevious(num,time,value,type)){
+         return nullptr;
+        }
     const int ind=index(num);
     const Num *endnum=end();
     if(num<endnum)  {
+        if(nearnext(num,time,value,type)) {
+            return nullptr;
+            }
         const int movelen=(endnum-num);
         libremovelarger(ind,ind+1,movelen);
         memmove(num+1,num,movelen*sizeof(Num));
@@ -614,14 +630,16 @@ void numsaveonly( const uint32_t time, const float32_t value, const uint32_t typ
     updateposnowake(ind,lastnum);
     addlibrechange(ind);
     LOGGERTAG("numsaveonly pos=%d newlastnum=%d numsave %f %s mealptrin=%d\n",ind,lastnum,value,settings->getlabel(type).data(),mealptrin);
-    addCalibration( time, type,num,this);
+    return num;
      }
 
 void numsave( const uint32_t time, const float32_t value, const uint32_t type,const uint32_t mealptrin) {
-    numsaveonly(time,  value,  type, mealptrin);
-    if(backup)
-        backup->wakebackup(Backup::wakenums);
-    setnumchanged();
+    if(Num *num=numsaveonly(time,  value,  type, mealptrin)) {
+        addCalibration( time, type,num,this);
+        if(backup)
+            backup->wakebackup(Backup::wakenums);
+        setnumchanged();
+        }
      }
 
 
@@ -631,6 +649,7 @@ void numsavepos(int pos, uint32_t time, float32_t value, uint32_t type,uint32_t 
 //        at(pos).time=at(pos-1).time;
         }
     else {
+        std::lock_guard<std::mutex> lck(nummutex);
         LOGGERTAG("numsavepos %d %d %f %s\n",pos,mealptr,value,settings->getlabel(type).data());
         if(mealptr&&type!=settings->data()->bloodvar&&!meals->datameal()->goodmeal(mealptr)) {
             mealptr=0;
@@ -663,6 +682,7 @@ void changeDevice() {
     getlibreSolid()=getlibresend();
     }
 void numremove(int pos) {
+    std::lock_guard<std::mutex> lck(nummutex);
     Num &num=at(pos);
     removeCalibration(&num);
     addlibrenumsdeleted(&num,pos);
@@ -703,6 +723,7 @@ int getdeclastpos() {
     
 int numremove(Num *num) {
     removeCalibration(num);
+    std::lock_guard<std::mutex> lck(nummutex);
     const int ver=end()-num;
     int pos=index(num);
     LOGGERTAG("numremove(NUM %d)\n",pos);
@@ -1077,10 +1098,9 @@ void updatesize() {
 //    backup->wakebackup(Backup::wakenums);
     }
 private:
-
 #ifdef LOCKNUM
-std::mutex nummutex;
-#define NUMLOCKGUARD     std::lock_guard<std::mutex> lock(nummutex);
+std::mutex nummutexupdate;
+#define NUMLOCKGUARD     std::lock_guard<std::mutex> lock(nummutexupdate);
 #else
 #define NUMLOCKGUARD
 #endif
@@ -1306,7 +1326,7 @@ public:
 static inline constexpr const int intinnum=(sizeof(Num)/sizeof(uint32_t));
 int update(crypt_t*pass,int sock,struct changednums *nuall,int ind) {
 //     NUMLOCKGUARD
-    nummutex.lock();
+    nummutexupdate.lock();
     updatebusy[ind]=false; //Otherwise it has lock in network operation and which can lead to an ANR kill off app.
     const int  dbindex=getindex();
     struct changednums *nu=nuall+dbindex;    
@@ -1329,7 +1349,7 @@ int update(crypt_t*pass,int sock,struct changednums *nuall,int ind) {
         }
     int ret;
     if(!offoutnr) {
-        nummutex.unlock();
+        nummutexupdate.unlock();
         if(nu->lastlastpos==endpos) {
             LOGGERTAG("ind=%d dbase=%d lastlastpos==endpos %d\n",ind,dbase,endpos);
             ret=2;
@@ -1369,7 +1389,7 @@ int update(crypt_t*pass,int sock,struct changednums *nuall,int ind) {
                 numsar+=nr*intinnum;
                 }
             }
-        nummutex.unlock();
+        nummutexupdate.unlock();
          if(!sendcommand(pass, sock ,destructptr.get(),totlen)) {
             LOGGERTAG("update sendcommand failed dbase=%d totlen=%d\n",dbase,totlen);
              return 0;

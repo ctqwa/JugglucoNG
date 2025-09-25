@@ -951,8 +951,10 @@ extern "C" JNIEXPORT void  JNICALL   fromjava(setfixatex)(JNIEnv *env, jclass cl
 	fixatex=val;
 	settings->data()->duration=appcurve.duration;
 	}
-
-extern "C" JNIEXPORT void  JNICALL   fromjava(setunit)(JNIEnv *env, jclass cl,jint unit) {
+void setallunit(int unit) {
 	settings->setunit(unit);
-    appcurve.setunit(unit);
+        appcurve.setunit(unit);
+        }
+extern "C" JNIEXPORT void  JNICALL   fromjava(setunit)(JNIEnv *env, jclass cl,jint unit) {
+        setallunit(unit);
 	}

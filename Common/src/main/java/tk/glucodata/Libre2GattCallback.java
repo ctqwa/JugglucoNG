@@ -59,15 +59,15 @@ import static tk.glucodata.Natives.hasalarmloss;
 import static tk.glucodata.Natives.processTooth;
 
 
-public class MyGattCallback extends SuperGattCallback {
+public class Libre2GattCallback extends SuperGattCallback {
 	private int conphase = 0;
 
        static private final UUID mADCCustomServiceUUID = UUID.fromString("0000fde3-0000-1000-8000-00805f9b34fb");
-	static private final String LOG_ID = "MyGattCallback";
+	static private final String LOG_ID = "Libre2GattCallback";
 
-	public MyGattCallback(String SerialNumber, long dataptr) {
+	public Libre2GattCallback(String SerialNumber, long dataptr) {
 		super(SerialNumber,dataptr,Natives.getsensorgen(dataptr));
-		{if(doLog) {Log.d(LOG_ID, "MyGattCallback(..)");};};
+		{if(doLog) {Log.d(LOG_ID, "Libre2GattCallback(..)");};};
 	}
 
 
@@ -137,6 +137,7 @@ static void showCharacter(String label, BluetoothGattCharacteristic characterist
 		endBLEHandler();
 		if(stop) {
 			{if(doLog) {Log.i(LOG_ID,"onConnectionStateChange stop==true");};};
+                        close();
 			return;
 			}
 		long tim = System.currentTimeMillis();

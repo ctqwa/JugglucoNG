@@ -330,7 +330,7 @@ is also used by Juggluco on Android 6, 7 and 7.1</p>
 <a href="https://www.juggluco.nl/"><font color="#ffffff"><font face="Cambria, serif"><font size="4" style="font-size: 14pt"><b>Juggluco</b></font></font></font></a><font color="#ffffff">
 is an applet for the control of blood glucose by people with
 diabetes. It can scan Freestyle Libre (0 and 2) sensors (via NFC) and
-receive (via Bluetooth) glucose values from </font><font color="#4f81bd"><i><b>Freestyle Libre 2</b></i></font><font color="#ffffff"> and </font><font color="#4f81bd"><i><b>3</b></i></font><font color="#ffffff">, </font><font color="#4f81bd"><b><i>Sibionics GS1Sb</b></i></font><font color="#ffffff"> and </font><b><i><font color="#4f81bd">Dexcom G7/ONE+</b></i></font><font color="#ffffff"> sensors.</font><font color="#ffffff"></p>
+receive (via Bluetooth) glucose values from </font><font color="#4f81bd"><i><b>Freestyle Libre 2</b></i></font><font color="#ffffff"> and </font><font color="#4f81bd"><i><b>3</b></i></font><font color="#ffffff">, </font><font color="#4f81bd"><b><i>Sibionics GS1Sb</b></i></font><font color="#ffffff">, </font><b><i><font color="#4f81bd">Dexcom G7/ONE+</b></i></font><font color="#ffffff"> and </font><b><i><font color="#4f81bd">Accu-Chek SmartGuide</b></i></font><font color="#ffffff"> sensors.</font><font color="#ffffff"></p>
 <p style="line-height: 115%; margin-bottom: 0in"><font color="#ffffff">When
 the program is run for the first time, you can scan a Freestyle Libre </font><font color="#ffffff"><b>2</b></font><font color="#ffffff">
 sensor by holding it against the NFC sensor in your smartphone.
@@ -342,10 +342,9 @@ used to activate the sensor in <a href="https://www.juggluco.nl/Jugglucohelp/lib
 data-&gt;Libreview</a>, press <a href="https://www.juggluco.nl/Jugglucohelp/getaccountidhelp.html">&quot;Get
 Account ID&quot;</a> and wait for the Account ID to arrive before
 scanning. </font></p><p><font color="#ffffff">To connect to</font><font color="#ffffff">
-</font><font color="#4f81bd"><i><b>Sibionics
-GS1Sb</b></i></font><font color="#ffffff">  and </font><font color="#4f81bd"><b><i>Dexcom G7/ONE+</b></i></font><font color="#ffffff"> 
-sensors </font><font color="#ffffff">you need to scan their data
-matrix with left menu-&gt;Photo.</font> Dexcom G7/ONE+ sensors are paired via Bluetooth, which you have to accept on most phones. Agreeing you have to do very fast otherwise you have to wait another 5 minutes. So prevent the screen from turning off. On Samsung Galaxy Watch 4 and 7 you don’t need to agree to pair. Used up Dexcom G7/ONE+ sensors remain active via Bluetooth for a long time after they stopped recording glucose values. To prevent Juggluco from trying to pair with the wrong sensor, keep old sensors out of Bluetooth reach (for example 15 meters away in the microwave), especially when an old sensor has the same pincode as the new sensor. Turn off (force stop or uninstall) apps and devices that previously connected with the sensor.</p
+</font><font color="#4f81bd"><i><b>Sibionics GS1Sb</b></i></font><font color="#ffffff">, </font><font color="#4f81bd"><b><i>Dexcom G7/ONE+</b></i></font><font color="#ffffff"></font> and <font color="#4f81bd"><b><i>Accu-Chek SmartGuide</b></i></font><font color="#ffffff"> sensors </font><font color="#ffffff">you need to scan their data
+matrix with left menu-&gt;Photo.</font> Dexcom G7/ONE+ sensors are paired via Bluetooth, which you have to accept on most phones. Agreeing you have to do very fast otherwise you have to wait another 5 minutes. So prevent the screen from turning off. On Samsung Galaxy Watch 4 and 7 you don’t need to agree to pair. Used up Dexcom G7/ONE+ sensors remain active via Bluetooth for a long time after they stopped recording glucose values. To prevent Juggluco from trying to pair with the wrong sensor, keep old sensors out of Bluetooth reach (for example 15 meters away in the microwave), especially when an old sensor has the same pincode as the new sensor. Turn off (force stop or uninstall) apps and devices that previously connected with the sensor.</p>
+<p>See <a href="https://www.juggluco.nl/Juggluco/sensors">https://www.juggluco.nl/Juggluco/sensors</a> for more information about connecting to sensors.</p>
 <p style="line-height: 115%; margin-bottom: 0in"><font color="#ffffff"><span lang="en-US">The
 program contains four</span> <font color="#4f81bd"><font face="Cambria, serif"><font size="3" style="font-size: 13pt"><span lang="en-US"><b>menus</b></span></font></font></font><span lang="en-US">;
 by touching on an empty part of the display you can open a</span>
@@ -2418,6 +2417,9 @@ restrict doses to doses from <b>after</b> a certain date and time.
 When hundreds of doses are present in the memory of the pen, it can
 take more than 30 seconds before they are all received via NFC by
 Juggluco.</p>
+<p>Some blood glucose meters can send finger prick
+blood glucose measurements via Bluetooth to Juggluco. See left
+menu→Settings→Exchange data→ <b><a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeterList.html">Glucose Meters</a></b>.</p>
 <p>Under Left menu-&gt;Settings-&gt;<a href="https://www.juggluco.nl/Jugglucohelp/labelhelp.html">Number
 Labels</a> is also specified under which label you enter the
 carbohydrates of a meal. In <i>New amount</i>, a <b>Meal</b> button
@@ -2925,6 +2927,85 @@ right middle menu→Stream and still see all values.</p>
 <br/>
 
 </p>
+]]>
+</string>
+<string name="GlucoseMeter" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/GlucoseMeter.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/GlucoseMeter.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeter.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Glucose meter</h1>
+<p style="line-height: 100%; margin-bottom: 0cm">Juggluco will only
+add glucose values with a timestamp later than the specified date and
+time. Change to a later date and time if earlier glucose values are
+already present in Juggluco.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">Select the label for
+blood glucose.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">The first time you
+need to bring the glucose meter in PAIRING mode, for example by long
+pressing the button of the powered off meter until a blue light
+blinks.</p>
+<p><br></p>
+<p><br></p>
+]]>
+</string>
+<string name="GlucoseMeterList" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/GlucoseMeterList.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/GlucoseMeterList.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/GlucoseMeterList.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Glucose meter list</h1>
+<p style="line-height: 100%; margin-bottom: 0cm">Juggluco can receive
+blood glucose test measurements via Bluetooth from some blood glucose
+meters.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">If you have a
+Contour Next ONE, you can add it to Juggluco by scanning the data
+matrix on the glucose meter with left menu→Photo. 
+</p>
+<p style="line-height: 100%; margin-bottom: 0cm">For other meters,
+you need to press “Find devices” and press the device when it is
+found.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">A screen will be
+presented on which you have to select the label for blood glucose and
+specify from what date and time you will receive glucose
+measurements.</p>
+<p style="line-height: 100%; margin-bottom: 0cm">The first time you
+need to bring the glucosemeter in PAIRING mode, for example by long
+pressing the button of the powered off meter until a blue light
+blinks.</p>
+<br>
+<p>Juggluco shows here the glucose meters already used with Juggluco.</p>
+<p>For every glucose meter, the device name and device address is
+shown as can also be viewed under “Connected Devices” in Androids
+settings.</p>
+<p><b>Last</b>: time of last glucose value received from this glucose
+meter.</p>
+<p><b>(Dis)Connected:</b> last time (dis)connected</p>
+<p><b>No new data: </b><span style="font-weight: normal">At this time
+there was a successful exchange with the glucose meter, but there was
+no new data;</span></p>
+<p><b>New data:</b><span style="font-weight: normal"> received new
+data at that time.</span></p>
+<p style="line-height: 100%; margin-bottom: 0cm"><b>Active</b><span style="font-weight: normal">:
+</span><span style="font-weight: normal">If you uncheck “</span><i><span style="font-weight: normal">Active”</span></i><span style="font-weight: normal">
+Juggluco will no longer connect to </span><span style="font-weight: normal">the
+glucose meter.</span></p>
+<p><br></p>
+<p><br></p>
+]]>
+</string>
+<string name="DeviceList" >
+<![CDATA[
+<p><a href="https://www.juggluco.nl/Jugglucohelp/de/DeviceList.html">de</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/nl/DeviceList.html">nl</a>&emsp;&emsp;<a href="https://www.juggluco.nl/Jugglucohelp/DeviceList.html?lang=en">en</a>&emsp;&emsp;</p><h1 class="western">Glucose meter
+devices</h1>
+<p>Scans for Glucose Meter devices. Found devices are displayed here.
+Connected devices will not be found. The first time, devices need to
+be brought in pairing mode, for example by starting the device by
+long pressing the button until a blue light blinks. 
+</p>
+<p>When the device is displayed, press it and select the blood
+glucose variable. If glucose readings from this meter are already
+present in Juggluco you can specify that only glucose data from a
+later date are added to prevent duplicates.</p>
+<p>Press <i>Save</i> to use this glucose meter, or <i>Cancel</i> to
+not use it.</p>
+<p>If you have a Contour next ONE glucose meter, you can also scan
+the data matrix with left menu→Photo instead of selecting it from
+this list.</p>
 ]]>
 </string>
 </resources>
