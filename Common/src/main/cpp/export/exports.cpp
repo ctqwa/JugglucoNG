@@ -376,6 +376,7 @@ extern bool allsavemeals(int handle,uint32_t starttime,uint32_t endtime,int maxc
 
 extern bool savemeals(FILE* handle,uint32_t starttime,uint32_t endtime);
 bool savemeals(FILE * handle,uint32_t starttime,uint32_t endtime) {
+    const bool mealvar=settings->data()->mealvar;
 	MealSave mealsave;
 	extern vector<Numdata*> numdatas;
 	//NumIter<Num> *numiters=mknumiters();
@@ -386,7 +387,7 @@ bool savemeals(FILE * handle,uint32_t starttime,uint32_t endtime) {
 	tostart(numiters,basecount);
 	for(int oldest;(oldest=ifindoldest(numiters,0,basecount))>=0;) {
 		const Num *num=numiters[oldest].prev();
-		if(num->mealptr) {
+		if(num->type==mealvar&&num->mealptr) {
 			if(!mealsave.savemeal(handle,num))
 				return false;
 			}

@@ -157,7 +157,7 @@ inline bool putiphasfamport(const struct sockaddr *addrptr,struct sockaddr_in6 *
 			break;
 		default: return false;
 		};
-	LOGSTRING("putip succes\n");
+	LOGAR("putip succes");
 	return true;
 	}
 inline bool putip(const struct sockaddr *addrptr,struct sockaddr_in6 *outip) {
@@ -172,7 +172,7 @@ inline bool putip(const struct sockaddr *addrptr,struct sockaddr_in6 *outip) {
 			break;
 		default: return false;
 		};
-	LOGSTRING("putip succes\n");
+	LOGAR("putip succes");
 	return true;
 	}
 

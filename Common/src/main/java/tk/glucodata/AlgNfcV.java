@@ -199,7 +199,7 @@ static private byte[] wholenfccmdtimes(final Tag tag, final byte[] cmd,int times
             } 
         finally {
             try {
-                {if(doLog) {Log.i(LOG_ID,"nfcvTag.close()");};};
+                if(doLog) {Log.i(LOG_ID,"nfcvTag.close()");};
                 nfcvTag.close();
             } catch (Exception e) {
                Log.stack(LOG_ID, "Error closing tag ", e);

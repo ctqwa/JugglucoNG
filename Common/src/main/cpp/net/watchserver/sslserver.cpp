@@ -28,6 +28,7 @@ char privatekey[]="privkey.pem";
 #include <dlfcn.h>
 #ifdef JUGGLUCO_APP
 #include <android/dlext.h>
+#define DLSYMS_SSL 1
 #endif
 #include <unistd.h>
 
@@ -37,43 +38,53 @@ char privatekey[]="privkey.pem";
 #include <sys/prctl.h>
 #endif
 #include "strconcat.hpp"
-#include "openssl/ssl.h"
-#include "openssl/err.h"
 #include "logs.hpp"
 #include "inout.hpp"
 #include "watchserver.hpp"
 #include "destruct.hpp"
-const SSL_METHOD *(*TheMethod)(void);
-int (*SSL_library_initptr)(void)=NULL;
-void (*OPENSSL_add_all_algorithms_noconfptr)(void)=NULL;
-
-void (*SSL_load_error_stringsptr)(void)=NULL;
+#ifdef DLSYMS_SSL
+#include "openssl/ssl.h"
+#include "openssl/err.h"
+static const SSL_METHOD *(*TheMethod)(void);
+static int (*SSL_library_initptr)(void)=NULL;
+static void (*OPENSSL_add_all_algorithms_noconfptr)(void)=NULL;
+static void (*SSL_load_error_stringsptr)(void)=NULL;
+static SSL_CTX *(*SSL_CTX_newptr)(const SSL_METHOD *method);
+static int (*SSL_CTX_use_certificate_chain_fileptr)(SSL_CTX *ctx, const char *file);
+static int (*SSL_CTX_use_PrivateKey_fileptr)(SSL_CTX *ctx, const char *file, int type);
+static int (*SSL_CTX_check_private_keyptr)(const SSL_CTX *ctx);
+static int (*SSL_acceptptr)(SSL *ssl);
+static int (*SSL_readptr)(SSL *ssl, void *buf, int num);
+static int (*SSL_writeptr)(SSL *ssl, const void *buf, int num);
+static int (*SSL_get_fdptr)(const SSL *ssl);
+static void (*SSL_freeptr)(SSL *ssl);
+static SSL *(*SSL_newptr)(SSL_CTX *ctx);
+static int (*SSL_set_fdptr)(SSL *ssl, int fd);
+static void (*SSL_CTX_freeptr)(SSL_CTX *ctx);
+extern void (*ERR_print_errors_cbptr)(int (*cb)(const char *str, size_t len, void *u), void *u);
+#else
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#define TheMethod SSLv23_method
+#define SSL_library_initptr SSL_library_init
+#define OPENSSL_add_all_algorithms_noconfptr OPENSSL_add_all_algorithms_noconf
+#define SSL_load_error_stringsptr SSL_load_error_strings
+#define SSL_CTX_newptr SSL_CTX_new
+#define SSL_CTX_use_certificate_chain_fileptr SSL_CTX_use_certificate_chain_file
+#define SSL_CTX_use_PrivateKey_fileptr SSL_CTX_use_PrivateKey_file
+#define SSL_CTX_check_private_keyptr SSL_CTX_check_private_key
+#define SSL_acceptptr SSL_accept
+#define SSL_readptr SSL_read
+#define SSL_writeptr SSL_write
+#define SSL_get_fdptr SSL_get_fd
+#define SSL_freeptr SSL_free
+#define SSL_newptr SSL_new
+#define SSL_set_fdptr SSL_set_fd
+#define SSL_CTX_freeptr SSL_CTX_free
+#define ERR_print_errors_cbptr ERR_print_errors_cb
+#endif
 
 extern int logcallback(const char *str, size_t len, void *u) ;
-
-SSL_CTX *(*SSL_CTX_newptr)(const SSL_METHOD *method);
-
-extern void (*ERR_print_errors_cbptr)(int (*cb)(const char *str, size_t len, void *u), void *u);
-int (*SSL_CTX_use_certificate_chain_fileptr)(SSL_CTX *ctx, const char *file);
-
-//int (*SSL_CTX_use_certificate_ASN1ptr)(SSL_CTX *ctx, int len, unsigned char *d);
-//int (*SSL_CTX_use_PrivateKey_ASN1ptr)(int pk, SSL_CTX *ctx, unsigned char *d, long len);
-int (*SSL_CTX_use_PrivateKey_fileptr)(SSL_CTX *ctx, const char *file, int type);
-//const char* (*ERR_reason_error_stringptr)(unsigned long e);
-//unsigned long (*ERR_get_errorptr)(void);
-//unsigned long (*ERR_peek_last_errorptr)(void);
-
-
-int (*SSL_CTX_check_private_keyptr)(const SSL_CTX *ctx);
-int (*SSL_acceptptr)(SSL *ssl);
-int (*SSL_readptr)(SSL *ssl, void *buf, int num);
-int (*SSL_writeptr)(SSL *ssl, const void *buf, int num);
-int (*SSL_get_fdptr)(const SSL *ssl);
-void (*SSL_freeptr)(SSL *ssl);
-SSL *(*SSL_newptr)(SSL_CTX *ctx);
-int (*SSL_set_fdptr)(SSL *ssl, int fd);
-void (*SSL_CTX_freeptr)(SSL_CTX *ctx);
-
 void  sslerror(const char *format) {
 	ERR_print_errors_cbptr(logcallback,(void*)format);
 	}
@@ -108,6 +119,7 @@ extern void *opencrypto();
 extern void *openssl();
 extern void * dlopener(std::string_view filename,int flags);
 std::string loadsslfunctions() {
+#ifdef DLSYMS_SSL
    #ifndef  JUGGLUCO_APP
    char cryptolib[]="libcrypto.so.3";
    void* cryptohandle;
@@ -172,6 +184,7 @@ std::string loadsslfunctions() {
    symtest(SSL_new);
    symtest(SSL_set_fd);
    symtest(SSL_CTX_free);
+#endif
    return "";
  }
 
@@ -280,9 +293,18 @@ const std::string initsslserver(void) {
  class init{
 	 public:
 		init() {
-		    if(SSL_library_initptr) SSL_library_initptr();
-		    if(OPENSSL_add_all_algorithms_noconfptr) OPENSSL_add_all_algorithms_noconfptr();
-		    if(SSL_load_error_stringsptr) SSL_load_error_stringsptr();  
+        #ifdef DLSYMS_SSL
+		    if(SSL_library_initptr) 
+        #endif
+                SSL_library_initptr();
+        #ifdef DLSYMS_SSL
+		    if(OPENSSL_add_all_algorithms_noconfptr) 
+        #endif
+                OPENSSL_add_all_algorithms_noconfptr();
+        #ifdef DLSYMS_SSL
+		    if(SSL_load_error_stringsptr) 
+        #endif
+                SSL_load_error_stringsptr();  
 		    } 
 	    };
  static init _init;
