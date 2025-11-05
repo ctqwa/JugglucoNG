@@ -67,7 +67,7 @@
             android:label="@string/app_name"
             android:launchMode="singleTask"
             android:resizeableActivity="true"
-            android:screenOrientation="reverseLandscape"
+            android:screenOrientation="fullSensor"
 	    >
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
