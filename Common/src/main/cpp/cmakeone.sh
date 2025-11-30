@@ -1,3 +1,3 @@
-APPDIR=/home/jka/src/android/Glucodata
-export OUTPUTDIR=$APPDIR/app/build/mij/debug
+APPDIR=$(cd "$(dirname "$0")"/../../../.. && pwd)
+export OUTPUTDIR=$APPDIR/Common/build/mij/debug
 sh cmakemake.sh

@@ -1,5 +1,5 @@
 #s/\/home\/jka\/src\/android\/Librefree/$APPDIR/g
-APPDIR=/home/jka/src/android/Glucodata
+APPDIR=$(cd "$(dirname "$0")"/../../../.. && pwd)
 #ABI=armeabi-v7a
 model=$4
 ANVERSION=$3

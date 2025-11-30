@@ -1,4 +1,4 @@
-APPDIR=/home/jka/src/android/Glucodata
+APPDIR=$(cd "$(dirname "$0")"/../../../.. && pwd)
 #SU=/data/local/tmp/mtk-su
 #SU=/sbin/su
 #SU=/su/bin/su

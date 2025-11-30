@@ -1,11 +1,11 @@
-APPDIR=/home/jka/src/android/Glucodata
+APPDIR=$(cd "$(dirname "$0")"/../../../.. && pwd)
 #SU=/data/local/tmp/mtk-su
 #SU=/sbin/su
 SU=/su/bin/su
 #ADB="adb -s RQ3006DWZL "
 #ADB="adb -s  JQE6R18402000126 "
 ADB="adb -s  75bc9a40 "
-export OUTPUTDIR=$APPDIR/app/build/mij/debug
+export OUTPUTDIR=$APPDIR/Common/build/mij/debug
 
 if test ! -d $OUTPUTDIR
 then

@@ -1,10 +1,7 @@
-#s/\/home\/jka\/src\/android\/Librefree/$APPDIR/g
-#mkdir -p /tmp/output/CMakeFiles/
-APPDIR=/home/jka/src/android/Glucodata
+APPDIR=$(cd "$(dirname "$0")"/../../../.. && pwd)
 ANDROID_ABI=x86
 OUTPUTDIR=/tmp/glucose$ANDROID_ABI
-#/home/jka/Android/Sdk/cmake/3.10.2.4988404/bin/cmake\
-cmake -H$APPDIR/app/src/main/cpp\
+cmake -H$APPDIR/Common/src/main/cpp\
 	-DCMAKE_CXX_FLAGS=-std=c++20\
 	-DCMAKE_FIND_ROOT_PATH=$OUTPUTDIR\
 	-DCMAKE_BUILD_TYPE=Debug\

@@ -50,9 +50,7 @@ test:
 #ACXX=g++
 #ACC=gcc
 #LIBRARYPATH=/data/local/tmp/lib/$(APP_ABI)
-#LIBRARYPATH=/o/home/jka/src/android/librelibs/2.4.2/$(APP_ABI)
-#LIBRARYPATH=/o/home/jka/src/android/librelibs/2.4.0/$(APP_ABI)
-LIBRARYPATH=/o/home/jka/src/android/librelibs/2.5.2/$(APP_ABI)
+LIBRARYPATH=../jniLibs/$(APP_ABI)
 
 #ACLDFLAGS+= -O0  -g  -fno-exceptions   -rdynamic 
 #ACLDFLAGS+= -O0  -g  -fno-exceptions   -Wl,--export-dynamic -Wl,-Bdynamic

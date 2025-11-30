@@ -9,10 +9,10 @@ CXX=clang++
 #receive:receive.o mkdirs.o
 all: backup sender
 sendmagic.h:sendmagic 
-	/home/jka/apps/bed/utils/bin2byte sendmagic sendmagic sendmagic.h uit
+#	/home/jka/apps/bed/utils/bin2byte sendmagic sendmagic sendmagic.h uit
 
 receivemagic.h:receivemagic 
-	/home/jka/apps/bed/utils/bin2byte receivemagic receivemagic receivemagic.h uit
+#	/home/jka/apps/bed/utils/bin2byte receivemagic receivemagic receivemagic.h uit
 
 
 sender: sender.o  sendcommands.o netstuff.o
