@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Gradle / build outputs
+.gradle/
+build/
+*/build/
+
+# CMake / NDK build cache
+.cxx/
+
+# Android local config
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+
+# Keystores (keep them private)
+*.jks
+
+# Misc
+*.iml
