@@ -1,8 +1,6 @@
 ![Logo-icon](Common/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp)
-
-![Screenshot](juggluco_screenshot.png)
-
 # JugglucoNG 
+![Screenshot](juggluco_screenshot.png)
 ## 0.1.20
 Changelog:
 1. Sibionics 2 reset error fixes
