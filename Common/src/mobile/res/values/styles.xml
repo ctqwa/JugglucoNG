@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
-       <item name="windowActionBar">false</item>
-    <item name="android:windowActionBar">false</item>
+<style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Material 3 Color Palette -->
+    <item name="colorPrimary">@color/dark_blue</item>
+    <item name="colorOnPrimary">@color/white</item>
+    <item name="colorPrimaryContainer">@color/light_blue</item>
+    <item name="colorOnPrimaryContainer">@color/black</item>
+    
+    <item name="windowActionBar">false</item>
+    <item name="windowNoTitle">true</item>
     <item name="android:windowContentOverlay">@null</item>
     <item name="android:textViewStyle">@style/MyTextViewStyle</item>
      <item name="android:textAppearanceButton">@style/textAppearanceButton</item>
-      <item name="android:spinnerStyle">@android:style/Widget.Holo.Spinner</item>
+      <!-- <item name="android:spinnerStyle">@android:style/Widget.Holo.Spinner</item> -->
            <item name="android:windowSwipeToDismiss">false</item>
     <!-- Set the navigation bar to 50% translucent white -->
 <!--    <item name="android:navigationBarColor">#80FFFFFF</item> -->
