@@ -1,7 +1,6 @@
-![Screenshot](juggluco_screenshot.png)
 ![Logo-icon](Common/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp)
-
 # JugglucoNG
+![Screenshot](juggluco_screenshot.png)
 ## 0.2.0-Alpha
 Initial build with Material 3 UI.
 Sibionics 2 Auto Reset, more buttons.
