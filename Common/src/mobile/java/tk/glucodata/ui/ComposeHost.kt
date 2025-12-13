@@ -397,6 +397,10 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
             composable("settings") { SettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
             composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
             composable("settings/mirror") { MirrorSettingsScreen(navController) }
+            composable("settings/mirror/edit/{pos}") { backStackEntry ->
+                val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
+                MirrorEditScreen(navController, pos)
+            }
         }
     }
 }
@@ -1107,6 +1111,22 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("Cancel") } }
             )
         }
+
+        ListItem(
+            headlineContent = { Text("Use Google Scan") },
+            supportingContent = { Text("Use Google Play Services for QR scanning") },
+            trailingContent = {
+                var googleScan by remember { mutableStateOf(Natives.getGoogleScan()) }
+                Switch(
+                    checked = googleScan,
+                    onCheckedChange = { 
+                        Natives.setGoogleScan(it)
+                        googleScan = it
+                    }
+                )
+            }
+        )
+
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
         Text("Exchange Data", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
@@ -1134,6 +1154,8 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             supportingContent = { Text("Upload to Nightscout") },
             modifier = Modifier.clickable { navController.navigate("settings/nightscout") }
         )
+
+
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
@@ -1843,7 +1865,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
 
                                 horizontalArrangement = Arrangement.SpaceBetween
-                            )
+                            ) {}
 //                            {
 //                                Text("1d", style = MaterialTheme.typography.labelSmall)
 //                                Text("22d", style = MaterialTheme.typography.labelSmall)
@@ -1904,156 +1926,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 }
 }
 
-@Composable
-fun MirrorSettingsScreen(navController: androidx.navigation.NavController) {
-    val context = LocalContext.current
-    val activity = context as? Activity
-    // State for sensors (would ideally be in ViewModel, but using Natives directly for now as per pattern)
-    // We need a way to refresh this list. Triggering on composition or button press.
-    var activeSensors by remember { mutableStateOf(longArrayOf()) }
-    var useBluetooth by remember { mutableStateOf(Natives.getusebluetooth()) }
 
-    LaunchedEffect(Unit) {
-        activeSensors = Natives.activeSensorPtrs()
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Mirror Settings") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-        ) {
-            Text("ICE Mirroring (Internet)", style = MaterialTheme.typography.titleMedium)
-            Text("Share or receive data securely over the internet.", style = MaterialTheme.typography.bodySmall)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ICE / Home Net Buttons
-            // Send
-            Text("Send Data", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (activity is tk.glucodata.MainActivity) {
-                             val pos = Natives.makeHomeSender()
-                             if (pos >= 0) {
-                                  val json = Natives.getbackJson(pos)
-                                  tk.glucodata.QRmake.show(activity, json)
-                             }
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Home Net")
-                }
-                OutlinedButton(
-                    onClick = {
-                        if (activity is tk.glucodata.MainActivity) {
-                             val pos = Natives.makeICESender()
-                             if (pos >= 0) {
-                                  val json = Natives.getbackJson(pos)
-                                  tk.glucodata.QRmake.show(activity, json)
-                             }
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Internet (ICE)")
-                }
-            }
-
-            // Receive
-            Text("Receive Data", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (activity is tk.glucodata.MainActivity) {
-                             val pos = Natives.makeHomeReceiver()
-                             if (pos >= 0) {
-                                  val json = Natives.getbackJson(pos)
-                                  tk.glucodata.QRmake.show(activity, json)
-                             }
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Home Net")
-                }
-                OutlinedButton(
-                    onClick = {
-                        if (activity is tk.glucodata.MainActivity) {
-                             val pos = Natives.makeICEReceiver()
-                             if (pos >= 0) {
-                                  val json = Natives.getbackJson(pos)
-                                  tk.glucodata.QRmake.show(activity, json)
-                             }
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Internet (ICE)")
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            // Sensor Mirroring (Active Sensors)
-            Text("Sensor Mirroring", style = MaterialTheme.typography.titleMedium)
-            
-            ListItem(
-                headlineContent = { Text("Use Bluetooth") },
-                supportingContent = { Text("Enable Bluetooth for sensor connections") },
-                trailingContent = {
-                    Switch(
-                        checked = useBluetooth,
-                        onCheckedChange = { 
-                            Natives.setusebluetooth(it)
-                            useBluetooth = it
-                            // Trigger native update if needed, typically handled by MainActivity onResume/Changes
-                            if (activity is tk.glucodata.MainActivity) {
-                                // MirrorSensors.java does: act.setbluetoothmain(isChecked); act.requestRender(); doonback(); bluediag.start(act);
-                                // We might need to expose setbluetoothmain or just trust Natives + restart
-                                activity.setbluetoothmain(it)
-                            }
-                        }
-                    )
-                }
-            )
-
-            if (activeSensors.isEmpty()) {
-                Text("No active mirrored sensors found.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp))
-            } else {
-                Text("Active Sensors:", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(vertical=8.dp))
-                activeSensors.forEach { ptr ->
-                    val name = Natives.namefromSensorptr(ptr) ?: "Unknown Sensor"
-                    ListItem(
-                        headlineContent = { Text(name) },
-                        trailingContent = {
-                            Button(onClick = {
-                                Natives.finishfromSensorptr(ptr)
-                                activeSensors = Natives.activeSensorPtrs() // Refresh list
-                                Toast.makeText(context, "Sensor finished", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Text("Finish")
-                            }
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

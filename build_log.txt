@@ -1,0 +1,344 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/ctqwa/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/lib/native-platform-0.22-milestone-28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Reusing configuration cache.
+> Task :Common:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :Common:preBuild UP-TO-DATE
+> Task :Common:preMobileLibre3SiDexGoogleReleaseBuild UP-TO-DATE
+> Task :Common:generateMobileLibre3SiDexGoogleReleaseResValues UP-TO-DATE
+> Task :Common:extractProguardFiles UP-TO-DATE
+> Task :Common:buildKotlinToolingMetadata UP-TO-DATE
+> Task :Common:compileMobileLibre3SiDexGoogleReleaseAidl NO-SOURCE
+> Task :Common:mergeMobileLibre3SiDexGoogleReleaseJniLibFolders UP-TO-DATE
+> Task :Common:generateMobileLibre3SiDexGoogleReleaseBuildConfig UP-TO-DATE
+> Task :Common:createMobileLibre3SiDexGoogleReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :Common:generateMobileLibre3SiDexGoogleReleaseResources UP-TO-DATE
+> Task :Common:extractDeepLinksMobileLibre3SiDexGoogleRelease UP-TO-DATE
+> Task :Common:mapMobileLibre3SiDexGoogleReleaseSourceSetPaths UP-TO-DATE
+> Task :Common:javaPreCompileMobileLibre3SiDexGoogleRelease UP-TO-DATE
+> Task :Common:mergeMobileLibre3SiDexGoogleReleaseResources UP-TO-DATE
+> Task :Common:checkMobileLibre3SiDexGoogleReleaseAarMetadata UP-TO-DATE
+> Task :Common:mergeMobileLibre3SiDexGoogleReleaseStartupProfile UP-TO-DATE
+> Task :Common:extractMobileLibre3SiDexGoogleReleaseVersionControlInfo UP-TO-DATE
+> Task :Common:validateSigningMobileLibre3SiDexGoogleRelease UP-TO-DATE
+> Task :Common:writeMobileLibre3SiDexGoogleReleaseAppMetadata UP-TO-DATE
+> Task :Common:writeMobileLibre3SiDexGoogleReleaseSigningConfigVersions UP-TO-DATE
+> Task :Common:mergeMobileLibre3SiDexGoogleReleaseShaders UP-TO-DATE
+> Task :Common:compileMobileLibre3SiDexGoogleReleaseShaders NO-SOURCE
+> Task :Common:mergeMobileLibre3SiDexGoogleReleaseArtProfile UP-TO-DATE
+> Task :Common:generateMobileLibre3SiDexGoogleReleaseAssets UP-TO-DATE
+> Task :Common:processMobileLibre3SiDexGoogleReleaseNavigationResources UP-TO-DATE
+> Task :Common:compileMobileLibre3SiDexGoogleReleaseNavigationResources UP-TO-DATE
+> Task :Common:expandMobileLibre3SiDexGoogleReleaseL8ArtProfileWildcards UP-TO-DATE
+> Task :Common:dataBindingMergeDependencyArtifactsMobileLibre3SiDexGoogleRelease UP-TO-DATE
+> Task :Common:collectMobileLibre3SiDexGoogleReleaseDependencies UP-TO-DATE
+> Task :Common:sdkMobileLibre3SiDexGoogleReleaseDependencyData UP-TO-DATE
+> Task :Common:mergeMobileLibre3SiDexGoogleReleaseAssets UP-TO-DATE
+> Task :Common:dataBindingGenBaseClassesMobileLibre3SiDexGoogleRelease UP-TO-DATE
+> Task :Common:checkMobileLibre3SiDexGoogleReleaseDuplicateClasses UP-TO-DATE
+> Task :Common:compressMobileLibre3SiDexGoogleReleaseAssets UP-TO-DATE
+> Task :Common:configureCMakeRelWithDebInfo[armeabi-v7a]-4
+> Task :Common:configureCMakeRelWithDebInfo[x86]-4
+> Task :Common:configureCMakeRelWithDebInfo[arm64-v8a]-4
+> Task :Common:configureCMakeRelWithDebInfo[x86_64]-4
+> Task :Common:processMobileLibre3SiDexGoogleReleaseMainManifest UP-TO-DATE
+> Task :Common:processMobileLibre3SiDexGoogleReleaseManifest UP-TO-DATE
+> Task :Common:processMobileLibre3SiDexGoogleReleaseManifestForPackage UP-TO-DATE
+> Task :Common:processMobileLibre3SiDexGoogleReleaseResources UP-TO-DATE
+
+> Task :Common:buildCMakeRelWithDebInfo[x86_64]-4 FAILED
+C/C++: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86_64'
+C/C++: /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=x86_64-none-linux-android26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+C/C++:   272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86_64/<scratch space>:4:1: note: expanded from here
+C/C++:     4 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+C/C++:    47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86_64/<scratch space>:377:1: note: expanded from here
+C/C++:   377 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: 1 error generated.
+
+> Task :Common:buildCMakeRelWithDebInfo[x86]-4 FAILED
+C/C++: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86'
+C/C++: /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=i686-none-linux-android26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+C/C++:   272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86/<scratch space>:178:1: note: expanded from here
+C/C++:   178 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+C/C++:    47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86/<scratch space>:164:1: note: expanded from here
+C/C++:   164 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: 1 error generated.
+
+> Task :Common:buildCMakeRelWithDebInfo[armeabi-v7a]-4 FAILED
+C/C++: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/armeabi-v7a'
+C/C++: /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=armv7-none-linux-androideabi26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+C/C++:   272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/armeabi-v7a/<scratch space>:178:1: note: expanded from here
+C/C++:   178 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+C/C++:    47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/armeabi-v7a/<scratch space>:164:1: note: expanded from here
+C/C++:   164 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: 1 error generated.
+
+> Task :Common:buildCMakeRelWithDebInfo[arm64-v8a]-4 FAILED
+C/C++: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/arm64-v8a'
+C/C++: /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=aarch64-none-linux-android26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+C/C++:   272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/arm64-v8a/<scratch space>:4:1: note: expanded from here
+C/C++:     4 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+C/C++:    47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+C/C++:       | ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+C/C++:    23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+C/C++:       |                     ^
+C/C++: /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/arm64-v8a/<scratch space>:377:1: note: expanded from here
+C/C++:   377 | Java_tk_glucodata_Natives_getbackupHasHostname
+C/C++:       | ^
+C/C++: 1 error generated.
+
+> Task :Common:compileMobileLibre3SiDexGoogleReleaseKotlin FAILED
+e: file:///Users/ctqwa/Dev/Android/JugglucoNG/Common/src/mobile/java/tk/glucodata/ui/ComposeHost.kt:1136:13 Unresolved reference 'modifier'.
+e: file:///Users/ctqwa/Dev/Android/JugglucoNG/Common/src/mobile/java/tk/glucodata/ui/ComposeHost.kt:1137:9 Syntax error: Expecting an element.
+e: file:///Users/ctqwa/Dev/Android/JugglucoNG/Common/src/mobile/java/tk/glucodata/ui/MirrorSettingsScreen.kt:184:61 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/ctqwa/Dev/Android/JugglucoNG/Common/src/mobile/java/tk/glucodata/ui/MirrorSettingsScreen.kt:242:65 Unresolved reference 'getbackupDetect'.
+e: file:///Users/ctqwa/Dev/Android/JugglucoNG/Common/src/mobile/java/tk/glucodata/ui/MirrorSettingsScreen.kt:252:65 Unresolved reference 'getbackupTestIP'.
+
+FAILURE: Build completed with 5 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':Common:buildCMakeRelWithDebInfo[armeabi-v7a]-4'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/armeabi-v7a'
+  [1/3] Building CXX object CMakeFiles/g.dir/backupjava.cpp.o
+  FAILED: CMakeFiles/g.dir/backupjava.cpp.o 
+  /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=armv7-none-linux-androideabi26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+    272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:178:1: note: expanded from here
+    178 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+     47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:164:1: note: expanded from here
+    164 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  1 error generated.
+  ninja: build stopped: subcommand failed.
+  
+  C++ build system [build] failed while executing:
+      /Users/ctqwa/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+        -C \
+        /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/armeabi-v7a \
+        g \
+        libnative.so
+    from /Users/ctqwa/Dev/Android/JugglucoNG/Common
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':Common:buildCMakeRelWithDebInfo[x86_64]-4'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86_64'
+  [1/3] Building CXX object CMakeFiles/g.dir/backupjava.cpp.o
+  FAILED: CMakeFiles/g.dir/backupjava.cpp.o 
+  /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=x86_64-none-linux-android26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+    272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:4:1: note: expanded from here
+      4 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+     47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:377:1: note: expanded from here
+    377 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  1 error generated.
+  ninja: build stopped: subcommand failed.
+  
+  C++ build system [build] failed while executing:
+      /Users/ctqwa/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+        -C \
+        /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86_64 \
+        g \
+        libnative.so
+    from /Users/ctqwa/Dev/Android/JugglucoNG/Common
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+3: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':Common:buildCMakeRelWithDebInfo[arm64-v8a]-4'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/arm64-v8a'
+  [1/3] Building CXX object CMakeFiles/g.dir/backupjava.cpp.o
+  FAILED: CMakeFiles/g.dir/backupjava.cpp.o 
+  /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=aarch64-none-linux-android26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+    272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:4:1: note: expanded from here
+      4 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+     47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:377:1: note: expanded from here
+    377 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  1 error generated.
+  ninja: build stopped: subcommand failed.
+  
+  C++ build system [build] failed while executing:
+      /Users/ctqwa/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+        -C \
+        /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/arm64-v8a \
+        g \
+        libnative.so
+    from /Users/ctqwa/Dev/Android/JugglucoNG/Common
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+4: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':Common:buildCMakeRelWithDebInfo[x86]-4'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `/Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86'
+  [1/3] Building CXX object CMakeFiles/g.dir/backupjava.cpp.o
+  FAILED: CMakeFiles/g.dir/backupjava.cpp.o 
+  /Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=i686-none-linux-android26 --sysroot=/Users/ctqwa/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DANDROID_STL=c++_static -DANDROID__APP=1 -DDONTSCALESTROKEWIDTH -DDYNLINK -DJUGGLUCO_APP=1 -DLIBRENUMBERS=1 -DNOTIMEOUT -DUSE_MEAL -DUSE_SSL=1 -DWEAROS_MESSAGES=1 -Dg_EXPORTS -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/curve/nanovg/src -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/LibAscon/inc -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/include -I/Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/bcrypt -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -DAPPID="quotes(tk.glucodata.ng)"   -DAPPVERSION="quotes(0.2.0-Alpha)"     -DDEXCOM=1     -DSIBIONICS=1     -DLIBRE3=1  -std=gnu++26 -DRELEASEID=1 -DRELEASE=1 -DNORAWSTREAM=1 -DRELEASEDIR=1 -DNOLOG=1    -g -Wall -Wno-sign-compare -fvisibility=hidden  -Wno-vla-cxx-extension -fno-rtti -fexceptions  -DALWAYSPATH=1   -O3 -DNDEBUG  -fPIC -MD -MT CMakeFiles/g.dir/backupjava.cpp.o -MF CMakeFiles/g.dir/backupjava.cpp.o.d -o CMakeFiles/g.dir/backupjava.cpp.o -c /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:272:1: error: redefinition of 'Java_tk_glucodata_Natives_getbackupHasHostname'
+    272 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:178:1: note: expanded from here
+    178 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/backupjava.cpp:47:1: note: previous definition is here
+     47 | fromjava(getbackupHasHostname)(JNIEnv *envin, jclass cl, jint pos) {
+        | ^
+  /Users/ctqwa/Dev/Android/JugglucoNG/Common/src/main/cpp/share/fromjava.h:23:21: note: expanded from macro 'fromjava'
+     23 | #define fromjava(x) Java_tk_glucodata_Natives_ ##x
+        |                     ^
+  <scratch space>:164:1: note: expanded from here
+    164 | Java_tk_glucodata_Natives_getbackupHasHostname
+        | ^
+  1 error generated.
+  ninja: build stopped: subcommand failed.
+  
+  C++ build system [build] failed while executing:
+      /Users/ctqwa/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+        -C \
+        /Users/ctqwa/Dev/Android/JugglucoNG/Common/.cxx/RelWithDebInfo/25cs406j/x86 \
+        g \
+        libnative.so
+    from /Users/ctqwa/Dev/Android/JugglucoNG/Common
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+5: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':Common:compileMobileLibre3SiDexGoogleReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+BUILD FAILED in 2s
+42 actionable tasks: 9 executed, 33 up-to-date
+Configuration cache entry reused.

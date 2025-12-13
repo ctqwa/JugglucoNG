@@ -420,6 +420,10 @@ public class Natives {
 
         public static native boolean getbackuptestip(int pos);
 
+        public static native boolean getbackupTestLabel(int pos);
+
+        public static native boolean getbackupActiveOnly(int pos);
+
         public static native String getbackuplabel(int pos);
 
         public static native void wakestreamsender();
