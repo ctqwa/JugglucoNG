@@ -1,0 +1,322 @@
+01-03 15:06:24.304 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Dialog$$ExternalSyntheticLambda2@e645ae8
+01-03 15:06:24.305 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@bdd9501
+01-03 15:06:24.386 22537 22537 D InsetsController: hide(ime())
+01-03 15:06:24.387 22537 22537 I ImeTracker: tk.glucodata.ng.debug:b1ef523f: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:06:25.080 22537 22537 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:06:25.088 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=false device=XX:XX:XX:XX:31:57
+01-03 15:06:25.088 22537 22901 D BluetoothGatt: unregisterApp()
+01-03 15:06:25.094 22537 22901 D BluetoothGatt: close()
+01-03 15:06:25.096 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): null
+01-03 15:06:25.099 22537 22589 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:06:25.100 22537 22589 D BluetoothGatt: registerApp() - UUID=f4a8cdc2-32d1-4a9b-9881-0cb6d9f2628f
+01-03 15:06:25.102 22537 22901 D BluetoothGatt: onClientRegistered(0)
+01-03 15:06:25.105 22537 22591 D HWUI    : endAllActiveAnimators on 0xb400006f06513720 (UnprojectedRipple) with handle 0xb400006ee6496e80
+01-03 15:06:25.109 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:06:25.109 22537 22901 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:06:25.112 22537 22537 W InputEventReceiver: Failed to send outbound event on channel '2c4ecd9 tk.glucodata.ng.debug/tk.glucodata.MainActivity'.  status=DEAD_OBJECT(-32)
+01-03 15:06:25.112 22537 22537 W InputEventReceiver: channel '2c4ecd9 tk.glucodata.ng.debug/tk.glucodata.MainActivity' ~ Could not send 0 outbound event(s), status:DEAD_OBJECT
+01-03 15:06:26.603 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:06:27.087 22537 22537 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:06:27.095 22537 22537 D BluetoothGatt: close()
+01-03 15:06:27.095 22537 22537 D BluetoothGatt: unregisterApp()
+01-03 15:06:27.309 22537 22590 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:06:27.310 22537 22590 D BluetoothGatt: registerApp() - UUID=fe1fd56b-f888-4dba-bda5-dc642ff3d8c2
+01-03 15:06:27.316 22537 23379 D BluetoothGatt: onClientRegistered(0)
+01-03 15:06:27.332 22537 23379 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:06:27.332 22537 23379 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:06:27.382 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:06:28.984 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:06:29.608 22537 23379 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:06:29.609 22537 23379 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:06:29.765 22537 22901 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:06:33.345 22537 22560 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:06:41.837 22537 22628 D HistoryRepo: Room returned 23327 readings since 0
+01-03 15:06:41.982 22537 22585 D HistoryRepo: Stored 23383 readings
+01-03 15:06:41.982 22537 22585 D HistorySync: Synced 23383 readings from native
+01-03 15:06:46.548 22537 22555 I codata.ng.debug: Background young concurrent mark compact GC freed 27MB AllocSpace bytes, 0(0B) LOS objects, 55% free, 22MB/49MB, paused 403us,9.484ms total 47.878ms
+01-03 15:07:00.382 22537 22901 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:07:00.398 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=false device=XX:XX:XX:XX:31:57
+01-03 15:07:00.398 22537 22901 D BluetoothGatt: unregisterApp()
+01-03 15:07:00.400 22537 22901 D BluetoothGatt: close()
+01-03 15:07:00.405 22537 22590 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:07:00.406 22537 22590 D BluetoothGatt: registerApp() - UUID=7c30b470-0a9d-4f52-840f-b75584626030
+01-03 15:07:00.409 22537 22901 D BluetoothGatt: onClientRegistered(0)
+01-03 15:07:00.416 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:07:00.416 22537 22901 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:07:01.986 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:07:02.614 22537 23379 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:07:02.614 22537 23379 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:07:02.762 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:07:09.706 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:07:09.714 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:07:15.941 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:07:15.948 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:07:33.575 22537 22560 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:14:11.226 22537 22537 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:14:11.231 22537 22537 I ImeTracker: tk.glucodata.ng.debug:e676f006: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:11.231 22537 22537 I ImeTracker: tk.glucodata.ng.debug:e676f006: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:11.234 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:14:13.733 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:14:13.738 22537 22591 D HWUI    : endAllActiveAnimators on 0xb400006f06485040 (UnprojectedRipple) with handle 0xb400006ee646cc40
+01-03 15:14:13.743 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:14:14.321 22537 22537 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:14:14.323 22537 22537 I ImeTracker: tk.glucodata.ng.debug:6e09f597: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:14.323 22537 22537 I ImeTracker: tk.glucodata.ng.debug:6e09f597: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:14.325 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:14:16.729 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:14:16.739 22537 22591 D HWUI    : endAllActiveAnimators on 0xb400006f06485040 (UnprojectedRipple) with handle 0xb400006ee646fdf0
+01-03 15:14:16.744 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:14:17.163 22537 22537 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:14:17.165 22537 22537 I ImeTracker: tk.glucodata.ng.debug:505b7049: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:17.165 22537 22537 I ImeTracker: tk.glucodata.ng.debug:505b7049: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:17.166 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:14:18.529 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:14:18.530 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:14:53.280 22537 22537 I ImeTracker: tk.glucodata.ng.debug:4f95c952: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:53.280 22537 22537 I ImeTracker: tk.glucodata.ng.debug:4f95c952: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:53.281 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:14:55.414 22537 22628 D HistoryRepo: Room returned 23336 readings since 0
+01-03 15:14:55.547 22537 22585 D HistoryRepo: Stored 23391 readings
+01-03 15:14:55.547 22537 22585 D HistorySync: Synced 23391 readings from native
+01-03 15:14:59.216 22537 22555 I codata.ng.debug: Background young concurrent mark compact GC freed 21MB AllocSpace bytes, 0(0B) LOS objects, 62% free, 12MB/33MB, paused 329us,1.715ms total 107.101ms
+01-03 15:15:00.369 22537 22901 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:15:00.390 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=false device=XX:XX:XX:XX:31:57
+01-03 15:15:00.390 22537 22901 D BluetoothGatt: unregisterApp()
+01-03 15:15:00.394 22537 22901 D BluetoothGatt: close()
+01-03 15:15:00.399 22537 22589 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:15:00.399 22537 22589 D BluetoothGatt: registerApp() - UUID=f2112c90-922d-4bdf-a09c-c8a17e68f364
+01-03 15:15:00.404 22537 22901 D BluetoothGatt: onClientRegistered(0)
+01-03 15:15:00.414 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:15:00.414 22537 22901 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:15:01.976 22537 22901 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:15:02.624 22537 22901 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:15:02.626 22537 22901 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:15:02.951 22537 22901 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:15:06.668 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:15:06.679 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:15:08.715 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+--------- beginning of crash
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: FATAL EXCEPTION: main
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: Process: tk.glucodata.ng.debug, PID: 16168
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: java.lang.IllegalArgumentException: Key "1767382920000" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.internal.InlineClassHelperKt.throwIllegalArgumentException(InlineClassHelper.kt:36)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState.subcompose(SubcomposeLayout.kt:1055)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState$Scope.subcompose(SubcomposeLayout.kt:926)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScopeImpl.measure-0kLqBqw(LazyLayoutMeasureScope.kt:124)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw(LazyListMeasuredItemProvider.kt:55)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw$default(LazyListMeasuredItemProvider.kt:49)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListMeasureKt.measureLazyList-LCrQqZ4(LazyListMeasure.kt:222)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListKt$rememberLazyListMeasurePolicy$1$1.invoke-0kLqBqw(LazyList.kt:352)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.LazyListKt$rememberLazyListMeasurePolicy$1$1.invoke(LazyList.kt:200)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutKt$LazyLayout$1$2$1.invoke-0kLqBqw(LazyLayout.kt:78)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutKt$LazyLayout$1$2$1.invoke(LazyLayout.kt:76)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.layout.LayoutNodeSubcompositionsState$createMeasurePolicy$1.measure-3p2s80s(SubcomposeLayout.kt:754)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.InnerNodeCoordinator.measure-BRTryo0(InnerNodeCoordinator.kt:128)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.graphics.SimpleGraphicsLayerModifier.measure-3p2s80s(GraphicsLayerModifier.kt:642)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.lazy.layout.LazyLayoutBeyondBoundsModifierNode.measure-3p2s80s(LazyLayoutBeyondBoundsModifierLocal.kt:118)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.layout.PaddingNode.measure-3p2s80s(Padding.kt:401)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.layout.PaddingValuesModifier.measure-3p2s80s(Padding.kt:465)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.foundation.layout.FillNode.measure-3p2s80s(Size.kt:721)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutModifierNodeCoordinator.measure-BRTryo0(LayoutModifierNodeCoordinator.kt:190)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasurePassDelegate$performMeasureBlock$1.invoke(MeasurePassDelegate.kt:171)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasurePassDelegate$performMeasureBlock$1.invoke(MeasurePassDelegate.kt:170)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.runtime.snapshots.Snapshot$Companion.observe(Snapshot.kt:2495)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.runtime.snapshots.SnapshotStateObserver$ObservedScopeMap.observe(SnapshotStateObserver.kt:464)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.runtime.snapshots.SnapshotStateObserver.observeReads(SnapshotStateObserver.kt:248)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.OwnerSnapshotObserver.observeReads$ui_release(OwnerSnapshotObserver.kt:124)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.OwnerSnapshotObserver.observeMeasureSnapshotReads$ui_release(OwnerSnapshotObserver.kt:107)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasurePassDelegate.performMeasure-BRTryo0$ui_release(MeasurePassDelegate.kt:424)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasurePassDelegate.remeasure-BRTryo0(MeasurePassDelegate.kt:472)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutNode.remeasure-_Sx5XlM$ui_release(LayoutNode.kt:1212)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutNode.remeasure-_Sx5XlM$ui_release$default(LayoutNode.kt:1205)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.doRemeasure-sdFAvZA(MeasureAndLayoutDelegate.kt:369)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.remeasureAndRelayoutIfNeeded(MeasureAndLayoutDelegate.kt:569)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.onlyRemeasureIfPending(MeasureAndLayoutDelegate.kt:663)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:690)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtreeInternal(MeasureAndLayoutDelegate.kt:697)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.forceMeasureTheSubtree(MeasureAndLayoutDelegate.kt:654)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.platform.AndroidComposeView.forceMeasureTheSubtree(AndroidComposeView.android.kt:1576)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.Owner.forceMeasureTheSubtree$default(Owner.kt:265)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasurePassDelegate.remeasure-BRTryo0(MeasurePassDelegate.kt:487)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.LayoutNode.remeasure-_Sx5XlM$ui_release(LayoutNode.kt:1212)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.doRemeasure-sdFAvZA(MeasureAndLayoutDelegate.kt:367)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.remeasureOnly(MeasureAndLayoutDelegate.kt:632)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.node.MeasureAndLayoutDelegate.measureOnly(MeasureAndLayoutDelegate.kt:422)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.platform.AndroidComposeView.onMeasure(AndroidComposeView.android.kt:1649)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.platform.AbstractComposeView.internalOnMeasure$ui_release(ComposeView.android.kt:299)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.compose.ui.platform.AbstractComposeView.onMeasure(ComposeView.android.kt:286)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewGroup.measureChildWithMargins(ViewGroup.java:7030)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.FrameLayout.onMeasure(FrameLayout.java:194)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at androidx.appcompat.widget.ContentFrameLayout.onMeasure(ContentFrameLayout.java:141)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewGroup.measureChildWithMargins(ViewGroup.java:7030)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.LinearLayout.measureChildBeforeLayout(LinearLayout.java:1608)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.LinearLayout.measureVertical(LinearLayout.java:878)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.LinearLayout.onMeasure(LinearLayout.java:721)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewGroup.measureChildWithMargins(ViewGroup.java:7030)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.FrameLayout.onMeasure(FrameLayout.java:194)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewGroup.measureChildWithMargins(ViewGroup.java:7030)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.LinearLayout.measureChildBeforeLayout(LinearLayout.java:1608)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.LinearLayout.measureVertical(LinearLayout.java:878)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.LinearLayout.onMeasure(LinearLayout.java:721)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewGroup.measureChildWithMargins(ViewGroup.java:7030)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.widget.FrameLayout.onMeasure(FrameLayout.java:194)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at com.android.internal.policy.DecorView.onMeasure(DecorView.java:758)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.View.measure(View.java:28652)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewRootImpl.performMeasure(ViewRootImpl.java:5096)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewRootImpl.measureHierarchy(ViewRootImpl.java:3438)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:3751)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3129)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:10900)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1647)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1656)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.Choreographer.doCallbacks(Choreographer.java:1252)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.Choreographer.doFrame(Choreographer.java:1181)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1630)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:1095)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:125)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:269)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:367)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:9309)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:566)
+01-03 00:42:16.550 16168 16168 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:929)
+--------- beginning of system
+01-03 15:06:24.386 22537 22537 D InsetsController: hide(ime())
+--------- beginning of main
+01-03 15:15:45.770 24724 24724 I Zygote  : Process 24724 created for tk.glucodata.ng.debug
+01-03 15:15:45.770 24724 24724 I codata.ng.debug: Late-enabling -Xcheck:jni
+01-03 15:15:45.795 24724 24724 I codata.ng.debug: Using CollectorTypeCMC GC.
+01-03 15:15:45.802 24724 24724 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+01-03 15:15:46.175 24724 24724 D nativeloader: Configuring clns-9 for other apk /data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/base.apk. target_sdk_version=35, uses_libraries=, library_path=/data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/lib/arm64:/data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/tk.glucodata.ng.debug
+01-03 15:15:46.176 24724 24724 D CompatChangeReporter: Compat change id reported: 202956589; UID 10495; state: ENABLED
+01-03 15:15:46.182 24724 24724 V GraphicsEnvironment: Currently set values for:
+01-03 15:15:46.182 24724 24724 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[com.android.angle]
+01-03 15:15:46.182 24724 24724 V GraphicsEnvironment:   angle_gl_driver_selection_values=[angle]
+01-03 15:15:46.182 24724 24724 V GraphicsEnvironment: tk.glucodata.ng.debug is not listed in per-application setting
+01-03 15:15:46.182 24724 24724 V GraphicsEnvironment: No special selections for ANGLE, returning default driver choice
+01-03 15:15:46.182 24724 24724 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+01-03 15:15:46.188 24724 24724 I Applic  : start tk.glucodata
+01-03 15:15:46.193 24724 24724 I Available:: 14616961024
+01-03 15:15:46.194 24724 24724 D Natives : before LoadLibrary
+01-03 15:15:46.205 24724 24724 D nativeloader: Load /data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/lib/arm64/libg.so using class loader ns clns-9 (caller=/data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/base.apk!classes7.dex): ok
+01-03 15:15:46.211 24724 24724 D Natives : after LoadLibrary
+01-03 15:15:46.228 24743 24743 W codata.ng.debug: type=1400 audit(0.0:215214): avc:  granted  { execute } for  name="testprog" dev="dm-64" ino=182575 scontext=u:r:untrusted_app:s0:c239,c257,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c257,c512,c768 tclass=file app=tk.glucodata.ng.debug
+01-03 15:15:46.228 24743 24743 W codata.ng.debug: type=1400 audit(0.0:215215): avc:  denied  { execute_no_trans } for  path="/data/data/tk.glucodata.ng.debug/files/testprog" dev="dm-64" ino=182575 scontext=u:r:untrusted_app:s0:c239,c257,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c257,c512,c768 tclass=file permissive=0 app=tk.glucodata.ng.debug
+01-03 15:15:46.312 24724 24724 I HWUI    : Using FreeType backend (prop=Auto)
+01-03 15:15:46.341 24724 24752 D BluetoothAdapter: isLeEnabled(): ON
+01-03 15:15:46.343 24724 24744 D BluetoothLeScanner: onScannerRegistered(): status=0 scannerId=3 mScannerId=0
+01-03 15:15:46.343 24724 24754 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+01-03 15:15:46.344 24724 24754 D vulkan  : searching for layers in '/data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/lib/arm64'
+01-03 15:15:46.344 24724 24754 D vulkan  : searching for layers in '/data/app/~~8TufGhuVPmTaUVeUD8t1YA==/tk.glucodata.ng.debug-3O5O470SU6j8JWVBM42bQw==/base.apk!/lib/arm64-v8a'
+01-03 15:15:46.355 24724 24724 D DesktopExperienceFlags: Toggle override initialized to: false
+01-03 15:15:46.375 24724 24724 D CompatChangeReporter: Compat change id reported: 309578419; UID 10495; state: ENABLED
+01-03 15:15:46.375 24724 24724 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+01-03 15:15:46.385 24724 24724 I codata.ng.debug: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app, TargetSdkVersion=35) using reflection: allowed
+01-03 15:15:46.410 24724 24724 I ImeTracker: tk.glucodata.ng.debug:cbf6f8ef: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:15:46.411 24724 24724 I ImeTracker: tk.glucodata.ng.debug:cbf6f8ef: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:15:46.433 24724 24724 D CompatChangeReporter: Compat change id reported: 349153669; UID 10495; state: ENABLED
+01-03 15:15:46.468 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:15:46.537 24724 24724 E VibratorInfo: Invalid frequency profile received from HAL. resonantFrequencyHz=144.78448, frequenciesHz=null, outputAccelerationsGs=null
+01-03 15:15:46.557 24724 24724 D CompatChangeReporter: Compat change id reported: 270674727; UID 10495; state: ENABLED
+01-03 15:15:46.575 24724 24724 D VRI[MainActivity]: WindowInsets changed: 1344x2992 statusBars:[0,151,0,0] navigationBars:[0,0,0,72] ime:[0,0,0,1279] mandatorySystemGestures:[0,184,0,96] 
+01-03 15:15:46.587 24724 24771 D HistoryRepo: History database has 23336 readings, skipping backfill
+01-03 15:15:46.587 24724 24748 D HistoryRepo: History database has 23336 readings, skipping backfill
+01-03 15:15:46.802 24724 24724 I Choreographer: Skipped 37 frames!  The application may be doing too much work on its main thread.
+01-03 15:15:46.822 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:15:46.921 24724 24724 D InsetsController: hide(ime())
+01-03 15:15:46.921 24724 24724 I ImeTracker: tk.glucodata.ng.debug:8b4800e1: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:15:46.960 24724 24724 D VRI[MainActivity]: WindowInsets changed: ime:null 
+01-03 15:15:46.971 24724 24724 I ImeTracker: system_server:703177ec: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+01-03 15:15:47.037 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.view.ImeBackAnimationController@23d8821
+01-03 15:15:47.037 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:15:47.107 24724 24730 I codata.ng.debug: Compiler allocated 5038KB to compile void android.view.ViewRootImpl.performTraversals()
+01-03 15:15:47.317 24724 24771 D HistoryRepo: Room returned 23336 readings since 0
+01-03 15:15:47.326 24724 24748 D HistoryRepo: Room returned 23336 readings since 0
+01-03 15:15:47.348 24724 24724 D BluetoothAdapter: isLeEnabled(): ON
+01-03 15:15:47.353 24724 24753 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:15:47.354 24724 24753 D BluetoothGatt: registerApp() - UUID=f2f65977-5cb1-4e70-9790-5d1c3d9e5f50
+01-03 15:15:47.357 24724 24744 D BluetoothGatt: onClientRegistered(0)
+01-03 15:15:47.413 24724 24749 D HistoryRepo: Stored 23392 readings
+01-03 15:15:47.413 24724 24749 D HistorySync: Synced 23392 readings from native
+01-03 15:15:47.568 24724 24749 D HistoryRepo: Stored 23392 readings
+01-03 15:15:47.568 24724 24749 D HistorySync: Synced 23392 readings from native
+01-03 15:15:47.843 24724 24731 W codata.ng.debug: userfaultfd: MOVE ioctl seems unsupported: Try again
+01-03 15:15:48.399 24724 24742 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:15:48.399 24724 24742 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:15:48.911 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:15:48.925 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:15:49.248 24724 24737 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:15:49.249 24724 24737 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:15:49.419 24724 24744 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=39 latency=0 timeout=500 status=0
+01-03 15:15:49.706 24724 24748 D HistoryRepo: Room returned 23337 readings since 0
+01-03 15:15:49.799 24724 24771 D HistoryRepo: Stored 23392 readings
+01-03 15:15:49.799 24724 24771 D HistorySync: Synced 23392 readings from native
+01-03 15:15:50.127 24724 24730 I codata.ng.debug: Compiler allocated 6738KB to compile void tk.glucodata.ui.ComposeHostKt.InteractiveGlucoseChart(java.util.List, float, float, java.lang.String, int, kotlin.jvm.functions.Function1, androidx.compose.runtime.Composer, int, int)
+01-03 15:15:53.831 24724 24742 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:16:14.592 24724 24731 I codata.ng.debug: Background concurrent mark compact GC freed 23MB AllocSpace bytes, 0(0B) LOS objects, 75% free, 8837KB/34MB, paused 79us,1.556ms total 115.564ms
+01-03 15:16:17.148 24724 24731 I codata.ng.debug: Background young concurrent mark compact GC freed 27MB AllocSpace bytes, 0(0B) LOS objects, 77% free, 8125KB/34MB, paused 1.671ms,3.751ms total 140.933ms
+01-03 15:16:19.046 24724 24724 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:16:19.047 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:16:25.254 24724 24724 I ImeTracker: tk.glucodata.ng.debug:2e342b62: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:16:25.254 24724 24724 I ImeTracker: tk.glucodata.ng.debug:2e342b62: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:16:25.257 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:16:25.322 24724 24747 D HistoryRepo: Room returned 23338 readings since 0
+01-03 15:16:25.460 24724 24771 D HistoryRepo: Stored 23393 readings
+01-03 15:16:25.460 24724 24771 D HistorySync: Synced 23393 readings from native
+01-03 15:16:40.983 24724 24724 D ViewRootImpl: ScrollCaptureSearchResponse: android.view.ScrollCaptureResponse$Builder@58c1191
+01-03 15:16:49.047 24724 24724 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:16:49.048 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:16:53.727 24724 24724 I ImeTracker: tk.glucodata.ng.debug:894a74c2: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:16:53.728 24724 24724 I ImeTracker: tk.glucodata.ng.debug:894a74c2: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:16:53.731 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:16:53.875 24724 24747 D HistoryRepo: Room returned 23338 readings since 0
+01-03 15:16:54.072 24724 24749 D HistoryRepo: Stored 23393 readings
+01-03 15:16:54.072 24724 24749 D HistorySync: Synced 23393 readings from native
+01-03 15:16:55.387 24724 24724 D InsetsController: hide(ime())
+01-03 15:16:55.387 24724 24724 I ImeTracker: tk.glucodata.ng.debug:94d70cbc: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:16:58.204 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:16:58.212 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:17:26.469 24724 24771 D HistoryRepo: Room returned 23339 readings since 0
+01-03 15:17:26.655 24724 24747 D HistoryRepo: Stored 23394 readings
+01-03 15:17:26.655 24724 24747 D HistorySync: Synced 23394 readings from native
+01-03 15:18:38.597 24724 24724 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:18:38.599 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:20:04.904 24724 24724 I ImeTracker: tk.glucodata.ng.debug:8397ad44: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:20:04.904 24724 24724 I ImeTracker: tk.glucodata.ng.debug:8397ad44: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:20:04.909 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:20:05.061 24724 24747 D HistoryRepo: Room returned 23342 readings since 0
+01-03 15:20:05.299 24724 24748 D HistoryRepo: Stored 23397 readings
+01-03 15:20:05.299 24724 24748 D HistorySync: Synced 23397 readings from native
+01-03 15:20:08.214 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:20:08.220 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:20:10.760 24724 24724 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:20:10.766 24724 24754 D HWUI    : endAllActiveAnimators on 0xb400006f064df240 (UnprojectedRipple) with handle 0xb400006ee64a8c70
+01-03 15:20:10.772 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:20:11.321 24724 24724 I ImeTracker: tk.glucodata.ng.debug:22988669: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:20:11.321 24724 24724 I ImeTracker: tk.glucodata.ng.debug:22988669: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:20:11.322 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805
+01-03 15:20:13.714 24724 24724 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:20:13.725 24724 24754 D HWUI    : endAllActiveAnimators on 0xb400006f064df240 (UnprojectedRipple) with handle 0xb400006ee64661c0
+01-03 15:20:13.731 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@dc694b2
+01-03 15:20:14.001 24724 24724 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:20:14.003 24724 24724 I ImeTracker: tk.glucodata.ng.debug:a37ce1c: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:20:14.003 24724 24724 I ImeTracker: tk.glucodata.ng.debug:a37ce1c: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:20:14.007 24724 24724 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@486a805

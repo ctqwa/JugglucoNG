@@ -1,0 +1,72 @@
+01-03 15:06:24.304 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Dialog$$ExternalSyntheticLambda2@e645ae8
+01-03 15:06:24.305 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@bdd9501
+01-03 15:06:24.386 22537 22537 D InsetsController: hide(ime())
+01-03 15:06:24.387 22537 22537 I ImeTracker: tk.glucodata.ng.debug:b1ef523f: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:06:25.080 22537 22537 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:06:25.088 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=false device=XX:XX:XX:XX:31:57
+01-03 15:06:25.088 22537 22901 D BluetoothGatt: unregisterApp()
+01-03 15:06:25.094 22537 22901 D BluetoothGatt: close()
+01-03 15:06:25.096 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): null
+01-03 15:06:25.099 22537 22589 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:06:25.100 22537 22589 D BluetoothGatt: registerApp() - UUID=f4a8cdc2-32d1-4a9b-9881-0cb6d9f2628f
+01-03 15:06:25.102 22537 22901 D BluetoothGatt: onClientRegistered(0)
+01-03 15:06:25.105 22537 22591 D HWUI    : endAllActiveAnimators on 0xb400006f06513720 (UnprojectedRipple) with handle 0xb400006ee6496e80
+01-03 15:06:25.109 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:06:25.109 22537 22901 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:06:25.112 22537 22537 W InputEventReceiver: Failed to send outbound event on channel '2c4ecd9 tk.glucodata.ng.debug/tk.glucodata.MainActivity'.  status=DEAD_OBJECT(-32)
+01-03 15:06:25.112 22537 22537 W InputEventReceiver: channel '2c4ecd9 tk.glucodata.ng.debug/tk.glucodata.MainActivity' ~ Could not send 0 outbound event(s), status:DEAD_OBJECT
+01-03 15:06:26.603 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:06:27.087 22537 22537 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:06:27.095 22537 22537 D BluetoothGatt: close()
+01-03 15:06:27.095 22537 22537 D BluetoothGatt: unregisterApp()
+01-03 15:06:27.309 22537 22590 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:06:27.310 22537 22590 D BluetoothGatt: registerApp() - UUID=fe1fd56b-f888-4dba-bda5-dc642ff3d8c2
+01-03 15:06:27.316 22537 23379 D BluetoothGatt: onClientRegistered(0)
+01-03 15:06:27.332 22537 23379 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:06:27.332 22537 23379 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:06:27.382 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:06:28.984 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:06:29.608 22537 23379 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:06:29.609 22537 23379 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:06:29.765 22537 22901 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:06:33.345 22537 22560 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:06:41.837 22537 22628 D HistoryRepo: Room returned 23327 readings since 0
+01-03 15:06:41.982 22537 22585 D HistoryRepo: Stored 23383 readings
+01-03 15:06:41.982 22537 22585 D HistorySync: Synced 23383 readings from native
+01-03 15:06:46.548 22537 22555 I codata.ng.debug: Background young concurrent mark compact GC freed 27MB AllocSpace bytes, 0(0B) LOS objects, 55% free, 22MB/49MB, paused 403us,9.484ms total 47.878ms
+01-03 15:07:00.382 22537 22901 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:07:00.398 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=false device=XX:XX:XX:XX:31:57
+01-03 15:07:00.398 22537 22901 D BluetoothGatt: unregisterApp()
+01-03 15:07:00.400 22537 22901 D BluetoothGatt: close()
+01-03 15:07:00.405 22537 22590 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:07:00.406 22537 22590 D BluetoothGatt: registerApp() - UUID=7c30b470-0a9d-4f52-840f-b75584626030
+01-03 15:07:00.409 22537 22901 D BluetoothGatt: onClientRegistered(0)
+01-03 15:07:00.416 22537 22901 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:07:00.416 22537 22901 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:07:01.986 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:07:02.614 22537 23379 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:07:02.614 22537 23379 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:07:02.762 22537 23379 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:07:09.706 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:07:09.714 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:07:15.941 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:07:15.948 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:07:33.575 22537 22560 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:14:11.226 22537 22537 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:14:11.231 22537 22537 I ImeTracker: tk.glucodata.ng.debug:e676f006: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:11.231 22537 22537 I ImeTracker: tk.glucodata.ng.debug:e676f006: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:11.234 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:14:13.733 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:14:13.738 22537 22591 D HWUI    : endAllActiveAnimators on 0xb400006f06485040 (UnprojectedRipple) with handle 0xb400006ee646cc40
+01-03 15:14:13.743 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:14:14.321 22537 22537 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:14:14.323 22537 22537 I ImeTracker: tk.glucodata.ng.debug:6e09f597: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:14.323 22537 22537 I ImeTracker: tk.glucodata.ng.debug:6e09f597: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:14.325 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c
+01-03 15:14:16.729 22537 22537 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:14:16.739 22537 22591 D HWUI    : endAllActiveAnimators on 0xb400006f06485040 (UnprojectedRipple) with handle 0xb400006ee646fdf0
+01-03 15:14:16.744 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@48801b9
+01-03 15:14:17.163 22537 22537 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:14:17.165 22537 22537 I ImeTracker: tk.glucodata.ng.debug:505b7049: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:14:17.165 22537 22537 I ImeTracker: tk.glucodata.ng.debug:505b7049: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:14:17.166 22537 22537 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@371877c

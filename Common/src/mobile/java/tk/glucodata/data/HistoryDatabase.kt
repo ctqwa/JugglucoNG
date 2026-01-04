@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
  * This database is separate from the C++ native sensor data and
  * persists through "wipe sensor data" operations.
  */
-@Database(entities = [HistoryReading::class], version = 1, exportSchema = false)
+@Database(entities = [HistoryReading::class], version = 2, exportSchema = false)
 abstract class HistoryDatabase : RoomDatabase() {
     
     abstract fun historyDao(): HistoryDao
@@ -25,7 +25,9 @@ abstract class HistoryDatabase : RoomDatabase() {
                     context.applicationContext,
                     HistoryDatabase::class.java,
                     "glucose_history.db"
-                ).build().also { INSTANCE = it }
+                )
+                .fallbackToDestructiveMigration()  // Recreate DB on schema changes
+                .build().also { INSTANCE = it }
             }
     }
 }

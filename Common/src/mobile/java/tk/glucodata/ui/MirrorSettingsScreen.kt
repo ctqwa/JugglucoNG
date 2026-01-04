@@ -176,6 +176,7 @@ fun MirrorSettingsScreen(navController: NavController) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = { Text("Mirror Settings") },
@@ -458,6 +459,7 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = { Text(if (isNew) "Add Connection" else "Edit Connection") },

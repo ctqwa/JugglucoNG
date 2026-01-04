@@ -73,6 +73,15 @@ class DashboardViewModel(
     init {
         refreshData()
         startCollection()
+        startHistoryCollection()
+    }
+    
+    /**
+     * Called when the app resumes from background.
+     * Refreshes data to prevent stale chart state after Home button.
+     */
+    fun onResume() {
+        refreshData()
     }
     private fun startCollection() {
         viewModelScope.launch {
@@ -86,7 +95,7 @@ class DashboardViewModel(
                 if (point != null) {
                     val valueToDisplay = if (mode == 1 || mode == 3) point.rawValue else point.value
                     _currentGlucose.value = if (valueToDisplay < 30) String.format("%.1f", valueToDisplay) else valueToDisplay.toInt().toString()
-                    _currentRate.value = point.rate
+                    _currentRate.value = point.rate ?: 0f  // Default to 0 if rate is null
                     
                     // Efficiently update history by appending the new point instead of re-querying the DB
                     val currentHistory = _glucoseHistory.value
@@ -184,12 +193,42 @@ class DashboardViewModel(
                  _daysRemaining.value = ""
             }
 
-            // Sync from native history to Room before fetching
-            HistorySync.syncFromNative()
+            // PERFORMANCE FIX: Sync history asynchronously in background
+            // Prevents blocking UI thread on cold start (Back button)
+            viewModelScope.launch {
+                HistorySync.syncFromNative()
+            }
             
-            // Load ALL history from Room (no time limit)
-            glucoseRepository.getAllHistory().let {
-                _glucoseHistory.value = it
+            // Note: History is now collected reactively via startHistoryCollection()
+        }
+    }
+
+    private fun startHistoryCollection() {
+        viewModelScope.launch {
+            // Re-collect history when unit changes
+            _unit.collect { unitStr ->
+                val isMmol = unitStr == "mmol/L"
+                
+                // TWO-STAGE LOADING for instant UI with full history:
+                // Stage 1: Load last 24h immediately (fast, for instant render)
+                val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
+                
+                // First collect: recent data only (instant)
+                var isFirstLoad = true
+                glucoseRepository.getHistoryFlow(oneDayAgo, isMmol).collect { history ->
+                    _glucoseHistory.value = history
+                    
+                    // Stage 2: After first render, switch to full history (background)
+                    if (isFirstLoad) {
+                        isFirstLoad = false
+                        viewModelScope.launch {
+                            // Switch to loading ALL history
+                            glucoseRepository.getHistoryFlow(0L, isMmol).collect { fullHistory ->
+                                _glucoseHistory.value = fullHistory
+                            }
+                        }
+                    }
+                }
             }
         }
     }

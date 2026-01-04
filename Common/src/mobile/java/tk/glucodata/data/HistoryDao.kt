@@ -5,6 +5,8 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Data Access Object for glucose history readings.
  * Provides efficient insert and query operations.
@@ -17,6 +19,9 @@ interface HistoryDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(readings: List<HistoryReading>)
+    
+    @Query("SELECT * FROM history_readings WHERE timestamp >= :startTime ORDER BY timestamp ASC")
+    fun getHistoryFlow(startTime: Long): Flow<List<HistoryReading>>
     
     @Query("SELECT * FROM history_readings WHERE timestamp >= :startTime ORDER BY timestamp ASC")
     suspend fun getReadingsSince(startTime: Long): List<HistoryReading>

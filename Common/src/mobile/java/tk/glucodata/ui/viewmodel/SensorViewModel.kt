@@ -24,7 +24,10 @@ data class SensorInfo(
     val autoResetDays: Int,
     val isSibionics2: Boolean,
     val startMs: Long,
-    val officialEndMs: Long
+    val officialEndMs: Long,
+    val customCalEnabled: Boolean,
+    val customCalIndex: Int,
+    val customCalAutoReset: Boolean
 )
 
 class SensorViewModel : ViewModel() {
@@ -46,7 +49,15 @@ class SensorViewModel : ViewModel() {
                 val currentViewMode = Natives.getViewMode(gatt.dataptr)
                 var autoResetDays = Natives.getAutoResetDays(gatt.dataptr)
                 val isSi2 = Natives.isSibionics2(gatt.dataptr)
-                // If 0 (Fresh), force to 21 (Default ON)
+                
+                // Fetch Custom Calibration Settings
+                // Packed long: [index:8][autoReset:1][active:1]
+                val packed = Natives.getCustomCalibrationSettings(gatt.dataptr)
+                val isCustomEnabled = (packed and 1L) != 0L
+                val isCustomAutoReset = (packed and 2L) != 0L
+                val customIndex = ((packed ushr 8) and 0xFF).toInt()
+                
+                // If 0 (Fresh), force to 21 (Default ON) for old autoResetDays setting
                 if (isSi2 && autoResetDays == 0) {
                     Natives.setAutoResetDays(gatt.dataptr, 21)
                     autoResetDays = 21
@@ -66,7 +77,10 @@ class SensorViewModel : ViewModel() {
                     autoResetDays = autoResetDays,
                     isSibionics2 = isSi2,
                     startMs = startMs,
-                    officialEndMs = officialEndMs
+                    officialEndMs = officialEndMs,
+                    customCalEnabled = isCustomEnabled,
+                    customCalIndex = customIndex,
+                    customCalAutoReset = isCustomAutoReset
                 )
 
 
@@ -80,6 +94,15 @@ class SensorViewModel : ViewModel() {
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
             Natives.setAutoResetDays(gatt.dataptr, days)
+            refreshSensors()
+        }
+    }
+    
+    fun updateCustomCalibration(serial: String, enabled: Boolean, index: Int, autoReset: Boolean) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt != null) {
+            Natives.setCustomCalibrationSettings(gatt.dataptr, enabled, index, autoReset)
             refreshSensors()
         }
     }

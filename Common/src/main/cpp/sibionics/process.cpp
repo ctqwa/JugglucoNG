@@ -159,7 +159,7 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
       }
     }
     double newvalue = 0.0;
-    if (value > 0.1 && value < 3000.0 &&
+    if (value > 0.1 && value < 3000.0 && algcontext &&
         (newvalue = process3(index, value, temp)) > 1.8) {
       sens->getinfo()->pollinterval = newvalue - value;
     } else {
@@ -171,7 +171,9 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
     const int status = std::byteswap(one[4]);
 #endif
     const int mgdL = std::round(newvalue * convfactordL);
-    const int trend = algcontext->ig_trend;
+    // Fix: Check for null algcontext to avoid crash during reset race
+    // conditions
+    const int trend = algcontext ? algcontext->ig_trend : 0;
     const float change = sitrend2RateOfChange(trend);
     const int abbotttrend = sitrend2abbott(trend);
     LOGGER("SIprocess: index=%d temp=%f electric=%ld value=%f->%f status=%d "

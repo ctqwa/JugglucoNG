@@ -423,7 +423,7 @@
     <string name="restart">Перезапуск</string>
     <string name="restart_autocal_title">Перезапуск автокалибровки?</string>
     <string name="restart_autocal_desc">Удалить все данные автокалибровки, перезапустить алгоритм и переподключиться?</string>
-    <string name="reset_autocal_button">Перезапуск калибровки</string>
+    <string name="reset_autocal_button">Перезапуск автокалибровки</string>
 
     <string name="trend_rising">Глюкоза растет</string>
     <string name="trend_falling">Глюкоза падает</string>

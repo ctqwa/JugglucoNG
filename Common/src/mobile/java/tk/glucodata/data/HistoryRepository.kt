@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import tk.glucodata.Applic
 import tk.glucodata.Natives
 import tk.glucodata.ui.GlucosePoint
@@ -24,6 +26,32 @@ class HistoryRepository(context: Context = Applic.app) {
         
         @Volatile
         private var backfillCompleted = false
+        
+        /**
+         * Blocking version of getHistory for Java access.
+         * This runs the suspend function on a blocking coroutine.
+         * Should be called from a background thread.
+         */
+        @JvmStatic
+        fun getHistoryBlocking(startTime: Long, isMmol: Boolean): List<GlucosePoint> {
+            return kotlinx.coroutines.runBlocking {
+                HistoryRepository().getHistory(startTime, isMmol)
+            }
+        }
+        
+        /**
+         * Blocking version for Notify.java that returns tk.glucodata.GlucosePoint.
+         * This converts from the UI GlucosePoint to the simpler main GlucosePoint.
+         */
+        @JvmStatic
+        fun getHistoryForNotification(startTime: Long, isMmol: Boolean): List<tk.glucodata.GlucosePoint> {
+            return kotlinx.coroutines.runBlocking {
+                val uiPoints = HistoryRepository().getHistory(startTime, isMmol)
+                uiPoints.map { p ->
+                    tk.glucodata.GlucosePoint(p.timestamp, p.value, p.rawValue)
+                }
+            }
+        }
     }
     
     /**
@@ -66,6 +94,34 @@ class HistoryRepository(context: Context = Applic.app) {
     }
     
     /**
+     * Get history as a Flow for reactive updates.
+     */
+    fun getHistoryFlow(startTime: Long = 0L, isMmol: Boolean): kotlinx.coroutines.flow.Flow<List<GlucosePoint>> {
+        return dao.getHistoryFlow(startTime).map { readings ->
+            readings.map { reading ->
+                var value = reading.value
+                var rawValue = reading.rawValue
+                
+                if (isMmol) {
+                    value = value / 18.0182f
+                    rawValue = rawValue / 18.0182f
+                }
+                
+                val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                    .format(java.util.Date(reading.timestamp))
+                
+                GlucosePoint(
+                    value = value,
+                    time = timeStr,
+                    timestamp = reading.timestamp,
+                    rawValue = rawValue,
+                    rate = reading.rate
+                )
+            }.distinctBy { it.timestamp }
+        }.flowOn(Dispatchers.IO)
+    }
+
+    /**
      * Get history for chart display. Returns data in user's preferred unit.
      * @param startTime Start time in milliseconds (0 = all data)
      * @param isMmol Whether to convert to mmol/L
@@ -74,7 +130,7 @@ class HistoryRepository(context: Context = Applic.app) {
         return withContext(Dispatchers.IO) {
             try {
                 val readings = dao.getReadingsSince(startTime)
-                Log.d(TAG, "Room returned ${readings.size} readings since $startTime")
+                // Log.d(TAG, "Room returned ${readings.size} readings since $startTime")
                 readings.map { reading ->
                     var value = reading.value
                     var rawValue = reading.rawValue
@@ -101,6 +157,7 @@ class HistoryRepository(context: Context = Applic.app) {
             }
         }
     }
+
     
     /**
      * Get the count of stored readings.
@@ -117,6 +174,21 @@ class HistoryRepository(context: Context = Applic.app) {
     }
     
     /**
+     * Get the timestamp of the latest stored reading.
+     * Returns 0 if no readings exist.
+     */
+    suspend fun getLatestTimestamp(): Long {
+        return withContext(Dispatchers.IO) {
+            try {
+                dao.getLatestReading()?.timestamp ?: 0L
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting latest timestamp", e)
+                0L
+            }
+        }
+    }
+    
+    /**
      * Backfill ALL history from native layer on first run.
      * Only runs once per app session.
      */
@@ -125,16 +197,14 @@ class HistoryRepository(context: Context = Applic.app) {
         
         withContext(Dispatchers.IO) {
             try {
-                val count = dao.getCount()
-                if (count == 0) {
-                    Log.d(TAG, "First run - backfilling ALL history from native")
-                    backfillFromNative()
-                } else {
-                    Log.d(TAG, "History database has $count readings, skipping backfill")
-                }
+                // Always try to backfill from native on first run of the session.
+                // Conflicts are handled by OnConflictStrategy.REPLACE in the DAO.
+                // This ensures we fill the gap between imported CSV data and current sensor data.
+                Log.d(TAG, "Session start - merging native history into database")
+                backfillFromNative()
                 backfillCompleted = true
             } catch (e: Exception) {
-                Log.e(TAG, "Error during backfill check", e)
+                Log.e(TAG, "Error during backfill", e)
             }
         }
     }

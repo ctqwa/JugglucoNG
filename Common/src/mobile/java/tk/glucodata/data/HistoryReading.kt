@@ -18,5 +18,5 @@ data class HistoryReading(
     val timestamp: Long,      // Epoch milliseconds - unique key
     val value: Float,         // Calibrated/auto glucose value (mg/dL)
     val rawValue: Float,      // Raw sensor value (mg/dL)
-    val rate: Float           // Rate of change
+    val rate: Float?          // Rate of change (nullable - may not always be available)
 )

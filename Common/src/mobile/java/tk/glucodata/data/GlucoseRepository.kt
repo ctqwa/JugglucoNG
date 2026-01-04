@@ -113,6 +113,14 @@ class GlucoseRepository {
     }
 
     /**
+     * Get history as a Flow for reactive updates.
+     * Delegates to HistoryRepository.
+     */
+    fun getHistoryFlow(startTime: Long = 0L, isMmol: Boolean): Flow<List<GlucosePoint>> {
+        return historyRepository.getHistoryFlow(startTime, isMmol)
+    }
+
+    /**
      * Legacy synchronous method - fetches ALL history from native layer.
      * Used for initial load and when Room hasn't been populated yet.
      */

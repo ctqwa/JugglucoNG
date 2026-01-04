@@ -1389,6 +1389,11 @@ public class Natives {
 
         public static native int getAutoResetDays(long dataptr);
 
+        public static native void setCustomCalibrationSettings(long dataptr, boolean enabled, int index,
+                        boolean autoReset);
+
+        public static native long getCustomCalibrationSettings(long dataptr);
+
         public static native boolean isSibionics2(long dataptr);
 
         public static native boolean getResetSibionics2(long dataptr);

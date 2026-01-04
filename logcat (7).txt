@@ -1,0 +1,155 @@
+01-03 15:42:26.929 29891 29927 D HistoryRepo: Room returned 23364 readings since 0
+01-03 15:42:27.110 29891 30154 D HistoryRepo: Stored 23419 readings
+01-03 15:42:27.110 29891 30154 D HistorySync: Synced 23419 readings from native
+01-03 15:42:27.664 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:42:27.679 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:42:28.726 29891 29927 D HistoryRepo: Room returned 23364 readings since 0
+01-03 15:42:28.889 29891 29922 D HistoryRepo: Stored 23419 readings
+01-03 15:42:28.890 29891 29922 D HistorySync: Synced 23419 readings from native
+01-03 15:42:29.524 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:42:29.531 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:42:36.460 29891 29921 D HistoryRepo: Room returned 23364 readings since 0
+01-03 15:42:36.636 29891 29927 D HistoryRepo: Stored 23419 readings
+01-03 15:42:36.636 29891 29927 D HistorySync: Synced 23419 readings from native
+01-03 15:42:41.169 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:42:41.176 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:42:44.497 29891 29921 D HistoryRepo: Room returned 23364 readings since 0
+01-03 15:42:44.665 29891 29927 D HistoryRepo: Stored 23419 readings
+01-03 15:42:44.666 29891 29927 D HistorySync: Synced 23419 readings from native
+01-03 15:42:52.023 29891 29891 D InsetsController: hide(ime())
+01-03 15:42:52.023 29891 29891 I ImeTracker: tk.glucodata.ng.debug:dcb61d29: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:42:57.615 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:42:57.623 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:43:02.959 29891 29922 D HistoryRepo: Room returned 23364 readings since 0
+01-03 15:43:03.127 29891 29927 D HistoryRepo: Stored 23420 readings
+01-03 15:43:03.128 29891 29927 D HistorySync: Synced 23420 readings from native
+01-03 15:43:07.152 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:43:07.158 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:43:16.626 29891 29927 D HistoryRepo: Room returned 23365 readings since 0
+01-03 15:43:16.764 29891 30154 D HistoryRepo: Stored 23420 readings
+01-03 15:43:16.764 29891 30154 D HistorySync: Synced 23420 readings from native
+01-03 15:43:19.898 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:43:19.905 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:43:20.835 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Dialog$$ExternalSyntheticLambda2@82077f3
+01-03 15:43:20.835 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@3514cb0
+01-03 15:43:20.913 29891 29891 D InsetsController: hide(ime())
+01-03 15:43:20.913 29891 29891 I ImeTracker: tk.glucodata.ng.debug:92e4e04b: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:43:21.656 29891 29891 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:43:21.667 29891 30038 D BluetoothGatt: onClientConnectionState() - status=0 connected=false device=XX:XX:XX:XX:31:57
+01-03 15:43:21.667 29891 30038 D BluetoothGatt: unregisterApp()
+01-03 15:43:21.667 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): null
+01-03 15:43:21.669 29891 30038 D BluetoothGatt: close()
+01-03 15:43:21.673 29891 29925 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:43:21.673 29891 29925 D BluetoothGatt: registerApp() - UUID=8b11f791-a138-40ab-8efc-29e8d3fc80c4
+01-03 15:43:21.674 29891 29928 D HWUI    : endAllActiveAnimators on 0xb400006f06566540 (UnprojectedRipple) with handle 0xb400006ee64714d0
+01-03 15:43:21.676 29891 30038 D BluetoothGatt: onClientRegistered(0)
+01-03 15:43:21.679 29891 29891 W InputEventReceiver: Failed to send outbound event on channel 'd08b6ae tk.glucodata.ng.debug/tk.glucodata.MainActivity'.  status=DEAD_OBJECT(-32)
+01-03 15:43:21.679 29891 29891 W InputEventReceiver: channel 'd08b6ae tk.glucodata.ng.debug/tk.glucodata.MainActivity' ~ Could not send 0 outbound event(s), status:DEAD_OBJECT
+01-03 15:43:21.686 29891 30038 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:43:21.686 29891 30038 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:43:23.306 29891 30038 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:43:23.662 29891 29891 D BluetoothGatt: cancelOpen() - device: XX:XX:XX:XX:31:57
+01-03 15:43:23.668 29891 29891 D BluetoothGatt: close()
+01-03 15:43:23.668 29891 29891 D BluetoothGatt: unregisterApp()
+01-03 15:43:23.671 29891 30038 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:43:23.880 29891 29926 D BluetoothGatt: connect() - device: XX:XX:XX:XX:31:57, auto: false
+01-03 15:43:23.881 29891 29926 D BluetoothGatt: registerApp() - UUID=f66f6e01-876f-41d0-9a05-c3301e0808ab
+01-03 15:43:23.887 29891 30038 D BluetoothGatt: onClientRegistered(0)
+01-03 15:43:23.900 29891 30038 D BluetoothGatt: onClientConnectionState() - status=0 connected=true device=XX:XX:XX:XX:31:57
+01-03 15:43:23.901 29891 30038 D BluetoothGatt: discoverServices() - device: XX:XX:XX:XX:31:57
+01-03 15:43:24.085 29891 30038 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:43:25.690 29891 30038 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=15 latency=0 timeout=500 status=0
+01-03 15:43:26.297 29891 30038 D BluetoothGatt: onSearchComplete(XX:XX:XX:XX:31:57, _, 0)
+01-03 15:43:26.299 29891 30038 D BluetoothGatt: setCharacteristicNotification() - uuid: 0000ff31-0000-1000-8000-00805f9b34fb enable: true
+01-03 15:43:26.468 29891 30038 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:43:30.245 29891 30038 D BluetoothGatt: onConnectionUpdated() - device=XX:XX:XX:XX:31:57 interval=159 latency=0 timeout=400 status=0
+01-03 15:43:34.165 29891 29927 D HistoryRepo: Room returned 23365 readings since 0
+01-03 15:43:34.313 29891 30154 D HistoryRepo: Stored 23708 readings
+01-03 15:43:34.313 29891 30154 D HistorySync: Synced 23708 readings from native
+01-03 15:43:34.334 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:43:34.343 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:43:54.013 29891 30154 D HistoryRepo: Room returned 23365 readings since 0
+01-03 15:43:54.181 29891 29922 D HistoryRepo: Stored 23708 readings
+01-03 15:43:54.181 29891 29922 D HistorySync: Synced 23708 readings from native
+01-03 15:44:05.099 29891 29891 D InsetsController: hide(ime())
+01-03 15:44:05.099 29891 29891 I ImeTracker: tk.glucodata.ng.debug:75f50ca5: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:44:05.151 29891 30154 D HistoryRepo: Room returned 23365 readings since 0
+01-03 15:44:05.291 29891 29922 D HistoryRepo: Stored 23709 readings
+01-03 15:44:05.293 29891 29922 D HistorySync: Synced 23709 readings from native
+01-03 15:44:05.513 29891 29896 I codata.ng.debug: Background young concurrent mark compact GC freed 57MB AllocSpace bytes, 1(556KB) LOS objects, 58% free, 29MB/70MB, paused 2.332ms,5.380ms total 143.559ms
+01-03 15:44:06.637 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:44:06.642 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:44:13.076 29891 30154 D HistoryRepo: Room returned 23366 readings since 0
+01-03 15:44:13.233 29891 29922 D HistoryRepo: Stored 23709 readings
+01-03 15:44:13.233 29891 29922 D HistorySync: Synced 23709 readings from native
+01-03 15:44:13.310 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:44:13.317 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:44:14.074 29891 30154 D HistoryRepo: Room returned 23366 readings since 0
+01-03 15:44:14.201 29891 29921 D HistoryRepo: Stored 23709 readings
+01-03 15:44:14.201 29891 29921 D HistorySync: Synced 23709 readings from native
+01-03 15:44:42.838 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:44:42.844 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:45:05.718 29891 29921 D HistoryRepo: Room returned 23366 readings since 0
+01-03 15:45:05.855 29891 30154 D HistoryRepo: Stored 23710 readings
+01-03 15:45:05.855 29891 30154 D HistorySync: Synced 23710 readings from native
+01-03 15:45:06.860 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:45:06.868 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:45:22.561 29891 29921 D HistoryRepo: Room returned 23367 readings since 0
+01-03 15:45:22.707 29891 30154 D HistoryRepo: Stored 23710 readings
+01-03 15:45:22.708 29891 30154 D HistorySync: Synced 23710 readings from native
+01-03 15:45:22.801 29891 29896 I codata.ng.debug: Background young concurrent mark compact GC freed 41MB AllocSpace bytes, 46(1792KB) LOS objects, 43% free, 36MB/64MB, paused 1.963ms,7.714ms total 94.460ms
+01-03 15:45:38.830 29891 29891 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:45:38.847 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:45:43.456 29891 29891 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:45:43.458 29891 29891 I ImeTracker: tk.glucodata.ng.debug:7d33d7d4: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:45:43.458 29891 29891 I ImeTracker: tk.glucodata.ng.debug:7d33d7d4: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:45:43.461 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:45:43.596 29891 30154 D HistoryRepo: Room returned 23367 readings since 0
+01-03 15:45:43.734 29891 29921 D HistoryRepo: Stored 23710 readings
+01-03 15:45:43.734 29891 29921 D HistorySync: Synced 23710 readings from native
+01-03 15:45:44.972 29891 29891 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:45:44.972 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:45:56.702 29891 29891 I ImeTracker: tk.glucodata.ng.debug:93eea1af: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:45:56.702 29891 29891 I ImeTracker: tk.glucodata.ng.debug:93eea1af: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:45:56.707 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:45:56.820 29891 30154 D HistoryRepo: Room returned 23367 readings since 0
+01-03 15:45:56.949 29891 29921 D HistoryRepo: Stored 23710 readings
+01-03 15:45:56.949 29891 29921 D HistorySync: Synced 23710 readings from native
+01-03 15:45:58.978 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:45:58.984 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:46:00.659 29891 30154 D HistoryRepo: Room returned 23367 readings since 0
+01-03 15:46:00.784 29891 29922 D HistoryRepo: Stored 23711 readings
+01-03 15:46:00.784 29891 29922 D HistorySync: Synced 23711 readings from native
+01-03 15:46:04.586 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:46:04.592 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:46:22.035 29891 29922 D HistoryRepo: Room returned 23368 readings since 0
+01-03 15:46:22.187 29891 30154 D HistoryRepo: Stored 23711 readings
+01-03 15:46:22.188 29891 30154 D HistorySync: Synced 23711 readings from native
+01-03 15:46:35.596 29891 29896 I codata.ng.debug: Background young concurrent mark compact GC freed 56MB AllocSpace bytes, 0(0B) LOS objects, 79% free, 14MB/71MB, paused 348us,6.477ms total 96.013ms
+01-03 15:47:06.340 29891 29891 D InsetsController: hide(ime())
+01-03 15:47:06.340 29891 29891 I ImeTracker: tk.glucodata.ng.debug:b7053a98: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-03 15:47:06.466 29891 29922 D HistoryRepo: Room returned 23368 readings since 0
+01-03 15:47:06.641 29891 29921 D HistoryRepo: Stored 23712 readings
+01-03 15:47:06.641 29891 29921 D HistorySync: Synced 23712 readings from native
+01-03 15:47:06.911 29891 29896 I codata.ng.debug: Background young concurrent mark compact GC freed 62MB AllocSpace bytes, 1(556KB) LOS objects, 68% free, 22MB/71MB, paused 1.615ms,5.152ms total 105.615ms
+01-03 15:47:09.186 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:47:09.194 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:48:15.209 29891 29891 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:48:15.231 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:49:14.135 29891 29891 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:49:14.138 29891 29891 I ImeTracker: tk.glucodata.ng.debug:8120842c: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:49:14.139 29891 29891 I ImeTracker: tk.glucodata.ng.debug:8120842c: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:49:14.144 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:49:16.859 29891 29891 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:49:16.860 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:49:16.868 29891 29928 D HWUI    : endAllActiveAnimators on 0xb400006f06518ad0 (UnprojectedRipple) with handle 0xb400006ee64aba60
+01-03 15:49:17.444 29891 29891 I ImeTracker: tk.glucodata.ng.debug:4a70bfeb: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:49:17.444 29891 29891 I ImeTracker: tk.glucodata.ng.debug:4a70bfeb: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:49:17.445 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1
+01-03 15:49:19.452 29891 29891 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+01-03 15:49:19.456 29891 29928 D HWUI    : endAllActiveAnimators on 0xb400006f06518ad0 (UnprojectedRipple) with handle 0xb400006ee64fb9e0
+01-03 15:49:19.463 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@7202283
+01-03 15:49:19.797 29891 29891 D ViewRootImpl: Skipping stats log for color mode
+01-03 15:49:19.799 29891 29891 I ImeTracker: tk.glucodata.ng.debug:d4ad7628: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+01-03 15:49:19.799 29891 29891 I ImeTracker: tk.glucodata.ng.debug:d4ad7628: onFailed at PHASE_CLIENT_VIEW_SERVED
+01-03 15:49:19.802 29891 29891 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@36b38c1

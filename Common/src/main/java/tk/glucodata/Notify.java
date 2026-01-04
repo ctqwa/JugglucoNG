@@ -1089,16 +1089,25 @@ public class Notify {
                         break;
                     }
                 }
-                // Try fallback using JUST time if value match failed
+                // Try fallback using JUST time if value match failed (60s tolerance)
                 if (!found && targetTime > 0) {
                     for (int i = points.size() - 1; i >= 0; i--) {
                         GlucosePoint p = points.get(i);
-                        if (Math.abs(p.timestamp - targetTime) < 2000) { // Very close match
+                        if (Math.abs(p.timestamp - targetTime) < 60000) {
                             String autoStr = format(usedlocale, pureglucoseformat, p.value);
                             secondary = autoStr.replace(".", ",");
                             found = true;
                             break;
                         }
+                    }
+                }
+                // Ultimate fallback: use latest point's value
+                if (!found && !points.isEmpty()) {
+                    GlucosePoint latest = points.get(points.size() - 1);
+                    if (latest.value > 0.1f) {
+                        String autoStr = format(usedlocale, pureglucoseformat, latest.value);
+                        secondary = autoStr.replace(".", ",");
+                        found = true;
                     }
                 }
             }
@@ -1121,11 +1130,12 @@ public class Notify {
                         }
                     }
                 }
-                // Fallback time match
+                // Fallback time match (60s tolerance to handle Room DB vs Native timing
+                // differences)
                 if (!found && targetTime > 0) {
                     for (int i = points.size() - 1; i >= 0; i--) {
                         GlucosePoint p = points.get(i);
-                        if (Math.abs(p.timestamp - targetTime) < 2000) {
+                        if (Math.abs(p.timestamp - targetTime) < 60000) {
                             if (p.rawValue > 0.1f) {
                                 String rawStr = format(usedlocale, pureglucoseformat, p.rawValue);
                                 secondary = rawStr.replace(".", ",");
@@ -1133,6 +1143,15 @@ public class Notify {
                                 break;
                             }
                         }
+                    }
+                }
+                // Ultimate fallback: use latest point if it has rawValue
+                if (!found && !points.isEmpty()) {
+                    GlucosePoint latest = points.get(points.size() - 1);
+                    if (latest.rawValue > 0.1f) {
+                        String rawStr = format(usedlocale, pureglucoseformat, latest.rawValue);
+                        secondary = rawStr.replace(".", ",");
+                        found = true;
                     }
                 }
             }
@@ -1169,36 +1188,45 @@ public class Notify {
 
         // Delta (Current - Previous?) - omitted for now
 
+        // Trigger History Sync to ensure Room DB has latest data for main app
+        tk.glucodata.data.HistorySync.INSTANCE.syncFromNative();
+
         // 2. Build Chart
-        // Fetch history (last 3 hours)
+        // Fetch history (last 3 hours) from Room DB (same source as main chart)
         long endT = System.currentTimeMillis();
         long startT = endT - 3 * 60 * 60 * 1000L;
-        long[] historyRaw = Natives.getGlucoseHistory(startT / 1000L); // C++ expects seconds
-
-        java.util.List<GlucosePoint> points = new java.util.ArrayList<>();
         boolean isMmol = Applic.unit == 1; // Check user unit preference
 
-        if (historyRaw != null) {
-            for (int i = 0; i < historyRaw.length; i += 3) {
-                long t = historyRaw[i] * 1000L;
+        // Use Room DB via HistoryRepository for chart display (consistent with main
+        // app)
+        java.util.List<GlucosePoint> chartPoints;
+        try {
+            chartPoints = tk.glucodata.data.HistoryRepository.getHistoryForNotification(startT, isMmol);
+        } catch (Exception e) {
+            chartPoints = new java.util.ArrayList<>();
+        }
 
-                // Fix: Ensure we don't add points far in future or corrupted
-                if (t > endT + 1000 * 60 * 60)
-                    continue;
-
-                long valAutoLong = historyRaw[i + 1];
-                long valRawLong = historyRaw[i + 2]; // Extract Raw
-
-                float val = valAutoLong / 10.0f;
-                float valRaw = valRawLong / 10.0f;
-
-                if (isMmol) {
-                    val = val / 18.0182f;
-                    valRaw = valRaw / 18.0182f;
+        // FRESH native points for value text lookup (has calibrateNow on-the-fly)
+        // Only need recent readings for value matching
+        long recentStartT = endT - 10 * 60 * 1000L; // Last 10 minutes
+        java.util.List<GlucosePoint> nativePoints = new java.util.ArrayList<>();
+        try {
+            long[] historyRaw = Natives.getGlucoseHistory(recentStartT / 1000L); // Native expects seconds
+            if (historyRaw != null) {
+                for (int i = 0; i < historyRaw.length; i += 3) {
+                    long t = historyRaw[i] * 1000L;
+                    float val = historyRaw[i + 1] / 10.0f;
+                    float valRaw = historyRaw[i + 2] / 10.0f;
+                    if (isMmol) {
+                        val = val / 18.0182f;
+                        valRaw = valRaw / 18.0182f;
+                    }
+                    nativePoints.add(new GlucosePoint(t, val, valRaw));
                 }
-
-                points.add(new GlucosePoint(t, val, valRaw));
             }
+        } catch (Exception e) {
+            // Fall back to chart points if native fails
+            nativePoints = chartPoints;
         }
 
         // Draw Arrow Bitmap
@@ -1221,9 +1249,9 @@ public class Notify {
             }
         }
 
-        // Get Consistently Formatted Text
+        // Get Consistently Formatted Text using NATIVE points (fresh data)
         // If ViewMode == 3 (Combined), we force appending Raw if available
-        CharSequence valueText = formatGlucoseText(glucose.value, glvalue, points, viewMode, glucose.time);
+        CharSequence valueText = formatGlucoseText(glucose.value, glvalue, nativePoints, viewMode, glucose.time);
 
         // 3a. Construct RemoteViews (Collapsed)
         RemoteViews remoteViews = new RemoteViews(Applic.app.getPackageName(), R.layout.notification_material);
@@ -1265,9 +1293,11 @@ public class Notify {
         if (showChart) {
             // Set Chart
             // Collapsed (approx 400x128dp -> ~400x150px)
-            chartBitmapCollapsed = NotificationChartDrawer.drawChart(Applic.app, points, 600, 100, isMmol, viewMode);
+            chartBitmapCollapsed = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 100, isMmol,
+                    viewMode);
             // Expanded (approx 400x256dp -> ~400x300px)
-            chartBitmapExpanded = NotificationChartDrawer.drawChart(Applic.app, points, 600, 180, isMmol, viewMode);
+            chartBitmapExpanded = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 180, isMmol,
+                    viewMode);
         }
 
         remoteViews.setImageViewBitmap(R.id.notification_chart, chartBitmapCollapsed);
@@ -1333,34 +1363,38 @@ public class Notify {
         final String message = app
                 .getString(SensorBluetooth.blueone != null ? R.string.connectwithsensor : R.string.exchangedata);
 
-        // Fetch History for Startup Graph
+        // Fetch History for Startup Graph from Room DB (same source as main chart)
         long endT = System.currentTimeMillis();
         long startT = endT - 3 * 60 * 60 * 1000L;
-        long[] historyRaw = Natives.getGlucoseHistory(startT / 1000L);
-
-        java.util.List<GlucosePoint> points = new java.util.ArrayList<>();
         boolean isMmol = Applic.unit == 1;
 
-        if (historyRaw != null) {
-            for (int i = 0; i < historyRaw.length; i += 3) {
-                long t = historyRaw[i] * 1000L;
+        // Use Room DB via HistoryRepository for consistent data with chart
+        java.util.List<GlucosePoint> chartPoints;
+        try {
+            chartPoints = tk.glucodata.data.HistoryRepository.getHistoryForNotification(startT, isMmol);
+        } catch (Exception e) {
+            chartPoints = new java.util.ArrayList<>();
+        }
 
-                // Fix: Ensure we don't add points far in future or corrupted
-                if (t > endT + 1000 * 60 * 60)
-                    continue;
-
-                long valAutoLong = historyRaw[i + 1];
-                long valRawLong = historyRaw[i + 2];
-
-                float val = valAutoLong / 10.0f;
-                float valRaw = valRawLong / 10.0f;
-
-                if (isMmol) {
-                    val = val / 18.0182f;
-                    valRaw = valRaw / 18.0182f;
+        // FRESH native points for value text lookup (has calibrateNow on-the-fly)
+        long recentStartT = endT - 15 * 60 * 1000L; // Last 15 minutes
+        java.util.List<GlucosePoint> nativePoints = new java.util.ArrayList<>();
+        try {
+            long[] historyRaw = Natives.getGlucoseHistory(recentStartT / 1000L);
+            if (historyRaw != null) {
+                for (int i = 0; i < historyRaw.length; i += 3) {
+                    long t = historyRaw[i] * 1000L;
+                    float val = historyRaw[i + 1] / 10.0f;
+                    float valRaw = historyRaw[i + 2] / 10.0f;
+                    if (isMmol) {
+                        val = val / 18.0182f;
+                        valRaw = valRaw / 18.0182f;
+                    }
+                    nativePoints.add(new GlucosePoint(t, val, valRaw));
                 }
-                points.add(new GlucosePoint(t, val, valRaw));
             }
+        } catch (Exception e) {
+            nativePoints = chartPoints;
         }
 
         // Identify ViewMode for Startup
@@ -1390,13 +1424,13 @@ public class Notify {
                 } catch (NumberFormatException e) {
                     // ignore
                 }
-                // Use unified formatter with TIME check
-                startupValue = formatGlucoseText(last.value, val, points, viewMode, last.time);
+                // Use unified formatter with TIME check using NATIVE points
+                startupValue = formatGlucoseText(last.value, val, nativePoints, viewMode, last.time);
             }
-        } else if (!points.isEmpty()) {
+        } else if (!chartPoints.isEmpty()) {
             // Fallback if Natives.lastglucose() is not ready but history is
             // Manual fall back logic if formatGlucoseText can't be used (no string value)
-            GlucosePoint latest = points.get(points.size() - 1);
+            GlucosePoint latest = chartPoints.get(chartPoints.size() - 1);
             // Also check staleness of history
             long now = System.currentTimeMillis();
             if (Math.abs(now - latest.timestamp) < 15 * 60 * 1000L) {
@@ -1420,8 +1454,10 @@ public class Notify {
         Bitmap chartBitmapExpanded = null;
 
         if (showChart) {
-            chartBitmapCollapsed = NotificationChartDrawer.drawChart(Applic.app, points, 600, 100, isMmol, viewMode);
-            chartBitmapExpanded = NotificationChartDrawer.drawChart(Applic.app, points, 600, 180, isMmol, viewMode);
+            chartBitmapCollapsed = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 100, isMmol,
+                    viewMode);
+            chartBitmapExpanded = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 180, isMmol,
+                    viewMode);
         }
 
         Bitmap arrowBitmap = NotificationChartDrawer.drawArrow(Applic.app, (last != null) ? last.rate : 0, isMmol);

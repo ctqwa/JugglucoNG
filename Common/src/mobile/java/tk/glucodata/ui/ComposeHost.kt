@@ -17,6 +17,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -30,6 +31,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
@@ -100,6 +104,8 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.material.icons.automirrored.filled.LastPage
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Download
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import tk.glucodata.Natives
@@ -243,7 +249,7 @@ data class GlucosePoint(
     val time: String, 
     val timestamp: Long = 0L, 
     val rawValue: Float = 0f,
-    val rate: Float = 0f
+    val rate: Float? = null
 )
 
 fun getTrendIcon(rate: Float, modifier: Modifier = Modifier): ImageVector =
@@ -415,7 +421,13 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
     val currentRoute = currentBackStackEntry?.destination?.route
     
     BackHandler(enabled = currentRoute == "dashboard") {
+        // OPTION 1 (Current): Traditional Android - Back button exits/destroys app
         (context as? Activity)?.finish()
+        
+        // OPTION 2 (Alternative): Modern UX - Back = Home (minimizes instead of destroying)
+        // Uncomment below to make Back button minimize the app instead of destroying it.
+        // This keeps the app in memory like pressing Home, avoiding reload delay.
+        // (context as? Activity)?.moveTaskToBack(true)
     }
     
     // Navigation Items Logic (Shared)
@@ -534,9 +546,10 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
 fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     val context = LocalContext.current
     
-// This runs every time the Activity/Fragment/Screen hits the ON_RESUME state
+    // This runs every time the Activity/Fragment/Screen hits the ON_RESUME state
+    // PERFORMANCE FIX: Refreshes stale data after Home button to prevent chart issues
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        viewModel.refreshData()
+        viewModel.onResume()
     }
 
     val currentGlucose by viewModel.currentGlucose.collectAsState()
@@ -2156,9 +2169,13 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         if (showUnitDialog) {
             AlertDialog(
                 onDismissRequest = { showUnitDialog = false },
-                title = { Text(stringResource(R.string.select_unit)) },
                 text = {
-                    Column {
+                    Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                        Text(
+                            "Select Unit",
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
                         listOf("mg/dL" to 0, "mmol/L" to 1).forEach { (label, value) ->
                             Row(
                                 Modifier
@@ -2167,16 +2184,25 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                                         viewModel.setUnit(value)
                                         showUnitDialog = false
                                     }
-                                    .padding(6.dp),
+                                    .padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(selected = (if (isMmol) 1 else 0) == value, onClick = null)
-                                Text(text = label, modifier = Modifier.padding(start = 8.dp))
+                                Text(
+                                    text = label,
+                                    modifier = Modifier.padding(start = 12.dp),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
                             }
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showUnitDialog = false }) { Text(stringResource(R.string.cancel)) } }
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showUnitDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
             )
         }
 
@@ -2196,9 +2222,13 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         if (showThemeDialog) {
             AlertDialog(
                 onDismissRequest = { showThemeDialog = false },
-                title = { Text(stringResource(R.string.select_theme)) },
                 text = {
-                    Column {
+                    Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                        Text(
+                            "Choose theme",
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
                         ThemeMode.values().forEach { mode ->
                             val label = when(mode) {
                                 ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
@@ -2212,16 +2242,25 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                                         onThemeChanged(mode)
                                         showThemeDialog = false
                                     }
-                                    .padding(8.dp),
+                                    .padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(selected = themeMode == mode, onClick = null)
-                                Text(text = label, modifier = Modifier.padding(start = 8.dp))
+                                Text(
+                                    text = label,
+                                    modifier = Modifier.padding(start = 12.dp),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
                             }
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text(stringResource(R.string.cancel)) } }
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showThemeDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
             )
         }
 
@@ -2300,9 +2339,11 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 
 
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        Text(stringResource(R.string.exchanges), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
+        // M3 Grid: 24dp between major sections
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text(stringResource(R.string.exchanges), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         ListItem(
             headlineContent = { Text(stringResource(R.string.xdripbroadcast)) },
@@ -2330,10 +2371,10 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 
 
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+        // M3 Grid: 24dp between major sections
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- GLUCOSE ALERTS ---
-        Text(stringResource(R.string.glucose_alerts_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
+        Text(stringResource(R.string.glucose_alerts_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
         Spacer(modifier = Modifier.height(16.dp))
 
         AlarmCard(
@@ -2364,10 +2405,10 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+        // M3 Grid: 24dp between major sections
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- TARGET RANGES ---
-        Text(stringResource(R.string.target_range_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp)
+        Text(stringResource(R.string.target_range_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -2421,9 +2462,11 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 //            }
 //        )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+        // M3 Grid: 24dp between major sections
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Text(stringResource(R.string.advanced_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
+        Text(stringResource(R.string.advanced_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         // Google Scan
         ListItem(
@@ -2478,6 +2521,366 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             supportingContent = { Text("View trace.log and logcat") },
             modifier = Modifier.clickable { navController.navigate("settings/debug") }
         )
+
+
+        // M3 Grid: 24dp between major sections
+        Spacer(modifier = Modifier.height(24.dp))
+
+        //--- DATA MANAGEMENT SECTION ---
+        Text(
+            text = "Data Management",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        // M3 Grid: 16dp spacing after section header
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        val coroutineScope = rememberCoroutineScope()
+        var showExportDialog by remember { mutableStateOf(false) }
+        var exportType by remember { mutableStateOf("csv") }
+        
+        // EXPORT LAUNCHER
+        val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("*/*")
+        ) { uri ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    val format = exportType 
+                    val unitStr = if (isMmol) "mmol/L" else "mg/dL"
+                    val data = tk.glucodata.data.HistoryRepository.getHistoryBlocking(0L, isMmol)
+                    
+                    val success = if (format == "csv") {
+                        tk.glucodata.data.HistoryExporter.exportToCsv(context, uri, data, unitStr)
+                    } else {
+                        tk.glucodata.data.HistoryExporter.exportToReadable(context, uri, data, unitStr)
+                    }
+                    
+                    Toast.makeText(context, if (success) "Export successful" else "Export failed", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // IMPORT LAUNCHER
+        val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    val result = tk.glucodata.data.HistoryExporter.importFromCsv(context, uri)
+                    if (result.success) {
+                        Toast.makeText(context, "Imported ${result.successCount} readings", Toast.LENGTH_LONG).show()
+                        viewModel.refreshData()
+                    } else {
+                        Toast.makeText(context, "Import failed: ${result.errorMessage}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+        
+        // Export Format Dialog
+        if (showExportDialog) {
+            AlertDialog(
+                onDismissRequest = { showExportDialog = false },
+                title = { Text("Select Export Format") },
+                text = {
+                    Column {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { exportType = "csv" }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = exportType == "csv", onClick = null)
+                            Column(Modifier.padding(start = 8.dp)) {
+                                Text("CSV File (.csv)", fontWeight = FontWeight.Bold)
+                                Text("Best for Excel/Analysis", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { exportType = "readable" }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = exportType == "readable", onClick = null)
+                            Column(Modifier.padding(start = 8.dp)) {
+                                Text("Readable Text (.txt)", fontWeight = FontWeight.Bold)
+                                Text("Best for sharing/printing", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                },
+                confirmButton = { 
+                    TextButton(onClick = { 
+                        showExportDialog = false
+                        val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                        val ext = if (exportType == "csv") "csv" else "txt"
+                        exportLauncher.launch("juggluco_history_$date.$ext")
+                    }) { Text("Export") } 
+                },
+                dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("Cancel") } }
+            )
+        }
+        
+        // Export History - M3 ListItem pattern (fully clickable)
+        ListItem(
+            headlineContent = { Text("Export History") },
+            supportingContent = { Text("Save glucose readings to CSV or text file") },
+            modifier = Modifier.clickable { showExportDialog = true },
+            leadingContent = { 
+                Icon(
+                    Icons.Default.Share, 
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                ) 
+            }
+        )
+        
+        // Import History - M3 ListItem pattern (fully clickable)
+        ListItem(
+            headlineContent = { Text("Import History") },
+            supportingContent = { Text("Restore glucose readings from CSV file") },
+            modifier = Modifier.clickable { importLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
+            leadingContent = { 
+                Icon(
+                    Icons.Default.Download, 
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary
+                ) 
+            }
+        )
+        
+        // M3 Grid: 24dp before new subsection
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text(
+            text = "Dangerous Actions",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.error
+        )
+        // M3 Grid: 16dp after subsection header
+        Spacer(modifier = Modifier.height(16.dp))
+        var showClearHistoryDialog by remember { mutableStateOf(false) }
+        var showClearDataDialog by remember { mutableStateOf(false) }
+        var showFactoryResetDialog by remember { mutableStateOf(false) }
+        var isClearing by remember { mutableStateOf(false) }
+        
+        // Clear History Card - Description + Action button pattern
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    "Remove all glucose readings from database",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(
+                    onClick = { showClearHistoryDialog = true },
+                    enabled = !isClearing,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    if (isClearing) CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                    else Text("Clear History")
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Clear App Data Card - Description + Action button pattern  
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    "Remove history and cache, keep settings",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { showClearDataDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    enabled = !isClearing,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    if (isClearing) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onError)
+                    else Text("Clear Data")
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Factory Reset Card - Description + Action button pattern
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    "Remove everything - app returns to first-run state",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { showFactoryResetDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    enabled = !isClearing,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    if (isClearing) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onError)
+                    else Text("Factory Reset")
+                }
+            }
+        }
+        
+        // Confirmation Dialogs
+        if (showClearHistoryDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearHistoryDialog = false },
+                icon = { Icon(Icons.Default.History, contentDescription = null) },
+                title = { Text("Clear History?") },
+                text = { Text("This will remove all glucose readings from the database. This action cannot be undone.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            isClearing = true
+                            coroutineScope.launch {
+                                tk.glucodata.data.DataManagement.clearHistory()
+                                isClearing = false
+                                showClearHistoryDialog = false
+                            }
+                        }
+                    ) { Text("Clear") }
+                },
+                dismissButton = { TextButton(onClick = { showClearHistoryDialog = false }) { Text("Cancel") } }
+            )
+        }
+        
+        if (showClearDataDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDataDialog = false },
+                icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                title = { Text("Clear App Data?") },
+                text = { 
+                    Column {
+                        Text("This will remove:")
+                        Text("• All glucose readings")
+                        Text("• Cache files")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Settings will be preserved.")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("This action cannot be undone.", fontWeight = FontWeight.Bold)
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            isClearing = true
+                            coroutineScope.launch {
+                                tk.glucodata.data.DataManagement.clearAppData()
+                                isClearing = false
+                                showClearDataDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Clear Data") }
+                },
+                dismissButton = { TextButton(onClick = { showClearDataDialog = false }) { Text("Cancel") } }
+            )
+        }
+        
+        if (showFactoryResetDialog) {
+            AlertDialog(
+                onDismissRequest = { showFactoryResetDialog = false },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                title = { Text("⚠️ Factory Reset?") },
+                text = { 
+                    Column {
+                        Text("This will REMOVE EVERYTHING:", fontWeight = FontWeight.Bold)
+                        Text("• All glucose readings")
+                        Text("• All settings")
+                        Text("• Cache files")
+                        Text("• Sensor data")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("The app will return to first-run state.", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("THIS CANNOT BE UNDONE!", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            isClearing = true
+                            coroutineScope.launch {
+                                tk.glucodata.data.DataManagement.factoryReset()
+                                // Close app after factory reset
+                                (context as? Activity)?.finishAffinity()
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("RESET EVERYTHING") }
+                },
+                dismissButton = { TextButton(onClick = { showFactoryResetDialog = false }) { Text("Cancel") } }
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -2764,6 +3167,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             },
             confirmButton = {
                 TextButton(onClick = { 
+                    viewModel.terminateSensor(sensor.serial, wipeDataChecked)
                     showTerminateDialog = false 
                     wipeDataChecked = false
                 }) { Text(stringResource(R.string.disconnect)) }
@@ -3027,6 +3431,74 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 
 
 
+
+                // --- CUSTOM AUTO-CALIBRATION (Sibionics Only) ---
+                if (sensor.isSibionics2 && sensor.viewMode != 1) {
+                     Spacer(modifier = Modifier.height(16.dp))
+                     
+                     var customEnabled by remember(sensor.customCalEnabled) { mutableStateOf(sensor.customCalEnabled) }
+                     var customIndex by remember(sensor.customCalIndex) { mutableStateOf(sensor.customCalIndex.toFloat()) }
+                     var customAutoReset by remember(sensor.customCalAutoReset) { mutableStateOf(sensor.customCalAutoReset) }
+
+                     // Helper for slider labels
+                     val labels = listOf("12H", "24H", "2D", "3D", "7D", "14D", "20D")
+                     val currentLabel = labels.getOrElse(customIndex.toInt()) { "24H" }
+
+                     Row(
+                         modifier = Modifier.fillMaxWidth(),
+                         verticalAlignment = Alignment.CenterVertically,
+                         horizontalArrangement = Arrangement.SpaceBetween
+                     ) {
+                         Column {
+                             Text("Custom auto-calibration", style = MaterialTheme.typography.titleMedium)
+                             if (!customEnabled) {
+                                 Text("Juggluco native", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                             }
+                         }
+                         Switch(
+                             checked = customEnabled,
+                             onCheckedChange = { enabled ->
+                                 customEnabled = enabled
+                                 viewModel.updateCustomCalibration(sensor.serial, enabled, customIndex.toInt(), customAutoReset)
+                             }
+                         )
+                     }
+
+                     AnimatedVisibility(visible = customEnabled) {
+                         Column {
+                             Spacer(modifier = Modifier.height(8.dp))
+                             Text("Calibration window: $currentLabel", style = MaterialTheme.typography.bodyMedium)
+                             Slider(
+                                 modifier = Modifier.padding(horizontal = 8.dp),
+                                 value = customIndex,
+                                 onValueChange = { customIndex = it },
+                                 valueRange = 0f..6f,
+                                 steps = 5,
+                                 onValueChangeFinished = {
+                                     viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), customAutoReset)
+                                 }
+                             )
+                             Row(
+                                 modifier = Modifier.fillMaxWidth().clickable { 
+                                     val newVal = !customAutoReset
+                                     customAutoReset = newVal
+                                     viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), newVal)
+                                 },
+                                 verticalAlignment = Alignment.CenterVertically
+                             ) {
+                                 Checkbox(
+                                     checked = customAutoReset,
+                                     onCheckedChange = { checked ->
+                                         customAutoReset = checked
+                                         viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), checked)
+                                     }
+                                 )
+                                 Text("Auto reset algorithm", modifier = Modifier.padding(start = 8.dp))
+                             }
+                         }
+                     }
+                }
+
                 // --- ACTION BUTTONS (Always Visible) ---
 
 
@@ -3098,6 +3570,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
     var showSecret by remember { mutableStateOf(false) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = { Text("Nightscout Settings") },

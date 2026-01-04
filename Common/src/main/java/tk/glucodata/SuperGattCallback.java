@@ -570,18 +570,22 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         mActiveDeviceAddress = null;
     }
 
-    String getinfo() {
+    synchronized String getinfo() {
         if (dataptr != 0L)
             return Natives.getsensortext(dataptr);
         return "";
     }
 
-    public long resetdataptr() {
+    public synchronized long resetdataptr() {
         if (constatchange[1] < constatchange[0]) {
             constatchange[1] = System.currentTimeMillis();
             constatstatusstr = "resetdataptr";
         }
-        Natives.freedataptr(dataptr);
+        long oldptr = dataptr;
+        dataptr = 0; // Safeguard: Ensure no one uses the old pointer while we free/realloc
+        if (oldptr != 0)
+            Natives.freedataptr(oldptr);
+
         close();
         dataptr = Natives.getdataptr(SerialNumber);
         mActiveDeviceAddress = Natives.getDeviceAddress(dataptr, true);
@@ -613,7 +617,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         }
     }
 
-    public void setDeviceAddress(String address) {
+    public synchronized void setDeviceAddress(String address) {
         {
             if (doLog) {
                 Log.i(LOG_ID, SerialNumber + " " + "setDeviceAddress(" + address + ")");
@@ -640,11 +644,11 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         // sensorbluetooth=null;
     }
 
-    public boolean streamingEnabled() {// TODO: libre3?
+    public synchronized boolean streamingEnabled() {// TODO: libre3?
         return Natives.askstreamingEnabled(dataptr);
     }
 
-    public void finishSensor() {
+    public synchronized void finishSensor() {
         Natives.finishSensor(dataptr);
     }
 

@@ -261,7 +261,8 @@ Data_t askindexdata(jlong index) {
 #else
 #define THREADLOCAL thread_local
 #endif
-static THREADLOCAL jlong sprintargs[2048];
+static constexpr int sprintargs_size = 2048;
+static THREADLOCAL jlong sprintargs[sprintargs_size];
 static THREADLOCAL int recordsprint = -1;
 #define VISIBLE __attribute__((__visibility__("default")))
 extern "C" int VISIBLE __vSprintf_chk(char *s, int flag, size_t slen,
@@ -271,11 +272,15 @@ extern "C" int VISIBLE __vsprintf_chk(char *s, int flag, size_t slen,
 extern "C" int VISIBLE __vSprintf_chk(char *s, int flag, size_t slen,
                                       const char *format, va_list args) {
   if (recordsprint >= 0) {
-    va_list newargs;
-    va_copy(newargs, args);
-    jlong val = va_arg(newargs, jlong);
-    sprintargs[recordsprint++] = val;
-    va_end(newargs);
+    if (recordsprint < 65536) {
+      va_list newargs;
+      va_copy(newargs, args);
+      jlong val = va_arg(newargs, jlong);
+      sprintargs[recordsprint++] = val;
+      va_end(newargs);
+    } else {
+      LOGAR("sprintargs overflow avoided");
+    }
   }
   int res = __vsprintf_chk(s, flag, slen, format, args);
   LOGGER(" __vsprintf_chk(%s (%p),%d,%zd,%s,va_list)=%d\n", s, s, flag, slen,
@@ -298,6 +303,12 @@ extern jlong glucoseback(uint32_t nu, uint32_t glval, float drate,
 
 jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
                               data_t *data, int sensorindex) {
+  // Verify algorithm is initialized
+  if (!algcontext) {
+    LOGSTRING("processData2: algcontext is null, cannot process\n");
+    return 0LL;
+  }
+
   const int datasize = data->size();
   logbytes("processData2 input: ", (const uint8_t *)data->data(), datasize);
   Gegs<jint> jiar(2);
@@ -315,8 +326,8 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
         V120SpiltData(subenv, nullptr, 0, (jbyteArray)data, (jintArray)jiar,
                       (jbyteArray)jsonuit, false, (jbyteArray)bar2, datasize);
   }
-  //   int recorded=recordsprint;
   recordsprint = -1;
+
   LOGGER("nritems=%d\n", nritems);
   LOGGER("%s\n", jsonuit.data->data());
   logbytes("bar2", (const uint8_t *)bar2.data->data(), bar2.data->size());
@@ -384,8 +395,10 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
         if (current > 1 && value < 3000.0) {
           double computed_val = process2(index, value, temp);
           // Fix for Sibionics 2 sensor going into error mode with crazy
-          // calibration values
-          if (computed_val > 50.0 || computed_val < 0.0) {
+          // calibration values - only reset for real-time data, not historical
+          // replay
+          // Note: Algorithm returns 0.0 during warmup (normal), so allow that
+          if (!reindex && (computed_val > 50.0 || computed_val < -0.5)) {
             LOGGER("SIprocess sanity check failed: index=%d temp=%f value=%f "
                    "computed=%f. Forcing reset.",
                    index, temp, value, computed_val);

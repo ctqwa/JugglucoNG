@@ -62,8 +62,11 @@ public class SiGattCallback extends SuperGattCallback {
 
    @SuppressLint("MissingPermission")
    @Override // android.bluetooth.BluetoothGattCallback
-   public void onDescriptorWrite(BluetoothGatt bluetoothGatt, BluetoothGattDescriptor bluetoothGattDescriptor,
+   public synchronized void onDescriptorWrite(BluetoothGatt bluetoothGatt,
+         BluetoothGattDescriptor bluetoothGattDescriptor,
          int status) {
+      if (dataptr == 0)
+         return;
       super.onDescriptorWrite(bluetoothGatt, bluetoothGattDescriptor, status);
       long tim = System.currentTimeMillis();
       if (doLog) {
@@ -95,7 +98,7 @@ public class SiGattCallback extends SuperGattCallback {
 
    @SuppressLint("MissingPermission")
    @Override
-   public void onConnectionStateChange(BluetoothGatt bluetoothGatt, int status, int newState) {
+   public synchronized void onConnectionStateChange(BluetoothGatt bluetoothGatt, int status, int newState) {
       if (stop) {
          {
             if (doLog) {
@@ -106,6 +109,8 @@ public class SiGattCallback extends SuperGattCallback {
          ;
          return;
       }
+      if (dataptr == 0)
+         return;
       long tim = System.currentTimeMillis();
       if (doLog) {
          final String[] state = { "DISCONNECTED", "CONNECTING", "CONNECTED", "DISCONNECTING" };
@@ -125,7 +130,8 @@ public class SiGattCallback extends SuperGattCallback {
             disconnect();
          }
          connected = true;
-         Natives.EverSenseClear(dataptr);
+         if (dataptr != 0)
+            Natives.EverSenseClear(dataptr);
       } else {
          connected = false;
          if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -263,7 +269,9 @@ public class SiGattCallback extends SuperGattCallback {
    // UUID.fromString("00002A05-0000-1000-8000-00805f9b34fb");
 
    @Override // android.bluetooth.BluetoothGattCallback
-   public void onServicesDiscovered(BluetoothGatt bluetoothGatt, int status) {
+   public synchronized void onServicesDiscovered(BluetoothGatt bluetoothGatt, int status) {
+      if (dataptr == 0)
+         return;
       {
          if (doLog) {
             Log.i(LOG_ID, "BLE onServicesDiscovered invoked, status: " + status);
@@ -278,7 +286,9 @@ public class SiGattCallback extends SuperGattCallback {
    }
 
    @SuppressLint("MissingPermission")
-   private void askvalues(BluetoothGatt bluetoothGatt) {
+   private synchronized void askvalues(BluetoothGatt bluetoothGatt) {
+      if (dataptr == 0)
+         return;
       var tim = System.currentTimeMillis();
       final byte[] data = Natives.siAsknewdata(dataptr);
       if (data == null) {
@@ -324,8 +334,10 @@ public class SiGattCallback extends SuperGattCallback {
       return false;
    }
 
-   private void authenticate() {
+   private synchronized void authenticate() {
       // justAuthenticated=true;
+      if (dataptr == 0)
+         return;
       if (hasNotChinese) {
          final var bytes = Natives.siAuthBytes(dataptr);
          if (bytes != null)
@@ -333,12 +345,16 @@ public class SiGattCallback extends SuperGattCallback {
       }
    }
 
-   private void activate() {
+   private synchronized void activate() {
+      if (dataptr == 0)
+         return;
       if (hasNotChinese)
          write2(Natives.getSIActivation());
    }
 
-   private boolean writeReset() {
+   private synchronized boolean writeReset() {
+      if (dataptr == 0)
+         return false;
       if (hasNotChinese) {
          if (write2(Natives.getSIResetBytes())) {
             Log.i(LOG_ID, "writeReset successful");
@@ -376,17 +392,24 @@ public class SiGattCallback extends SuperGattCallback {
    private boolean novalue = false;
 
    @SuppressLint("MissingPermission")
-   private void sendtime() {
+   private synchronized void sendtime() {
+      if (dataptr == 0)
+         return;
       if (hasNotChinese)
          write2(Natives.getSItimecmd());
    }
 
-   private void processchanged(byte[] value) {
+   private synchronized void processchanged(byte[] value) {
+      if (dataptr == 0) {
+         Log.e(LOG_ID, "processchanged: dataptr is 0");
+         return;
+      }
       long timmsec = System.currentTimeMillis();
       long res = Natives.SIprocessData(dataptr, value, timmsec);
       if (res == 10L) {
          tryer(() -> writeReset());
-         Natives.setResetSibionics2(dataptr, false);
+         if (dataptr != 0)
+            Natives.setResetSibionics2(dataptr, false);
          novalue = true;
          Applic.app.getHandler().postDelayed(() -> {
             if (novalue) {
@@ -435,7 +458,8 @@ public class SiGattCallback extends SuperGattCallback {
          return;
       }
       if (res == 1L) {
-         sensorstartmsec = Natives.getSensorStartmsec(dataptr);
+         if (dataptr != 0)
+            sensorstartmsec = Natives.getSensorStartmsec(dataptr);
          return;
       }
       if (res == 4L) {
@@ -485,7 +509,9 @@ public class SiGattCallback extends SuperGattCallback {
    }
 
    @Override
-   public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
+   public synchronized void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
+      if (dataptr == 0)
+         return;
       {
          if (doLog) {
             Log.i(LOG_ID, "onReadRemoteRssi(BluetoothGatt," + rssi + "," + status
@@ -500,8 +526,10 @@ public class SiGattCallback extends SuperGattCallback {
    }
 
    @Override
-   public boolean matchDeviceName(String deviceName, String address) {
+   public synchronized boolean matchDeviceName(String deviceName, String address) {
       if (deviceName == null)
+         return false;
+      if (dataptr == 0)
          return false;
       var savedname = Natives.siGetDeviceName(dataptr);
       if (savedname != null && deviceName.equals(savedname))
@@ -517,7 +545,7 @@ public class SiGattCallback extends SuperGattCallback {
    }
 
    @Override
-   public void free() {
+   public synchronized void free() {
       super.free();
       --siNR;
    }
