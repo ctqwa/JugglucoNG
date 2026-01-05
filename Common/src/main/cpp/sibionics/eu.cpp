@@ -357,11 +357,25 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
             return 3LL;
           }
         } else {
-          LOGGER("SIprocess index=%d>maxid=%d\n", index, maxid);
-          int maxretry =
-              (index - maxid) < 20 ? 2 : ((index - maxid) < 200 ? 5 : 10);
-          if (sens->retried++ < maxretry) {
-            return 3LL;
+          // If in reset mode, this Gap is expected.
+          // 1. Request History (to fill the gap).
+          // 2. JUMP the gap (update maxid) and Process this packet (for UI).
+          if (sens->isInResetMode()) {
+            LOGSTRING("SIprocess Gap due to Reset. Requesting History & "
+                      "Jumping Gap.\n");
+            backup->resendResetDevices(&updateone::sendstream);
+
+            // Accept the new index, jumping over the missing history for now.
+            maxid = index;
+            sens->setSiIndex(index);
+            // Fall through to process stream...
+          } else {
+            LOGGER("SIprocess index=%d>maxid=%d\n", index, maxid);
+            int maxretry =
+                (index - maxid) < 20 ? 2 : ((index - maxid) < 200 ? 5 : 10);
+            if (sens->retried++ < maxretry) {
+              return 3LL;
+            }
           }
         }
       }
@@ -382,6 +396,9 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
       double newvalue;
       if (algcontext) {
         if (current > 1 && value < 3000.0) {
+          // FIX: If we have successfully reached processing with a valid or
+          // current index, we are "Synced" enough to clear the Reset flag.
+
           double computed_val = process2(index, value, temp);
           // Fix for Sibionics 2 sensor going into error mode with crazy
           // calibration values
@@ -416,7 +433,10 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
              "%d %d %1.f itime=%" PRIu64 " %s",
              totalIndex, index, temp, value, newvalue, trend, trend2,
              abbottrend, change, eventTime, ctime(&eventTime));
-      if (newvalue > 1.8 && newvalue < 30) {
+      // Relaxed check: Allow values > 0.1 (approx 2 mg/dL) to capture deep
+      // hypoglycemia/noise without failure. Previous > 1.0 was still rejecting
+      // 0.8/0.9 seen in user logs.
+      if (newvalue > 0.1 && newvalue < 30) {
         sens->savestream(eventTime, totalIndex, mgdL, abbottrend, change,
                          (int)current);
         sens->setSiIndex(index + 1);

@@ -62,8 +62,11 @@ public class SiGattCallback extends SuperGattCallback {
 
    @SuppressLint("MissingPermission")
    @Override // android.bluetooth.BluetoothGattCallback
-   public void onDescriptorWrite(BluetoothGatt bluetoothGatt, BluetoothGattDescriptor bluetoothGattDescriptor,
+   public synchronized void onDescriptorWrite(BluetoothGatt bluetoothGatt,
+         BluetoothGattDescriptor bluetoothGattDescriptor,
          int status) {
+      if (stop || dataptr == 0)
+         return;
       super.onDescriptorWrite(bluetoothGatt, bluetoothGattDescriptor, status);
       long tim = System.currentTimeMillis();
       if (doLog) {
@@ -381,7 +384,9 @@ public class SiGattCallback extends SuperGattCallback {
          write2(Natives.getSItimecmd());
    }
 
-   private void processchanged(byte[] value) {
+   private synchronized void processchanged(byte[] value) {
+      if (stop || dataptr == 0)
+         return;
       long timmsec = System.currentTimeMillis();
       long res = Natives.SIprocessData(dataptr, value, timmsec);
       if (res == 10L) {
@@ -517,7 +522,9 @@ public class SiGattCallback extends SuperGattCallback {
    }
 
    @Override
-   public void free() {
+   public synchronized void free() {
+      if (stop)
+         return;
       super.free();
       --siNR;
    }
