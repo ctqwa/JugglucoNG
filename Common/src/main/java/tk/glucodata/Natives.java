@@ -1397,6 +1397,11 @@ public class Natives {
 
         public static native void siClearAll(long dataptr);
 
+        public static native void setCustomCalibrationSettings(long dataptr, boolean enabled, int index,
+                        boolean autoReset);
+
+        public static native long getCustomCalibrationSettings(long dataptr);
+
         public static native void siWipeDataOnly(long dataptr);
 
         public static native void setViewMode(long dataptr, int mode);

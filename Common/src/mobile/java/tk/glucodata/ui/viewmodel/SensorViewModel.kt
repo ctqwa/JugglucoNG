@@ -24,7 +24,10 @@ data class SensorInfo(
     val autoResetDays: Int,
     val isSibionics2: Boolean,
     val startMs: Long,
-    val officialEndMs: Long
+    val officialEndMs: Long,
+    val customCalEnabled: Boolean,
+    val customCalIndex: Int,
+    val customCalAutoReset: Boolean
 )
 
 class SensorViewModel : ViewModel() {
@@ -52,6 +55,12 @@ class SensorViewModel : ViewModel() {
                     autoResetDays = 21
                 }
 
+                // Get custom calibration settings
+                val customSettings = Natives.getCustomCalibrationSettings(gatt.dataptr)
+                val customEnabled = (customSettings and 1L) != 0L
+                val customAutoReset = (customSettings and 2L) != 0L
+                val customIndex = ((customSettings ushr 8) and 0xFF).toInt()
+
                 SensorInfo(
                     serial = gatt.SerialNumber ?: "Unknown",
                     deviceAddress = gatt.mActiveDeviceAddress ?: "Unknown",
@@ -66,7 +75,10 @@ class SensorViewModel : ViewModel() {
                     autoResetDays = autoResetDays,
                     isSibionics2 = isSi2,
                     startMs = startMs,
-                    officialEndMs = officialEndMs
+                    officialEndMs = officialEndMs,
+                    customCalEnabled = customEnabled,
+                    customCalIndex = customIndex,
+                    customCalAutoReset = customAutoReset
                 )
 
 
@@ -138,6 +150,15 @@ class SensorViewModel : ViewModel() {
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
             Natives.setViewMode(gatt.dataptr, mode)
+            refreshSensors()
+        }
+    }
+
+    fun updateCustomCalibration(serial: String, enabled: Boolean, index: Int, autoReset: Boolean) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt != null) {
+            Natives.setCustomCalibrationSettings(gatt.dataptr, enabled, index, autoReset)
             refreshSensors()
         }
     }

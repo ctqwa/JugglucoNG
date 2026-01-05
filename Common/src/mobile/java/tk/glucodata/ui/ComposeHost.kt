@@ -245,9 +245,9 @@ fun formatSensorTime(rawTime: String): String {
 }
 
 data class GlucosePoint(
-    val value: Float, 
-    val time: String, 
-    val timestamp: Long = 0L, 
+    val value: Float,
+    val time: String,
+    val timestamp: Long = 0L,
     val rawValue: Float = 0f,
     val rate: Float? = null
 )
@@ -415,21 +415,21 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    
+
     // Handle back button to exit app when on start destination
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
-    
+
     BackHandler(enabled = currentRoute == "dashboard") {
         // OPTION 1 (Current): Traditional Android - Back button exits/destroys app
         (context as? Activity)?.finish()
-        
+
         // OPTION 2 (Alternative): Modern UX - Back = Home (minimizes instead of destroying)
         // Uncomment below to make Back button minimize the app instead of destroying it.
         // This keeps the app in memory like pressing Home, avoiding reload delay.
         // (context as? Activity)?.moveTaskToBack(true)
     }
-    
+
     // Navigation Items Logic (Shared)
     val onNavigate = { route: String ->
         navController.navigate(route) {
@@ -438,7 +438,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
             restoreState = true
         }
     }
-    
+
     // Define items for use in both Bar and Rail
     data class NavItem(val route: String, val label: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector)
     val navItems = listOf(
@@ -453,7 +453,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
             NavigationRail {
                 Spacer(modifier = Modifier.weight(1f)) // Center vertically? Or top? Usually top or center.
                 // Let's center them vertically for likely better ergonomics in landscape phone
-                
+
                 navItems.forEach { item ->
                     val isSelected = currentRoute == item.route
                     NavigationRailItem(
@@ -472,7 +472,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 }
                 Spacer(modifier = Modifier.weight(1f))
             }
-            
+
             // Content Area
             Scaffold(contentWindowInsets = WindowInsets(0.dp)) { innerPadding ->
                 NavHost(
@@ -518,34 +518,34 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
             }
         ) { innerPadding ->
             NavHost(
-            navController = navController,
-            startDestination = "dashboard",
-            modifier = Modifier.padding(innerPadding),
-            // Use a fast fade (200ms) for a snappy feel that isn't jarring
-            enterTransition = { fadeIn(animationSpec = tween(200)) },
-            exitTransition = { fadeOut(animationSpec = tween(200)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(200)) },
-            popExitTransition = { fadeOut(animationSpec = tween(200)) }
-        ) {
-            composable("dashboard") { DashboardScreen(dashboardViewModel) }
-            composable("sensors") { SensorScreen() }
-            composable("settings") { SettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
-            composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
-            composable("settings/mirror") { MirrorSettingsScreen(navController) }
-            composable("settings/mirror/edit/{pos}") { backStackEntry ->
-                val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
-                MirrorEditScreen(navController, pos)
+                navController = navController,
+                startDestination = "dashboard",
+                modifier = Modifier.padding(innerPadding),
+                // Use a fast fade (200ms) for a snappy feel that isn't jarring
+                enterTransition = { fadeIn(animationSpec = tween(200)) },
+                exitTransition = { fadeOut(animationSpec = tween(200)) },
+                popEnterTransition = { fadeIn(animationSpec = tween(200)) },
+                popExitTransition = { fadeOut(animationSpec = tween(200)) }
+            ) {
+                composable("dashboard") { DashboardScreen(dashboardViewModel) }
+                composable("sensors") { SensorScreen() }
+                composable("settings") { SettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
+                composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
+                composable("settings/mirror") { MirrorSettingsScreen(navController) }
+                composable("settings/mirror/edit/{pos}") { backStackEntry ->
+                    val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
+                    MirrorEditScreen(navController, pos)
+                }
+                composable("settings/debug") { DebugSettingsScreen(navController) }
             }
-            composable("settings/debug") { DebugSettingsScreen(navController) }
         }
-    }
     }
 }
 
 @Composable
 fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     val context = LocalContext.current
-    
+
     // This runs every time the Activity/Fragment/Screen hits the ON_RESUME state
     // PERFORMANCE FIX: Refreshes stale data after Home button to prevent chart issues
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -580,9 +580,9 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
         // --- REUSABLE UI SECTIONS ---
-        
 
-        val recentReadings = remember(glucoseHistory) { 
+
+        val recentReadings = remember(glucoseHistory) {
             glucoseHistory.takeLast(10).reversed().distinctBy { it.timestamp }
         }
 
@@ -607,8 +607,8 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                     item { DashboardMetaInfoSection(sensorName, daysRemaining) }
                     itemsIndexed(recentReadings, key = { index, item -> "${item.timestamp}_$index" }) { _, item ->
                         ReadingRow(
-                            point = item, 
-                            unit = unit, 
+                            point = item,
+                            unit = unit,
                             viewMode = viewMode,
                             modifier = Modifier.animateItem()
                         )
@@ -644,8 +644,8 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
             ) {
                 item { DashboardStatusSection(currentGlucose, currentRate, viewMode, latestPoint) }
                 item { DashboardMetaInfoSection(sensorName, daysRemaining) }
-                
-                item { 
+
+                item {
                     // Portrait Chart: Flexible height
                     DashboardChartSection(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 520.dp),
@@ -659,8 +659,8 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
 
                 itemsIndexed(recentReadings, key = { index, item -> "${item.timestamp}_$index" }) { _, item ->
                     ReadingRow(
-                        point = item, 
-                        unit = unit, 
+                        point = item,
+                        unit = unit,
                         viewMode = viewMode,
                         modifier = Modifier.animateItem()
                     )
@@ -701,7 +701,7 @@ fun DashboardStatusSection(
                             androidx.compose.ui.text.AnnotatedString(currentGlucose)
                         }
                     }
-                    
+
                     // M3 Expressive: Animated value change (slide up with fade)
                     AnimatedContent(
                         targetState = finalDisplayGlucose,
@@ -721,28 +721,28 @@ fun DashboardStatusSection(
                         label = "GlucoseValueAnimation"
                     ) { glucoseValue ->
                         Text(
-                            glucoseValue, 
-                            style = MaterialTheme.typography.displayLarge, 
+                            glucoseValue,
+                            style = MaterialTheme.typography.displayLarge,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
                 Spacer(modifier = Modifier.width(16.dp))
-                
+
                 // M3 Expressive: Animated trend icon
                 AnimatedContent(
                     targetState = currentRate,
                     transitionSpec = {
                         (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
-                            slideInVertically(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ) { if (targetState > initialState) -it / 3 else it / 3 })
+                                slideInVertically(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                ) { if (targetState > initialState) -it / 3 else it / 3 })
                             .togetherWith(
                                 fadeOut(animationSpec = tween(100)) +
-                                slideOutVertically() { if (targetState > initialState) it / 3 else -it / 3 }
+                                        slideOutVertically() { if (targetState > initialState) it / 3 else -it / 3 }
                             )
                     },
                     label = "TrendIconAnimation"
@@ -765,8 +765,8 @@ fun DashboardMetaInfoSection(
     daysRemaining: String
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(), 
-        horizontalArrangement = Arrangement.SpaceBetween, 
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (sensorName.isNotEmpty()) Text(sensorName, style = MaterialTheme.typography.titleMedium)
@@ -845,8 +845,8 @@ fun InteractiveGlucoseChart(
 
     // --- ONE-TIME INIT ---
     // Ensure Fast Random Access for the drawing loop (critical for performance)
-    val safeData = remember(fullData) { 
-        if (fullData is java.util.RandomAccess) fullData else ArrayList(fullData) 
+    val safeData = remember(fullData) {
+        if (fullData is java.util.RandomAccess) fullData else ArrayList(fullData)
     }
 
     // --- FORMATTERS & TOOLS (Hoisted for Performance) ---
@@ -857,9 +857,9 @@ fun InteractiveGlucoseChart(
     // Reusable objects to avoid allocation on every frame
     val reusablePath = remember { Path() }
     val reusableDate = remember { java.util.Date() }
-    
+
     // Hoist intervals array to avoid allocation in Canvas loop
-    val gridIntervals = remember { 
+    val gridIntervals = remember {
         longArrayOf(
             15 * 60 * 1000L,     // 15m
             30 * 60 * 1000L,     // 30m
@@ -871,10 +871,10 @@ fun InteractiveGlucoseChart(
             24 * 60 * 60 * 1000L // 24h
         )
     }
-    
+
     // Hoisted PathEffect for dashed lines (Zero-Allocation)
     val dashEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f) }
-    
+
     // Label Cache to avoid SimpleDateFormat overhead during scroll
     // Maps Timestamp -> Formatted String
     val labelCache = remember { mutableMapOf<Long, String>() }
@@ -894,7 +894,7 @@ fun InteractiveGlucoseChart(
     var visibleDuration by rememberSaveable { mutableLongStateOf(3L * 60 * 60 * 1000) }
     var preZoomDuration by rememberSaveable { mutableLongStateOf(0L) } // For toggle zoom
     var centerTime by rememberSaveable { mutableLongStateOf(now - visibleDuration / 2) }
-    
+
     // Date picker state
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
@@ -910,10 +910,10 @@ fun InteractiveGlucoseChart(
     // Auto-scroll logic: Only jump if we are already "near" the end (monitor mode)
     // or if this is the first load.
     // Auto-scroll logic: Only jump if we are explicitly RESUMED (Active)
-    
+
     val lifecycleOwner = LocalLifecycleOwner.current
     var isResumed by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
-    
+
     // Flag to detect immediate Resume/Startup so we can FORCE snap to latest
     // (ignoring the 1h check initially) as per User Request.
     var justResumed by remember { mutableStateOf(true) }
@@ -933,13 +933,13 @@ fun InteractiveGlucoseChart(
                 val currentTime = System.currentTimeMillis()
                 // Check for 10-minute timeout (10 * 60 * 1000 = 600000 ms)
                 if (currentTime - lastActiveTime > 600000) {
-                     // TIMEOUT EXCEEDED: Reset Graph State
-                     // Only reset if we have valid data to snap to, otherwise wait for data load
-                     if (latestDataTimestamp > 0) {
-                         visibleDuration = 3L * 60 * 60 * 1000 // Default 3h
-                         lastAutoScrolledTimestamp = 0L // Reset auto-scroll memory
-                         centerTime = latestDataTimestamp - visibleDuration / 2 // Snap to live
-                     }
+                    // TIMEOUT EXCEEDED: Reset Graph State
+                    // Only reset if we have valid data to snap to, otherwise wait for data load
+                    if (latestDataTimestamp > 0) {
+                        visibleDuration = 3L * 60 * 60 * 1000 // Default 3h
+                        lastAutoScrolledTimestamp = 0L // Reset auto-scroll memory
+                        centerTime = latestDataTimestamp - visibleDuration / 2 // Snap to live
+                    }
                 }
             }
             else if (event == Lifecycle.Event.ON_PAUSE) {
@@ -954,20 +954,20 @@ fun InteractiveGlucoseChart(
     LaunchedEffect(latestDataTimestamp, isResumed) {
         if (isResumed && latestDataTimestamp > lastAutoScrolledTimestamp) {
             val currentEnd = centerTime + visibleDuration / 2
-            
+
             // Robust Logic:
             // 1. If we JUST Resumed (or started), we force snap (User: "exited via Home... regardless of 1h").
             // 2. If we are Active/Monitoring (last update was recent), we snap.
             // 3. If we are Active but viewing History (dist > 1h), we STAY PUT.
-            
+
             val dist = kotlin.math.abs(lastAutoScrolledTimestamp - currentEnd)
             val isMonitoring = lastAutoScrolledTimestamp == 0L || dist < 60 * 60 * 1000
 
             if (justResumed || isMonitoring) {
-                 centerTime = latestDataTimestamp - visibleDuration / 2
+                centerTime = latestDataTimestamp - visibleDuration / 2
             }
             lastAutoScrolledTimestamp = latestDataTimestamp
-            
+
             // Clear flag after processing the "Resume" frame
             justResumed = false
         }
@@ -977,26 +977,26 @@ fun InteractiveGlucoseChart(
     // Adaptive Scaling Logic (User Request)
     // Defaults: mmol/L: 1.5 - 14.0 | mg/dL: 27 - 250
     // "Robust" Expansion: Only expand if > 3 points exceed the range (ignores single spikes).
-    
+
     val isMmol = targetHigh <= 12
     val defaultMin = if (isMmol) 1.5f else 27f
     val defaultMax = if (isMmol) 14f else 250f
-    
-    var yMin by rememberSaveable { 
+
+    var yMin by rememberSaveable {
         var initMin = defaultMin
         if (safeData.isNotEmpty()) {
             val outlierCount = 3
             val lowPoints = safeData.count { it.value < defaultMin }
             if (lowPoints > outlierCount) {
-                 // We have frequent low values, drop floor
-                 val dataMin = safeData.minOf { it.value }
-                 initMin = (dataMin - (if(isMmol) 0.5f else 10f)).coerceAtLeast(0f)
+                // We have frequent low values, drop floor
+                val dataMin = safeData.minOf { it.value }
+                initMin = (dataMin - (if(isMmol) 0.5f else 10f)).coerceAtLeast(0f)
             }
         }
-        mutableFloatStateOf(initMin) 
+        mutableFloatStateOf(initMin)
     }
-    
-    var yMax by rememberSaveable { 
+
+    var yMax by rememberSaveable {
         var initMax = defaultMax
         if (safeData.isNotEmpty()) {
             val outlierCount = 3
@@ -1050,7 +1050,7 @@ fun InteractiveGlucoseChart(
         val data = currentSafeData // Always use fresh data
         val minuteInMillis = 60000.0
         val snappedTime = (kotlin.math.round(timeAtTapRaw / minuteInMillis) * minuteInMillis).toLong()
-        
+
         // Manual Binary Search (Zero-Allocation)
         var low = 0
         var high = data.size - 1
@@ -1065,16 +1065,16 @@ fun InteractiveGlucoseChart(
         // If exact match not found, we use 'low' as insertion point (-idx - 1 logic)
         // binarySearch returns: index of the search key, if it is contained in the list; otherwise, (-(insertion point) - 1).
         // Since we did manual, if not found, 'idx' is -1. The standard equivalent would be... we just need nearest.
-        
+
         if (idx >= 0) return data[idx]
-        
+
         // Find closest neighbor
         // 'low' should be the insertion point
         val insPoint = low
-        
+
         if (insPoint >= data.size) return data.lastOrNull()
         if (insPoint <= 0) return data.firstOrNull()
-        
+
         val p1 = data[insPoint - 1]
         val p2 = data[insPoint]
         return if (kotlin.math.abs(p1.timestamp - snappedTime) < kotlin.math.abs(p2.timestamp - snappedTime)) p1 else p2
@@ -1095,7 +1095,7 @@ fun InteractiveGlucoseChart(
                     // 2. Pinch Zoom
                     // 3. One-Finger Zoom (Double-Tap + Drag)
                     // 4. Tap to Select
-                    
+
                     var lastGestureWasTap = false
                     var lastTapTime = 0L
                     var lastTapPos = Offset.Zero
@@ -1106,19 +1106,19 @@ fun InteractiveGlucoseChart(
                         val down = awaitFirstDown(requireUnconsumed = true)
                         autoScrollJob?.cancel()
                         autoScrollJob = null
-                        
+
                         // STRICT DOUBLE TAP DETECTION
                         // Only trigger if:
                         // 1. Previous gesture was a tap (not a scroll)
                         // 2. Short duration since then (<300ms)
                         // 3. Close spatial proximity (<100px)
                         val now = System.currentTimeMillis()
-                        val isDoubleTapStart = lastGestureWasTap && 
-                                             (now - lastTapTime < 300) && 
-                                             (down.position - lastTapPos).getDistance() < 100.dp.toPx()
-                                             
+                        val isDoubleTapStart = lastGestureWasTap &&
+                                (now - lastTapTime < 300) &&
+                                (down.position - lastTapPos).getDistance() < 100.dp.toPx()
+
                         var isOneFingerZoom = isDoubleTapStart
-                        
+
                         // Kill inertia
                         coroutineScope.launch { inertiaAnim.snapTo(0f) }
                         velocityTracker.resetTracking()
@@ -1134,12 +1134,12 @@ fun InteractiveGlucoseChart(
 
                         // Only allow scrubbing if purely single tap start (not double tap sequence)
                         isScrubbing = if (pointAtTouch != null && !isOneFingerZoom) {
-                             val timeDiff = timeAtTouch - pointAtTouch.timestamp
-                             if (timeDiff > 15 * 60 * 1000) false else {
+                            val timeDiff = timeAtTouch - pointAtTouch.timestamp
+                            if (timeDiff > 15 * 60 * 1000) false else {
                                 val v = if (currentViewMode == 1 || currentViewMode == 3) pointAtTouch.rawValue else pointAtTouch.value
                                 val dataY = chartHeight - ((v - curYMin) / (curYMax - curYMin)) * chartHeight
                                 abs(down.position.y - dataY) < touchThreshold
-                             }
+                            }
                         } else {
                             false
                         }
@@ -1159,11 +1159,11 @@ fun InteractiveGlucoseChart(
                             velocityTracker.addPointerInputChange(newChange)
 
                             val pointerCount = event.changes.size
-                            
+
                             if (isOneFingerZoom) {
                                 // ONE FINGER ZOOM MODE (Double-Tap-Drag)
                                 val panY = newChange.position.y - change.position.y
-                                
+
                                 // Only apply zoom if there's meaningful vertical movement
                                 if (abs(panY) > 2f) {
                                     // EXPONENTIAL ZOOM (Smoother feel)
@@ -1171,13 +1171,13 @@ fun InteractiveGlucoseChart(
                                     // Form: newDur = oldDur * exp(-panY * sensitivity)
                                     val zoomSensitivity = 3f / height // Adjust constant for speed
                                     val zoomFactor = kotlin.math.exp(-panY * zoomSensitivity)
-                                    
+
                                     val newDuration = (visibleDuration * zoomFactor).toLong()
                                     visibleDuration = newDuration.coerceIn(minDuration, maxDuration)
                                     totalDragDistance += abs(panY) // Mark as dragged, not tap
                                 }
                                 newChange.consume()
-                                
+
                             } else if (pointerCount > 1) {
                                 // 2-FINGER ZOOM
                                 val zoomChange = event.calculateZoom()
@@ -1218,16 +1218,16 @@ fun InteractiveGlucoseChart(
                             }
                             change = newChange
                         }
-                        
+
                         // ON UP
                         val wasTap = totalDragDistance < viewConfiguration.touchSlop
                         lastGestureWasTap = wasTap && !isOneFingerZoom && !isScrubbing
-                        
+
                         if (wasTap) {
                             lastTapTime = System.currentTimeMillis()
                             lastTapPos = change.position
                         }
-                        
+
                         if (!isScrubbing) {
                             if (wasTap) {
                                 // TAP DETECTED
@@ -1291,14 +1291,14 @@ fun InteractiveGlucoseChart(
                 val currentDur = animatedVisibleDuration.toLong()
                 val viewportStart = centerTime - currentDur / 2
                 val viewportEnd = centerTime + currentDur / 2
-                
+
                 // Optimization: Don't filter list. Calculate indices.
                 // 1. Find start index using Binary Search (Manual to avoid lambda allocation)
                 // Use the larger valid duration for padding to avoid popping during zoom out
                 val paddingTime = maxOf(visibleDuration, currentDur) / 5
                 val searchStart = viewportStart - paddingTime
                 val searchEnd = viewportEnd + paddingTime
-                
+
                 // Manual Binary Search for Start Index
                 var low = 0
                 var high = safeData.size - 1
@@ -1316,7 +1316,7 @@ fun InteractiveGlucoseChart(
                 // Manual Binary Search for End Index
                 high = safeData.size - 1 // Reset high, keep low as optimization? No, reset.
                 // low = startIndex // Optimization: End is definitely after start
-                low = 0 
+                low = 0
                 var endIndex = -1
                 while (low <= high) {
                     val mid = (low + high) ushr 1
@@ -1368,15 +1368,15 @@ fun InteractiveGlucoseChart(
                 val pxPerMin = width / (visibleDuration / 60000f)
                 val minSpacingPx = 120f
                 val minSpacingMins = minSpacingPx / pxPerMin
-                
+
                 val gridInterval = gridIntervals.firstOrNull { it / 60000f >= minSpacingMins } ?: gridIntervals.last()
-                
+
                 // --- FORMATTERS & TOOLS (Hoisted) ---
                 // (Moved to top of function due to Composable context requirement)
-                
+
                 // --- 1. DRAW GRID ---
                 // ... Grid Logic ...
-                
+
                 // Fix: align t to local timezone so we hit 00:00 correctly
                 val tzOffset = java.util.TimeZone.getDefault().getOffset(viewportStart).toLong()
                 var t = ((viewportStart + tzOffset) / gridInterval) * gridInterval - tzOffset
@@ -1385,7 +1385,7 @@ fun InteractiveGlucoseChart(
                     val x = timeToX(t)
                     if (x in -50f..width + 50f) { // Allow slight overdraw for edges
                         cal.timeInMillis = t
-                        
+
                         // Check for Midnight (Date Boundary)
                         val isMidnight = cal.get(java.util.Calendar.HOUR_OF_DAY) == 0 && cal.get(java.util.Calendar.MINUTE) == 0
                         val isDayStart = isMidnight
@@ -1393,7 +1393,7 @@ fun InteractiveGlucoseChart(
                         if (isDayStart) {
                             // Date Line
                             drawLine(gridColor.copy(alpha=0.8f), Offset(x, 0f), Offset(x, chartHeight), 3f)
-                            
+
                             val dateLabel = labelCache.getOrPut(t) {
                                 reusableDate.time = t
                                 formatDate.format(reusableDate)
@@ -1404,7 +1404,7 @@ fun InteractiveGlucoseChart(
                         } else {
                             // Time Line
                             drawLine(gridColor, Offset(x, 0f), Offset(x, chartHeight), 1f)
-                            
+
                             // Optimization: Use Cache to avoid SimpleDateFormat on every frame
                             val timeLabel = labelCache.getOrPut(t) {
                                 reusableDate.time = t
@@ -1421,27 +1421,27 @@ fun InteractiveGlucoseChart(
                 // --- 3. DATA LINES ---
                 if (endIndex > startIndex) {
                     // Optimized: Inline drawing (Manual Unroll) to avoid closure allocations
-                    
+
                     // --- RAW LINE ---
                     if (viewMode == 1 || viewMode == 3 || viewMode == 2) {
                         reusablePath.rewind()
                         var first = true
                         var lastX = -100f
-                        
+
                         for (i in startIndex until endIndex) {
                             val p = safeData[i]
                             // Raw value handling: filter invalid < 0.1 checks
                             val v = if(p.rawValue < 0.1f) p.value else p.rawValue
-                            
+
                             val px = timeToX(p.timestamp)
                             // DECIMATION: Aggressive (1.0px) to reduce GPU load
                             if (!first && kotlin.math.abs(px - lastX) < 1.0f) continue
                             lastX = px
                             val py = valToY(v)
-                            if (first) { reusablePath.moveTo(px, py); first = false } 
+                            if (first) { reusablePath.moveTo(px, py); first = false }
                             else { reusablePath.lineTo(px, py) }
                         }
-                        
+
                         // Color Logic: Mode 2 uses Secondary for Raw, others (1, 3) use Primary
                         val color = if (viewMode == 2) secondaryColor else primaryColor
                         val width = if (viewMode == 2) 2.dp.toPx() else 3.dp.toPx()
@@ -1453,17 +1453,17 @@ fun InteractiveGlucoseChart(
                         reusablePath.rewind()
                         var first = true
                         var lastX = -100f
-                        
+
                         for (i in startIndex until endIndex) {
                             val p = safeData[i]
                             val v = p.value // Always use value
-                            
+
                             val px = timeToX(p.timestamp)
                             // DECIMATION: Aggressive (1.0px) to reduce GPU load
                             if (!first && kotlin.math.abs(px - lastX) < 1.0f) continue
                             lastX = px
                             val py = valToY(v)
-                            if (first) { reusablePath.moveTo(px, py); first = false } 
+                            if (first) { reusablePath.moveTo(px, py); first = false }
                             else { reusablePath.lineTo(px, py) }
                         }
 
@@ -1486,10 +1486,10 @@ fun InteractiveGlucoseChart(
                     for (i in startIndex until endIndex) {
                         val p = safeData[i]
                         val v = if (viewMode == 1 || viewMode == 3) p.rawValue else p.value
-                        
+
                         // Ignore invalid raw values if in raw mode
                         if ((viewMode == 1 || viewMode == 3) && v < 0.1f) continue
-                        
+
                         if (v < minVal) {
                             minVal = v
                             minPoint = p
@@ -1504,12 +1504,12 @@ fun InteractiveGlucoseChart(
                         val v = if (viewMode == 1 || viewMode == 3) point.rawValue else point.value
                         // Sanity check
                         if (v < 0.1f) return
-                        
+
                         val y = valToY(v)
                         val x = timeToX(point.timestamp)
 
                         if (y in 0f..chartHeight && x in 0f..width) {
-                             // ... (Drawing code matches original context)
+                            // ... (Drawing code matches original context)
                             val label = String.format("%.1f", v)
                             drawContext.canvas.nativeCanvas.drawText(
                                 label,
@@ -1547,13 +1547,13 @@ fun InteractiveGlucoseChart(
                         selectedPoint?.let { p ->
                             // Draw Dots
                             val dotRadius = 5.dp.toPx()
-                            
+
                             // Raw Dot (Modes 1, 2, 3)
                             if (viewMode == 1 || viewMode == 2 || viewMode == 3) {
                                 val color = if (viewMode == 1 || viewMode == 3) primaryColor else secondaryColor
                                 drawCircle(color, dotRadius, Offset(x, valToY(p.rawValue)))
                             }
-                            
+
                             // Auto Dot (Modes 0, 2, 3)
                             if (viewMode == 0 || viewMode == 2 || viewMode == 3) {
                                 val color = if (viewMode == 0 || viewMode == 2) primaryColor else secondaryColor
@@ -1582,26 +1582,26 @@ fun InteractiveGlucoseChart(
                 // MATCH GRAPH COLORS EXACTLY
                 val textPrimaryColor = MaterialTheme.colorScheme.primary
                 val textSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
-                
+
                 // Capture Theme Colors outside non-composable builder
                 val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
-                
+
                 // User Feedback: "same color as graph bg" -> Use distinct colors.
                 // Info Card: Standard SurfaceContainer (Distinct from base Surface)
                 // --- COLORS & STYLING ---
                 // MATCH "Current Status Card" (Top Card, lines 500-503) EXACTLY
                 // Top Card uses: colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 // Default Card Shape is usually Medium (12.dp) in M3.
-                
+
                 val statusCardColor = MaterialTheme.colorScheme.primaryContainer
                 val statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 val cardShape = RoundedCornerShape(12.dp) // Match likely default Card shape
-                
+
                 // AXIS TEXT MATCHING
                 val axisFontSize = 12.sp
 
                 val dvs = getDisplayValues(point, viewMode, unit)
-                
+
                 // --- 1. INFO CARD (Top) ---
                 // "Current Status Card styling" -> primaryContainer
                 Surface(
@@ -1633,7 +1633,7 @@ fun InteractiveGlucoseChart(
                             withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)) {
                                 append(dvs.primaryStr)
                             }
-                            
+
                             // Separator & Secondary
                             dvs.secondaryStr?.let { sec ->
                                 withStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
@@ -1644,14 +1644,14 @@ fun InteractiveGlucoseChart(
                                 }
                             }
                         }
-                        
+
                         Text(
                             text = styledText,
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
-                
+
                 // --- 2. TIME BUBBLE (Bottom) ---
 
                 Surface(
@@ -1690,7 +1690,7 @@ fun InteractiveGlucoseChart(
             val dayCheckFormat = java.text.SimpleDateFormat("yyyyDDD", java.util.Locale.getDefault())
             val isToday = dayCheckFormat.format(java.util.Date(now)) == dayCheckFormat.format(java.util.Date(centerTime))
             val isRecent = abs(now - centerTime) < 4 * 60 * 60 * 1000L // 4 Hour buffer for "just started" days
-            
+
             androidx.compose.animation.AnimatedVisibility(
                 visible = !isToday && !isRecent,
                 enter = androidx.compose.animation.fadeIn(),
@@ -1700,7 +1700,7 @@ fun InteractiveGlucoseChart(
                     .padding(8.dp)
             ) {
                 val headerDate = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault()).format(java.util.Date(centerTime))
-                
+
                 Text(
                     text = headerDate,
                     style = MaterialTheme.typography.labelLarge,
@@ -1787,7 +1787,7 @@ fun InteractiveGlucoseChart(
             val configuration = LocalConfiguration.current
             // Graceful collapse: on narrow screens (<380dp), collapse "Back to Now" width
             val isCompact = configuration.screenWidthDp < 380
-            
+
             // Date Picker Button (Left side, always visible)
             FilledTonalIconButton(
                 onClick = { showDatePicker = true },
@@ -1804,13 +1804,13 @@ fun InteractiveGlucoseChart(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(Modifier.width(width = if (isCompact) 4.dp else 8.dp))
-            
+
             items.forEach { range ->
                 val rangeDur = range.hours * 60 * 60 * 1000L
                 val isSel = abs(visibleDuration - rangeDur) < 1000
-                
+
                 // M3 Expressive Animation specs - bouncy springs
                 val bouncySpec = spring<Float>(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -1829,14 +1829,14 @@ fun InteractiveGlucoseChart(
                     animationSpec = colorSpec,
                     label = "ButtonContentColor"
                 )
-                
+
                 // M3 Expressive: Scale pop on selection
                 val scale by animateFloatAsState(
                     targetValue = if (isSel) 1f else 1f,
                     animationSpec = bouncySpec,
                     label = "ButtonScale"
                 )
-                
+
                 // M3 Expressive: Icon rotation (fun subtle touch)
                 val iconRotation by animateFloatAsState(
                     targetValue = if (isSel) 360f else 0f,
@@ -1846,7 +1846,7 @@ fun InteractiveGlucoseChart(
                     ),
                     label = "IconRotation"
                 )
-                
+
                 Surface(
                     onClick = {
                         val now = System.currentTimeMillis()
@@ -1858,11 +1858,11 @@ fun InteractiveGlucoseChart(
                             autoScrollJob = coroutineScope.launch {
                                 val targetTime = now - visibleDuration / 2
                                 val diff = targetTime - centerTime
-                                
+
                                 // "Smart Scroll": Avoid crazy jumps
                                 val maxScroll = 12 * 60 * 60 * 1000L // 12 Hours
                                 var startScroll = centerTime
-                                
+
                                 // If distance is huge, snap closer first
                                 if (abs(diff) > maxScroll) {
                                     startScroll = targetTime - (if (diff > 0) maxScroll else -maxScroll)
@@ -1912,7 +1912,7 @@ fun InteractiveGlucoseChart(
                                     .graphicsLayer { rotationZ = iconRotation }
                             )
                         }
-                        
+
                         Text(
                             text = range.label,
                             style = MaterialTheme.typography.labelLarge,
@@ -1928,23 +1928,23 @@ fun InteractiveGlucoseChart(
             val now = System.currentTimeMillis()
             val targetTime = now - visibleDuration / 2
             val isAtNow = abs(centerTime - targetTime) < 60 * 60 * 1000 // 1 hour threshold (Old behavior)
-            
+
             AnimatedVisibility(
                 visible = !isAtNow,
                 enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start) + scaleIn(),
                 exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start) + scaleOut()
             ) {
 
-                    Surface(
-                        onClick = {
+                Surface(
+                    onClick = {
                         // Cancel previous if any
                         autoScrollJob?.cancel()
-                        
+
                         autoScrollJob = coroutineScope.launch {
                             val maxScroll = 12 * 60 * 60 * 1000L
                             val diff = targetTime - centerTime
                             var startScroll = centerTime
-                             if (abs(diff) > maxScroll) {
+                            if (abs(diff) > maxScroll) {
                                 startScroll = targetTime - (if (diff > 0) maxScroll else -maxScroll)
                                 centerTime = startScroll
                             }
@@ -1956,70 +1956,70 @@ fun InteractiveGlucoseChart(
                             }
                         }
                     },
-                        shape = RoundedCornerShape(12.dp), 
-                        // "Similar background when its active" -> SecondaryContainer
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier
+                    shape = RoundedCornerShape(12.dp),
+                    // "Similar background when its active" -> SecondaryContainer
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier
 //                            .padding(start = 4.dp)
-                            .size(width = if (isCompact) 32.dp else 40.dp, height = 32.dp) // Collapse to square on small screens
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.LastPage,
-                                contentDescription = "Back to Now",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        .size(width = if (isCompact) 32.dp else 40.dp, height = 32.dp) // Collapse to square on small screens
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.LastPage,
+                            contentDescription = "Back to Now",
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
-            }
-        }
-        
-        // Date Picker Dialog
-        if (showDatePicker) {
-            DatePickerDialog(
-                onDismissRequest = { showDatePicker = false },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            datePickerState.selectedDateMillis?.let { selectedDate ->
-                                // Jump to selected date
-                                autoScrollJob?.cancel()
-                                centerTime = selectedDate + (12 * 60 * 60 * 1000) // Center on noon of selected day
-                            }
-                            showDatePicker = false
-                        }
-                    ) {
-                        Text("Go")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text("Cancel")
-                    }
-                }
-            ) {
-                DatePicker(state = datePickerState)
             }
         }
     }
+
+    // Date Picker Dialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { selectedDate ->
+                            // Jump to selected date
+                            autoScrollJob?.cancel()
+                            centerTime = selectedDate + (12 * 60 * 60 * 1000) // Center on noon of selected day
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Go")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
 
 
 
 
 fun buildGlucoseString(
-    dvs: DisplayValues, 
-    primaryColor: Color, 
-    secondaryColor: Color, 
+    dvs: DisplayValues,
+    primaryColor: Color,
+    secondaryColor: Color,
     unitColor: Color,
-    includeUnit: Boolean = false, 
+    includeUnit: Boolean = false,
     unit: String = ""
 ): androidx.compose.ui.text.AnnotatedString {
     return androidx.compose.ui.text.buildAnnotatedString {
         withStyle(androidx.compose.ui.text.SpanStyle(color = primaryColor)) {
             append(dvs.primaryStr)
-            
+
             // If single value, append unit here if requested
             if (includeUnit && dvs.secondaryStr == null) {
                 append(" ")
@@ -2045,14 +2045,14 @@ fun buildGlucoseString(
 
 @Composable
 fun ReadingRow(
-    point: GlucosePoint, 
-    unit: String, 
-    viewMode: Int = 0, 
+    point: GlucosePoint,
+    unit: String,
+    viewMode: Int = 0,
     modifier: Modifier = Modifier
 ) {
     // M3 Expressive: Local smooth fade-out
     val highlightAlpha = remember(point.timestamp) { Animatable(0f) }
-    
+
     LaunchedEffect(point.timestamp) {
         val age = System.currentTimeMillis() - point.timestamp
         if (age < 60_000) {
@@ -2060,7 +2060,7 @@ fun ReadingRow(
             val startAlpha = 0.4f * (remaining.toFloat() / 60_000f)
             highlightAlpha.snapTo(startAlpha)
             highlightAlpha.animateTo(
-                targetValue = 0f, 
+                targetValue = 0f,
                 animationSpec = tween(durationMillis = remaining.toInt(), easing = LinearEasing)
             )
         }
@@ -2090,7 +2090,7 @@ fun ReadingRow(
         val primaryColor = MaterialTheme.colorScheme.onSurface
         val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 1.0f) // More visible
         val unitColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) // Least visible
-        
+
         Text(
             text = buildGlucoseString(dvs, primaryColor, secondaryColor, unitColor, true, unit),
             fontWeight = FontWeight.Bold
@@ -2125,7 +2125,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 
     var showUnitDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
-    
+
     val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsState()
 
     // Alarms
@@ -2158,7 +2158,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(16.dp))
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-        Spacer(modifier = Modifier.padding(horizontal = 16.dp)) 
+        Spacer(modifier = Modifier.padding(horizontal = 16.dp))
 
         // --- UNIT ---
         ListItem(
@@ -2213,7 +2213,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             ThemeMode.LIGHT -> stringResource(R.string.theme_light)
             ThemeMode.DARK -> stringResource(R.string.theme_dark)
         }
-        
+
         ListItem(
             headlineContent = { Text(stringResource(R.string.theme_title)) },
             supportingContent = { Text(themeLabel) },
@@ -2270,58 +2270,58 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         val currentLangName = currentLocale.displayLanguage.capitalize()
 
         ListItem(
-             headlineContent = { Text(stringResource(R.string.languagename)) },
-             supportingContent = { Text(currentLangName) },
-             modifier = Modifier.clickable { showLanguageDialog = true }
+            headlineContent = { Text(stringResource(R.string.languagename)) },
+            supportingContent = { Text(currentLangName) },
+            modifier = Modifier.clickable { showLanguageDialog = true }
         )
 
         if (showLanguageDialog) {
-             val languages = listOf(
-                 stringResource(R.string.system_default) to null,
-                 "English" to "en",
-                 "Belarusian" to "be",
-                 "Chinese" to "zh",
-                 "German" to "de",
-                 "French" to "fr",
-                 "Italian" to "it",
-                 "Dutch" to "nl",
-                 "Polish" to "pl",
-                 "Portuguese" to "pt",
-                 "Russian" to "ru",
-                 "Swedish" to "sv",
-                 "Turkish" to "tr",
-                 "Ukrainian" to "uk"
-             )
+            val languages = listOf(
+                stringResource(R.string.system_default) to null,
+                "English" to "en",
+                "Belarusian" to "be",
+                "Chinese" to "zh",
+                "German" to "de",
+                "French" to "fr",
+                "Italian" to "it",
+                "Dutch" to "nl",
+                "Polish" to "pl",
+                "Portuguese" to "pt",
+                "Russian" to "ru",
+                "Swedish" to "sv",
+                "Turkish" to "tr",
+                "Ukrainian" to "uk"
+            )
 
-             AlertDialog(
-                 onDismissRequest = { showLanguageDialog = false },
-                 title = { Text(stringResource(R.string.select_language)) },
-                 text = {
-                     LazyColumn {
-                         items(languages) { (name, tag) ->
-                             Row(
-                                 Modifier
-                                     .fillMaxWidth()
-                                     .clickable {
-                                         val appLocale = if (tag != null) LocaleListCompat.forLanguageTags(tag) else LocaleListCompat.getEmptyLocaleList()
-                                         AppCompatDelegate.setApplicationLocales(appLocale)
-                                         showLanguageDialog = false
-                                     }
-                                     .padding(12.dp),
-                                 verticalAlignment = Alignment.CenterVertically
-                             ) {
-                                 Text(text = name)
-                                 if ((tag == null && AppCompatDelegate.getApplicationLocales().isEmpty) || 
-                                     (tag != null && AppCompatDelegate.getApplicationLocales().toLanguageTags().contains(tag))) {
-                                      Spacer(Modifier.weight(1f))
-                                      Icon(Icons.Default.Check, contentDescription = "Selected")
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(stringResource(R.string.cancel)) } }
-             )
+            AlertDialog(
+                onDismissRequest = { showLanguageDialog = false },
+                title = { Text(stringResource(R.string.select_language)) },
+                text = {
+                    LazyColumn {
+                        items(languages) { (name, tag) ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val appLocale = if (tag != null) LocaleListCompat.forLanguageTags(tag) else LocaleListCompat.getEmptyLocaleList()
+                                        AppCompatDelegate.setApplicationLocales(appLocale)
+                                        showLanguageDialog = false
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = name)
+                                if ((tag == null && AppCompatDelegate.getApplicationLocales().isEmpty) ||
+                                    (tag != null && AppCompatDelegate.getApplicationLocales().toLanguageTags().contains(tag))) {
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Default.Check, contentDescription = "Selected")
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(stringResource(R.string.cancel)) } }
+            )
         }
 
 
@@ -2341,7 +2341,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 
         // M3 Grid: 24dp between major sections
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(stringResource(R.string.exchanges), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -2362,7 +2362,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             modifier = Modifier.clickable { navController.navigate("settings/mirror") }
         )
 
-        
+
         ListItem(
             headlineContent = { Text(stringResource(R.string.nightscout_config)) },
             supportingContent = { Text(stringResource(R.string.nightscout_desc)) },
@@ -2427,7 +2427,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             title = stringResource(R.string.high_label),
             value = targetHighValue,
             unit = unit,
-            range = if (isMmol) 6.0f..20.0f else 100f..350f,
+            range = if (isMmol) 6.0f..16.0f else 100f..350f,
             onValueChange = { viewModel.setTargetHigh(it) },
             modifier = Modifier.padding(horizontal = 16.dp)
 
@@ -2467,7 +2467,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
 
         Text(stringResource(R.string.advanced_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Google Scan
         ListItem(
             headlineContent = { Text(stringResource(R.string.googlescan)) },
@@ -2534,27 +2534,27 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         )
         // M3 Grid: 16dp spacing after section header
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         val coroutineScope = rememberCoroutineScope()
         var showExportDialog by remember { mutableStateOf(false) }
         var exportType by remember { mutableStateOf("csv") }
-        
+
         // EXPORT LAUNCHER
         val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
             contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("*/*")
         ) { uri ->
             if (uri != null) {
                 coroutineScope.launch {
-                    val format = exportType 
+                    val format = exportType
                     val unitStr = if (isMmol) "mmol/L" else "mg/dL"
                     val data = tk.glucodata.data.HistoryRepository.getHistoryBlocking(0L, isMmol)
-                    
+
                     val success = if (format == "csv") {
                         tk.glucodata.data.HistoryExporter.exportToCsv(context, uri, data, unitStr)
                     } else {
                         tk.glucodata.data.HistoryExporter.exportToReadable(context, uri, data, unitStr)
                     }
-                    
+
                     Toast.makeText(context, if (success) "Export successful" else "Export failed", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -2576,7 +2576,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 }
             }
         }
-        
+
         // Export Format Dialog
         if (showExportDialog) {
             AlertDialog(
@@ -2612,49 +2612,49 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                         }
                     }
                 },
-                confirmButton = { 
-                    TextButton(onClick = { 
+                confirmButton = {
+                    TextButton(onClick = {
                         showExportDialog = false
                         val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
                         val ext = if (exportType == "csv") "csv" else "txt"
                         exportLauncher.launch("juggluco_history_$date.$ext")
-                    }) { Text("Export") } 
+                    }) { Text("Export") }
                 },
                 dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("Cancel") } }
             )
         }
-        
+
         // Export History - M3 ListItem pattern (fully clickable)
         ListItem(
             headlineContent = { Text("Export History") },
             supportingContent = { Text("Save glucose readings to CSV or text file") },
             modifier = Modifier.clickable { showExportDialog = true },
-            leadingContent = { 
+            leadingContent = {
                 Icon(
-                    Icons.Default.Share, 
+                    Icons.Default.Share,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
-                ) 
+                )
             }
         )
-        
+
         // Import History - M3 ListItem pattern (fully clickable)
         ListItem(
             headlineContent = { Text("Import History") },
             supportingContent = { Text("Restore glucose readings from CSV file") },
             modifier = Modifier.clickable { importLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
-            leadingContent = { 
+            leadingContent = {
                 Icon(
-                    Icons.Default.Download, 
+                    Icons.Default.Download,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.secondary
-                ) 
+                )
             }
         )
-        
+
         // M3 Grid: 24dp before new subsection
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             text = "Dangerous Actions",
             style = MaterialTheme.typography.titleLarge,
@@ -2667,7 +2667,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         var showClearDataDialog by remember { mutableStateOf(false) }
         var showFactoryResetDialog by remember { mutableStateOf(false) }
         var isClearing by remember { mutableStateOf(false) }
-        
+
         // Clear History Card - Description + Action button pattern
         Card(
             modifier = Modifier
@@ -2704,10 +2704,10 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
-        // Clear App Data Card - Description + Action button pattern  
+
+        // Clear App Data Card - Description + Action button pattern
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2747,9 +2747,9 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         // Factory Reset Card - Description + Action button pattern
         Card(
             modifier = Modifier
@@ -2790,7 +2790,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 }
             }
         }
-        
+
         // Confirmation Dialogs
         if (showClearHistoryDialog) {
             AlertDialog(
@@ -2813,13 +2813,13 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 dismissButton = { TextButton(onClick = { showClearHistoryDialog = false }) { Text("Cancel") } }
             )
         }
-        
+
         if (showClearDataDialog) {
             AlertDialog(
                 onDismissRequest = { showClearDataDialog = false },
                 icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 title = { Text("Clear App Data?") },
-                text = { 
+                text = {
                     Column {
                         Text("This will remove:")
                         Text("• All glucose readings")
@@ -2846,13 +2846,13 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 dismissButton = { TextButton(onClick = { showClearDataDialog = false }) { Text("Cancel") } }
             )
         }
-        
+
         if (showFactoryResetDialog) {
             AlertDialog(
                 onDismissRequest = { showFactoryResetDialog = false },
                 icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 title = { Text("⚠️ Factory Reset?") },
-                text = { 
+                text = {
                     Column {
                         Text("This will REMOVE EVERYTHING:", fontWeight = FontWeight.Bold)
                         Text("• All glucose readings")
@@ -2933,9 +2933,9 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         Spacer(modifier = Modifier.height(80.dp))
     }
 
-        // Add bottom padding so the last item isn't covered by navigation bar
-        Spacer(modifier = Modifier.height(80.dp))
-    }
+    // Add bottom padding so the last item isn't covered by navigation bar
+    Spacer(modifier = Modifier.height(80.dp))
+}
 
 
 
@@ -2960,7 +2960,7 @@ fun TargetCard(
                 val currentSliderValStr = if (sliderVal < 30) String.format("%.1f", sliderVal) else sliderVal.toInt().toString()
                 Text(
                     text = "$currentSliderValStr $unit",
-                    style = MaterialTheme.typography.titleSmall, 
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
@@ -3006,19 +3006,19 @@ fun AlarmCard(
                 }
                 Switch(checked = enabled, onCheckedChange = onToggle)
             }
-            
+
             if (enabled) {
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 var sliderVal by remember(value) { mutableStateOf(value.coerceIn(range)) }
-                
+
                 // Display current slider value
                 val currentSliderValStr = if (sliderVal < 30) String.format("%.1f", sliderVal) else sliderVal.toInt().toString()
                 Text(
                     text = "$currentSliderValStr $unit",
-                    style = MaterialTheme.typography.labelLarge, 
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
@@ -3029,7 +3029,7 @@ fun AlarmCard(
                     valueRange = range,
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Alert Sound", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3147,12 +3147,12 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 
     if (showTerminateDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                showTerminateDialog = false 
+            onDismissRequest = {
+                showTerminateDialog = false
                 wipeDataChecked = false
             },
             title = { Text(stringResource(R.string.disconnect_sensor_title)) },
-            text = { 
+            text = {
                 Column {
                     Text(stringResource(R.string.disconnect_sensor_desc))
                     Spacer(modifier = Modifier.height(8.dp))
@@ -3166,15 +3166,15 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                 }
             },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     viewModel.terminateSensor(sensor.serial, wipeDataChecked)
-                    showTerminateDialog = false 
+                    showTerminateDialog = false
                     wipeDataChecked = false
                 }) { Text(stringResource(R.string.disconnect)) }
             },
             dismissButton = {
-                TextButton(onClick = { 
-                    showTerminateDialog = false 
+                TextButton(onClick = {
+                    showTerminateDialog = false
                     wipeDataChecked = false
                 }) { Text(stringResource(R.string.cancel)) }
             }
@@ -3183,12 +3183,12 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 
     if (showReconnectDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                showReconnectDialog = false 
+            onDismissRequest = {
+                showReconnectDialog = false
                 wipeDataChecked = false
             },
             title = { Text(stringResource(R.string.reconnect_sensor_title)) },
-            text = { 
+            text = {
                 Column {
                     Text(stringResource(R.string.reconnect_sensor_desc))
                     Spacer(modifier = Modifier.height(8.dp))
@@ -3209,23 +3209,23 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                 }) { Text(stringResource(R.string.reconnect)) }
             },
             dismissButton = {
-                TextButton(onClick = { 
-                    showReconnectDialog = false 
+                TextButton(onClick = {
+                    showReconnectDialog = false
                     wipeDataChecked = false
                 }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
-    
+
     if (showForgetDialog) {
         AlertDialog(
             onDismissRequest = { showForgetDialog = false },
             title = { Text(stringResource(R.string.forget_sensor_title)) },
             text = { Text(stringResource(R.string.forget_sensor_desc)) },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     viewModel.forgetSensor(sensor.serial)
-                    showForgetDialog = false 
+                    showForgetDialog = false
                 }) { Text(stringResource(R.string.forget)) }
             },
             dismissButton = {
@@ -3240,9 +3240,9 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             title = { Text(stringResource(R.string.reset_sensor_title)) },
             text = { Text(stringResource(R.string.reset_sensor_desc)) },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     viewModel.resetSensor(sensor.serial)
-                    showResetDialog = false 
+                    showResetDialog = false
                 }) { Text(stringResource(R.string.reset_sensor)) }
             },
             dismissButton = {
@@ -3257,12 +3257,12 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             title = { Text(stringResource(R.string.restart_autocal_title)) },
             text = { Text(stringResource(R.string.restart_autocal_desc)) },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     // Launch coroutine to handle sequence
                     viewModel.clearCalibration(sensor.serial)
                     // Reconnect handles its own async disconnect/delay logic now
                     viewModel.reconnectSensor(sensor.serial, false)
-                    showClearDialog = false 
+                    showClearDialog = false
                 }) { Text(stringResource(R.string.restart)) }
             },
             dismissButton = {
@@ -3277,9 +3277,9 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             title = { Text(stringResource(R.string.reset_all_title)) },
             text = { Text(stringResource(R.string.reset_all_desc)) },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     viewModel.clearAll(sensor.serial)
-                    showClearAllDialog = false 
+                    showClearAllDialog = false
                 }) { Text(stringResource(R.string.reset_all)) }
             },
             dismissButton = {
@@ -3297,13 +3297,13 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 //            val titleText = sensor.serial
-                val statusText = if (sensor.streaming) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status)
-                val titleText = "${sensor.serial} • $statusText"
-                Text(titleText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            val statusText = if (sensor.streaming) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status)
+            val titleText = "${sensor.serial} • $statusText"
+            Text(titleText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
 
                 if (sensor.connectionStatus.isNotEmpty()) {
@@ -3330,12 +3330,12 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             Text(stringResource(R.string.calibration_algorithm), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                
+
                 val autoStr = stringResource(R.string.auto)
                 val rawStr = stringResource(R.string.raw)
                 val autoRawStr = stringResource(R.string.auto_raw)
                 val rawAutoStr = stringResource(R.string.raw_auto)
-                
+
                 val modes = listOf(autoStr, rawStr, autoRawStr, rawAutoStr)
                 modes.forEachIndexed { index, title ->
                     FilterChip(
@@ -3347,19 +3347,131 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
 
-                FilledTonalButton(
-                    onClick = { showClearDialog = true },
-                    modifier = Modifier.weight(1f)
+
+            // --- CUSTOM AUTO-CALIBRATION (Sibionics Only) ---
+            if (sensor.isSibionics2 && sensor.viewMode != 1) {
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(stringResource(R.string.reset_autocal_button), maxLines = 1)
+
+                    FilledTonalButton(
+                        onClick = { showClearDialog = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.reset_autocal_button), maxLines = 1)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                var customEnabled by remember(sensor.customCalEnabled) { mutableStateOf(sensor.customCalEnabled) }
+                var customIndex by remember(sensor.customCalIndex) { mutableStateOf(sensor.customCalIndex.toFloat()) }
+                var customAutoReset by remember(sensor.customCalAutoReset) { mutableStateOf(sensor.customCalAutoReset) }
+
+                // Helper for slider labels
+                val labels = listOf("12 hours", "24 hours", "2 days", "3 days", "7 days", "14 days", "20 days")
+                
+                // Calculate max allowed index based on sensor age
+                val sensorAge = System.currentTimeMillis() - sensor.startMs
+                val maxAllowedIndex = if (sensor.startMs > 0) {
+                    when {
+                        sensorAge >= 20L * 24 * 3600 * 1000 -> 6
+                        sensorAge >= 14L * 24 * 3600 * 1000 -> 5
+                        sensorAge >= 7L * 24 * 3600 * 1000 -> 4
+                        sensorAge >= 3L * 24 * 3600 * 1000 -> 3
+                        sensorAge >= 2L * 24 * 3600 * 1000 -> 2
+                        sensorAge >= 24L * 3600 * 1000 -> 1
+                        else -> 0
+                    }
+                } else {
+                    6 // Fallback if start time unknown
+                }
+
+                // Coerce current index to valid range
+                // Note: We don't auto-update the backend here to avoid side effects, but we visually clamp the slider
+                val safeIndex = customIndex.coerceIn(0f, maxAllowedIndex.toFloat())
+                val currentLabel = labels.getOrElse(safeIndex.toInt()) { "12 hours" }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Custom auto-calibration", style = MaterialTheme.typography.titleMedium)
+//                             if (!customEnabled) {
+//                                 Text("Juggluco native", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+//                             }
+                        if (customEnabled) {
+                            Text(
+                                text = "$currentLabel window",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = "Juggluco native",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = customEnabled,
+                        onCheckedChange = { enabled ->
+                            customEnabled = enabled
+                            viewModel.updateCustomCalibration(sensor.serial, enabled, safeIndex.toInt(), customAutoReset)
+                        }
+                    )
+                }
+
+                AnimatedVisibility(visible = customEnabled) {
+                    Column {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (maxAllowedIndex < 6) {
+                             Text(
+                                text = "Limited by sensor age (${(sensorAge / (3600 * 1000 * 24))} days)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                        }
+                        Slider(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            value = safeIndex,
+                            onValueChange = { customIndex = it },
+                            valueRange = 0f..maxAllowedIndex.toFloat(),
+                            steps = if (maxAllowedIndex > 0) maxAllowedIndex - 1 else 0,
+                            onValueChangeFinished = {
+                                viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt().coerceAtMost(maxAllowedIndex), customAutoReset)
+                            }
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val newVal = !customAutoReset
+                                customAutoReset = newVal
+                                viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), newVal)
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = customAutoReset,
+                                onCheckedChange = { checked ->
+                                    customAutoReset = checked
+                                    viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), checked)
+                                }
+                            )
+                            Text("Auto restart algorithm")
+                        }
+                    }
                 }
             }
             if (sensor.isSibionics2) {
+
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Auto reset
@@ -3383,7 +3495,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                             Text(stringResource(R.string.auto_reset_title), style = MaterialTheme.typography.titleMedium)
                             Text(
                                 text = if (isAutoResetEnabled) stringResource(R.string.auto_reset_days, sliderValue.toInt()) else stringResource(R.string.auto_reset_never),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -3426,77 +3538,6 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 //                            }
                         }
                     }
-                }
-
-
-
-
-
-                // --- CUSTOM AUTO-CALIBRATION (Sibionics Only) ---
-                if (sensor.isSibionics2 && sensor.viewMode != 1) {
-                     Spacer(modifier = Modifier.height(16.dp))
-                     
-                     var customEnabled by remember(sensor.customCalEnabled) { mutableStateOf(sensor.customCalEnabled) }
-                     var customIndex by remember(sensor.customCalIndex) { mutableStateOf(sensor.customCalIndex.toFloat()) }
-                     var customAutoReset by remember(sensor.customCalAutoReset) { mutableStateOf(sensor.customCalAutoReset) }
-
-                     // Helper for slider labels
-                     val labels = listOf("12H", "24H", "2D", "3D", "7D", "14D", "20D")
-                     val currentLabel = labels.getOrElse(customIndex.toInt()) { "24H" }
-
-                     Row(
-                         modifier = Modifier.fillMaxWidth(),
-                         verticalAlignment = Alignment.CenterVertically,
-                         horizontalArrangement = Arrangement.SpaceBetween
-                     ) {
-                         Column {
-                             Text("Custom auto-calibration", style = MaterialTheme.typography.titleMedium)
-                             if (!customEnabled) {
-                                 Text("Juggluco native", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                             }
-                         }
-                         Switch(
-                             checked = customEnabled,
-                             onCheckedChange = { enabled ->
-                                 customEnabled = enabled
-                                 viewModel.updateCustomCalibration(sensor.serial, enabled, customIndex.toInt(), customAutoReset)
-                             }
-                         )
-                     }
-
-                     AnimatedVisibility(visible = customEnabled) {
-                         Column {
-                             Spacer(modifier = Modifier.height(8.dp))
-                             Text("Calibration window: $currentLabel", style = MaterialTheme.typography.bodyMedium)
-                             Slider(
-                                 modifier = Modifier.padding(horizontal = 8.dp),
-                                 value = customIndex,
-                                 onValueChange = { customIndex = it },
-                                 valueRange = 0f..6f,
-                                 steps = 5,
-                                 onValueChangeFinished = {
-                                     viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), customAutoReset)
-                                 }
-                             )
-                             Row(
-                                 modifier = Modifier.fillMaxWidth().clickable { 
-                                     val newVal = !customAutoReset
-                                     customAutoReset = newVal
-                                     viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), newVal)
-                                 },
-                                 verticalAlignment = Alignment.CenterVertically
-                             ) {
-                                 Checkbox(
-                                     checked = customAutoReset,
-                                     onCheckedChange = { checked ->
-                                         customAutoReset = checked
-                                         viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), checked)
-                                     }
-                                 )
-                                 Text("Auto reset algorithm", modifier = Modifier.padding(start = 8.dp))
-                             }
-                         }
-                     }
                 }
 
                 // --- ACTION BUTTONS (Always Visible) ---
@@ -3555,7 +3596,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 @Composable
 fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
     val context = LocalContext.current
-    
+
     // Load initial values from Natives
     // Note: Natives methods are static and blocking, but usually fast enough for UI.
     // In a perfect world, we'd wrap this in a ViewModel/Suspend, but sticking to existing pattern.
@@ -3566,7 +3607,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
     // V3 is only for phone, watch doesn't support it according to NightPost.java logic (isWearable check)
     // Assuming mobile context here.
     var isV3 by remember { mutableStateOf(Natives.getnightscoutV3()) }
-    
+
     var showSecret by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -3599,7 +3640,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            
+
             // Active Switch
             ListItem(
                 headlineContent = { Text("Active") },
@@ -3608,7 +3649,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                     Switch(checked = isActive, onCheckedChange = { isActive = it })
                 }
             )
-            
+
             HorizontalDivider()
 
             // URL
@@ -3620,7 +3661,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                 singleLine = true,
                 placeholder = { Text("https://my-nightscout.herokuapp.com") }
             )
-            
+
             // Secret
             OutlinedTextField(
                 value = secret,
@@ -3630,19 +3671,19 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                 singleLine = true,
                 visualTransformation = if (showSecret) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 trailingIcon = {
-                   val image = if (showSecret)
-                       Icons.Filled.Visibility
-                   else
-                       Icons.Filled.VisibilityOff
+                    val image = if (showSecret)
+                        Icons.Filled.Visibility
+                    else
+                        Icons.Filled.VisibilityOff
 
-                   IconButton(onClick = { showSecret = !showSecret }) {
-                       Icon(imageVector = image, contentDescription = if (showSecret) "Hide password" else "Show password")
-                   }
+                    IconButton(onClick = { showSecret = !showSecret }) {
+                        Icon(imageVector = image, contentDescription = if (showSecret) "Hide password" else "Show password")
+                    }
                 }
             )
 
             HorizontalDivider()
-            
+
             // Send Treatments
             ListItem(
                 headlineContent = { Text("Send Amounts") },
@@ -3651,7 +3692,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                     Switch(checked = sendTreatments, onCheckedChange = { sendTreatments = it })
                 }
             )
-            
+
             // Mobile only V3 check
             ListItem(
                 headlineContent = { Text("Use V3 API") },
@@ -3660,12 +3701,12 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                     Switch(checked = isV3, onCheckedChange = { isV3 = it })
                 }
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Resend / Sync Buttons
             Button(
-                onClick = { 
+                onClick = {
                     Natives.wakeuploader()
                     android.widget.Toast.makeText(context, "Sending now...", android.widget.Toast.LENGTH_SHORT).show()
                 },
@@ -3673,11 +3714,11 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
             ) {
                 Text("Send Now")
             }
-            
+
             OutlinedButton(
                 onClick = {
-                     Natives.resetuploader()
-                     android.widget.Toast.makeText(context, "Resend triggered", android.widget.Toast.LENGTH_SHORT).show()
+                    Natives.resetuploader()
+                    android.widget.Toast.makeText(context, "Resend triggered", android.widget.Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

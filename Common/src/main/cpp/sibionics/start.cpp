@@ -1,373 +1,458 @@
-/*      This file is part of Juggluco, an Android app to receive and display         */
-/*      glucose values from Freestyle Libre 2 and 3 sensors.                         */
+/*      This file is part of Juggluco, an Android app to receive and display */
+/*      glucose values from Freestyle Libre 2 and 3 sensors. */
 /*                                                                                   */
-/*      Copyright (C) 2021 Jaap Korthals Altes <jaapkorthalsaltes@gmail.com>         */
+/*      Copyright (C) 2021 Jaap Korthals Altes <jaapkorthalsaltes@gmail.com> */
 /*                                                                                   */
-/*      Juggluco is free software: you can redistribute it and/or modify             */
-/*      it under the terms of the GNU General Public License as published            */
-/*      by the Free Software Foundation, either version 3 of the License, or         */
-/*      (at your option) any later version.                                          */
+/*      Juggluco is free software: you can redistribute it and/or modify */
+/*      it under the terms of the GNU General Public License as published */
+/*      by the Free Software Foundation, either version 3 of the License, or */
+/*      (at your option) any later version. */
 /*                                                                                   */
-/*      Juggluco is distributed in the hope that it will be useful, but              */
-/*      WITHOUT ANY WARRANTY; without even the implied warranty of                   */
-/*      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                         */
-/*      See the GNU General Public License for more details.                         */
+/*      Juggluco is distributed in the hope that it will be useful, but */
+/*      WITHOUT ANY WARRANTY; without even the implied warranty of */
+/*      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. */
+/*      See the GNU General Public License for more details. */
 /*                                                                                   */
-/*      You should have received a copy of the GNU General Public License            */
-/*      along with Juggluco. If not, see <https://www.gnu.org/licenses/>.            */
+/*      You should have received a copy of the GNU General Public License */
+/*      along with Juggluco. If not, see <https://www.gnu.org/licenses/>. */
 /*                                                                                   */
-/*      Thu Apr 04 20:14:31 CEST 2024                                                 */
-
+/*      Thu Apr 04 20:14:31 CEST 2024 */
 
 #ifdef SIBIONICS
 
 #include "config.h"
-//#define SI3ONLY
-//#define SIHISTORY
-#include <dlfcn.h>
-#include <string_view>
-#include <mutex>
+// #define SI3ONLY
+// #define SIHISTORY
 #include "SensorGlucoseData.hpp"
-#include "streamdata.hpp" 
-#include "fromjava.h"
-#include "destruct.hpp"
-#include "sibionics/AlgorithmContext.hpp"
 #include "datbackup.hpp"
-#include "jnisubin.hpp"
+#include "destruct.hpp"
+#include "fromjava.h"
 #include "jniclass.hpp"
-extern void    sendstreaming(SensorGlucoseData *hist);
+#include "jnisubin.hpp"
+#include "sibionics/AlgorithmContext.hpp"
+#include "streamdata.hpp"
+#include <dlfcn.h>
+#include <mutex>
+#include <string_view>
+extern void sendstreaming(SensorGlucoseData *hist);
 
 extern bool siInit();
 
-extern "C" JNIEXPORT jstring JNICALL   fromjava(getSiBluetoothNum)(JNIEnv *envin, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return nullptr;
-    const SensorGlucoseData *usedhist=reinterpret_cast<streamdata *>(dataptr)->hist ; 
-    if(!usedhist)
-        return nullptr;
-    if(!usedhist->isSibionics())
-        return nullptr;
-    const char *name=usedhist->getinfo()->siBlueToothNum;
-    LOGGER("getSiBluetoothNum()=%s\n",name);
-    return envin->NewStringUTF(name);
-    } 
+extern "C" JNIEXPORT jstring JNICALL
+fromjava(getSiBluetoothNum)(JNIEnv *envin, jclass cl, jlong dataptr) {
+  if (!dataptr)
+    return nullptr;
+  const SensorGlucoseData *usedhist =
+      reinterpret_cast<streamdata *>(dataptr)->hist;
+  if (!usedhist)
+    return nullptr;
+  if (!usedhist->isSibionics())
+    return nullptr;
+  const char *name = usedhist->getinfo()->siBlueToothNum;
+  LOGGER("getSiBluetoothNum()=%s\n", name);
+  return envin->NewStringUTF(name);
+}
 
 extern int newGlucoseMeter(std::string_view scangegs);
-extern "C" JNIEXPORT jstring JNICALL   fromjava(addSIscangetName)(JNIEnv *env, jclass cl,jstring jgegs,jintArray jindexptr) {
-  if(!jgegs) {
-        LOGAR("addSIscangetName(null)");
-        return nullptr;
-        }
-   const char *gegs = env->GetStringUTFChars( jgegs, NULL);
-   if(!gegs) {
+extern "C" JNIEXPORT jstring JNICALL fromjava(addSIscangetName)(
+    JNIEnv *env, jclass cl, jstring jgegs, jintArray jindexptr) {
+  if (!jgegs) {
+    LOGAR("addSIscangetName(null)");
+    return nullptr;
+  }
+  const char *gegs = env->GetStringUTFChars(jgegs, NULL);
+  if (!gegs) {
     LOGAR("addSIscangetName GetStringUTFChars()=null");
     return nullptr;
+  }
+  destruct dest(
+      [jgegs, gegs, env]() { env->ReleaseStringUTFChars(jgegs, gegs); });
+  const size_t gegslen = env->GetStringUTFLength(jgegs);
+  std::string_view scangegs{gegs, gegslen};
+  auto [sensindex, sens] = sensors->makeSIsensorindex(scangegs, time(nullptr));
+  if (sens) {
+    const char *name = sens->shortsensorname()->data();
+    LOGGER("addSIscangetName(%s)=%s\n", gegs, name);
+    sendstreaming(sens); // TODO??
+    backup->resendResetDevices();
+    backup->wakebackup(Backup::wakeall);
+    return env->NewStringUTF(name);
+  } else {
+    if (int meterIndex = newGlucoseMeter(scangegs); meterIndex >= 0) {
+      CritArSave<jint> indexptr(env, jindexptr);
+      *indexptr.data() = meterIndex;
     }
-   destruct   dest([jgegs,gegs,env]() {env->ReleaseStringUTFChars(jgegs, gegs);});
-   const size_t gegslen= env->GetStringUTFLength( jgegs);
-  std::string_view scangegs{gegs,gegslen};
-   auto [sensindex,sens]= sensors->makeSIsensorindex(scangegs,time(nullptr));
-   if(sens) {
-      const char *name=sens->shortsensorname()->data();
-      LOGGER("addSIscangetName(%s)=%s\n",gegs,name);
-      sendstreaming(sens);  //TODO??
-      backup->resendResetDevices();
-      backup->wakebackup(Backup::wakeall);
-      return env->NewStringUTF(name);
-      }
-   else {
-     if(int meterIndex=newGlucoseMeter(scangegs);meterIndex>=0) {
-         CritArSave<jint> indexptr(env,jindexptr);
-         *indexptr.data()=meterIndex;
-         }
-      }
-   return nullptr;
-   }
-extern "C" JNIEXPORT void JNICALL   fromjava(siSaveDeviceName)(JNIEnv *env, jclass cl,jlong dataptr,jstring jdeviceName) {
-    if(!dataptr)
-        return;
-    streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
-    jint getlen= env->GetStringUTFLength( jdeviceName);
-    auto *sens= sdata->hist;
-   auto *info=sens->getinfo();
-   const int maxlen=sizeof(info->siDeviceName);
-    if((getlen+1)>maxlen) {
-        LOGGER("deviceNamelen=%d toolarge\n",getlen);
-        }    
-   int len=std::min(maxlen-1,getlen);
-   info->siToken='%';
-   char *name=(char *)info->siDeviceName;
-   env->GetStringUTFRegion( jdeviceName, 0,len, name);
-   info->siDeviceNamelen=len;
+  }
+  return nullptr;
+}
+extern "C" JNIEXPORT void JNICALL fromjava(siSaveDeviceName)(
+    JNIEnv *env, jclass cl, jlong dataptr, jstring jdeviceName) {
+  if (!dataptr)
+    return;
+  streamdata *sdata = reinterpret_cast<streamdata *>(dataptr);
+  jint getlen = env->GetStringUTFLength(jdeviceName);
+  auto *sens = sdata->hist;
+  auto *info = sens->getinfo();
+  const int maxlen = sizeof(info->siDeviceName);
+  if ((getlen + 1) > maxlen) {
+    LOGGER("deviceNamelen=%d toolarge\n", getlen);
+  }
+  int len = std::min(maxlen - 1, getlen);
+  info->siToken = '%';
+  char *name = (char *)info->siDeviceName;
+  env->GetStringUTFRegion(jdeviceName, 0, len, name);
+  info->siDeviceNamelen = len;
 
-  name[len]='\0';
-  sendstreaming(sens);  
+  name[len] = '\0';
+  sendstreaming(sens);
   backup->resendResetDevices();
   backup->wakebackup(Backup::wakeall);
-  // sendstreaming(sens);  
-   }
-extern "C" JNIEXPORT void  JNICALL   fromjava(setSensorptrResetSibionics2)(JNIEnv *env, jclass cl,jlong sensorptr,jboolean val) {
-    if(!sensorptr)
-        return;
-    reinterpret_cast<SensorGlucoseData *>(sensorptr)->getinfo()->reset=val;
-    }
-extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getSensorptrResetSibionics2)(JNIEnv *env, jclass cl,jlong sensorptr) {
-    if(!sensorptr)
-        return false;
-    return reinterpret_cast<SensorGlucoseData *>(sensorptr)->getinfo()->reset;
-    }
-
-extern "C" JNIEXPORT void  JNICALL   fromjava(setResetSibionics2)(JNIEnv *env, jclass cl,jlong dataptr,jboolean val) {
-    if(!dataptr)
-        return;
-    sistream  *stream=reinterpret_cast<sistream *>(dataptr);
-    auto *sens=stream->hist;
-   sens->getinfo()->reset=val;
-    }
-
-extern "C" JNIEXPORT void  JNICALL   fromjava(setAutoResetDays)(JNIEnv *env, jclass cl,jlong dataptr,jint val) {
-    if(!dataptr)
-        return;
-    sistream  *stream=reinterpret_cast<sistream *>(dataptr);
-    auto *sens=stream->hist;
-   sens->getinfo()->autoResetDays=val;
-    }
-
-extern "C" JNIEXPORT jint  JNICALL   fromjava(getAutoResetDays)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return 0;
-    sistream  *stream=reinterpret_cast<sistream *>(dataptr);
-    auto *sens=stream->hist;
-   return sens->getinfo()->autoResetDays;
-    }
-
-extern "C" JNIEXPORT jboolean JNICALL fromjava(isSibionics2)(JNIEnv *env, jclass cl, jlong dataptr) {
-    if(!dataptr) return false;
-    sistream *stream = reinterpret_cast<sistream *>(dataptr);
-    auto *sens = stream->hist;
-    return sens && sens->isSibionics2();
+  // sendstreaming(sens);
+}
+extern "C" JNIEXPORT void JNICALL fromjava(setSensorptrResetSibionics2)(
+    JNIEnv *env, jclass cl, jlong sensorptr, jboolean val) {
+  if (!sensorptr)
+    return;
+  reinterpret_cast<SensorGlucoseData *>(sensorptr)->getinfo()->reset = val;
+}
+extern "C" JNIEXPORT jboolean JNICALL
+fromjava(getSensorptrResetSibionics2)(JNIEnv *env, jclass cl, jlong sensorptr) {
+  if (!sensorptr)
+    return false;
+  return reinterpret_cast<SensorGlucoseData *>(sensorptr)->getinfo()->reset;
 }
 
-extern "C" JNIEXPORT void  JNICALL   fromjava(siClearCalibration)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return;
-    sistream  *stream=reinterpret_cast<sistream *>(dataptr);
-    auto *sens=stream->hist;
-    if(sens) stream->sicontext.reset(sens);
-    }
-
-extern "C" JNIEXPORT void  JNICALL   fromjava(siClearAll)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return;
-    sistream  *stream=reinterpret_cast<sistream *>(dataptr);
-    auto *sens=stream->hist;
-    if(sens) stream->sicontext.resetAll(sens);
-    }
-
-extern "C" JNIEXPORT void JNICALL fromjava(setViewMode)(JNIEnv *env, jclass cl, jlong dataptr, jint mode) {
-    if(!dataptr) return;
-    sistream *stream=reinterpret_cast<sistream *>(dataptr);
-    if(stream->hist) stream->hist->getinfo()->viewMode = mode;
+extern "C" JNIEXPORT void JNICALL fromjava(setResetSibionics2)(JNIEnv *env,
+                                                               jclass cl,
+                                                               jlong dataptr,
+                                                               jboolean val) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  sens->getinfo()->reset = val;
 }
 
-extern "C" JNIEXPORT jint JNICALL fromjava(getViewMode)(JNIEnv *env, jclass cl, jlong dataptr) {
-    if(!dataptr) return 0;
-    sistream *stream=reinterpret_cast<sistream *>(dataptr);
-    if(stream->hist) return stream->hist->getinfo()->viewMode;
+extern "C" JNIEXPORT void JNICALL fromjava(setAutoResetDays)(JNIEnv *env,
+                                                             jclass cl,
+                                                             jlong dataptr,
+                                                             jint val) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  sens->getinfo()->autoResetDays = val;
+}
+
+extern "C" JNIEXPORT jint JNICALL fromjava(getAutoResetDays)(JNIEnv *env,
+                                                             jclass cl,
+                                                             jlong dataptr) {
+  if (!dataptr)
     return 0;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  return sens->getinfo()->autoResetDays;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL fromjava(isSibionics2)(JNIEnv *env,
+                                                             jclass cl,
+                                                             jlong dataptr) {
+  if (!dataptr)
+    return false;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  return sens && sens->isSibionics2();
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(siClearCalibration)(JNIEnv *env,
+                                                               jclass cl,
+                                                               jlong dataptr) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (sens)
+    stream->sicontext.reset(sens);
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(siClearAll)(JNIEnv *env, jclass cl,
+                                                       jlong dataptr) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (sens)
+    stream->sicontext.resetAll(sens);
+}
+
+// Custom Calibration Settings JNI
+extern "C" JNIEXPORT void JNICALL fromjava(setCustomCalibrationSettings)(
+    JNIEnv *env, jclass cl, jlong dataptr, jboolean enabled, jint index,
+    jboolean autoReset) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (sens) {
+    auto *info = sens->getinfo();
+    info->useCustomCalibration = enabled;
+    info->customCalIndex = index;
+    info->autoResetAlgorithm = autoReset;
+    LOGGER("JNI setCustomCalibrationSettings: enabled=%d, index=%d, "
+           "autoReset=%d\n",
+           enabled, index, autoReset);
+  }
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+fromjava(getCustomCalibrationSettings)(JNIEnv *env, jclass cl, jlong dataptr) {
+  if (!dataptr)
+    return 0;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (!sens)
+    return 0;
+
+  auto *info = sens->getinfo();
+  // Pack settings into a long: bits 0-7 = flags, bits 8-15 = index
+  jlong result = 0;
+  if (info->useCustomCalibration)
+    result |= 1;
+  if (info->autoResetAlgorithm)
+    result |= 2;
+  result |= (static_cast<jlong>(info->customCalIndex) << 8);
+
+  LOGGER("JNI getCustomCalibrationSettings: enabled=%d, index=%d, "
+         "autoReset=%d, result=%lld\n",
+         info->useCustomCalibration, info->customCalIndex,
+         info->autoResetAlgorithm, result);
+  return result;
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(setViewMode)(JNIEnv *env, jclass cl,
+                                                        jlong dataptr,
+                                                        jint mode) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  if (stream->hist)
+    stream->hist->getinfo()->viewMode = mode;
+}
+
+extern "C" JNIEXPORT jint JNICALL fromjava(getViewMode)(JNIEnv *env, jclass cl,
+                                                        jlong dataptr) {
+  if (!dataptr)
+    return 0;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  if (stream->hist)
+    return stream->hist->getinfo()->viewMode;
+  return 0;
 }
 /*
-extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getResetSibionics2)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return false;
-    return reinterpret_cast<streamdata *>(dataptr)->hist->getinfo()->reset;
+extern "C" JNIEXPORT jboolean  JNICALL   fromjava(getResetSibionics2)(JNIEnv
+*env, jclass cl,jlong dataptr) { if(!dataptr) return false; return
+reinterpret_cast<streamdata *>(dataptr)->hist->getinfo()->reset;
     } */
 
-extern "C" JNIEXPORT jboolean JNICALL   fromjava(siSensorptrTransmitterScan)(JNIEnv *env, jclass cl,jlong sensorptr,jstring jscancode) {
-    if(!sensorptr) {
-        LOGAR("siSensorptrTransmitterScan sensorptr==null");
-        return false;
-        }
-    const jint getlen= env->GetStringUTFLength( jscancode);
-    if(getlen!=59) {
-        LOGGER("siSensorptrTransmitterScan len==%d\n",getlen);
-        return false;
-        }
-   const char *scancode = env->GetStringUTFChars( jscancode, NULL);
-   if(!scancode) {
-        LOGAR("siSensorptrTransmitterScan  GetStringUTFChars()=null");
-        return false;
-        }
-   if(!std::ranges::contains_subrange(std::string_view(scancode,getlen),sibionicsRecognition)) {
-        LOGGER("siSensorptrTransmitterScan  not %s in %s\n",sibionicsRecognition.data(),scancode);
-        return false;
-        }
+extern "C" JNIEXPORT jboolean JNICALL fromjava(siSensorptrTransmitterScan)(
+    JNIEnv *env, jclass cl, jlong sensorptr, jstring jscancode) {
+  if (!sensorptr) {
+    LOGAR("siSensorptrTransmitterScan sensorptr==null");
+    return false;
+  }
+  const jint getlen = env->GetStringUTFLength(jscancode);
+  if (getlen != 59) {
+    LOGGER("siSensorptrTransmitterScan len==%d\n", getlen);
+    return false;
+  }
+  const char *scancode = env->GetStringUTFChars(jscancode, NULL);
+  if (!scancode) {
+    LOGAR("siSensorptrTransmitterScan  GetStringUTFChars()=null");
+    return false;
+  }
+  if (!std::ranges::contains_subrange(std::string_view(scancode, getlen),
+                                      sibionicsRecognition)) {
+    LOGGER("siSensorptrTransmitterScan  not %s in %s\n",
+           sibionicsRecognition.data(), scancode);
+    return false;
+  }
 
-   auto *sens=reinterpret_cast<SensorGlucoseData *>(sensorptr);
-   auto *info=sens->getinfo();
-   info->siToken='%';
+  auto *sens = reinterpret_cast<SensorGlucoseData *>(sensorptr);
+  auto *info = sens->getinfo();
+  info->siToken = '%';
 
-   char *name=(char *)info->siDeviceName;
-   constexpr const int namlen= 10;
-   memcpy(name,scancode+getlen-namlen,namlen);
-   info->siDeviceNamelen=namlen;
-   name[namlen]='\0';
-   LOGGER("siSensorptrTransmitterScan %s\n",name);
-  sendstreaming(sens);  
+  char *name = (char *)info->siDeviceName;
+  constexpr const int namlen = 10;
+  memcpy(name, scancode + getlen - namlen, namlen);
+  info->siDeviceNamelen = namlen;
+  name[namlen] = '\0';
+  LOGGER("siSensorptrTransmitterScan %s\n", name);
+  sendstreaming(sens);
   backup->resendResetDevices();
   backup->wakebackup(Backup::wakeall);
-   return true;
-   }
+  return true;
+}
 /*
-extern "C" JNIEXPORT jboolean JNICALL   fromjava(siTransmitterScan)(JNIEnv *env, jclass cl,jlong dataptr,jstring jscancode) {
-    streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
-    auto *sens= sdata->hist;
-    return fromjava(siSensorptrTransmitterScan)(env,cl,(jlong)sens,jscancode);
+extern "C" JNIEXPORT jboolean JNICALL   fromjava(siTransmitterScan)(JNIEnv *env,
+jclass cl,jlong dataptr,jstring jscancode) { streamdata
+*sdata=reinterpret_cast<streamdata *>(dataptr); auto *sens= sdata->hist; return
+fromjava(siSensorptrTransmitterScan)(env,cl,(jlong)sens,jscancode);
    } */
-extern "C" JNIEXPORT jstring JNICALL   fromjava(siGetDeviceName)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return nullptr;
-   const streamdata *sdata=reinterpret_cast<streamdata *>(dataptr);
-   const auto *sens= sdata->hist;
-   const auto *info=sens->getinfo();
-   if(info->siDeviceNamelen<=0) return nullptr;
-   const char *name=(char *)info->siDeviceName;
-   return env->NewStringUTF(name);
-   }
+extern "C" JNIEXPORT jstring JNICALL fromjava(siGetDeviceName)(JNIEnv *env,
+                                                               jclass cl,
+                                                               jlong dataptr) {
+  if (!dataptr)
+    return nullptr;
+  const streamdata *sdata = reinterpret_cast<streamdata *>(dataptr);
+  const auto *sens = sdata->hist;
+  const auto *info = sens->getinfo();
+  if (info->siDeviceNamelen <= 0)
+    return nullptr;
+  const char *name = (char *)info->siDeviceName;
+  return env->NewStringUTF(name);
+}
 
 /*
-extern "C" JNIEXPORT int JNICALL   fromjava(getSIindex)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return 0;
-    const streamdata *sdata=reinterpret_cast<const streamdata *>(dataptr);
-    return sdata->hist->getSiIndex();
+extern "C" JNIEXPORT int JNICALL   fromjava(getSIindex)(JNIEnv *env, jclass
+cl,jlong dataptr) { if(!dataptr) return 0; const streamdata
+*sdata=reinterpret_cast<const streamdata *>(dataptr); return
+sdata->hist->getSiIndex();
    } */
 
-//extern bool savejson(SensorGlucoseData *sens,std::string_view, int index,const AlgorithmContext *alg );
+// extern bool savejson(SensorGlucoseData *sens,std::string_view, int
+// index,const AlgorithmContext *alg );
 
-extern data_t *fromjbyteArray(JNIEnv *env,jbyteArray jar,jint len=-1);
+extern data_t *fromjbyteArray(JNIEnv *env, jbyteArray jar, jint len = -1);
 
-extern "C" JNIEXPORT void JNICALL   fromjava(EverSenseClear)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return;
-    if(auto *sens=reinterpret_cast<streamdata *>(dataptr)->hist)
-        sens->setbroadcastfrom(INT16_MAX);
-    }
+extern "C" JNIEXPORT void JNICALL fromjava(EverSenseClear)(JNIEnv *env,
+                                                           jclass cl,
+                                                           jlong dataptr) {
+  if (!dataptr)
+    return;
+  if (auto *sens = reinterpret_cast<streamdata *>(dataptr)->hist)
+    sens->setbroadcastfrom(INT16_MAX);
+}
 extern std::string_view libdirname;
 #include "sibionics/json.hpp"
 void *openlib(std::string_view libname) {
-    int liblen=libdirname.size();
-   if(liblen<=0) {
-      LOGGER("libdirname.size()=%d\n",liblen);
-      return  nullptr;
-      }
-    int libnamelen=libname.size()+1;
-    char fullpath[libnamelen+ liblen];
-    memcpy(fullpath,libdirname.data(),liblen);
-    memcpy(fullpath+liblen,libname.data(),libnamelen);
-    LOGGER("open %s\n",fullpath);
-    return dlopen(fullpath, RTLD_NOW);
-    }
-
-
+  int liblen = libdirname.size();
+  if (liblen <= 0) {
+    LOGGER("libdirname.size()=%d\n", liblen);
+    return nullptr;
+  }
+  int libnamelen = libname.size() + 1;
+  char fullpath[libnamelen + liblen];
+  memcpy(fullpath, libdirname.data(), liblen);
+  memcpy(fullpath + liblen, libname.data(), libnamelen);
+  LOGGER("open %s\n", fullpath);
+  return dlopen(fullpath, RTLD_NOW);
+}
 
 //"_ZN21NativeAlgorithmV1_1_223getJsonAlgorithmContextEv";
 //_ZN22NativeAlgorithmV1_1_3B23getJsonAlgorithmContextEv
 //_ZN22NativeAlgorithmV1_1_3B23setJsonAlgorithmContextEPc
-//#define algjavastr(x) "Java_com_algorithm_v1_11_13_1b_NativeAlgorithmLibraryV1_11_13B_" #x
+// #define algjavastr(x)
+// "Java_com_algorithm_v1_11_13_1b_NativeAlgorithmLibraryV1_11_13B_" #x
 #include "jnidef.h"
 
 extern JNIEnv *subenv;
 
 extern JavaVM *getnewvm();
 
-extern bool loadjson(SensorGlucoseData *sens, const char *statename,const AlgorithmContext *alg, setjson_t setjson) ;
+extern bool loadjson(SensorGlucoseData *sens, const char *statename,
+                     const AlgorithmContext *alg, setjson_t setjson);
 #ifdef SI3ONLY
-#undef algLibName 
-#undef jniAlglib 
+#undef algLibName
+#undef jniAlglib
 #undef vers
 #undef algjavastr
 #undef jsonname
 
-#define jsonname(et,end) "_ZN22NativeAlgorithmV1_1_3B23" #et  "JsonAlgorithmContext" #end //Makes one in 5 minutes
+#define jsonname(et, end)                                                      \
+  "_ZN22NativeAlgorithmV1_1_3B23" #et                                          \
+  "JsonAlgorithmContext" #end // Makes one in 5 minutes
 #define algLibName "/libnative-algorithm-v1_1_3_B.so";
-#define jniAlglib     "/libnative-algorithm-jni-v113B.so";
-#define vers(x) x 
+#define jniAlglib "/libnative-algorithm-jni-v113B.so";
+#define vers(x) x
 #undef algjavastr
 
-
-#undef targetlow 
+#undef targetlow
 #undef targethigh
 #define targetlow 3.9
 #define targethigh 7.8
-#define algjavastr(x) "Java_com_algorithm_v1_11_13_1b_NativeAlgorithmLibraryV1_11_13B_" #x
-
+#define algjavastr(x)                                                          \
+  "Java_com_algorithm_v1_11_13_1b_NativeAlgorithmLibraryV1_11_13B_" #x
 
 #include "jnifuncs.hpp"
 #else
-#undef jniAlglib 
+#undef jniAlglib
 #undef vers
 #undef algjavastr
 
-#undef targetlow 
+#undef targetlow
 #undef targethigh
 #ifdef NOTCHINESE
 #define targetlow 4.4
 #define targethigh 11.1
-//#define jniAlglib     "/libnative-algorithm-jni-v112.so";
-//#define algjavastr(x) "Java_com_algorithm_v1_11_12_NativeAlgorithmLibraryV1_11_12_" #x
-//#define algLibName "/libnative-algorithm-v1_1_2.so"
-//#define jsonname(et,end) "_ZN21NativeAlgorithmV1_1_223" #et  "JsonAlgorithmContext" #end
+// #define jniAlglib     "/libnative-algorithm-jni-v112.so";
+// #define algjavastr(x)
+// "Java_com_algorithm_v1_11_12_NativeAlgorithmLibraryV1_11_12_" #x #define
+// algLibName "/libnative-algorithm-v1_1_2.so" #define jsonname(et,end)
+// "_ZN21NativeAlgorithmV1_1_223" #et  "JsonAlgorithmContext" #end
 
 /*#define jniAlglib     "/libnative-algorithm-jni-v112F.so";
-#define algjavastr(x) "Java_com_algorithm_v1_11_12_1f_NativeAlgorithmLibraryV1_11_12F_" #x
-#define algLibName "/libnative-algorithm-v1_1_2F.so";
-#define jsonname(et,end) "_ZN22NativeAlgorithmV1_1_2F23" #et  "JsonAlgorithmContext" #end */
+#define algjavastr(x)
+"Java_com_algorithm_v1_11_12_1f_NativeAlgorithmLibraryV1_11_12F_" #x #define
+algLibName "/libnative-algorithm-v1_1_2F.so"; #define jsonname(et,end)
+"_ZN22NativeAlgorithmV1_1_2F23" #et  "JsonAlgorithmContext" #end */
 
-#define jniAlglib     "/libnative-algorithm-jni-v116A.so";
+#define jniAlglib "/libnative-algorithm-jni-v116A.so";
 #define algjavastr(x) "Java_com_algorithm_v116a_NativeAlgorithmLibraryV116A_" #x
 
-
-#define vers(x) x ## 2
+#define vers(x) x##2
 
 #include "jnifuncs.hpp"
 #endif
 
-//#ifdef SIHISTORY
+// #ifdef SIHISTORY
 #if 1
-#undef algLibName 
-#undef jniAlglib 
+#undef algLibName
+#undef jniAlglib
 #undef vers
 #undef algjavastr
 #undef jsonname
 
-#undef targetlow 
+#undef targetlow
 #undef targethigh
 #define targetlow 3.9
 #define targethigh 7.8
 
-/*#define jsonname(et,end) "_ZN22NativeAlgorithmV1_1_3B23" #et  "JsonAlgorithmContext" #end //Makes one in 5 minutes
-#define algLibName "/libnative-algorithm-v1_1_3_B.so";
-#define jniAlglib     "/libnative-algorithm-jni-v113B.so";
-#define algjavastr(x) "Java_com_algorithm_v1_11_13_1b_NativeAlgorithmLibraryV1_11_13B_" #x */
+/*#define jsonname(et,end) "_ZN22NativeAlgorithmV1_1_3B23" #et
+"JsonAlgorithmContext" #end //Makes one in 5 minutes #define algLibName
+"/libnative-algorithm-v1_1_3_B.so"; #define jniAlglib
+"/libnative-algorithm-jni-v113B.so"; #define algjavastr(x)
+"Java_com_algorithm_v1_11_13_1b_NativeAlgorithmLibraryV1_11_13B_" #x */
 
-
-#define jsonname(et,end) "_ZN22NativeAlgorithmV1_1_5G23" #et  "JsonAlgorithmContext" #end //Makes one in 5 minutes
+#define jsonname(et, end)                                                      \
+  "_ZN22NativeAlgorithmV1_1_5G23" #et                                          \
+  "JsonAlgorithmContext" #end // Makes one in 5 minutes
 
 #define algLibName "/libnative-algorithm-v1_1_5G.so";
-#define jniAlglib     "/libnative-algorithm-jni-v115G.so";
-#define algjavastr(x) "Java_com_algorithm_v1_11_15_1g_NativeAlgorithmLibraryV1_11_15G_" #x
+#define jniAlglib "/libnative-algorithm-jni-v115G.so";
+#define algjavastr(x)                                                          \
+  "Java_com_algorithm_v1_11_15_1g_NativeAlgorithmLibraryV1_11_15G_" #x
 
-#define vers(x) x ##3
+#define vers(x) x##3
 #include "jnifuncs.hpp"
 
 #endif
 #endif
 
 #ifdef NOTCHINESE
-#define datahandlestr(x) "Java_com_no_sisense_enanddecryption_CGMDataHandle130_" #x
+#define datahandlestr(x)                                                       \
+  "Java_com_no_sisense_enanddecryption_CGMDataHandle130_" #x
 
-#define    algDatahandleName "/libdata-handle-lib.so";
+#define algDatahandleName "/libdata-handle-lib.so";
 algtype(V120SpiltData) V120SpiltData;
 algtype(v120RegisterKey) v120RegisterKey;
 algtype(V120ApplyAuthentication) V120ApplyAuthentication;
@@ -376,110 +461,120 @@ algtype(V120Activation) V120Activation;
 algtype(V120Reset) V120Reset;
 algtype(V120IsecUpdate) V120IsecUpdate;
 static bool getDatahandle() {
-    std::string_view alglib=algDatahandleName;
-    void *handle=openlib(alglib);
-    if(!handle) {
-        LOGGER("dlopen %s failed: %s\n",alglib.data(),dlerror());
-        return false;
-        }
-{    constexpr const char str[]=datahandlestr(V120SpiltData);
-    V120SpiltData= (algtype(V120SpiltData)) dlsym(handle,str);
-     if(!V120SpiltData) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-
-{    constexpr const char str[]=datahandlestr(v120RegisterKey);
-    v120RegisterKey= (algtype(v120RegisterKey)) dlsym(handle,str);
-     if(!v120RegisterKey) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-{    constexpr const char str[]=datahandlestr(V120ApplyAuthentication);
-    V120ApplyAuthentication= (algtype(V120ApplyAuthentication)) dlsym(handle,str);
-     if(!V120ApplyAuthentication) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-{    constexpr const char str[]=datahandlestr(V120RawData);
-    V120RawData= (algtype(V120RawData)) dlsym(handle,str);
-     if(!V120RawData) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-{    constexpr const char str[]=datahandlestr(V120Activation);
-    V120Activation= (algtype(V120Activation)) dlsym(handle,str);
-     if(!V120Activation) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-{    constexpr const char str[]=datahandlestr(V120Reset);
-    V120Reset= (algtype(V120Reset)) dlsym(handle,str);
-     if(!V120Reset) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-{    constexpr const char str[]=datahandlestr(V120IsecUpdate);
-    V120IsecUpdate= (algtype(V120IsecUpdate)) dlsym(handle,str);
-     if(!V120IsecUpdate) {
-         LOGGER("dlsym %s failed: %s\n",str,dlerror());
-        return false;
-         }
-}
-
-     LOGAR("found datahandle functions");
-     return true;
+  std::string_view alglib = algDatahandleName;
+  void *handle = openlib(alglib);
+  if (!handle) {
+    LOGGER("dlopen %s failed: %s\n", alglib.data(), dlerror());
+    return false;
+  }
+  {
+    constexpr const char str[] = datahandlestr(V120SpiltData);
+    V120SpiltData = (algtype(V120SpiltData))dlsym(handle, str);
+    if (!V120SpiltData) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
     }
+  }
+
+  {
+    constexpr const char str[] = datahandlestr(v120RegisterKey);
+    v120RegisterKey = (algtype(v120RegisterKey))dlsym(handle, str);
+    if (!v120RegisterKey) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
+    }
+  }
+  {
+    constexpr const char str[] = datahandlestr(V120ApplyAuthentication);
+    V120ApplyAuthentication =
+        (algtype(V120ApplyAuthentication))dlsym(handle, str);
+    if (!V120ApplyAuthentication) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
+    }
+  }
+  {
+    constexpr const char str[] = datahandlestr(V120RawData);
+    V120RawData = (algtype(V120RawData))dlsym(handle, str);
+    if (!V120RawData) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
+    }
+  }
+  {
+    constexpr const char str[] = datahandlestr(V120Activation);
+    V120Activation = (algtype(V120Activation))dlsym(handle, str);
+    if (!V120Activation) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
+    }
+  }
+  {
+    constexpr const char str[] = datahandlestr(V120Reset);
+    V120Reset = (algtype(V120Reset))dlsym(handle, str);
+    if (!V120Reset) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
+    }
+  }
+  {
+    constexpr const char str[] = datahandlestr(V120IsecUpdate);
+    V120IsecUpdate = (algtype(V120IsecUpdate))dlsym(handle, str);
+    if (!V120IsecUpdate) {
+      LOGGER("dlsym %s failed: %s\n", str, dlerror());
+      return false;
+    }
+  }
+
+  LOGAR("found datahandle functions");
+  return true;
+}
 #endif
 #ifdef NOTCHINESE
-bool siInit2()  {
-   static bool init=getNativefunctions2()&&getJNIfunctions2()&&getDatahandle();
-   return init;
-   }
+bool siInit2() {
+  static bool init =
+      getNativefunctions2() && getJNIfunctions2() && getDatahandle();
+  return init;
+}
 #endif
-bool siInit3()  {
-   static bool init=getNativefunctions3()&&getJNIfunctions3() ;
-   return init;
-   }
- bool siInit(bool notchinese) {
+bool siInit3() {
+  static bool init = getNativefunctions3() && getJNIfunctions3();
+  return init;
+}
+bool siInit(bool notchinese) {
 #ifdef NOTCHINESE
 
-   if(notchinese)
-      return siInit2();
+  if (notchinese)
+    return siInit2();
 #endif
-   return siInit3();
-   };
+  return siInit3();
+};
 
 #include <charconv>
-bool loadjson(SensorGlucoseData *sens, const char *statename,const AlgorithmContext *alg, setjson_t setjson) {
-   auto *nati=reinterpret_cast<NativeAlgorithm*>(alg ->mNativeContext);
-   if(!nati) {
-      LOGAR("mNativeContext==null");
-      return false;
-      }
+bool loadjson(SensorGlucoseData *sens, const char *statename,
+              const AlgorithmContext *alg, setjson_t setjson) {
+  auto *nati = reinterpret_cast<NativeAlgorithm *>(alg->mNativeContext);
+  if (!nati) {
+    LOGAR("mNativeContext==null");
+    return false;
+  }
   sens->mutex.lock();
   Readall json(statename);
   sens->mutex.unlock();
-  if(!json.data()) {
-     LOGGER("read %s failed\n",statename);
-     return false;
-     }
+  if (!json.data()) {
+    LOGGER("read %s failed\n", statename);
+    return false;
+  }
 #ifndef NOLOG
-   int res=
+  int res =
 #endif
-   setjson(nati,json.data());
-   LOGGER("setjson()=%d\n",res);
-   return true;
-   }
+      setjson(nati, json.data());
+  LOGGER("setjson()=%d\n", res);
+  return true;
+}
 /*
-bool savejson(SensorGlucoseData *sens,const string_view name,int index,const AlgorithmContext *alg,getjson_t getjson) {
-    if(!getjson) {
+bool savejson(SensorGlucoseData *sens,const string_view name,int index,const
+AlgorithmContext *alg,getjson_t getjson) { if(!getjson) {
         LOGAR("getjson==null");
         return false;
         }
@@ -491,7 +586,7 @@ bool savejson(SensorGlucoseData *sens,const string_view name,int index,const Alg
     const char *json=getjson(nati);
     LOGGER("getjson()=%p\n",json);
     if(!json) {
-        return false;    
+        return false;
         }
     int jsonlen=strlen(json);
     if(!json) {
@@ -522,209 +617,293 @@ bool savejson(SensorGlucoseData *sens,const string_view name,int index,const Alg
     */
 #include "sibionics/SiContext.hpp"
 
-void      SiContext::setNotchinese(SensorGlucoseData *sens) {
-   sens->setNotchinese();
+void SiContext::setNotchinese(SensorGlucoseData *sens) {
+  sens->setNotchinese();
 #ifdef NOTCHINESE
-   release();
-   auto res= siInit2();
-   algcontext=initAlgorithm2(sens,binState);
+  release();
+  auto res = siInit2();
+  algcontext = initAlgorithm2(sens, binState);
 #endif
-    notchinese=true;
-   }
-SiContext::SiContext(SensorGlucoseData *sens): binState(2,sens->binstatefile,4096),algcontext(
+  notchinese = true;
+}
+SiContext::SiContext(SensorGlucoseData *sens)
+    : binState(2, sens->binstatefile, 4096),
+      algcontext(
 #ifdef NOTCHINESE
-        sens->notchinese()?initAlgorithm2(sens,binState):
+          sens->notchinese() ? initAlgorithm2(sens, binState) :
 #endif
 
-        initAlgorithm3(sens,binState)),
-        notchinese(sens->notchinese()) {
-       };
+                             initAlgorithm3(sens, binState)),
+      notchinese(sens->notchinese()) {};
 void SiContext::release() {
 #ifndef NOLOG
-    int res=
+  int res =
 #endif
-    (
+      (
 #ifdef NOTCHINESE
-            notchinese?releaseAlgorithmContext2:
+          notchinese ? releaseAlgorithmContext2 :
 #endif
 
-    releaseAlgorithmContext3)(subenv,nullptr, reinterpret_cast<jobject>(algcontext));
-    LOGGER("releaseAlgorithmContext(%p)=%d notchinese=%d\n",algcontext,res,notchinese);
-   delete algcontext;
-    }
+                     releaseAlgorithmContext3)(
+          subenv, nullptr, reinterpret_cast<jobject>(algcontext));
+  LOGGER("releaseAlgorithmContext(%p)=%d notchinese=%d\n", algcontext, res,
+         notchinese);
+  delete algcontext;
+}
 void SiContext::reset(SensorGlucoseData *sens) {
-    LOGGER("SiContext::reset() called for sensor %s\n", sens->deviceaddress());
-    release(); // Properly destroy existing algorithm context
+  LOGGER("SiContext::reset() called for sensor %s\n", sens->deviceaddress());
+  release(); // Properly destroy existing algorithm context
 
-    // Wipe the entire memory mapped file content to ensure no stale state persists
-    if (binState.map.data() && binState.map.size() > 0) {
-        memset(binState.map.data(), 0, binState.map.size());
-        LOGSTRING("SiContext::reset() zeroed out binState memory map.\n");
+  // Wipe the entire memory mapped file content to ensure no stale state
+  // persists
+  if (binState.map.data() && binState.map.size() > 0) {
+    memset(binState.map.data(), 0, binState.map.size());
+    LOGSTRING("SiContext::reset() zeroed out binState memory map.\n");
+  }
+
+  binState.reset(); // Reset allocator headers
+
+  // Force delete binState file to ensure fresh algorithm state on disk
+  unlink(sens->binstatefile.c_str());
+  // Also delete JSON backups to prevent reloading old state
+  unlink(sens->statefile.c_str());
+  unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
+
+  auto *info = sens->getinfo();
+
+  // Clear old calibration
+  info->caliNr = 0;
+
+  // Note: Do NOT reset starttime, scancount, etc. to preserve history.
+  // Explicitly clear the reset flag to ensure we don't trigger a hardware reset
+  // accidentally.
+  info->reset = false;
+
+  // Save current siIndex before recreating algorithm
+  const int savedSiIndex = sens->getSiIndex();
+  sens->setSiIndex(0); // Temporarily set to 0 so initAlgorithm doesn't trigger
+                       // duplicate reset
+
+  // Recreate algcontext with clean state
+  if (notchinese) {
+    algcontext = initAlgorithm2(sens, binState);
+  } else {
+    algcontext = initAlgorithm3(sens, binState);
+  }
+
+  // Restore siIndex - set to savedSiIndex - windowSize for rolling window
+  int windowSize = 0;
+  int newIndex = 1;
+
+  if (info->useCustomCalibration) {
+    int hoursWindow =
+        SensorGlucoseData::getCustomCalHours(info->customCalIndex);
+    // Dynamic interval calculation (mirrors resetSiIndex in glucose.cpp)
+    float interval = sens->getinfo()->pollinterval;
+    if (interval < 59.0f) {
+      interval =
+          60.0f; // Fallback to 1 min (most common for custom cal sensors)
+      LOGGER("SiContext::reset (Custom): interval too small (%.1f), using "
+             "fallback 60.0s\n",
+             sens->getinfo()->pollinterval);
     }
-    
-    binState.reset(); // Reset allocator headers
-    
-    // Force delete binState file to ensure fresh algorithm state on disk
-    unlink(sens->binstatefile.c_str());
-    // Also delete JSON backups to prevent reloading old state
-    unlink(sens->statefile.c_str());
-    unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
-    
-    auto *info = sens->getinfo();
-    
-    // Clear old calibration
-    info->caliNr = 0;
-    
-        // Note: Do NOT reset starttime, scancount, etc. to preserve history.
-        // Explicitly clear the reset flag to ensure we don't trigger a hardware reset accidentally.
-        info->reset = false;
-    
-        // Recreate algcontext with clean state
-        if (notchinese) {        algcontext = initAlgorithm2(sens, binState);
+    windowSize = (int)((hoursWindow * 3600.0f) / interval);
+    // Idempotent Reset: Calculate from TIME, not current index
+    // This prevents repeated resets from drifting infinitely backward.
+    time_t now = time(NULL);
+    uint32_t starttime = sens->getinfo()->starttime;
+
+    // Safety check for starttime
+    if (starttime > 0 && now > starttime) {
+      float calcInterval = interval > 0.1f ? interval : 60.0f;
+      int maxIndex = (int)((now - starttime) / calcInterval);
+
+      // Target is "Now - Window", regardless of current siIndex state
+      newIndex = maxIndex > windowSize ? (maxIndex - windowSize) : 1;
+
+      LOGGER("SiContext::reset() Custom (Time-Based): now=%ld start=%d "
+             "elapsed=%d maxIndex=%d windowSize=%d newIndex=%d\n",
+             now, starttime, (int)(now - starttime), maxIndex, windowSize,
+             newIndex);
     } else {
-        algcontext = initAlgorithm3(sens, binState);
+      // Fallback if time is invalid
+      newIndex = savedSiIndex > windowSize ? (savedSiIndex - windowSize) : 1;
+      LOGGER("SiContext::reset() Custom (Fallback): Time invalid, using "
+             "savedSiIndex. newIndex=%d\n",
+             newIndex);
     }
-    LOGGER("SiContext::reset() recreated algcontext. New mNativeContext=%lld\n", algcontext ? algcontext->mNativeContext : 0LL);
 
-    LOGSTRING("SiContext::reset() FULL RESET completed. binState wiped & deleted, calibration cleared, algcontext recreated.\n");
+    // info->useCustomCalibration = false; // DON'T CLEAR: Keeps UI switch
+    // enabled!
+  } else {
+    // Native mode: Full reset to index 1 to re-process entire history
+    newIndex = 1;
+    LOGSTRING("SiContext::reset() NATIVE MODE: resetting to index 1 "
+              "(processing all history)\n");
+  }
+
+  sens->setSiIndex(newIndex);
+
+  LOGGER("SiContext::reset() set siIndex: saved=%d window=%d new=%d\n",
+         savedSiIndex, windowSize, newIndex);
+  LOGGER("SiContext::reset() recreated algcontext. mNativeContext=%lld\n",
+         algcontext ? algcontext->mNativeContext : 0LL);
+  // FIX: Signal Reset so checkinfo keeps sensor active and eu.cpp handles Gap.
+  info->redoAll = true;
+
+  // NOTE: Do NOT reset pollcount/scancount here. That destroys history data.
+  // The redoAll flag is sufficient to make eu.cpp accept the gap.
+
+  LOGSTRING(
+      "SiContext::reset() completed. Fresh algorithm, ready for new data.\n");
 }
 
 void SiContext::resetAll(SensorGlucoseData *sens) {
-    LOGGER("SiContext::resetAll() called for sensor %s\n", sens->deviceaddress());
-    release(); 
+  LOGGER("SiContext::resetAll() called for sensor %s\n", sens->deviceaddress());
+  release();
 
-    if (binState.map.data() && binState.map.size() > 0) {
-        memset(binState.map.data(), 0, binState.map.size());
-    }
-    
-    binState.reset();
-    unlink(sens->binstatefile.c_str());
-    unlink(sens->statefile.c_str());
-    unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
-    
-    auto *info = sens->getinfo();
-    info->caliNr = 0;
-    
-    // FULL RESET: Wipe history counters
-    info->starttime = time(nullptr);
-    info->scancount = 0;
-    info->pollcount = 0;
-    info->starthistory = 0;
-    info->endhistory = 0;
-    
-    // TRIGGER SENSOR RESET
-    info->reset = true; 
+  if (binState.map.data() && binState.map.size() > 0) {
+    memset(binState.map.data(), 0, binState.map.size());
+  }
 
-    if (notchinese) {
-        algcontext = initAlgorithm2(sens, binState);
-    } else {
-        algcontext = initAlgorithm3(sens, binState);
-    }
-    LOGSTRING("SiContext::resetAll() COMPLETE FACTORY RESET performed.\n");
+  binState.reset();
+  unlink(sens->binstatefile.c_str());
+  unlink(sens->statefile.c_str());
+  unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
+
+  auto *info = sens->getinfo();
+  info->caliNr = 0;
+
+  // FULL RESET: Wipe history counters
+  info->starttime = time(nullptr);
+  info->scancount = 0;
+  info->pollcount = 0;
+  info->starthistory = 0;
+  info->endhistory = 0;
+
+  // TRIGGER SENSOR RESET
+
+  info->reset = true;
+
+  if (notchinese) {
+    algcontext = initAlgorithm2(sens, binState);
+  } else {
+    algcontext = initAlgorithm3(sens, binState);
+  }
+  // Safety: Clear redoAll to restore standard gap checks after a Factory Reset.
+  info->redoAll = false;
+
+  LOGSTRING("SiContext::resetAll() COMPLETE FACTORY RESET performed.\n");
 }
 
 void SiContext::wipeDataOnly(SensorGlucoseData *sens) {
-    LOGGER("SiContext::wipeDataOnly() called for sensor %s\n", sens->deviceaddress());
-    release(); 
+  LOGGER("SiContext::wipeDataOnly() called for sensor %s\n",
+         sens->deviceaddress());
+  release();
 
-    if (binState.map.data() && binState.map.size() > 0) {
-        memset(binState.map.data(), 0, binState.map.size());
-    }
-    
-    binState.reset();
-    unlink(sens->binstatefile.c_str());
-    unlink(sens->statefile.c_str());
-    unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
-    
+  if (binState.map.data() && binState.map.size() > 0) {
+    memset(binState.map.data(), 0, binState.map.size());
+  }
+
+  binState.reset();
+  unlink(sens->binstatefile.c_str());
+  unlink(sens->statefile.c_str());
+  unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
+
+  auto *info = sens->getinfo();
+  info->caliNr = 0;
+
+  // FULL RESET: Wipe history counters
+  info->starttime = time(nullptr);
+  info->scancount = 0;
+  info->pollcount = 0;
+  info->starthistory = 0;
+  info->endhistory = 0;
+
+  // DO NOT TRIGGER SENSOR RESET
+  info->reset = false;
+
+  if (notchinese) {
+    algcontext = initAlgorithm2(sens, binState);
+  } else {
+    algcontext = initAlgorithm3(sens, binState);
+  }
+  LOGSTRING(
+      "SiContext::wipeDataOnly() Local data wiped without sensor reset.\n");
+}
+
+SiContext::~SiContext() { release(); };
+
+extern "C" JNIEXPORT jlong JNICALL
+fromjava(SIprocessData)(JNIEnv *envin, jclass cl, jlong dataptr,
+                        jbyteArray bluetoothdata, jlong mmsec) {
+  if (!dataptr) {
+    LOGAR("SIprocessData dataptr==null");
+    return 0LL;
+  }
+  sistream *sdata = reinterpret_cast<sistream *>(dataptr);
+  SensorGlucoseData *sens = sdata->hist;
+  if (!sens) {
+    LOGAR("SIprocessData SensorGlucoseData==null");
+    return 0LL;
+  }
+  uint32_t timsec = mmsec / 1000L;
+  data_t *bluedata = fromjbyteArray(envin, bluetoothdata);
+  destruct _destbluedata([bluedata] { data_t::deleteex(bluedata); });
+  /*
+    if(sens->getinfo()->reset) {
+          if(!sens->getinfo()->notchinese||!V120Reset) {
+              sdata->sicontext.setNotchinese(sens);
+              }
+          LOGAR("SIprocessData reset");
+          return 10LL;
+          } */
+  if (sens->notchinese()) {
     auto *info = sens->getinfo();
-    info->caliNr = 0;
-    
-    // FULL RESET: Wipe history counters
-    info->starttime = time(nullptr);
-    info->scancount = 0;
-    info->pollcount = 0;
-    info->starthistory = 0;
-    info->endhistory = 0;
-    
-    // DO NOT TRIGGER SENSOR RESET
-    info->reset = false; 
-
-    if (notchinese) {
-        algcontext = initAlgorithm2(sens, binState);
-    } else {
-        algcontext = initAlgorithm3(sens, binState);
+    if (info->reset) {
+      LOGAR("SIprocessData reset");
+      return 10LL;
     }
-    LOGSTRING("SiContext::wipeDataOnly() Local data wiped without sensor reset.\n");
-}
-
-SiContext::~SiContext() {
-    release();
-    };
-
-
-extern "C" JNIEXPORT jlong JNICALL   fromjava(SIprocessData)(JNIEnv *envin, jclass cl,jlong dataptr, jbyteArray bluetoothdata,jlong mmsec) {
-if(!dataptr) {
-   LOGAR("SIprocessData dataptr==null");
-   return 0LL;
-    }
- sistream *sdata=reinterpret_cast<sistream *>(dataptr);
-  SensorGlucoseData *sens=sdata->hist;
-  if(!sens) {
-      LOGAR("SIprocessData SensorGlucoseData==null");
-      return 0LL;
-     }
-  uint32_t timsec=mmsec/1000L;
- data_t *bluedata=fromjbyteArray(envin,bluetoothdata);
- destruct _destbluedata([bluedata]{data_t::deleteex(bluedata);});
-/*
-  if(sens->getinfo()->reset) {
-        if(!sens->getinfo()->notchinese||!V120Reset) {
-            sdata->sicontext.setNotchinese(sens);
-            }
-        LOGAR("SIprocessData reset");
-        return 10LL;
-        } */
-   if(sens->notchinese()) {
-       auto *info=sens->getinfo();
-        if(info->reset) {
-            LOGAR("SIprocessData reset");
+    if (info->autoResetDays > 0) {
+      if (timsec > info->starttime) {
+        float age_days = (timsec - info->starttime) / (24.0f * 3600.0f);
+        if (age_days >= info->autoResetDays) {
+          if (info->siBetween == 0) {
+            info->reset = true;
+            info->siBetween = 1;
+            LOGGER("Auto Reset triggered: age=%.2f days limit=%d\n", age_days,
+                   info->autoResetDays);
             return 10LL;
-            }
-        if(info->autoResetDays>0) {
-             if(timsec>info->starttime) {
-                 float age_days=(timsec-info->starttime)/(24.0f*3600.0f);
-                 if(age_days>=info->autoResetDays) {
-                      if(info->siBetween==0) {
-                           info->reset=true;
-                           info->siBetween=1;
-                           LOGGER("Auto Reset triggered: age=%.2f days limit=%d\n",age_days,info->autoResetDays);
-                           return 10LL;
-                      }
-                 } else {
-                      if(info->siBetween!=0) info->siBetween=0;
-                 }
-            }
+          }
+        } else {
+          if (info->siBetween != 0)
+            info->siBetween = 0;
         }
-         const jlong res=sdata->sicontext.processData2(sens,timsec,bluedata,sdata->sensorindex);
-         LOGGER("processData2=%lld\n",res);
-         return res;
-       }
-   else   
-   {
-         const jlong res= sdata->sicontext.processData(sens,timsec,bluedata->data(),bluedata->size(),sdata->sensorindex);
-         LOGGER("processData=%lld\n",res);
-         return res;
-     }
+      }
+    }
+    const jlong res = sdata->sicontext.processData2(sens, timsec, bluedata,
+                                                    sdata->sensorindex);
+    LOGGER("processData2=%lld\n", res);
+    return res;
+  } else {
+    const jlong res = sdata->sicontext.processData(
+        sens, timsec, bluedata->data(), bluedata->size(), sdata->sensorindex);
+    LOGGER("processData=%lld\n", res);
+    return res;
+  }
 }
 
-extern "C" JNIEXPORT void  JNICALL   fromjava(siWipeDataOnly)(JNIEnv *env, jclass cl,jlong dataptr) {
-    if(!dataptr)
-        return;
-    sistream  *stream=reinterpret_cast<sistream *>(dataptr);
-    auto *sens=stream->hist;
-    if(sens) stream->sicontext.wipeDataOnly(sens);
+extern "C" JNIEXPORT void JNICALL fromjava(siWipeDataOnly)(JNIEnv *env,
+                                                           jclass cl,
+                                                           jlong dataptr) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (sens)
+    stream->sicontext.wipeDataOnly(sens);
 }
 
 #else
-bool siInit() {return false;}
+bool siInit() { return false; }
 #endif
