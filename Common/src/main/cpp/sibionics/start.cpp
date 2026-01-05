@@ -164,6 +164,16 @@ extern "C" JNIEXPORT jboolean JNICALL fromjava(isSibionics2)(JNIEnv *env,
   return sens && sens->isSibionics2();
 }
 
+extern "C" JNIEXPORT jboolean JNICALL fromjava(isSibionics)(JNIEnv *env,
+                                                            jclass cl,
+                                                            jlong dataptr) {
+  if (!dataptr)
+    return false;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  return sens && sens->isSibionics();
+}
+
 extern "C" JNIEXPORT void JNICALL fromjava(siClearCalibration)(JNIEnv *env,
                                                                jclass cl,
                                                                jlong dataptr) {

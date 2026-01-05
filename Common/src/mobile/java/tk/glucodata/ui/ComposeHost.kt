@@ -3350,7 +3350,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 
 
             // --- CUSTOM AUTO-CALIBRATION (Sibionics Only) ---
-            if (sensor.isSibionics2 && sensor.viewMode != 1) {
+            if (sensor.isSibionics && sensor.viewMode != 1) {
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

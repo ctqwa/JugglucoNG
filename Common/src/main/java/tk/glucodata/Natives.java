@@ -1391,6 +1391,8 @@ public class Natives {
 
         public static native boolean isSibionics2(long dataptr);
 
+        public static native boolean isSibionics(long dataptr);
+
         public static native boolean getResetSibionics2(long dataptr);
 
         public static native void siClearCalibration(long dataptr);

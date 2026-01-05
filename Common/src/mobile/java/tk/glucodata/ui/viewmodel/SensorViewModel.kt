@@ -22,6 +22,7 @@ data class SensorInfo(
     val expectedEnd: String,
     val viewMode: Int,
     val autoResetDays: Int,
+    val isSibionics: Boolean,
     val isSibionics2: Boolean,
     val startMs: Long,
     val officialEndMs: Long,
@@ -49,6 +50,7 @@ class SensorViewModel : ViewModel() {
                 val currentViewMode = Natives.getViewMode(gatt.dataptr)
                 var autoResetDays = Natives.getAutoResetDays(gatt.dataptr)
                 val isSi2 = Natives.isSibionics2(gatt.dataptr)
+                val isSi = Natives.isSibionics(gatt.dataptr)
                 // If 0 (Fresh), force to 21 (Default ON)
                 if (isSi2 && autoResetDays == 0) {
                     Natives.setAutoResetDays(gatt.dataptr, 21)
@@ -73,6 +75,7 @@ class SensorViewModel : ViewModel() {
                     expectedEnd = if(expectedEndMs > 0) tk.glucodata.bluediag.datestr(expectedEndMs) else "",
                     viewMode = currentViewMode,
                     autoResetDays = autoResetDays,
+                    isSibionics = isSi,
                     isSibionics2 = isSi2,
                     startMs = startMs,
                     officialEndMs = officialEndMs,
