@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.material3.Slider
+import tk.glucodata.ui.components.StyledSwitch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -484,7 +485,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 ) {
                     composable("dashboard") { DashboardScreen(dashboardViewModel) }
                     composable("sensors") { SensorScreen() }
-                    composable("settings") { SettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
+                    composable("settings") { ExpressiveSettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
                     composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
                     composable("settings/mirror") { MirrorSettingsScreen(navController) }
                     composable("settings/mirror/edit/{pos}") { backStackEntry ->
@@ -532,7 +533,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
             ) {
                 composable("dashboard") { DashboardScreen(dashboardViewModel) }
                 composable("sensors") { SensorScreen() }
-                composable("settings") { SettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
+                composable("settings") { ExpressiveSettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
                 composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
                 composable("settings/mirror") { MirrorSettingsScreen(navController) }
                 composable("settings/mirror/edit/{pos}") { backStackEntry ->
@@ -670,7 +671,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                 // Left Pane: Status + Info + History (Scrollable)
                 LazyColumn(
                     modifier = Modifier.weight(0.25f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(28.dp),
                     contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
                 ) {
                     item { DashboardStatusSection(currentGlucose, currentRate, viewMode, latestPoint) }
@@ -751,7 +752,8 @@ fun DashboardStatusSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(28.dp) // Status Values: 28dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -840,13 +842,13 @@ fun DashboardMetaInfoSection(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(8.dp), // Sensor Name (Lower): 16dp (User Request)
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -887,7 +889,10 @@ fun DashboardChartSection(
     unit: String,
     viewMode: Int
 ) {
-    Card(modifier = modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(28.dp) // Chart: 28dp (User Request)
+    ) {
         Column(modifier = Modifier.padding(8.dp)) {
             if (glucoseHistory.isNotEmpty()) {
                 InteractiveGlucoseChart(
@@ -1684,7 +1689,7 @@ fun InteractiveGlucoseChart(
 
                 val statusCardColor = MaterialTheme.colorScheme.primaryContainer
                 val statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                val cardShape = RoundedCornerShape(12.dp) // Match likely default Card shape
+                val cardShape = RoundedCornerShape(28.dp) // Match likely default Card shape
 
                 // AXIS TEXT MATCHING
                 val axisFontSize = 12.sp
@@ -1713,7 +1718,7 @@ fun InteractiveGlucoseChart(
                     tonalElevation = 0.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Colored Text Logic (Keep matching graph lines for values)
@@ -1765,7 +1770,7 @@ fun InteractiveGlucoseChart(
                         text = point.time,
                         fontSize = axisFontSize, // Match Axis (10.sp)
                         // "make the bubble bigger" -> Increase padding
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -1786,7 +1791,7 @@ fun InteractiveGlucoseChart(
                 exit = androidx.compose.animation.fadeOut(),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
+                    .padding(16.dp)
             ) {
                 val headerDate = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault()).format(java.util.Date(centerTime))
 
@@ -1799,7 +1804,7 @@ fun InteractiveGlucoseChart(
                             MaterialTheme.colorScheme.surface,
                             RoundedCornerShape(4.dp)
                         )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
 
@@ -1974,7 +1979,7 @@ fun InteractiveGlucoseChart(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(100),
+                    shape = RoundedCornerShape(28.dp),
                     color = containerColor,
                     contentColor = contentColor,
                     modifier = Modifier
@@ -2045,7 +2050,7 @@ fun InteractiveGlucoseChart(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(28.dp),
                     // "Similar background when its active" -> SecondaryContainer
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -2445,7 +2450,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             headlineContent = { Text(stringResource(R.string.notification_chart_title)) },
             supportingContent = { Text(stringResource(R.string.notification_chart_desc)) },
             trailingContent = {
-                Switch(
+                StyledSwitch(
                     checked = notificationChartEnabled,
                     onCheckedChange = { viewModel.toggleNotificationChart(it) }
                 )
@@ -2464,7 +2469,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             headlineContent = { Text(stringResource(R.string.xdripbroadcast)) },
             supportingContent = { Text(stringResource(R.string.patchedlibrebroadcast)) },
             trailingContent = {
-                Switch(
+                StyledSwitch(
                     checked = patchedLibreEnabled,
                     onCheckedChange = { viewModel.togglePatchedLibreBroadcast(it) }
                 )
@@ -2589,7 +2594,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             supportingContent = { Text(stringResource(R.string.google_scan_desc)) },
             trailingContent = {
                 var googleScan by remember { mutableStateOf(Natives.getGoogleScan()) }
-                Switch(
+                StyledSwitch(
                     checked = googleScan,
                     onCheckedChange = {
                         Natives.setGoogleScan(it)
@@ -2605,7 +2610,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             supportingContent = { Text("Requests high connection priority") },
             trailingContent = {
                 var turbo by remember { mutableStateOf(Natives.getpriority()) }
-                Switch(
+                StyledSwitch(
                     checked = turbo,
                     onCheckedChange = {
                         Natives.setpriority(it)
@@ -2621,7 +2626,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             supportingContent = { Text("Uses passive background connection") },
             trailingContent = {
                 var autoConnect by remember { mutableStateOf(Natives.getAndroid13()) }
-                Switch(
+                StyledSwitch(
                     checked = autoConnect,
                     onCheckedChange = {
                         SensorBluetooth.setAutoconnect(it)
@@ -3121,7 +3126,7 @@ fun AlarmCard(
                     val valStr = if (value < 30) String.format("%.1f", value) else value.toInt().toString()
 //                    Text("Threshold: $valStr $unit", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = enabled, onCheckedChange = onToggle)
+                StyledSwitch(checked = enabled, onCheckedChange = onToggle)
             }
 
             if (enabled) {
@@ -3242,30 +3247,11 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
         return
     }
 
-    Scaffold(
-        floatingActionButton = {
-            // Only show FAB when sensors exist (empty state has its own CTAs)
-            if (sensors.isNotEmpty()) {
-                // Standard FAB for cleaner M3 look
-                FloatingActionButton(
-                    onClick = { showSensorPicker = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Sensor",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-    ) { padding ->
+    // Use Box instead of Scaffold to avoid double padding from parent nav
+    Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         if (sensors.isEmpty()) {
             // Show sensor selection cards for empty state
-            Column(
-                modifier = Modifier.padding(padding)
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.sensors_title),
@@ -3286,21 +3272,39 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
         } else {
             // LazyColumn with header that scrolls
             LazyColumn(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp)
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp)
             ) {
                 // Scrollable header
                 item {
                     Text(
                         text = stringResource(R.string.sensors_title),
                         style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 24.dp)
                     )
                 }
                 items(sensors) { sensor ->
                     SensorCard(sensor, viewModel)
                 }
+            }
+        }
+        
+        // FAB overlay - only show when sensors exist
+        if (sensors.isNotEmpty()) {
+            FloatingActionButton(
+                onClick = { showSensorPicker = true },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Sensor",
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }
@@ -3369,13 +3373,14 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     var showReconnectDialog by remember { mutableStateOf(false) }
     var showWipeDialog by remember { mutableStateOf(false) }
     var wipeDataChecked by remember { mutableStateOf(false) }
+    var keepDataChecked by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope() // Fix: Add missing scope
 
     if (showTerminateDialog) {
         AlertDialog(
             onDismissRequest = {
                 showTerminateDialog = false
-                wipeDataChecked = false
+                keepDataChecked = false
             },
             title = { Text(stringResource(R.string.disconnect_sensor_title)) },
             text = {
@@ -3384,24 +3389,24 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
-                            checked = wipeDataChecked,
-                            onCheckedChange = { wipeDataChecked = it }
+                            checked = keepDataChecked,
+                            onCheckedChange = { keepDataChecked = it }
                         )
-                        Text(stringResource(R.string.wipe_data))
+                        Text(stringResource(R.string.keep_data))
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.terminateSensor(sensor.serial, wipeDataChecked)
+                    viewModel.terminateSensor(sensor.serial, !keepDataChecked)
                     showTerminateDialog = false
-                    wipeDataChecked = false
+                    keepDataChecked = false
                 }) { Text(stringResource(R.string.disconnect)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showTerminateDialog = false
-                    wipeDataChecked = false
+                    keepDataChecked = false
                 }) { Text(stringResource(R.string.cancel)) }
             }
         )
@@ -3545,9 +3550,9 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 2.dp),
+            .padding(horizontal = 0.dp, vertical = 2.dp), // Remove horizontal padding (handled by parent list content padding)
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(28.dp) // M3 Expressive Preferred (Extra Large)
     ) {
         Column(modifier = Modifier.padding(16.dp).alpha(contentAlpha)) {
 //            val titleText = sensor.serial
@@ -3790,7 +3795,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                             )
                         }
                     }
-                    Switch(
+                    StyledSwitch(
                         checked = customEnabled,
                         onCheckedChange = { enabled ->
                             customEnabled = enabled
@@ -3972,7 +3977,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                 }
                             }
                             
-                            Switch(
+                            StyledSwitch(
                                 checked = isAutoResetEnabled,
                                 onCheckedChange = { enabled ->
                                     val newValue = if (enabled) daysValue else 300
@@ -4014,15 +4019,16 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
                 OutlinedButton(
-                    onClick = { showTerminateDialog = true },
+                    onClick = { showReconnectDialog = true },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(stringResource(R.string.disconnect))
+                    Text(stringResource(R.string.reconnect))
                 }
                 // Destructive action: Error color (M3 Expressive)
                 OutlinedButton(
-                    onClick = { showWipeDialog = true },
+                    onClick = { showTerminateDialog = true },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
@@ -4032,7 +4038,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                         MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
                     )
                 ) {
-                    Text("Wipe Data")
+                    Text(stringResource(R.string.disconnect))
                 }
             }
             }
@@ -4097,7 +4103,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                 headlineContent = { Text("Active") },
                 supportingContent = { Text("Enable Nightscout Upload") },
                 trailingContent = {
-                    Switch(checked = isActive, onCheckedChange = { isActive = it })
+                    StyledSwitch(checked = isActive, onCheckedChange = { isActive = it })
                 }
             )
 
@@ -4140,7 +4146,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                 headlineContent = { Text("Send Amounts") },
                 supportingContent = { Text("Upload Insulin/Carbs (Treatments)") },
                 trailingContent = {
-                    Switch(checked = sendTreatments, onCheckedChange = { sendTreatments = it })
+                    StyledSwitch(checked = sendTreatments, onCheckedChange = { sendTreatments = it })
                 }
             )
 
@@ -4149,7 +4155,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                 headlineContent = { Text("Use V3 API") },
                 supportingContent = { Text("Experimental") },
                 trailingContent = {
-                    Switch(checked = isV3, onCheckedChange = { isV3 = it })
+                    StyledSwitch(checked = isV3, onCheckedChange = { isV3 = it })
                 }
             )
 

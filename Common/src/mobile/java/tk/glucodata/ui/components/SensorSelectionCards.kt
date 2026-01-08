@@ -231,8 +231,8 @@ fun DashboardEmptyState(
         
         // Welcome header
         Text(
-            text = "Welcome to JugglucoNG",
-            style = MaterialTheme.typography.headlineMedium,
+            text = "JugglucoNG",
+            style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
@@ -241,7 +241,7 @@ fun DashboardEmptyState(
         
         Text(
             text = "Get started by adding your sensor",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.displaySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )

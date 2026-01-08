@@ -1001,7 +1001,7 @@ public class bluediag {
                 }
             }
             if (!found)
-                put(messages, blue.scantime, ": Start search for sensors\n");
+                put(messages, blue.scantime, ": Searching for sensors\n");
             if (lasttime == 0L || lasttime > (System.currentTimeMillis() - 5 * 60 * 1000)) {
                 if (blue.scantimeouttime > blue.scantime)
                     put(messages, blue.scantimeouttime, ": timeout\n");

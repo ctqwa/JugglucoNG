@@ -591,7 +591,7 @@ public class SensorBluetooth {
         }
         for (SuperGattCallback cb : gattcallbacks) {
             if (cb.mBluetoothGatt == null) {
-                cb.constatstatusstr = "Start search for sensors";
+                cb.constatstatusstr = "Searching for sensors";
             }
         }
         Applic.updatescreen();

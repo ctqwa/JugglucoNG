@@ -95,15 +95,58 @@ class SensorViewModel : ViewModel() {
 
                 // Get detailed status from native code which has accurate logic
                 val nativeStatus = Natives.getsensortext(gatt.dataptr) ?: ""
+                val bleStatus = gatt.constatstatusstr ?: ""
+                
+                // Calculate streaming status first - needed for status resolution
                 // Consider "receiving" or "Receiving" in status as streaming
                 val isActivelyReceiving = nativeStatus.contains("Receiving", ignoreCase = true) ||
                     nativeStatus.contains("eceiv", ignoreCase = true) ||
                     gatt.streamingEnabled()
+                
+                
+                // Map common BLE status codes to user-friendly messages
+                fun mapBleStatus(status: String): String = when {
+                    status == "Status=22" -> "Bluetooth off"
+                    status == "Status=133" -> "Connection failed"
+                    status.startsWith("Status=") -> status // Keep other Status= codes as-is
+                    else -> status
+                }
+                
+                // Determine final display status with smart priority
+                val finalStatus = when {
+                    // Priority 1: Meaningful native sensor states (errors, warming up, receiving history)
+                    nativeStatus.isNotEmpty() && 
+                    (nativeStatus.contains("Error", ignoreCase = true) ||
+                     nativeStatus.contains("Ended", ignoreCase = true) ||
+                     nativeStatus.contains("Warming", ignoreCase = true) ||
+                     nativeStatus.contains("Receiving", ignoreCase = true)) -> nativeStatus
+                    
+                    // Priority 2: ANY BLE status issues (Status=X codes, BT off, searching, loss of signal)
+                    // These indicate real connection problems that should always show
+                    bleStatus.isNotEmpty() &&
+                    (bleStatus.startsWith("Status=") ||
+                     bleStatus.contains("Bluetooth off", ignoreCase = true) ||
+                     bleStatus.contains("search", ignoreCase = true) ||
+                     bleStatus.contains("Loss of signal", ignoreCase = true)) -> bleStatus
+                    
+                    // Priority 3: Show "Connected" when actively receiving AND no BLE problems
+                    // Only trust streaming flag if BLE status is normal (empty or just "Disconnected")
+                    isActivelyReceiving && 
+                    (bleStatus.isEmpty() || bleStatus == "Disconnected") -> "Connected"
+                    
+                    // Fallback: Show disconnected
+                    else -> "Disconnected"
+                }
+                
+                // Apply user-friendly mapping to final status
+                val displayStatus = mapBleStatus(finalStatus)
+
 
                 SensorInfo(
                     serial = gatt.SerialNumber ?: "Unknown",
                     deviceAddress = gatt.mActiveDeviceAddress ?: "Unknown",
-                    connectionStatus = gatt.constatstatusstr ?: "Disconnected",
+                    // connectionStatus: Only show REAL BLE status codes (Status=X), not app messages
+                    connectionStatus = if (bleStatus.startsWith("Status=")) mapBleStatus(bleStatus) else "",
                     starttime = if (startMs > 0) tk.glucodata.bluediag.datestr(startMs) else "",
                     streaming = isActivelyReceiving,
                     rssi = gatt.readrssi,
@@ -119,9 +162,7 @@ class SensorViewModel : ViewModel() {
                     customCalEnabled = customEnabled,
                     customCalIndex = customIndex,
                     customCalAutoReset = customAutoReset,
-                    detailedStatus = nativeStatus.ifEmpty { 
-                        gatt.constatstatusstr ?: "Disconnected"
-                    }
+                    detailedStatus = displayStatus
                 )
 
 

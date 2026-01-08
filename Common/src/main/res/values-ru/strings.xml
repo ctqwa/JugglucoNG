@@ -434,7 +434,8 @@
     <string name="disconnect_sensor_desc">Это навсегда остановит сессию датчика.</string>
     <string name="wipe_data">Стереть данные</string>
     <string name="disconnect">Отключить</string>
-    
+    <string name="keep_data">Оставить информацию о датчике</string>
+
     <string name="reconnect_sensor_title">Переподключить датчик?</string>
     <string name="reconnect_sensor_desc">Это сбросит соединение и попытается подключиться снова.</string>
     <string name="reconnect">Переподключить</string>

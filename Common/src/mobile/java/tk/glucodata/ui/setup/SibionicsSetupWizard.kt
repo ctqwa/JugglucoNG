@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
+import tk.glucodata.ui.components.StyledSwitch
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,11 +52,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class SibionicsType(val displayNameRes: Int, val subtype: Int, val description: String) {
-    EU(R.string.eusibionics, 0, "com.sisensing.sijoy"),
-    HEMATONIX(R.string.hematonix, 1, "com.sisensing.rusibionics"),
-    CHINESE(R.string.chsibionics, 2, "com.sisensing.sisensingcgm"),
-    SIBIONICS2(R.string.sibionics2, 3, "com.sisensing.eco")
+enum class SibionicsType(val displayNameRes: Int, val subtype: Int) {
+    EU(R.string.eusibionics, 0),
+    HEMATONIX(R.string.hematonix, 1),
+    CHINESE(R.string.chsibionics, 2),
+    SIBIONICS2(R.string.sibionics2, 3)
 }
 
 enum class SibionicsSetupStep {
@@ -902,7 +903,8 @@ fun ScanTransmitterStep(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
+                Spacer(Modifier.width(16.dp))
+                StyledSwitch(
                     checked = resetEnabled,
                     onCheckedChange = null // Handled by Row click
                 )

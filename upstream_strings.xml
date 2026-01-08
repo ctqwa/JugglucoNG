@@ -170,7 +170,7 @@
  <string name="wronglibrary">Library not functioning properly, try a different one</string>
  <string name="installedlibrary">Installed library</string>
  <string name="cantextract">Can\'t extract %s, try a different apk</string>
- <string name="connectwithsensor">Runs to connect to sensor</string>
+ <string name="connectwithsensor">Connecting to sensor</string>
  <string name="exchangedata">Runs to exchange data</string>
  <string name="nonewvalue">"No new value since "</string>
  <string name="lowglucose">" Low Glucose!"</string>

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
+import tk.glucodata.ui.components.StyledSwitch
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -155,7 +156,8 @@ fun DebugSettingsScreen(navController: NavController) {
                     Text(stringResource(R.string.logcat))
                 }
                 
-                Switch(
+                Spacer(modifier = Modifier.width(16.dp))
+                StyledSwitch(
                     checked = isEnabled,
                     onCheckedChange = { 
                         isEnabled = it

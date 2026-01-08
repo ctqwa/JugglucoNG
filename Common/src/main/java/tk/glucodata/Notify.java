@@ -747,27 +747,18 @@ public class Notify {
     }
 
     private static void showpopupalarm(String message, Boolean cancel) {
-        var act = MainActivity.thisone;
-        if (act != null && act.active) {
-            if (cancel)
-                MainActivity.showmessage = null;
-            {
-                if (doLog) {
-                    Log.i(LOG_ID, "showpopupalarm direct " + message);
-                }
-                ;
-            }
-            ;
-            act.runOnUiThread(() -> {
-                if (act.isFinishing() || act.isDestroyed() || !act.active) {
-                    setmessage(message, cancel);
-                    return;
-                }
-                act.showindialog(message, cancel);
-            });
-        } else {
-            setmessage(message, cancel);
+        if (cancel) {
+            MainActivity.showmessage = null;
         }
+
+        // Launch AlarmActivity
+        Intent alarmIntent = new Intent(Applic.app, tk.glucodata.ui.AlarmActivity.class);
+        alarmIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        // message typically contains "LOW 3.9 mmol/L"
+        // Simple parsing or just pass as VAL for now
+        alarmIntent.putExtra("EXTRA_GLUCOSE_VAL", message);
+        alarmIntent.putExtra("EXTRA_ALARM_TYPE", "ALARM");
+        Applic.app.startActivity(alarmIntent);
     }
 
     private void soundalarm(int kind, int draw, String message, String type, boolean alarm) {
@@ -925,7 +916,7 @@ public class Notify {
             ? PendingIntent.FLAG_IMMUTABLE
             : 0;
 
-    private final boolean makeicon = !isWearable && tk.glucodata.BuildConfig.minSDK >= 23;
+    private final boolean makeicon = !isWearable && android.os.Build.VERSION.SDK_INT >= 23;
     private final StatusIcon icons = makeicon ? new StatusIcon() : null;
 
     static int getMaxGlucose(int sensorgen) {
@@ -943,7 +934,7 @@ public class Notify {
             if (glvalue > (((double) maxglucose) / Applic.mgdLmult)) {
                 return "27.8<";
             }
-            var glstr = format(Applic.usedlocale, Notify.pureglucoseformat, glvalue);
+            var glstr = format(util.getlocale(), Notify.pureglucoseformat, glvalue);
             if (glstr.charAt(glstr.length() - 1) == '0')
                 glstr = glstr.substring(0, glstr.length() - 2);
             return glstr;
@@ -953,7 +944,7 @@ public class Notify {
                 return "40>";
             if (intval > maxglucose)
                 return "500<";
-            return format(Applic.usedlocale, Notify.pureglucoseformat, glvalue);
+            return format(util.getlocale(), Notify.pureglucoseformat, glvalue);
         }
     }
 
@@ -996,6 +987,51 @@ public class Notify {
                 GluNotBuilder.setPriority(Notification.PRIORITY_HIGH);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     GluNotBuilder.setCategory(Notification.CATEGORY_ALARM);
+                }
+
+                // Full Screen Intent for High Priority Alarms
+                Intent fullScreenIntent = new Intent(Applic.app, tk.glucodata.ui.AlarmActivity.class);
+                fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                fullScreenIntent.putExtra("EXTRA_GLUCOSE_VAL", glucose.value);
+                fullScreenIntent.putExtra("EXTRA_RATE", glucose.rate);
+                fullScreenIntent.putExtra("EXTRA_ALARM_TYPE", "ALARM"); // You might want to pass 'type' or determine
+                                                                        // based on 'glvalue'
+                // fullScreenIntent.putExtra("EXTRA_ARROW", ...); // Logic to determine arrow
+                // string from rate if needed
+
+                PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(Applic.app, 3, fullScreenIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | penmutable);
+                GluNotBuilder.setFullScreenIntent(fullScreenPendingIntent, true);
+
+                // Add Snooze Action
+                Intent snoozeIntent = new Intent(Applic.app, tk.glucodata.receivers.AlarmActionReceiver.class);
+                snoozeIntent.setAction(tk.glucodata.receivers.AlarmActionReceiver.ACTION_SNOOZE);
+                PendingIntent snoozePendingIntent = PendingIntent.getBroadcast(Applic.app, 1, snoozeIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | penmutable);
+                if (Build.VERSION.SDK_INT >= 23) {
+                    android.graphics.drawable.Icon icon = android.graphics.drawable.Icon.createWithResource(Applic.app,
+                            R.drawable.ic_snooze);
+                    Notification.Action snoozeAction = new Notification.Action.Builder(icon, "Snooze",
+                            snoozePendingIntent).build();
+                    GluNotBuilder.addAction(snoozeAction);
+                } else if (Build.VERSION.SDK_INT >= 20) {
+                    GluNotBuilder.addAction(R.drawable.ic_snooze, "Snooze", snoozePendingIntent);
+                }
+
+                // Add Dismiss Action
+                Intent dismissIntent = new Intent(Applic.app, tk.glucodata.receivers.AlarmActionReceiver.class);
+                dismissIntent.setAction(tk.glucodata.receivers.AlarmActionReceiver.ACTION_DISMISS);
+                PendingIntent dismissPendingIntent = PendingIntent.getBroadcast(Applic.app, 2, dismissIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | penmutable);
+                if (Build.VERSION.SDK_INT >= 23) {
+                    android.graphics.drawable.Icon icon = android.graphics.drawable.Icon.createWithResource(Applic.app,
+                            R.drawable.ic_dismiss);
+                    Notification.Action dismissAction = new Notification.Action.Builder(icon, "Dismiss",
+                            dismissPendingIntent).build();
+                    GluNotBuilder.addAction(dismissAction);
+                } else if (Build.VERSION.SDK_INT >= 20) {
+                    GluNotBuilder.addAction(R.drawable.ic_dismiss, "Dismiss", dismissPendingIntent);
                 }
                 Notification notif = GluNotBuilder.build();
                 notif.when = glucose.time;
@@ -1318,7 +1354,6 @@ public class Notify {
         var GluNotBuilder = mkbuilder(type);
 
         setIcon(GluNotBuilder, glvalue, glucose.sensorgen2);
-        GluNotBuilder.setSmallIcon(R.drawable.novalue);
 
         GluNotBuilder.setVisibility(VISIBILITY_PUBLIC);
 

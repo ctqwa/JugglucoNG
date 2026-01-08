@@ -142,9 +142,14 @@ class DashboardViewModel(
             
             // Get view mode from active sensor.
             val sName = Natives.lastsensorname()
-            if (!sName.isNullOrBlank()) {
+            if (!sName.isNullOrEmpty() && sName.isNotBlank()) {
                 _sensorName.value = sName
-                val dataptr = Natives.getdataptr(sName)
+                val dataptr = try {
+                    Natives.getdataptr(sName)
+                } catch (e: Exception) {
+                    android.util.Log.e("DashboardVM", "getdataptr failed for '$sName'", e)
+                    0L
+                }
                 if (dataptr != 0L) {
                     val status = Natives.getsensortext(dataptr)
                     _sensorStatus.value = status ?: ""
