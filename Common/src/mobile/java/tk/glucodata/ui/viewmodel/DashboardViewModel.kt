@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.collect
 import tk.glucodata.Natives
 import tk.glucodata.data.GlucoseRepository
 import tk.glucodata.data.HistorySync
+import tk.glucodata.alerts.AlertRepository
 
 class DashboardViewModel(
     private val glucoseRepository: GlucoseRepository = GlucoseRepository()
@@ -88,6 +89,9 @@ class DashboardViewModel(
     private val _highAlarmSoundMode = MutableStateFlow(0)
     val highAlarmSoundMode = _highAlarmSoundMode.asStateFlow()
 
+    private val _alertsSummary = MutableStateFlow("")
+    val alertsSummary = _alertsSummary.asStateFlow()
+
     init {
         refreshData()
         startCollection()
@@ -147,6 +151,10 @@ class DashboardViewModel(
             
             val highSound = Natives.alarmhassound(1)
             _highAlarmSoundMode.value = if (highSound) 1 else 0
+
+            // Alerts Summary
+            val anyActive = AlertRepository.loadAllConfigs().any { it.enabled }
+            _alertsSummary.value = if (anyActive) "Active" else "All Alerts Disabled" // TODO: String resource
             
             // Get view mode from active sensor.
             var sName = Natives.lastsensorname()

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,8 +91,8 @@ fun AlertSettingsScreen(
 
     // Track expanded states
     var expandedType by remember { mutableStateOf<AlertType?>(null) }
-    // Track sound picker state
-    var showSoundPicker by remember { mutableStateOf<AlertType?>(null) }
+    // Track sound picker state (Generic: Current URI + Callback)
+    var soundPickerRequest by remember { mutableStateOf<Pair<String?, (String?) -> Unit>?>(null) }
 
     Scaffold(
         topBar = {
@@ -115,6 +116,60 @@ fun AlertSettingsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            // === GLOBAL ALERTS SECTION ===
+            item {
+                GlobalAlertSettingsCard(
+                    allConfigs = configs,
+                    onMasterToggle = { enabled ->
+                         // Update ALL configs to enabled/disabled
+                         configs.forEach { (type, config) ->
+                             val updated = config.copy(enabled = enabled)
+                             configs[type] = updated
+                             AlertRepository.saveConfig(updated)
+                         }
+                    },
+                    onApplyToAll = { draft ->
+                        // Apply draft settings to ALL configs (except distinct fields like Threshold)
+                        configs.forEach { (type, config) ->
+                             val updated = config.copy(
+                                 soundEnabled = draft.soundEnabled,
+                                 vibrationEnabled = draft.vibrationEnabled,
+                                 flashEnabled = draft.flashEnabled,
+                                 deliveryMode = draft.deliveryMode,
+                                 volumeProfile = draft.volumeProfile,
+                                 
+                                 // New propagated fields
+                                 customSoundUri = draft.customSoundUri,
+                                 overrideDND = draft.overrideDND,
+                                 
+                                 timeRangeEnabled = draft.timeRangeEnabled,
+                                 activeStartHour = draft.activeStartHour,
+                                 activeEndHour = draft.activeEndHour,
+                                 
+                                 retryEnabled = draft.retryEnabled,
+                                 retryIntervalMinutes = draft.retryIntervalMinutes,
+                                 retryCount = draft.retryCount,
+                                 
+                                 defaultSnoozeMinutes = draft.defaultSnoozeMinutes
+                                 // Do NOT copy enabled state or thresholds
+                             )
+                             configs[type] = updated
+                             AlertRepository.saveConfig(updated)
+                        }
+                    },
+                    onPickSound = { draft, updateDraft ->
+                        soundPickerRequest = draft.customSoundUri to { uri ->
+                            updateDraft(draft.copy(customSoundUri = uri))
+                            soundPickerRequest = null
+                        }
+                    },
+                    onTest = { _ ->
+                        AlertStateTracker.resetState(AlertType.LOW)
+                        Notify.testTrigger(AlertType.LOW.id)
+                    }
+                )
+            }
+
             // === GLUCOSE ALERTS SECTION ===
             item {
                 SectionHeader(
@@ -140,7 +195,14 @@ fun AlertSettingsScreen(
                         configs[type] = updated
                         AlertRepository.saveConfig(updated)
                     },
-                    onPickSound = { showSoundPicker = type }
+                    onPickSound = {
+                        soundPickerRequest = config.customSoundUri to { uri ->
+                            val updated = config.copy(customSoundUri = uri)
+                            configs[type] = updated
+                            AlertRepository.saveConfig(updated)
+                            soundPickerRequest = null
+                        }
+                    }
                 )
             }
 
@@ -170,7 +232,14 @@ fun AlertSettingsScreen(
                         configs[type] = updated
                         AlertRepository.saveConfig(updated)
                     },
-                    onPickSound = { showSoundPicker = type }
+                    onPickSound = {
+                        soundPickerRequest = config.customSoundUri to { uri ->
+                            val updated = config.copy(customSoundUri = uri)
+                            configs[type] = updated
+                            AlertRepository.saveConfig(updated)
+                            soundPickerRequest = null
+                        }
+                    }
                 )
             }
 
@@ -200,7 +269,14 @@ fun AlertSettingsScreen(
                         configs[type] = updated
                         AlertRepository.saveConfig(updated)
                     },
-                    onPickSound = { showSoundPicker = type }
+                    onPickSound = {
+                        soundPickerRequest = config.customSoundUri to { uri ->
+                            val updated = config.copy(customSoundUri = uri)
+                            configs[type] = updated
+                            AlertRepository.saveConfig(updated)
+                            soundPickerRequest = null
+                        }
+                    }
                 )
             }
 
@@ -215,21 +291,13 @@ fun AlertSettingsScreen(
         }
 
         // Sound Picker Dialog
-        if (showSoundPicker != null) {
-            val type = showSoundPicker!!
-            val config = configs[type]
-            if (config != null) {
-                SoundPicker(
-                    currentUri = config.customSoundUri,
-                    onSoundSelected = { uri ->
-                        val updated = config.copy(customSoundUri = uri)
-                        configs[type] = updated
-                        AlertRepository.saveConfig(updated)
-                        showSoundPicker = null
-                    },
-                    onDismiss = { showSoundPicker = null }
-                )
-            }
+        if (soundPickerRequest != null) {
+            val (current, callback) = soundPickerRequest!!
+            SoundPicker(
+                currentUri = current,
+                onSoundSelected = callback,
+                onDismiss = { soundPickerRequest = null }
+            )
         }
     }
 }
@@ -296,12 +364,13 @@ private fun AlertCard(
     val context = LocalContext.current
     val (icon, accentColor) = getAlertIconAndColor(config.type)
 
+
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(cardShape(position)), // Explicit clip for animation performance
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         shape = cardShape(position),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        color = if (config.enabled) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+        tonalElevation = if (config.enabled) 6.dp else 1.dp,
+        shadowElevation = if (config.enabled) 2.dp else 0.dp
     ) {
         Column {
             // Main row (always visible) - minimum 72dp touch target
@@ -363,21 +432,16 @@ private fun AlertCard(
 
                 Spacer(Modifier.width(8.dp))
 
-                // Expand indicator
-                IconButton(
-                    onClick = onExpand,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                // Chevron Indicator (Before Switch)
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 Spacer(Modifier.width(16.dp))
 
-                // Enable/Disable switch with proper touch target
+                // Enable/Disable switch
                 StyledSwitch(
                     checked = config.enabled,
                     onCheckedChange = onToggle
@@ -433,14 +497,14 @@ private fun AlertSettingsExpanded(
         FilledTonalButton(
             onClick = onTest,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(12.dp)
+            contentPadding = PaddingValues(8.dp)
         ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text("Test Alert")
         }
 
-        HorizontalDivider()
+//        HorizontalDivider()
 
         // === Triggers Section ===
         // Threshold
@@ -482,7 +546,7 @@ private fun AlertSettingsExpanded(
             }
         }
 
-        HorizontalDivider()
+//        HorizontalDivider()
 
 //         === Feedback Section ===
 //        Text(
@@ -491,6 +555,41 @@ private fun AlertSettingsExpanded(
 //            color = MaterialTheme.colorScheme.primary
 //        )
 
+        // 3. Feedback Modes (Sound, Vibration, Flash)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Modes")
+
+            // New Multi-Select Connected Button Group
+            val modes = listOf("Sound", "Vibrate", "Flash")
+            val selectedModes = mutableListOf<String>().apply {
+                if (config.soundEnabled) add("Sound")
+                if (config.vibrationEnabled) add("Vibrate")
+                if (config.flashEnabled) add("Flash")
+            }
+
+            ConnectedButtonGroup(
+                options = modes,
+                selectedOptions = selectedModes,
+                multiSelect = true,
+                onOptionSelected = { mode ->
+                    when(mode) {
+                        "Sound" -> onConfigChange(config.copy(soundEnabled = !config.soundEnabled))
+                        "Vibrate" -> onConfigChange(config.copy(vibrationEnabled = !config.vibrationEnabled))
+                        "Flash" -> onConfigChange(config.copy(flashEnabled = !config.flashEnabled))
+                    }
+                },
+                label = { Text(it) },
+                icon = { mode ->
+                    when(mode) {
+                        "Sound" -> if(selectedModes.contains(mode)) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.VolumeOff
+                        "Vibrate" -> if(selectedModes.contains(mode)) Icons.Default.Vibration else Icons.Default.Smartphone
+                        "Flash" -> if(selectedModes.contains(mode)) Icons.Default.FlashOn else Icons.Default.FlashOff
+                        else -> null
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         // 1. Delivery Style (Notification vs Alarm)
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Alert Style")
@@ -521,55 +620,9 @@ private fun AlertSettingsExpanded(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+        Spacer(Modifier.height(2.dp))
 
-        // 3. Feedback Modes (Sound, Vibration, Flash)
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Modes")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                // Sound
-                FilterChip(
-                    selected = config.soundEnabled,
-                    onClick = { onConfigChange(config.copy(soundEnabled = !config.soundEnabled)) },
-                    label = { Text("Sound") },
-                    leadingIcon = {
-                        Icon(
-                            if (config.soundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.VolumeOff,
-                            null, Modifier.size(18.dp)
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
 
-                // Vibration
-                FilterChip(
-                    selected = config.vibrationEnabled,
-                    onClick = { onConfigChange(config.copy(vibrationEnabled = !config.vibrationEnabled)) },
-                    label = { Text("Vibrate") },
-                    leadingIcon = {
-                         Icon(
-                            if(config.vibrationEnabled) Icons.Default.Vibration else Icons.Default.Smartphone, // Fallback icon
-                            null, Modifier.size(18.dp)
-                        )
-                    }
-                )
-
-                // Flash
-                FilterChip(
-                    selected = config.flashEnabled,
-                    onClick = { onConfigChange(config.copy(flashEnabled = !config.flashEnabled)) },
-                    label = { Text("Flash") },
-                    leadingIcon = {
-                        Icon(
-                            if(config.flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                            null, Modifier.size(18.dp)
-                        )
-                    }
-                )
-            }
-        }
 
         // Sound Selection (Only if Sound is enabled)
         AnimatedVisibility(visible = config.soundEnabled) {
@@ -596,46 +649,39 @@ private fun AlertSettingsExpanded(
             }
         }
         
-        HorizontalDivider()
+//        HorizontalDivider()
         
         // === Advanced / Overrides ===
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Override DND
-            ListItem(
-                headlineContent = { Text("Override Do Not Disturb") },
-                leadingContent = { Icon(Icons.Default.DoNotDisturb, null) },
-                trailingContent = {
-                    Switch(
-                        checked = config.overrideDND,
-                        onCheckedChange = { onConfigChange(config.copy(overrideDND = it)) }
-                    )
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
+            // Override DND - Clean Settings Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+//                    .padding(vertical = 4.dp), // Minimal padding
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.DoNotDisturb,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    "Override Do Not Disturb",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                StyledSwitch(
+                    checked = config.overrideDND,
+                    onCheckedChange = { onConfigChange(config.copy(overrideDND = it)) }
+                )
+            }
             
-            // Snooze time
-             ListItem(
-                headlineContent = { Text("Default Snooze") },
-                supportingContent = { Text("${config.defaultSnoozeMinutes} min") },
-                leadingContent = { Icon(Icons.Default.Snooze, null) },
-                trailingContent = {
-                    // Simple stepper or reused slider? Let's use a mini slider or just buttons in a row for common values
-                    // For now, keep it simple, maybe just a click to open dialog? 
-                    // Let's stick to the slider inside the item for now to avoid complexity
-                },
-                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-            // Inline slider for snooze
-            DurationSlider(
-                label = "",
-                value = config.defaultSnoozeMinutes,
-                range = 5..120,
-                stepSize = 5,
-                onValueChange = { onConfigChange(config.copy(defaultSnoozeMinutes = it)) }
-            )
-        }
 
-        HorizontalDivider()
+//        HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
 
         // === Time & Retry (Collapsible or just standard) ===
         // Keeping as standard composables for now
@@ -647,6 +693,7 @@ private fun AlertSettingsExpanded(
             onStartChange = { onConfigChange(config.copy(activeStartHour = it)) },
             onEndChange = { onConfigChange(config.copy(activeEndHour = it)) }
         )
+            Spacer(Modifier.height(8.dp))
 
         RetrySettings(
             enabled = config.retryEnabled,
@@ -656,6 +703,18 @@ private fun AlertSettingsExpanded(
             onIntervalChange = { onConfigChange(config.copy(retryIntervalMinutes = it)) },
             onCountChange = { onConfigChange(config.copy(retryCount = it)) }
         )
+            Spacer(Modifier.height(16.dp))
+
+            // Snooze time - Direct Slider (Removed redundant ListItem)
+            DurationSlider(
+                label = "Default Snooze", // Capitalize for consistency
+                value = config.defaultSnoozeMinutes,
+                range = 5..60,
+                stepSize = 5,
+                onValueChange = { onConfigChange(config.copy(defaultSnoozeMinutes = it)) }
+            )
+        }
+
     }
 }
 
@@ -714,7 +773,7 @@ private fun ThresholdSlider(
  * Duration slider with snapping to useful values (every 5 mins).
  */
 @Composable
-private fun DurationSlider(
+internal fun DurationSlider(
     label: String,
     value: Int,
     range: IntRange,
@@ -1000,8 +1059,9 @@ private fun PreemptiveSnoozeDialog(
 }
 
 // === NEW: Time Range Settings ===
+// === NEW: Time Range Settings ===
 @Composable
-private fun TimeRangeSettings(
+internal fun TimeRangeSettings(
     enabled: Boolean,
     startHour: Int?,
     endHour: Int?,
@@ -1018,18 +1078,20 @@ private fun TimeRangeSettings(
                 Icons.Default.Schedule,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+//                modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(16.dp))
             Text(
                 "Active time range",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface
             )
             StyledSwitch(
                 checked = enabled,
                 onCheckedChange = onEnabledChange
             )
+
         }
         
         AnimatedVisibility(
@@ -1054,7 +1116,6 @@ private fun TimeRangeSettings(
                         onValueChange = onEndChange
                     )
                 }
-                Spacer(Modifier.height(4.dp))
                 Text(
                     text = formatTimeRange(startHour ?: 22, endHour ?: 8),
                     style = MaterialTheme.typography.labelSmall,
@@ -1066,7 +1127,7 @@ private fun TimeRangeSettings(
 }
 
 @Composable
-private fun HourPicker(
+internal fun HourPicker(
     value: Int,
     onValueChange: (Int) -> Unit
 ) {
@@ -1110,7 +1171,7 @@ private fun HourPicker(
     }
 }
 
-private fun formatTimeRange(start: Int, end: Int): String {
+internal fun formatTimeRange(start: Int, end: Int): String {
     val startStr = String.format("%02d:00", start)
     val endStr = String.format("%02d:00", end)
     return if (start > end) {
@@ -1123,7 +1184,7 @@ private fun formatTimeRange(start: Int, end: Int): String {
 // === NEW: Retry Settings ===
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RetrySettings(
+internal fun RetrySettings(
     enabled: Boolean,
     intervalMinutes: Int,
     retryCount: Int,
@@ -1140,19 +1201,20 @@ private fun RetrySettings(
                 Icons.Default.Refresh,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+//                modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Retry if no reaction",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    "Re-alert if not dismissed",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+//                Text(
+//                    "Re-alert if not dismissed",
+//                    style = MaterialTheme.typography.labelSmall,
+//                    color = MaterialTheme.colorScheme.onSurfaceVariant
+//                )
             }
             StyledSwitch(
                 checked = enabled,
@@ -1243,7 +1305,7 @@ private fun getThresholdRange(type: AlertType, isMmol: Boolean): ClosedFloatingP
 
 
 @Composable
-private fun SoundSelector(
+internal fun SoundSelector(
     currentUri: String?,
     onSoundClick: () -> Unit
 ) {

@@ -29,6 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +81,19 @@ fun ExpressiveSettingsScreen(
     val isMmol = unit == "mmol/L"
     val patchedLibreEnabled by viewModel.patchedLibreBroadcastEnabled.collectAsState()
     val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsState()
+    val alertsSummary by viewModel.alertsSummary.collectAsState()
+    
+    // Auto-refresh data when screen becomes active (e.g. returning from Alerts screen)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshData()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val hasLowAlarm by viewModel.hasLowAlarm.collectAsState()
     val lowAlarmValue by viewModel.lowAlarmThreshold.collectAsState()
@@ -133,11 +149,14 @@ fun ExpressiveSettingsScreen(
 //        item(key = "general_label") { SectionLabel(stringResource(R.string.general_settings), topPadding = 0.dp) }
 
         item(key = "general_group") {
+            // Theme: Primary (Core)
+            val generalColor = MaterialTheme.colorScheme.primary
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsItem(
                     title = stringResource(R.string.unit),
                     subtitle = unit,
                     icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.List,
+                    iconTint = generalColor,
                     position = CardPosition.TOP,
                     onClick = { showUnitDialog = true }
                 )
@@ -145,6 +164,7 @@ fun ExpressiveSettingsScreen(
                     title = stringResource(R.string.theme_title),
                     subtitle = themeLabel,
                     icon = if(themeMode == ThemeMode.LIGHT) Icons.Default.LightMode else Icons.Default.DarkMode,
+                    iconTint = generalColor,
                     position = CardPosition.MIDDLE,
                     onClick = { showThemeDialog = true }
                 )
@@ -153,6 +173,7 @@ fun ExpressiveSettingsScreen(
                     title = stringResource(R.string.languagename),
                     subtitle = currentLangName,
                     icon = Icons.Default.Language,
+                    iconTint = generalColor,
                     position = CardPosition.BOTTOM,
                     onClick = { showLanguageDialog = true }
                 )
@@ -163,12 +184,15 @@ fun ExpressiveSettingsScreen(
         item(key = "notif_label") { SectionLabel(stringResource(R.string.notifications)) }
 
         item(key = "notif_group") {
+            // Theme: Secondary (Accent)
+            val notifColor = MaterialTheme.colorScheme.secondary
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
 
                 SettingsItem(
                     title = "Notification Settings",
                     subtitle = "Customize notification shade",
                     icon = Icons.Default.ClearAll,
+                    iconTint = notifColor,
                     position = CardPosition.TOP,
                     onClick = { showNotificationSettingsSheet = true }
                 )
@@ -176,20 +200,15 @@ fun ExpressiveSettingsScreen(
                     title = "Lock Screen (AOD)",
                     subtitle = "Customize always-on display",
                     icon = Icons.Default.Visibility,
+                    iconTint = notifColor,
                     position = CardPosition.MIDDLE,
                     onClick = { showAODSettingsSheet = true }
                 )
                 SettingsItem(
                     title = stringResource(R.string.glucose_alerts_title),
-                    subtitle = "Low/High, predictive and others",
-//                    subtitle = buildString {
-//                        val alertsEnabled = mutableListOf<String>()
-//                        if (hasLowAlarm) alertsEnabled.add("Low")
-//                        if (hasHighAlarm) alertsEnabled.add("High")
-//                        if (alertsEnabled.isEmpty()) "No alerts enabled"
-//                        else "${alertsEnabled.joinToString(", ")} alerts enabled"
-//                    },
+                    subtitle = alertsSummary,
                     icon = Icons.Default.AddAlert,
+                    iconTint = MaterialTheme.colorScheme.error, // Semantic Red for Alerts
                     showArrow = true,
                     position = CardPosition.BOTTOM,
                     onClick = { navController.navigate("settings/alerts") }
@@ -207,12 +226,15 @@ fun ExpressiveSettingsScreen(
         item(key = "exchange_label") { SectionLabel(stringResource(R.string.exchanges)) }
 
         item(key = "exchange_group") {
+            // Theme: Tertiary (Apps/Services)
+            val exchangeColor = MaterialTheme.colorScheme.tertiary
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsSwitchItem(
                     title = stringResource(R.string.xdripbroadcast),
                     subtitle = stringResource(R.string.patchedlibrebroadcast),
                     checked = patchedLibreEnabled,
-                    icon = Icons.Default.Share, // Using Share icon as placeholder for Broadcast
+                    icon = Icons.Default.Share, 
+                    iconTint = exchangeColor,
                     position = CardPosition.TOP,
                     onCheckedChange = { viewModel.togglePatchedLibreBroadcast(it) }
                 )
@@ -221,6 +243,7 @@ fun ExpressiveSettingsScreen(
                     subtitle = stringResource(R.string.mirror_desc),
                     showArrow = true,
                     icon = Icons.Default.Devices,
+                    iconTint = exchangeColor,
                     position = CardPosition.MIDDLE,
                     onClick = { navController.navigate("settings/mirror") }
                 )
@@ -229,6 +252,7 @@ fun ExpressiveSettingsScreen(
                     subtitle = stringResource(R.string.nightscout_desc),
                     showArrow = true,
                     icon = Icons.Default.CloudUpload,
+                    iconTint = exchangeColor,
                     position = CardPosition.BOTTOM,
                     onClick = { navController.navigate("settings/nightscout") }
                 )
@@ -266,12 +290,15 @@ fun ExpressiveSettingsScreen(
         item(key = "adv_label") { SectionLabel(stringResource(R.string.advanced_title)) }
 
         item(key = "adv_group") {
+            // Theme: OnSurfaceVariant (Technical/Neutral)
+            val advColor = MaterialTheme.colorScheme.onSurfaceVariant
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsSwitchItem(
                     title = stringResource(R.string.googlescan),
                     subtitle = stringResource(R.string.google_scan_desc),
                     checked = googleScan,
                     icon = Icons.AutoMirrored.Filled.BluetoothSearching,
+                    iconTint = advColor,
                     position = CardPosition.TOP,
                     onCheckedChange = { Natives.setGoogleScan(it); googleScan = it }
                 )
@@ -280,6 +307,7 @@ fun ExpressiveSettingsScreen(
                     subtitle = stringResource(R.string.turbo_desc),
                     checked = turbo,
                     icon = Icons.Default.Speed,
+                    iconTint = advColor,
                     position = CardPosition.MIDDLE,
                     onCheckedChange = { Natives.setpriority(it); turbo = it }
                 )
@@ -288,6 +316,7 @@ fun ExpressiveSettingsScreen(
                     subtitle = stringResource(R.string.autoconnect_desc),
                     checked = autoConnect,
                     icon = Icons.Default.Autorenew,
+                    iconTint = advColor,
                     position = CardPosition.MIDDLE,
                     onCheckedChange = { SensorBluetooth.setAutoconnect(it); autoConnect = it }
                 )
@@ -296,6 +325,7 @@ fun ExpressiveSettingsScreen(
                     subtitle = stringResource(R.string.debug_logs_desc),
                     showArrow = true,
                     icon = Icons.Default.BugReport,
+                    iconTint = advColor,
                     position = CardPosition.BOTTOM,
                     onClick = { navController.navigate("settings/debug") }
                 )
@@ -306,11 +336,14 @@ fun ExpressiveSettingsScreen(
         item(key = "data_label") { SectionLabel(stringResource(R.string.data_management)) }
 
         item(key = "data_group") {
+            // Theme: Secondary (Files match notifications/system)
+            val dataColor = MaterialTheme.colorScheme.secondary
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsItem(
                     title = stringResource(R.string.export_data),
                     subtitle = stringResource(R.string.export_data_desc),
                     icon = androidx.compose.material.icons.Icons.Default.CloudUpload,
+                    iconTint = dataColor,
                     position = CardPosition.TOP,
                     onClick = { showExportDialog = true }
                 )
@@ -340,6 +373,7 @@ fun ExpressiveSettingsScreen(
                     title = stringResource(R.string.import_data),
                     subtitle = stringResource(R.string.import_data_desc),
                     icon = Icons.Default.FolderOpen,
+                    iconTint = dataColor,
                     position = CardPosition.BOTTOM,
                     onClick = { 
                         importLauncher.launch(arrayOf("text/*", "text/csv"))
@@ -881,8 +915,9 @@ fun SettingsItem(
     showArrow: Boolean = false,
     onClick: (() -> Unit)? = null,
     icon: ImageVector? = null,
+    iconTint: Color? = null, // Added tint
     trailingContent: (@Composable () -> Unit)? = null,
-    position: CardPosition = CardPosition.SINGLE, // Added position
+    position: CardPosition = CardPosition.SINGLE, 
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -899,12 +934,27 @@ fun SettingsItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 16.dp).size(24.dp)
-                )
+                val tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant
+                // If tint is present, use tonal background. Else match surface.
+                val background = if(iconTint != null) iconTint.copy(alpha = 0.12f) else Color.Transparent
+
+                Surface(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .padding(end = 0.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = background
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                         Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
             }
 
             Column(modifier = Modifier.weight(1f)) {
@@ -938,12 +988,14 @@ fun SettingsSwitchItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     icon: ImageVector? = null,
+    iconTint: Color? = null,
     position: CardPosition = CardPosition.SINGLE
 ) {
     SettingsItem(
         title = title,
         subtitle = subtitle,
         icon = icon,
+        iconTint = iconTint,
         onClick = { onCheckedChange(!checked) },
         trailingContent = {
             StyledSwitch(
@@ -1085,12 +1137,20 @@ fun DangerItem(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                icon,
-                null,
-                tint = contentColor,
-                modifier = Modifier.padding(end = 16.dp).size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .padding(end = 0.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    null,
+                    tint = contentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = contentColor)
                 Text(subtitle, style = MaterialTheme.typography.labelMedium, color = contentColor.copy(alpha = 0.7f))

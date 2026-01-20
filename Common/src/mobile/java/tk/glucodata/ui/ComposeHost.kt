@@ -592,12 +592,12 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 Spacer(modifier = Modifier.weight(1f))
             }
 
-            // Content Area
+            // Content Area -- LANDSCAPE
             Scaffold(contentWindowInsets = WindowInsets(0.dp)) { innerPadding ->
                 NavHost(
                     navController = navController,
                     startDestination = "dashboard",
-                    modifier = Modifier.padding(innerPadding)
+                    modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
                 ) {
                     composable("dashboard") { 
                         DashboardScreen(
@@ -664,11 +664,12 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     }
                 }
             }
+
         ) { innerPadding ->
             NavHost(
                 navController = navController,
                 startDestination = "dashboard",
-                modifier = Modifier.padding(innerPadding),
+                modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
                 // Use a fast fade (200ms) for a snappy feel that isn't jarring
                 enterTransition = { fadeIn(animationSpec = tween(200)) },
                 exitTransition = { fadeOut(animationSpec = tween(200)) },
