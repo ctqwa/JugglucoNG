@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Info
@@ -163,10 +164,11 @@ fun ExpressiveSettingsScreen(
 
         item(key = "notif_group") {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+
                 SettingsItem(
                     title = "Notification Settings",
                     subtitle = "Customize notification shade",
-                    icon = Icons.Default.Notifications,
+                    icon = Icons.Default.ClearAll,
                     position = CardPosition.TOP,
                     onClick = { showNotificationSettingsSheet = true }
                 )
@@ -174,12 +176,33 @@ fun ExpressiveSettingsScreen(
                     title = "Lock Screen (AOD)",
                     subtitle = "Customize always-on display",
                     icon = Icons.Default.Visibility,
-                    position = CardPosition.BOTTOM, 
+                    position = CardPosition.MIDDLE,
                     onClick = { showAODSettingsSheet = true }
+                )
+                SettingsItem(
+                    title = stringResource(R.string.glucose_alerts_title),
+                    subtitle = "Low/High, predictive and others",
+//                    subtitle = buildString {
+//                        val alertsEnabled = mutableListOf<String>()
+//                        if (hasLowAlarm) alertsEnabled.add("Low")
+//                        if (hasHighAlarm) alertsEnabled.add("High")
+//                        if (alertsEnabled.isEmpty()) "No alerts enabled"
+//                        else "${alertsEnabled.joinToString(", ")} alerts enabled"
+//                    },
+                    icon = Icons.Default.AddAlert,
+                    showArrow = true,
+                    position = CardPosition.BOTTOM,
+                    onClick = { navController.navigate("settings/alerts") }
                 )
             }
         }
+        // === ALERTS ===
 
+        item(key = "alerts_group") {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+
+            }
+        }
         // === EXCHANGES ===
         item(key = "exchange_label") { SectionLabel(stringResource(R.string.exchanges)) }
 
@@ -212,37 +235,8 @@ fun ExpressiveSettingsScreen(
             }
         }
 
-        // === ALERTS ===
-        item(key = "alerts_label") { SectionLabel(stringResource(R.string.glucose_alerts_title)) }
 
-        item(key = "alerts_group") {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                AlarmItem(
-                    title = stringResource(R.string.lowglucosealarm),
-                    enabled = hasLowAlarm,
-                    value = lowAlarmValue,
-                    unit = unit,
-                    range = if (isMmol) 2.0f..6.0f else 36f..108f,
-                    soundMode = lowAlarmSoundMode,
-                    position = CardPosition.TOP,
-                    onToggle = { viewModel.setLowAlarm(it, lowAlarmValue) },
-                    onValueChange = { viewModel.setLowAlarm(true, it) },
-                    onSoundChange = { viewModel.setAlarmSound(0, it) }
-                )
-                AlarmItem(
-                    title = stringResource(R.string.highglucosealarm),
-                    enabled = hasHighAlarm,
-                    value = highAlarmValue,
-                    unit = unit,
-                    range = if (isMmol) 6.0f..25.0f else 108f..450f,
-                    soundMode = highAlarmSoundMode,
-                    position = CardPosition.BOTTOM,
-                    onToggle = { viewModel.setHighAlarm(it, highAlarmValue) },
-                    onValueChange = { viewModel.setHighAlarm(true, it) },
-                    onSoundChange = { viewModel.setAlarmSound(1, it) }
-                )
-            }
-        }
+
 
         // === TARGETS ===
         item(key = "targets_label") { SectionLabel(stringResource(R.string.target_range_title)) }
@@ -277,7 +271,7 @@ fun ExpressiveSettingsScreen(
                     title = stringResource(R.string.googlescan),
                     subtitle = stringResource(R.string.google_scan_desc),
                     checked = googleScan,
-                    icon = Icons.Default.BluetoothSearching,
+                    icon = Icons.AutoMirrored.Filled.BluetoothSearching,
                     position = CardPosition.TOP,
                     onCheckedChange = { Natives.setGoogleScan(it); googleScan = it }
                 )

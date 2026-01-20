@@ -616,6 +616,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                         MirrorEditScreen(navController, pos)
                     }
                     composable("settings/debug") { DebugSettingsScreen(navController) }
+                    composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                     composable("calibrations") { 
                         val isMmol = dashboardViewModel.unit.value.contains("mmol", ignoreCase = true)
                         val viewMode by dashboardViewModel.viewMode.collectAsState()
@@ -690,6 +691,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     MirrorEditScreen(navController, pos)
                 }
                 composable("settings/debug") { DebugSettingsScreen(navController) }
+                composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                 composable("calibrations") { 
                     val isMmol = dashboardViewModel.unit.value.contains("mmol", ignoreCase = true)
                     val viewMode by dashboardViewModel.viewMode.collectAsState()

@@ -1509,7 +1509,36 @@ public class Natives {
         public static native void setTurnPort(int pos, int port);
 
         public static native int TurnServerNR();
+
         // s/^[ ]*extern.*JNIEXPORT[ ]*\([a-zA-Z]*\)[ ]*JNICALL[ ]*fromjava(\([^)]*\))
         // *(JNIEnv[^,]*,[^,)]*[,)]\([^){]*\)[^a-zA-Z0-9]*$/public static native \1
         // \2(\3);/g
+        /**
+         * Unified wrapper to update alerts without touching C++ layer.
+         * Maps generic type/threshold/enabled to the complex legacy native calls.
+         */
+        static public void setAlertConfig(int type, float threshold, boolean enabled) {
+                if (type <= 4) { // Legacy: Low(0), High(1), Available(2), Amount(3), Loss(4)
+                        float low = (type == 0) ? threshold : alarmlow();
+                        float high = (type == 1) ? threshold : alarmhigh();
+                        boolean lowEnabled = (type == 0) ? enabled : hasalarmlow();
+                        boolean highEnabled = (type == 1) ? enabled : hasalarmhigh();
+                        boolean availableEnabled = (type == 2) ? enabled : hasvaluealarm();
+                        boolean lossEnabled = (type == 4) ? enabled : hasalarmloss();
+
+                        setalarms(low, high, lowEnabled, highEnabled, availableEnabled, lossEnabled);
+                } else if (type <= 8) { // Advanced: VeryLow(5), VeryHigh(6), PreLow(7), PreHigh(8)
+                        float veryLow = (type == 5) ? threshold : alarmverylow();
+                        float veryHigh = (type == 6) ? threshold : alarmveryhigh();
+                        boolean veryLowEnabled = (type == 5) ? enabled : hasalarmverylow();
+                        boolean veryHighEnabled = (type == 6) ? enabled : hasalarmveryhigh();
+                        boolean preLowEnabled = (type == 7) ? enabled : hasalarmprelow();
+                        boolean preHighEnabled = (type == 8) ? enabled : hasalarmprehigh();
+                        float preLow = (type == 7) ? threshold : alarmprelow();
+                        float preHigh = (type == 8) ? threshold : alarmprehigh();
+
+                        setAdvancedAlarms(veryLow, veryHigh, veryLowEnabled, veryHighEnabled, preLowEnabled,
+                                        preHighEnabled, preLow, preHigh);
+                }
+        }
 }

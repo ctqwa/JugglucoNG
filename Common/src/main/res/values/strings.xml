@@ -470,12 +470,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="google_scan_desc">Use Google Play Services for QR scanning</string>
     <string name="mirror_desc">Share/Receive data via Internet/Home Net</string>
     <string name="nightscout_desc">Upload to Nightscout</string>
-    <string name="glucose_alerts_title">Blood Glucose Alerts</string>
+    <string name="glucose_alerts_title">Glucose Alerts and Alarms</string>
     <string name="target_range_title">Target Glucose Range</string>
     <string name="select_unit">Select Unit</string>
     <string name="select_theme">Select Theme</string>
     <string name="select_language">Select Language</string>
     <string name="system_default">System Default</string>
+    <string name="scanner_label">Scanner</string>
 
     <!-- Debug Settings Strings -->
     <string name="debug_logs_title">Debug Logs</string>
@@ -640,7 +641,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="delete_confirm">Delete</string>
 
     <string name="general_settings">General Settings</string>
-    <string name="notifications">Notifications</string>
+    <string name="notifications">Alerts and notifications</string>
 
     <!-- Expressive Settings Strings -->
     <string name="data_management">Data Management</string>
@@ -675,6 +676,20 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="alert_mode">Alert Mode</string>
     <string name="sound_vibrate">Sound &amp; Vibrate</string>
     <string name="vibrate_only">Vibrate</string>
+
+    <!-- Alert Types (Clean, no 'Glucose' suffix) -->
+    <string name="alert_low">Low</string>
+    <string name="alert_high">High</string>
+    <string name="alert_very_low">Very Low</string>
+    <string name="alert_very_high">Very High</string>
+    <string name="alert_forecast_low">Forecast Low</string>
+    <string name="alert_forecast_high">Forecast High</string>
+    <string name="alert_loss">Signal Loss</string>
+    <string name="alert_missed_reading">Missed Reading</string>
+    <string name="alert_persistent_high">Persistent High</string>
+    <string name="alert_sensor_expiry">Sensor Expiry</string>
+    <string name="alert_value_available">Value Available</string>
+    <string name="alert_amount">Amount Alert</string>
 
     <!-- Hardcoded Strings Extracted -->
     <string name="import_history">Import History</string>

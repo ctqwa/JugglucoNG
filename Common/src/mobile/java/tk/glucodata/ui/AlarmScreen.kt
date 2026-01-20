@@ -20,9 +20,8 @@ import tk.glucodata.R
 
 @Composable
 fun AlarmScreen(
-    glucoseValue: String,
-    glucoseUnit: String,
-    arrow: String,
+    glucoseBitmap: androidx.compose.ui.graphics.ImageBitmap,
+    arrowBitmap: androidx.compose.ui.graphics.ImageBitmap?,
     alarmType: String, // "LOW", "HIGH", "URGENT", etc.
     message: String,
     onSnooze: () -> Unit,
@@ -53,52 +52,67 @@ fun AlarmScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        // Glucose Value & Arrow Container
+        // Content Container
         Column(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // 1. Fullscreen Alert Label (Dominant)
+            // Using IBM Plex Sans Light (300)
+            val ibmPlexSansFamily = androidx.compose.ui.text.font.FontFamily(
+                androidx.compose.ui.text.font.Font(R.font.ibm_plex_sans_var, androidx.compose.ui.text.font.FontWeight.Light)
+            )
+
+            // Auto-sizing text or just very large text
             Text(
                 text = message.uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = accentColor.copy(alpha = 0.9f),
-                letterSpacing = 2.sp
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 80.sp, // Massive
+                    fontWeight = FontWeight.Light,
+                    fontFamily = ibmPlexSansFamily,
+                    letterSpacing = 12.sp, // Wide spacing for uppercase
+                    lineHeight = 90.sp // Proper line spacing
+                ),
+                color = accentColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
 
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // 2. Secondary Data (Glucose + Arrow) - Standard Size (Restored)
             Row(
-                verticalAlignment = Alignment.Bottom,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = glucoseValue,
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 120.sp,
-                        letterSpacing = (-2).sp
-                    ),
-                    color = Color.White
-                )
-                if (arrow.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = arrow,
-                        style = MaterialTheme.typography.displayMedium.copy(fontSize = 60.sp),
-                        color = accentColor,
-                        modifier = Modifier.padding(bottom = 24.dp)
+                 // Glucose Value (Restored to 140dp)
+                 androidx.compose.foundation.Image(
+                     bitmap = glucoseBitmap,
+                     contentDescription = "Glucose Value",
+                     modifier = Modifier.height(140.dp), 
+                     contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                 )
+
+                if (arrowBitmap != null) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                    androidx.compose.foundation.Image(
+                        bitmap = arrowBitmap,
+                        contentDescription = "Trend Arrow",
+                        modifier = Modifier.height(80.dp), // Restored to 80dp
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
                     )
                 }
             }
-            Text(
-                text = glucoseUnit,
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White.copy(alpha = 0.5f)
-            )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        // Actions
+        // Spacer(modifier = Modifier.weight(1f)) // Removed to let Box fill space
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Actions
         Row(

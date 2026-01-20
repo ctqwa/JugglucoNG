@@ -9,6 +9,8 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import tk.glucodata.Notify
 import tk.glucodata.Natives
 import tk.glucodata.Applic
@@ -21,28 +23,59 @@ class AlarmActivity : ComponentActivity() {
         turnScreenOnAndKeyguard()
 
         val intent = intent
-        val glucoseValExtra = intent.getStringExtra("EXTRA_GLUCOSE_VAL") ?: "---"
-        val glucoseUnit = intent.getStringExtra("EXTRA_GLUCOSE_UNIT") ?: if(Applic.unit == 1) "mmol/L" else "mg/dL"
+        // Force comma separator for display (User Request)
+        // Parse float value first for color (needs dot)
+        val rawValue = intent.getStringExtra("EXTRA_GLUCOSE_VAL") ?: "---"
+        
+        // Ensure rate is passed correctly
         val rate = intent.getFloatExtra("EXTRA_RATE", Float.NaN)
         val alarmType = intent.getStringExtra("EXTRA_ALARM_TYPE") ?: "ALARM"
         
-        // Parse Glucose Value and Message separately if stuck together
-        val (parsedValue, parsedMessage) = parseGlucoseString(glucoseValExtra, glucoseUnit)
+        // Parse Glucose Value and Message
+        // Parse Glucose Value and Message
+        val (parsedValueRaw, parsedMessage) = parseGlucoseString(rawValue, "")
+        
+        // Force comma for display
+        val parsedValue = parsedValueRaw.replace(".", ",")
 
-        // Arrow Logic
-        val arrow = if (!rate.isNaN()) {
-             getArrow(rate)
+        val isMmol = Applic.unit == 1
+        // Parse float value for Color determination
+        val floatValue = try {
+            // Take only the first part before any slash (in case of "3,9 / 2,7")
+            val firstPart = parsedValue.split("/")[0].trim()
+            firstPart.replace(",", ".").toFloat()
+        } catch (e: Exception) { 0f }
+        
+        val glucoseColor = tk.glucodata.NotificationChartDrawer.getGlucoseColor(this, floatValue, isMmol)
+        
+        // Use the Drawer to get the exact font/look
+        val glucoseBitmap = tk.glucodata.NotificationChartDrawer.drawGlucoseText(
+            this,
+            parsedValue,
+            glucoseColor,
+            4.0f, // Reduced Scale (Secondary Focus)
+            300 // Light weight
+        ).asImageBitmap()
+
+        // 2. Generate Arrow Bitmap (REUSING Notification Logic)
+        val arrowBitmap = if (!rate.isNaN()) {
+             // Use the Drawer check for arrow
+             tk.glucodata.NotificationChartDrawer.drawArrow(
+                 this,
+                 rate, 
+                 isMmol, 
+                 glucoseColor,
+                 3.0f // Standard Scale
+             )?.asImageBitmap()
         } else {
-             intent.getStringExtra("EXTRA_ARROW") ?: ""
+             null
         }
 
         setContent {
             MaterialTheme {
-                // Force Dark Mode feel (or actually use Dark Theme if app supports it, currently using hardcoded dark variants in screen)
                 AlarmScreen(
-                    glucoseValue = parsedValue,
-                    glucoseUnit = glucoseUnit,
-                    arrow = arrow,
+                    glucoseBitmap = glucoseBitmap,
+                    arrowBitmap = arrowBitmap,
                     alarmType = alarmType,
                     message = parsedMessage,
                     onSnooze = {
@@ -59,20 +92,44 @@ class AlarmActivity : ComponentActivity() {
     }
     
     private fun parseGlucoseString(input: String, unit: String): Pair<String, String> {
-        // Input might be "2.8 mmol/L Low Glucose!" or "2.8"
-        // Try to extract the number at the start (supports dot or comma)
-        val numberRegex = Regex("^(\\d+([.,]\\d+)?)")
+        // Regex to find value (e.g. "4.1" or "3,9 / 2,7") anywhere
+        // Matches: Num, optional decimals, optional " / " + Num + decimals
+        val numberRegex = Regex("(\\d+([.,]\\d+)?(\\s*[/]\\s*\\d+([.,]\\d+)?)?)")
         val match = numberRegex.find(input)
         
         return if (match != null) {
             val value = match.value
-            // Remove value and unit from message
-            var message = input.substring(match.range.last + 1).trim()
-            message = message.replace(unit, "", ignoreCase = true).trim()
+            
+            // Remove the value from the string to get the message part
+            // e.g. "Forecast Low 4.1 mmol/L" -> "Forecast Low  mmol/L"
+            var message = input.removeRange(match.range)
+            
+            // Remove units
+            val unitsToRemove = listOf(
+                unit, 
+                tk.glucodata.Notify.unitlabel, 
+                "mmol/L", 
+                "mg/dL",
+                "mmol/l",
+                "mg/dl"
+            )
+            
+            for (u in unitsToRemove) {
+                if (!u.isNullOrEmpty()) {
+                    message = message.replace(u, "", ignoreCase = true)
+                }
+            }
+            
+            // Cleanup: "Forecast Low  " -> "Forecast Low"
+            // Also remove any leftover / or dots if they were part of unit separators?
+            // Just trim for now.
+            message = message.replace(Regex("\\s+"), " ").trim()
+            
             value to message
         } else {
-            // Fallback
-            input to ""
+            // Fallback: If no number found, treat whole string as message? 
+            // Or if design requires a number, maybe "---" and whole string as message.
+            "---" to input
         }
     }
 
@@ -92,8 +149,8 @@ class AlarmActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
+            // val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            // keyguardManager.requestDismissKeyguard(this, null)
         } else {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -103,11 +160,11 @@ class AlarmActivity : ComponentActivity() {
     }
 
     companion object {
-        fun createIntent(context: Context, glucoseVal: String, alarmType: String, arrow: String): Intent {
+        fun createIntent(context: Context, glucoseVal: String, alarmType: String, rate: Float): Intent {
             return Intent(context, AlarmActivity::class.java).apply {
                 putExtra("EXTRA_GLUCOSE_VAL", glucoseVal)
                 putExtra("EXTRA_ALARM_TYPE", alarmType)
-                  putExtra("EXTRA_ARROW", arrow)
+                putExtra("EXTRA_RATE", rate)
                 // Add flags to clear top/new task if needed
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
