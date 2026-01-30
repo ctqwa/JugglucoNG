@@ -8,6 +8,7 @@ import com.eveningoutpost.dexdrip.services.broadcastservice.models.GraphLine
 import com.eveningoutpost.dexdrip.services.broadcastservice.models.GraphPoint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
 import android.util.Log
 import tk.glucodata.Applic
@@ -93,7 +94,7 @@ class GlucoseRepository {
                 Log.e(TAG, "Error getting last glucose", e)
                 emit(null)
             }
-            delay(15000)
+            delay(3000)
         }
     }
 
@@ -108,8 +109,29 @@ class GlucoseRepository {
         // Ensure backfill is done
         historyRepository.ensureBackfilled()
         
-        // Fetch all history (startTime = 0 means from the beginning)
-        return historyRepository.getHistory(0L, isMmol)
+        // Fetch all history RAW
+        val rawHistory = historyRepository.getHistory(0L)
+        
+        // Convert to display unit
+        return rawHistory.map { p ->
+             val v = if (isMmol) p.value / 18.0182f else p.value
+             val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+             GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+        }
+    }
+
+    /**
+     * Get history since startTime, converting if needed.
+     */
+    suspend fun getHistory(startTime: Long, isMmol: Boolean): List<GlucosePoint> {
+        val raw = historyRepository.getHistory(startTime)
+        return if (isMmol) {
+            raw.map { p ->
+                val v = p.value / 18.0182f
+                val r = p.rawValue / 18.0182f
+                GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+            }
+        } else raw
     }
 
     /**
@@ -117,7 +139,21 @@ class GlucoseRepository {
      * Delegates to HistoryRepository.
      */
     fun getHistoryFlow(startTime: Long = 0L, isMmol: Boolean): Flow<List<GlucosePoint>> {
-        return historyRepository.getHistoryFlow(startTime, isMmol)
+        return historyRepository.getHistoryFlow(startTime).map { list ->
+            list.map { p ->
+                 val v = if (isMmol) p.value / 18.0182f else p.value
+                 val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+                 GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+            }
+        }
+    }
+
+    /**
+     * Get history as a Flow in RAW mg/dL (no conversion).
+     * Delegates to HistoryRepository.
+     */
+    fun getHistoryFlowRaw(startTime: Long = 0L): Flow<List<GlucosePoint>> {
+        return historyRepository.getHistoryFlow(startTime)
     }
 
     /**

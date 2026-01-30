@@ -45,6 +45,9 @@ class DashboardViewModel(
     private val _patchedLibreBroadcastEnabled = MutableStateFlow(false)
     val patchedLibreBroadcastEnabled = _patchedLibreBroadcastEnabled.asStateFlow()
 
+    private val _glucodataBroadcastEnabled = MutableStateFlow(false)
+    val glucodataBroadcastEnabled = _glucodataBroadcastEnabled.asStateFlow()
+
     private val _glucoseHistory = MutableStateFlow<List<tk.glucodata.ui.GlucosePoint>>(emptyList())
     val glucoseHistory = _glucoseHistory.asStateFlow()
 
@@ -137,6 +140,7 @@ class DashboardViewModel(
             _targetHigh.value = Natives.targethigh()
             _xDripBroadcastEnabled.value = Natives.getxbroadcast()
             _patchedLibreBroadcastEnabled.value = Natives.getlibrelinkused()
+            _glucodataBroadcastEnabled.value = Natives.getJugglucobroadcast()
             
             // Alarms - Native getters return values in User Unit
             _hasLowAlarm.value = Natives.hasalarmlow()
@@ -257,8 +261,13 @@ class DashboardViewModel(
                 
                 // First collect: recent data only (instant)
                 var isFirstLoad = true
-                glucoseRepository.getHistoryFlow(oneDayAgo, isMmol).collect { history ->
-                    _glucoseHistory.value = history
+                glucoseRepository.getHistoryFlowRaw(oneDayAgo).collect { rawHistory ->
+                    val converted = rawHistory.map { p ->
+                        val v = if (isMmol) p.value / 18.0182f else p.value
+                        val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+                        tk.glucodata.ui.GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+                    }
+                    _glucoseHistory.value = converted
                     _isLoading.value = false
                     
                     // Stage 2: After first render, switch to full history (background)
@@ -266,8 +275,13 @@ class DashboardViewModel(
                         isFirstLoad = false
                         viewModelScope.launch {
                             // Switch to loading ALL history
-                            glucoseRepository.getHistoryFlow(0L, isMmol).collect { fullHistory ->
-                                _glucoseHistory.value = fullHistory
+                            glucoseRepository.getHistoryFlowRaw(0L).collect { fullHistory ->
+                                val fullConverted = fullHistory.map { p ->
+                                    val v = if (isMmol) p.value / 18.0182f else p.value
+                                    val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+                                    tk.glucodata.ui.GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+                                }
+                                _glucoseHistory.value = fullConverted
                             }
                         }
                     }
@@ -366,6 +380,21 @@ class DashboardViewModel(
         _patchedLibreBroadcastEnabled.value = Natives.getlibrelinkused()
     }
 
+    fun toggleGlucodataBroadcast(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        if (enabled) {
+             val intent = android.content.Intent("glucodata.Minute")
+             val receivers = context.packageManager.queryBroadcastReceivers(intent, 0)
+             val names = receivers.mapNotNull { it.activityInfo?.packageName }.toTypedArray()
+             Natives.setglucodataRecepters(names)
+             tk.glucodata.JugglucoSend.setreceivers()
+        } else {
+             Natives.setglucodataRecepters(emptyArray())
+             tk.glucodata.JugglucoSend.setreceivers()
+        }
+        _glucodataBroadcastEnabled.value = Natives.getJugglucobroadcast()
+    }
+
     fun toggleNotificationChart(enabled: Boolean) {
         val context = tk.glucodata.Applic.app
         val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
@@ -374,5 +403,28 @@ class DashboardViewModel(
         
         // Force update notification to reflect change immediately
         tk.glucodata.Notify.showoldglucose()
+    }
+
+    // Floating Glucose Logic
+    val floatingRepository = tk.glucodata.data.settings.FloatingSettingsRepository(tk.glucodata.Applic.app)
+
+    fun toggleFloatingGlucose(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        floatingRepository.setEnabled(enabled)
+        
+        val intent = android.content.Intent(context, tk.glucodata.service.FloatingGlucoseService::class.java)
+        if (enabled) {
+            // Check permission before starting? Service will likely fail or just not show if no permission.
+            // We assume UI handles permission check.
+           try {
+               context.startService(intent)
+               // Disable native floating to avoid duplication
+               Natives.setfloatglucose(false) 
+           } catch (e: Exception) {
+               android.util.Log.e("DashboardVM", "Failed to start floating service", e)
+           }
+        } else {
+            context.stopService(intent)
+        }
     }
 }

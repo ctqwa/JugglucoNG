@@ -317,17 +317,32 @@ public class Notify {
     public static final String CHANNEL_HIGH = "HIGH";
     public static final String CHANNEL_LOSS = "LOSS";
     // private static final String LOSSALARM = "LossofSensorAlarm";
-    private static final String GLUCOSENOTIFICATION = "glucoseNotification";
+    private static String GLUCOSENOTIFICATION = "glucoseNotification";
 
     private void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+            // Determine Channel ID (Standard)
+            String targetChannelId = "glucoseNotification";
+            GLUCOSENOTIFICATION = targetChannelId;
+
+            try {
+                // Cleanup experiment channels
+                String[] obsolete = { "glucoseNotification_nodot", "glucoseNotification_nobadge" };
+                for (String s : obsolete) {
+                    if (notificationManager.getNotificationChannel(s) != null) {
+                        notificationManager.deleteNotificationChannel(s);
+                    }
+                }
+            } catch (Exception e) {
+            }
+
             String description = context.getString(R.string.numalarm_description);
             int importance = NotificationManager.IMPORTANCE_HIGH;
             NotificationChannel channel = new NotificationChannel(NUMALARM, NUMALARM, importance);
             channel.setSound(null, null);
             channel.setDescription(description);
-            channel.setShowBadge(false);
-            // allowbubbel(channel);
+            channel.setShowBadge(true); // Default behavior
             notificationManager.createNotificationChannel(channel);
 
             description = context.getString(R.string.alarm_description);
@@ -335,16 +350,18 @@ public class Notify {
             channel = new NotificationChannel(GLUCOSEALARM, GLUCOSEALARM, importance);
             channel.setSound(null, null);
             channel.setDescription(description);
-            channel.setShowBadge(false);
-            // allowbubbel(channel);
+            channel.setShowBadge(true);
             notificationManager.createNotificationChannel(channel);
 
             description = context.getString(R.string.notification_description);
-            importance = NotificationManager.IMPORTANCE_HIGH;
+            importance = NotificationManager.IMPORTANCE_HIGH; // Default High
+
+            // Standard Channel
             channel = new NotificationChannel(GLUCOSENOTIFICATION, GLUCOSENOTIFICATION, importance);
-            // allowbubbel(channel);
             channel.setSound(null, null);
             channel.setDescription(description);
+            channel.setShowBadge(true);
+
             notificationManager.createNotificationChannel(channel);
 
             // === NEW CHANNELS (Phase 4) ===
@@ -1560,6 +1577,14 @@ public class Notify {
     }
 
     private void setIcon(Notification.Builder GluNotBuilder, float glvalue, int sensorgen2) {
+        boolean hideIcon = Applic.app.getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+                .getBoolean("notification_hide_status_icon", false);
+
+        if (hideIcon) {
+            GluNotBuilder.setSmallIcon(R.drawable.transparent_icon);
+            return;
+        }
+
         if (makeicon) {
             final var icon = icons.getIcon(getglstring(glvalue, sensorgen2));
             GluNotBuilder.setSmallIcon(icon);
@@ -1845,15 +1870,15 @@ public class Notify {
         try {
             Float.parseFloat(value);
             // If simple number, use PURE formatter
-            valueText = format(usedlocale, pureglucoseformat, glvalue);
+            valueText = format(java.util.Locale.getDefault(), pureglucoseformat, glvalue);
             isSimple = true;
         } catch (NumberFormatException e) {
-            // Complex string already? Just keep it but fix separators
-            valueText = value.replace(" (", " / ").replace(")", "");
+            // Complex string? Skip parsing legacy string.
+            // Format primary value and let logic below reconstruct full string from points
+            // data.
+            valueText = format(java.util.Locale.getDefault(), pureglucoseformat, glvalue);
+            isSimple = true;
         }
-
-        // Force comma separator
-        valueText = valueText.replace(".", ",");
 
         if (isSimple && points != null && !points.isEmpty()) {
             boolean isRawMode = (viewMode == 1 || viewMode == 3);
@@ -1924,21 +1949,21 @@ public class Notify {
                     float terVal = (viewMode == 3) ? autoVal : rawVal;
 
                     if (secVal > 0.1f)
-                        secondary = format(usedlocale, pureglucoseformat, secVal).replace(".", ",");
+                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, secVal);
                     if (terVal > 0.1f)
-                        tertiary = format(usedlocale, pureglucoseformat, terVal).replace(".", ",");
+                        tertiary = format(java.util.Locale.getDefault(), pureglucoseformat, terVal);
                 } else {
                     // 2 Values: Calibrated / Base
                     float baseVal = isRawMode ? rawVal : autoVal;
                     if (baseVal > 0.1f)
-                        secondary = format(usedlocale, pureglucoseformat, baseVal).replace(".", ",");
+                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, baseVal);
                 }
             } else {
                 // No Calibration - Original Logic
                 if (viewMode == 2 || viewMode == 3) {
                     float secVal = (viewMode == 3) ? autoVal : rawVal;
                     if (secVal > 0.1f)
-                        secondary = format(usedlocale, pureglucoseformat, secVal).replace(".", ",");
+                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, secVal);
                 }
             }
 
@@ -2058,7 +2083,7 @@ public class Notify {
         try {
             boolean useRaw = (viewMode == 1 || viewMode == 3);
             tk.glucodata.logic.TrendEngine.TrendResult res = tk.glucodata.logic.TrendEngine.INSTANCE
-                    .calculateTrend(nativePoints, useRaw);
+                    .calculateTrend(nativePoints, useRaw, isMmol);
             rate = res.getVelocity();
         } catch (Throwable t) {
             // keep original rate if fails
@@ -2079,6 +2104,8 @@ public class Notify {
                 .getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE);
 
         float fontSize = prefs.getFloat("notification_font_size", 1.0f);
+        int fontFamily = prefs.getInt("notification_font_family", 0); // 0=App, 1=System
+        boolean useSystemFont = (fontFamily == 1);
         int fontWeight = prefs.getInt("notification_font_weight", 400);
         boolean showArrow = prefs.getBoolean("notification_show_arrow", true);
         float arrowSize = prefs.getFloat("notification_arrow_size", 1.0f);
@@ -2101,14 +2128,11 @@ public class Notify {
         String family = "sans-serif";
         boolean isBold = false;
 
-        // Simplified Mapping based on User Feedback:
-        // Ignore 300/600/700 as requested.
-        // 400 -> google-sans
-        // 500+ -> google-sans-medium
+        // Use standard system font logic
         if (fontWeight >= 500) {
-            family = "google-sans-medium";
+            family = "sans-serif-medium";
         } else {
-            family = "google-sans";
+            family = "sans-serif";
         }
 
         // Apply Font Family
@@ -2167,11 +2191,14 @@ public class Notify {
             styledStatus = ssbStatus;
         }
 
-        // Glucose Value - native TextView with custom font from XML + size from prefs
-        remoteViews.setTextViewText(R.id.notification_glucose, finalText);
-        remoteViews.setTextColor(R.id.notification_glucose, glucoseColor);
-        remoteViews.setTextViewTextSize(R.id.notification_glucose, android.util.TypedValue.COMPLEX_UNIT_SP,
-                24 * fontSize);
+        // Glucose Value - Render as Bitmap to support IBM Plex Font & Locale
+        // consistency
+        // Collapsed: Base size 24sp (scale 1.0 * fontSize)
+        Bitmap valueBitmap = NotificationChartDrawer.drawGlucoseText(Applic.app, valueText.toString(), glucoseColor,
+                fontSize, fontWeight, useSystemFont);
+        remoteViews.setViewVisibility(R.id.notification_glucose, View.GONE);
+        remoteViews.setViewVisibility(R.id.notification_glucose_image, View.VISIBLE);
+        remoteViews.setImageViewBitmap(R.id.notification_glucose_image, valueBitmap);
 
         if (showArrow && arrowBitmap != null) {
             remoteViews.setViewVisibility(R.id.notification_arrow, View.VISIBLE);
@@ -2192,11 +2219,12 @@ public class Notify {
         RemoteViews remoteViewsExpanded = new RemoteViews(Applic.app.getPackageName(),
                 R.layout.notification_material_expanded);
 
-        // Glucose Value - native TextView + size from prefs
-        remoteViewsExpanded.setTextViewText(R.id.notification_glucose, finalText);
-        remoteViewsExpanded.setTextColor(R.id.notification_glucose, glucoseColor);
-        remoteViewsExpanded.setTextViewTextSize(R.id.notification_glucose, android.util.TypedValue.COMPLEX_UNIT_SP,
-                28 * fontSize);
+        // Glucose Value - Expanded: Size 28sp (scale ~1.17 * fontSize)
+        Bitmap valueBitmapExpanded = NotificationChartDrawer.drawGlucoseText(Applic.app, valueText.toString(),
+                glucoseColor, fontSize * 1.166f, fontWeight, useSystemFont);
+        remoteViewsExpanded.setViewVisibility(R.id.notification_glucose, View.GONE);
+        remoteViewsExpanded.setViewVisibility(R.id.notification_glucose_image, View.VISIBLE);
+        remoteViewsExpanded.setImageViewBitmap(R.id.notification_glucose_image, valueBitmapExpanded);
 
         if (showArrow && arrowBitmap != null) {
             remoteViewsExpanded.setViewVisibility(R.id.notification_arrow, View.VISIBLE);
@@ -2217,16 +2245,39 @@ public class Notify {
         Bitmap chartBitmapCollapsed = null;
         Bitmap chartBitmapExpanded = null;
 
+        // Create Safe Context with System Density (Fix for Low DPI/Large Text modes
+        // where Applic.app is stale)
+        Context safeContext = Applic.app;
+        if (showChartCollapsed || showChart) {
+            try {
+                android.util.DisplayMetrics systemDm = android.content.res.Resources.getSystem().getDisplayMetrics();
+                android.content.res.Configuration config = new android.content.res.Configuration(
+                        Applic.app.getResources().getConfiguration());
+                config.densityDpi = (int) (systemDm.density * 160f);
+                safeContext = Applic.app.createConfigurationContext(config);
+            } catch (Throwable t) {
+                // fallback to app context if creation fails
+            }
+        }
+
         if (showChartCollapsed) {
-            // Collapsed chart: Sparkline format (wide - 800x48)
-            chartBitmapCollapsed = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 800, 48, isMmol,
-                    viewMode, showTargetRange, hasCalibration);
+            // Collapsed chart: Limit height to 48dp based on SYSTEM density
+            float density = android.content.res.Resources.getSystem().getDisplayMetrics().density;
+            int collapsedHeight = (int) (48 * density);
+            if (collapsedHeight < 48)
+                collapsedHeight = 48;
+
+            // Use safeContext and explicit height
+            chartBitmapCollapsed = NotificationChartDrawer.drawChart(safeContext, chartPoints, 0, collapsedHeight,
+                    isMmol,
+                    viewMode, showTargetRange, hasCalibration, true);
         }
 
         if (showChart) {
-            // Expanded chart (larger, for expanded notification)
-            chartBitmapExpanded = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 180, isMmol,
-                    viewMode, showTargetRange, hasCalibration);
+            // Expanded chart: Use safely resolved density context (default 0 ->
+            // 256*density)
+            chartBitmapExpanded = NotificationChartDrawer.drawChart(safeContext, chartPoints, 0, 0, isMmol,
+                    viewMode, showTargetRange, hasCalibration, false);
         }
 
         remoteViews.setImageViewBitmap(R.id.notification_chart, chartBitmapCollapsed);
@@ -2302,7 +2353,21 @@ public class Notify {
         // Use Room DB via HistoryRepository for consistent data with chart
         java.util.List<GlucosePoint> chartPoints;
         try {
-            chartPoints = tk.glucodata.data.HistoryRepository.getHistoryForNotification(startT, isMmol);
+            // Get RAW mg/dL
+            java.util.List<GlucosePoint> rawPoints = tk.glucodata.data.HistoryRepository
+                    .getHistoryRawForNotification(startT);
+
+            // Convert to Display Unit if needed (UI Layer Logic)
+            chartPoints = new java.util.ArrayList<>();
+            for (GlucosePoint p : rawPoints) {
+                float val = p.value;
+                float rawVal = p.rawValue;
+                if (isMmol) {
+                    val /= 18.0182f;
+                    rawVal /= 18.0182f;
+                }
+                chartPoints.add(new GlucosePoint(p.timestamp, val, rawVal));
+            }
         } catch (Exception e) {
             chartPoints = new java.util.ArrayList<>();
         }
@@ -2384,15 +2449,36 @@ public class Notify {
         boolean showChart = prefs.getBoolean("notification_chart_enabled", true);
         float fontSize = prefs.getFloat("notification_font_size", 1.0f);
         int fontWeight = prefs.getInt("notification_font_weight", 400);
+        int fontFamily = prefs.getInt("notification_font_family", 0); // 0=App, 1=System
 
         Bitmap chartBitmapCollapsed = null;
         Bitmap chartBitmapExpanded = null;
 
         if (showChart) {
-            chartBitmapCollapsed = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 100, isMmol,
-                    viewMode);
-            chartBitmapExpanded = NotificationChartDrawer.drawChart(Applic.app, chartPoints, 600, 180, isMmol,
-                    viewMode);
+            // Create Safe Context for Startup Notification too
+            Context safeContext = Applic.app;
+            try {
+                android.util.DisplayMetrics systemDm = android.content.res.Resources.getSystem().getDisplayMetrics();
+                android.content.res.Configuration config = new android.content.res.Configuration(
+                        Applic.app.getResources().getConfiguration());
+                config.densityDpi = (int) (systemDm.density * 160f);
+                safeContext = Applic.app.createConfigurationContext(config);
+            } catch (Throwable t) {
+            }
+
+            float density = android.content.res.Resources.getSystem().getDisplayMetrics().density;
+            int collapsedHeight = (int) (48 * density);
+            if (collapsedHeight < 48)
+                collapsedHeight = 48;
+
+            // Collapsed: Compact Mode = TRUE, Height 48dp
+            chartBitmapCollapsed = NotificationChartDrawer.drawChart(safeContext, chartPoints, 0, collapsedHeight,
+                    isMmol,
+                    viewMode, true, false, true);
+
+            // Expanded: Compact Mode = FALSE, Height 256dp (via 0)
+            chartBitmapExpanded = NotificationChartDrawer.drawChart(safeContext, chartPoints, 0, 0, isMmol,
+                    viewMode, true, false, false);
         }
 
         Bitmap arrowBitmap;
@@ -2415,42 +2501,99 @@ public class Notify {
         // Use native TextView for startup value
         RemoteViews remoteViews = new RemoteViews(Applic.app.getPackageName(), R.layout.notification_material);
 
-        // Apply System Font Weight Mapping (Pixel-friendly)
+        // Apply Font Logic
+        // Hoisted variables
         android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder(startupValue);
+        CharSequence finalText = ssb;
         String family = "sans-serif";
         boolean isBold = false;
 
-        // Simplified Mapping based on User Feedback
-        if (fontWeight >= 500) {
-            family = "google-sans-medium";
-        } else {
-            family = "google-sans";
-        }
+        if (fontFamily == 0) { // App Font (IBM Plex) - Render as Bitmap
+            remoteViews.setViewVisibility(R.id.notification_glucose, View.GONE);
+            remoteViews.setViewVisibility(R.id.notification_glucose_image, View.VISIBLE);
 
-        // Apply Font Family
-        ssb.setSpan(new android.text.style.TypefaceSpan(family), 0, ssb.length(),
-                android.text.Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+            try {
+                // Measure text using TextPaint to support Spans
+                android.text.TextPaint textPaint = new android.text.TextPaint();
+                textPaint.setAntiAlias(true);
+                textPaint.setColor(glucoseColor);
+                textPaint.setTextSize(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+                        24 * fontSize, Applic.app.getResources().getDisplayMetrics()));
 
-        // Apply Bold if needed
-        if (isBold) {
-            ssb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, ssb.length(),
+                android.graphics.Typeface tf = androidx.core.content.res.ResourcesCompat.getFont(Applic.app,
+                        R.font.ibm_plex_sans_var);
+                textPaint.setTypeface(tf);
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    textPaint.setFontVariationSettings("'wght' " + fontWeight + ", 'wdth' 100");
+                }
+
+                int desiredWidth = (int) Math.ceil(android.text.Layout.getDesiredWidth(startupValue, textPaint));
+                // Add padding
+                int width = desiredWidth + 4;
+                if (width <= 0)
+                    width = 100;
+
+                // Create StaticLayout
+                // Use deprecated constructor for broad compatibility (or logic check)
+                // For simplicity in this file, standard deprecated constructor works well on
+                // Android.
+                android.text.StaticLayout layout = new android.text.StaticLayout(startupValue, textPaint, width,
+                        android.text.Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+
+                int height = layout.getHeight() + 4;
+                if (height <= 0)
+                    height = 50;
+
+                android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(width, height,
+                        android.graphics.Bitmap.Config.ARGB_8888);
+                android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+
+                // Draw layout
+                canvas.translate(2, 2); // padding
+                layout.draw(canvas);
+
+                remoteViews.setImageViewBitmap(R.id.notification_glucose_image, bmp);
+
+            } catch (Exception e) {
+                // Fallback to text view if bitmap creation fails
+                remoteViews.setViewVisibility(R.id.notification_glucose, View.VISIBLE);
+                remoteViews.setViewVisibility(R.id.notification_glucose_image, View.GONE);
+                remoteViews.setTextViewText(R.id.notification_glucose, startupValue);
+            }
+
+        } else { // System Font (Google Sans / Roboto) - Use TextView
+            remoteViews.setViewVisibility(R.id.notification_glucose, View.VISIBLE);
+            remoteViews.setViewVisibility(R.id.notification_glucose_image, View.GONE);
+
+            remoteViews.setViewVisibility(R.id.notification_glucose_image, View.GONE);
+
+            // ssb already initialized above
+
+            if (fontWeight >= 500) {
+                family = "google-sans-medium";
+            } else {
+                family = "google-sans";
+            }
+            // If system defaults to sans-serif because google-sans missing, it handles it.
+
+            ssb.setSpan(new android.text.style.TypefaceSpan(family), 0, ssb.length(),
                     android.text.Spannable.SPAN_INCLUSIVE_INCLUSIVE);
-        }
 
-        // Apply Relative Size (Scale) based on preference
-        if (fontSize != 1.0f) {
-            ssb.setSpan(new android.text.style.RelativeSizeSpan(fontSize), 0, ssb.length(),
-                    android.text.Spannable.SPAN_INCLUSIVE_INCLUSIVE);
-        }
+            if (fontSize != 1.0f) {
+                ssb.setSpan(new android.text.style.RelativeSizeSpan(fontSize), 0, ssb.length(),
+                        android.text.Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+            }
 
-        CharSequence finalText = ssb;
-        remoteViews.setTextViewText(R.id.notification_glucose, finalText);
-        remoteViews.setTextColor(R.id.notification_glucose, glucoseColor);
-        // Apply size and weight to startup notification too
-        remoteViews.setTextViewTextSize(R.id.notification_glucose, android.util.TypedValue.COMPLEX_UNIT_SP,
-                24 * fontSize);
-        if (android.os.Build.VERSION.SDK_INT >= 31) {
-            remoteViews.setString(R.id.notification_glucose, "setFontVariationSettings", "'wght' " + fontWeight);
+            remoteViews.setTextViewText(R.id.notification_glucose, ssb);
+            remoteViews.setTextColor(R.id.notification_glucose, glucoseColor);
+            remoteViews.setTextViewTextSize(R.id.notification_glucose, android.util.TypedValue.COMPLEX_UNIT_SP,
+                    24 * fontSize);
+
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                remoteViews.setString(R.id.notification_glucose, "setFontVariationSettings", "'wght' " + fontWeight);
+            }
+
+            finalText = ssb;
         }
 
         remoteViews.setImageViewBitmap(R.id.notification_arrow, arrowBitmap);

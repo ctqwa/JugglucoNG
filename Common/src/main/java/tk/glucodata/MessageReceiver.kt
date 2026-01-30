@@ -89,8 +89,7 @@ class MessageReceiver: WearableListenerService() {
                     val node: Node = nodes.elementAt(it)
                     galaxy = isGalaxy(node)
                 }
-                if (name == null)
-                    return
+
 
 
                 if(Natives.setmynetinfo(name, data, galaxy)) {

@@ -761,6 +761,18 @@ public class Applic extends Application {
             libre3init.init();
             SuperGattCallback.initAlarmTalk();
             initialize();
+
+            // Check if FloatingService should be started
+            if (getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+                    .getBoolean("floating_glucose_enabled", false)) {
+                Intent intent = new Intent(this, tk.glucodata.service.FloatingGlucoseService.class);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+            }
+
             NumAlarm.handlealarm(this);
             Maintenance.setMaintenancealarm(this);
             initbroadcasts();

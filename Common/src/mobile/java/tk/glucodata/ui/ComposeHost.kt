@@ -309,9 +309,11 @@ fun getDisplayValues(
     unit: String,
     calibratedValue: Float? = null
 ): DisplayValues {
-    val rawStr = if (point.rawValue < 30) String.format("%.1f", point.rawValue) else point.rawValue.toInt().toString()
-    val valStr = if (point.value < 30) String.format("%.1f", point.value) else point.value.toInt().toString()
-    val calStr = calibratedValue?.let { if (it < 30) String.format("%.1f", it) else it.toInt().toString() }
+    val isMmol = if (unit.isNotEmpty()) tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit) else tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
+    
+    val rawStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.rawValue, isMmol)
+    val valStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.value, isMmol)
+    val calStr = calibratedValue?.let { tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol) }
     
     // If calibration is active, it becomes primary and everything shifts down
     if (calibratedValue != null && calStr != null) {
@@ -618,7 +620,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     composable("settings/debug") { DebugSettingsScreen(navController) }
                     composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                     composable("calibrations") { 
-                        val isMmol = dashboardViewModel.unit.value.contains("mmol", ignoreCase = true)
+                        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
                         val viewMode by dashboardViewModel.viewMode.collectAsState()
                         tk.glucodata.ui.calibration.CalibrationListScreen(
                             navController = navController, 
@@ -694,7 +696,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("settings/debug") { DebugSettingsScreen(navController) }
                 composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                 composable("calibrations") { 
-                    val isMmol = dashboardViewModel.unit.value.contains("mmol", ignoreCase = true)
+                    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
                     val viewMode by dashboardViewModel.viewMode.collectAsState()
                     tk.glucodata.ui.calibration.CalibrationListScreen(
                         navController = navController, 
@@ -731,7 +733,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
             initialValueRaw = initRaw,
             initialTimestamp = initTime,
             glucoseHistory = glucoseHistory.map { tk.glucodata.GlucosePoint(it.timestamp, it.value, it.rawValue) },
-            isMmol = unit.contains("mmol", ignoreCase = true),
+            isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
             viewMode = viewMode,
             onNavigateToHistory = {
                 calibrationSheetState = CalibrationSheetState.Hidden
@@ -918,6 +920,7 @@ fun DashboardScreen(
                             currentDay = currentDay,
                             history = glucoseHistory, // Advanced Trend
                             calibratedValue = calibratedValue,
+                            isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onHeroClick = {
                                 val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
                                 val rawVal = latestPoint?.rawValue ?: autoVal
@@ -998,9 +1001,10 @@ fun DashboardScreen(
                         sensorProgress = sensorProgress,
                         sensorHoursRemaining = sensorHoursRemaining,
                         currentDay = currentDay,
-                        history = glucoseHistory, // Advanced Trend
-                        calibratedValue = calibratedValue,
-                        onHeroClick = {
+                            history = glucoseHistory, // Advanced Trend
+                            calibratedValue = calibratedValue,
+                            isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
+                            onHeroClick = {
                             val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
                             val rawVal = latestPoint?.rawValue ?: autoVal
                             onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
@@ -1011,7 +1015,7 @@ fun DashboardScreen(
                 item {
                     // Portrait Chart: Flexible height
                     DashboardChartSection(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 560.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 560.dp),
                         glucoseHistory = glucoseHistory,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
@@ -1057,7 +1061,7 @@ fun DashboardScreen(
                 item {
                     CalibrationsCard(
                         viewMode = viewMode,
-                        isMmol = unit.contains("mmol", ignoreCase = true),
+                        isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                         onAddCalibration = {
                             val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
                             val rawVal = latestPoint?.rawValue ?: autoVal
@@ -1334,7 +1338,7 @@ fun InteractiveGlucoseChart(
     // "Robust" Expansion: Only expand if > 3 points exceed the range (ignores single spikes).
     // DYNAMIC SCALING: Y-axis adapts to visible data with smooth animations.
 
-    val isMmol = targetHigh <= 12
+    val isMmol = if (unit.isNotEmpty()) tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit) else tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
     val defaultMin = if (isMmol) 1.5f else 27f
     val defaultMax = if (isMmol) 14f else 250f
 
@@ -1923,7 +1927,7 @@ fun InteractiveGlucoseChart(
                         val x = timeToX(point.timestamp)
 
                         if (y.isFinite() && x.isFinite() && y in 0f..chartHeight && x in 0f..width) {
-                            val label = String.format("%.1f", valToDraw)
+                            val label = tk.glucodata.ui.util.GlucoseFormatter.format(valToDraw, isMmol)
                             
                             // Text - Vertically centered with guide line, 4dp left padding
                             val indicatorBounds = android.graphics.Rect()
@@ -2712,7 +2716,7 @@ fun ReadingRow(
     val trendResult = remember(history, index) {
         val relevantHistory = if (history.isNotEmpty()) history.drop(index) else listOf(point)
         val nativeList = relevantHistory.map { tk.glucodata.GlucosePoint(it.timestamp, it.value, it.rawValue) }
-        tk.glucodata.logic.TrendEngine.calculateTrend(nativeList, useRaw = (viewMode == 1 || viewMode == 3))
+        tk.glucodata.logic.TrendEngine.calculateTrend(nativeList, useRaw = (viewMode == 1 || viewMode == 3), isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit))
     }
     
     // Wrap in Column to place Divider below the Surface
@@ -4291,10 +4295,10 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                             RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
                         )
                 )
-                
+
                 Column(modifier = Modifier.padding(16.dp).weight(1f)) {
                     val statusText = if (isStreaming) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status)
-                    
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -4303,11 +4307,11 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                         Column(modifier = Modifier.weight(1f)) {
                             // Title with optional "Active" badge
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("${sensor.serial} • $statusText", style = MaterialTheme.typography.titleLarge)
+                                Text("${sensor.serial}", style = MaterialTheme.typography.titleLarge)
                                 // Toggle Main Sensor Badge
                                 Spacer(modifier = Modifier.width(8.dp))
                                 val isMain = sensor.isActive
-                                
+
                                 val badgeColor = if(isMain) sensor.color else sensor.color.copy(alpha=0.6f)
                                 val badgeBg = if(isMain) sensor.color.copy(alpha = 0.15f) else Color.Transparent
                                 val badgeBorder = if(isMain) null else androidx.compose.foundation.BorderStroke(1.dp, sensor.color.copy(alpha=0.3f))
@@ -4317,7 +4321,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                     modifier = Modifier
                                         .clip(androidx.compose.foundation.shape.CircleShape)
                                         .clickable { if(!isMain) viewModel.setMain(sensor.serial) }
-                                        .defaultMinSize(minWidth = 28.dp, minHeight = 28.dp), // Check imports
+                                        .defaultMinSize(minWidth = 26.dp, minHeight = 26.dp), // Check imports
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Surface(
@@ -4330,14 +4334,19 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                             contentDescription = if (isMain) "Active" else "Set Main",
                                             tint = badgeColor,
                                             modifier = Modifier
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                .padding(horizontal = 8.dp, vertical = 8.dp)
                                                 .size(18.dp)
                                         )
                                     }
                                 }
+                                Text(
+                                    text = "${statusText}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
                             }
                             // Feature: Detailed Sensor Status
-                            Spacer(modifier = Modifier.height(8.dp)) 
+                            Spacer(modifier = Modifier.height(8.dp))
 
                     if (sensor.detailedStatus.isNotEmpty()) {
                         Text(
@@ -4353,7 +4362,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                         )
                     }
                         }
-                        
+
                         // Logic: Show Pause if running, Play if stopped (to resume)
                         IconButton(
                             onClick = {
@@ -4468,7 +4477,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -4484,21 +4493,28 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                         FilledTonalButton(
                         onClick = { showClearDialog = true },
                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-//                        modifier = Modifier.height(40.dp)
+                        modifier = Modifier.height(32.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp)
                         )
+
 //                        Spacer(Modifier.width(4.dp))
 //                        Text(stringResource(R.string.restart), style = MaterialTheme.typography.labelLarge)
                     }
-                } else {
+                        Spacer(modifier = Modifier.height(48.dp))
+
+                    } else {
                         Spacer(modifier = Modifier.height(48.dp))
                     }
                     }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp) // Add vertical spacing for wrapped rows
+                ) {
 
                     val autoStr = stringResource(R.string.auto)
                     val rawStr = stringResource(R.string.raw)

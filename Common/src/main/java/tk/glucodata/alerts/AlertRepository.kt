@@ -49,7 +49,7 @@ object AlertRepository {
      * For legacy types, reads from Natives. For new types, reads from SharedPreferences.
      */
     fun loadConfig(type: AlertType): AlertConfig {
-        val isMmol = Applic.unit == 1
+        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
         val default = AlertDefaults.defaultConfig(type, isMmol)
 
         return when (type) {

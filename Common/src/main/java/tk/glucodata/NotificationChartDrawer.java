@@ -153,10 +153,11 @@ public class NotificationChartDrawer {
 
     public static Bitmap drawGlucoseText(Context context, String text, int color, float fontSizeScale, int fontWeight,
             boolean useSystemFont) {
-        float density = context.getResources().getDisplayMetrics().density;
-        float textSize = 24f * density * fontSizeScale;
+        float density = context.getResources().getDisplayMetrics().density * 2.0f; // 2x Resolution (Safe for Binder)
+        float textSize = 22f * density * fontSizeScale;
 
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        paint.setHinting(Paint.HINTING_ON);
         paint.setTextSize(textSize);
         paint.setTextAlign(Paint.Align.LEFT);
 
@@ -164,8 +165,6 @@ public class NotificationChartDrawer {
             String familyName = "google-sans";
             if (fontWeight >= 500) {
                 familyName = "google-sans-medium";
-            } else if (fontWeight < 400) {
-                familyName = "sans-serif-light";
             }
 
             try {
@@ -339,22 +338,30 @@ public class NotificationChartDrawer {
 
     public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
             boolean isMmol, int viewMode, boolean showTargetRange) {
-        return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange, false);
+        boolean compactMode = (heightHint > 0 && heightHint < 150);
+        return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange, false,
+                compactMode);
     }
 
     public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
             boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration) {
+        boolean compactMode = (heightHint > 0 && heightHint < 150);
         return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
-                hasCalibration);
+                hasCalibration, compactMode);
+    }
+
+    public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
+            boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration, boolean compactMode) {
+        return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
+                hasCalibration, compactMode);
     }
 
     private static Bitmap drawChartInternal(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
-            boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration) {
-        // Get display metrics for proper sizing - 256dp height works best with
-        // fitCenter
+            boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration, boolean compactMode) {
+        // Get display metrics for proper sizing
         DisplayMetrics dm = context.getResources().getDisplayMetrics();
-        int width = dm.widthPixels;
-        int height = (int) (256 * dm.density);
+        int width = (widthHint > 0) ? widthHint : dm.widthPixels;
+        int height = (heightHint > 0) ? heightHint : (int) (256 * dm.density);
 
         // Theme detection
         int uiMode = context.getResources().getConfiguration().uiMode
@@ -375,13 +382,12 @@ public class NotificationChartDrawer {
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
 
-        // Zero/Small margins - chart fills the bitmap edge to edge
+        // margins
+        // User requested removing ALL margins/paddings to fill available space always.
         float leftMargin = 0;
-        float bottomMargin = (height < 120) ? 6.0f * dm.density : 2.0f * dm.density; // Add margin for collapsed
-        float topMargin = (height < 120) ? 12.0f * dm.density : 3.0f * dm.density; // Much larger margin for collapsed
-                                                                                   // to avoid clip
-
-        float rightMargin = 2 * dm.density;
+        float bottomMargin = 0;
+        float topMargin = 0;
+        float rightMargin = 0;
 
         float chartLeft = leftMargin;
         float chartRight = width - rightMargin;
@@ -437,17 +443,6 @@ public class NotificationChartDrawer {
                 autoColor = lineColorSecondary;
                 rawColor = lineColorSecondary;
             } else {
-                // No calibration:
-                // Auto Mode (0): autoColor=Primary (default)
-                // Raw Mode (1): rawColor=Primary (default)
-                // But wait, if ViewMode=1 (Raw Only), autoColor doesn't matter, rawColor is
-                // Primary.
-                // My default above sets BOTH to Primary, which is correct for singular modes.
-                // But for combined modes without calibration?
-                // ViewMode 2 (Auto+Raw): Auto=Primary, Raw=Secondary
-                // ViewMode 3 (Raw+Auto): Raw=Primary, Auto=Secondary
-                // Handled in the if/else blocks above.
-                // So defaults are safe for singular.
             }
         }
 
@@ -464,29 +459,11 @@ public class NotificationChartDrawer {
         } catch (Throwable t) {
         }
 
-        // Unit Normalization (Heuristic) indicating Mmol usage
-        // If values are small (<30), assume mmol.
-        boolean valueIsMmol = isMmol;
-        if (!visiblePoints.isEmpty() && visiblePoints.get(visiblePoints.size() - 1).value < 30) {
-            valueIsMmol = true;
-        }
-
-        // Ensure targets are in correct unit
-        // If Value is Mmol but Target is Mg/dL (>30), convert target
-        if (valueIsMmol && targetLow > 30) {
-            targetLow /= 18.0182f;
-            targetHigh /= 18.0182f;
-        }
-        // If Value is Mg/dL but Target is Mmol (<30), convert target
-        else if (!valueIsMmol && targetLow < 30) {
-            targetLow *= 18.0182f;
-            targetHigh *= 18.0182f;
-        }
-
         // Calculate Y range
         // Standard Strategy: Expand to fit Data, BUT ensure we cover Target Range +
-        // 1mmol (18mg/dl) buffer
-        float bufferVal = valueIsMmol ? 0.1f : 2.0f; // Increased buffer for safety (was 0.1/2.0)
+        // Buffer to ensure target lines don't touch edges (User Request: "small gap")
+        // approx 10mg/dl or 0.6mmol gap
+        float bufferVal = isMmol ? 0.6f : 10.0f;
 
         float minY = targetLow - bufferVal;
         float maxY = targetHigh + bufferVal;
@@ -503,11 +480,15 @@ public class NotificationChartDrawer {
         }
 
         // Add robust extra cosmetic buffer (10%) so lines don't touch edges exact
+        // SKIP buffer in ALL modes to maximize visible signal (request: "fill all
+        // available space")
         float range = maxY - minY;
         if (range == 0)
             range = 1; // avoid div by zero
-        minY -= range * 0.05f;
-        maxY += range * 0.05f;
+
+        // No extra buffer padding
+        // minY -= range * 0.05f;
+        // maxY += range * 0.05f;
 
         // Paints
         Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -536,7 +517,8 @@ public class NotificationChartDrawer {
 
         Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         linePaint.setStyle(Paint.Style.STROKE);
-        linePaint.setStrokeWidth(2 * dm.density);
+        float strokeWidth = (compactMode ? 1.5f : 2.0f) * dm.density;
+        linePaint.setStrokeWidth(strokeWidth);
 
         float yRange = maxY - minY;
 
@@ -560,7 +542,7 @@ public class NotificationChartDrawer {
 
         // Check if collapsed (from Notify.java: passed 100 for collapsed, 180 for
         // expanded)
-        boolean isCollapsed = heightHint < 150;
+        boolean isCollapsed = compactMode || (height < 150);
 
         // Draw grid lines (3 horizontal)
         // yRange already calculated above

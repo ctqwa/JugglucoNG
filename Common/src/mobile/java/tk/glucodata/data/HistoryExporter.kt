@@ -39,8 +39,8 @@ object HistoryExporter {
                         for (point in data) {
                             val dateStr = CSV_DATE_FORMAT.format(Date(point.timestamp))
                             // Ensure dot decimal separator for CSV
-                            val valueStr = String.format(Locale.US, "%.1f", point.value)
-                            val rawStr = String.format(Locale.US, "%.1f", point.rawValue)
+                            val valueStr = tk.glucodata.ui.util.GlucoseFormatter.formatCsv(point.value, unit)
+                            val rawStr = tk.glucodata.ui.util.GlucoseFormatter.formatCsv(point.rawValue, unit)
                             
                             writer.write("${point.timestamp},$dateStr,$valueStr,$rawStr,$unit\n")
                         }
@@ -69,8 +69,9 @@ object HistoryExporter {
                         
                         for (point in data) {
                             val dateStr = READABLE_DATE_FORMAT.format(Date(point.timestamp))
-                            val valueStr = String.format(Locale.getDefault(), "%.1f", point.value)
-                            val rawStr = String.format(Locale.getDefault(), "%.1f", point.rawValue)
+                            val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit)
+                            val valueStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.value, isMmol)
+                            val rawStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.rawValue, isMmol)
                             
                             val line = "$dateStr: $valueStr $unit (Raw: $rawStr)\n"
                             writer.write(line)

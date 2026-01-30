@@ -29,12 +29,45 @@ public class StatusIcon {
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.LEFT);
 
-        // Standard Width / Regular Weight for Status Bar
+        // Read Preferences
+        android.content.SharedPreferences prefs = mContext.getSharedPreferences("tk.glucodata_preferences",
+                android.content.Context.MODE_PRIVATE);
+        int fontFamily = prefs.getInt("notification_font_family", 0); // 0=App, 1=System
+        int fontWeight = prefs.getInt("notification_font_weight", 400);
+
+        // Boost weight for status bar visibility (Legibility improvement)
+        int effectiveWeight = Math.min(1000, fontWeight + 200);
+
         try {
-            Typeface tf = androidx.core.content.res.ResourcesCompat.getFont(mContext, R.font.ibm_plex_sans_var);
-            paint.setTypeface(tf);
-            if (Build.VERSION.SDK_INT >= 26) {
-                paint.setFontVariationSettings("'wght' 400, 'wdth' 100");
+            if (fontFamily == 0) {
+                // App Font (IBM Plex)
+                Typeface tf = androidx.core.content.res.ResourcesCompat.getFont(mContext, R.font.ibm_plex_sans_var);
+                paint.setTypeface(tf);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    paint.setFontVariationSettings("'wght' " + effectiveWeight + ", 'wdth' 100");
+                }
+            } else {
+                // System Font - Explicitly try Google Sans as requested
+                String familyName = "google-sans";
+                if (effectiveWeight >= 500) {
+                    familyName = "google-sans-medium";
+                }
+
+                Typeface tf = Typeface.create(familyName, Typeface.NORMAL);
+                // Fallback to basic google-sans if medium failed (returns default)
+                if (tf == Typeface.DEFAULT && !familyName.equals("google-sans")) {
+                    tf = Typeface.create("google-sans", Typeface.NORMAL);
+                }
+                // Fallback to sans-serif if google-sans failed
+                if (tf == Typeface.DEFAULT) {
+                    tf = Typeface.create("sans-serif", Typeface.NORMAL);
+                }
+
+                paint.setTypeface(tf);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    // Apply weight (works on variable fonts or supported system fonts)
+                    paint.setFontVariationSettings("'wght' " + effectiveWeight);
+                }
             }
         } catch (Throwable t) {
             // Fallback
@@ -68,7 +101,12 @@ public class StatusIcon {
         // Use the smaller of the two scales (Auto-fit vs Max-cap)
         float scale = Math.min(Math.min(scaleW, scaleH), maxScale);
 
-        float finalSize = testSize * scale;
+        // Apply User Scale Preference (50% - 100%)
+        float userScale = mContext
+                .getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+                .getFloat("notification_status_icon_scale", 1.0f);
+
+        float finalSize = testSize * scale * userScale;
         paint.setTextSize(finalSize);
 
         // 3. Re-measure for exact centering

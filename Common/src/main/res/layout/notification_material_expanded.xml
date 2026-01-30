@@ -26,6 +26,15 @@
             android:includeFontPadding="false"
             android:text="" />
 
+        <ImageView
+            android:id="@+id/notification_glucose_image"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            android:contentDescription="Glucose Value" />
+
         <!-- Trend Arrow with left padding -->
         <ImageView
             android:id="@+id/notification_arrow"

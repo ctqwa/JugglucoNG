@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -55,6 +57,8 @@ import tk.glucodata.ui.components.StyledSwitch
 import tk.glucodata.ui.theme.labelLargeExpressive
 import tk.glucodata.ui.viewmodel.DashboardViewModel
 //import tk.glucodata.ui.components.ExportDataDialog
+import tk.glucodata.ui.components.*
+import tk.glucodata.ui.overlay.FloatingSettingsSheet
 import java.util.Locale
 
 /**
@@ -78,7 +82,7 @@ fun ExpressiveSettingsScreen(
 
     // States
     val unit by viewModel.unit.collectAsState()
-    val isMmol = unit == "mmol/L"
+    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit)
     val patchedLibreEnabled by viewModel.patchedLibreBroadcastEnabled.collectAsState()
     val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsState()
     val alertsSummary by viewModel.alertsSummary.collectAsState()
@@ -114,6 +118,7 @@ fun ExpressiveSettingsScreen(
     var isClearing by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showAODSettingsSheet by remember { mutableStateOf(false) }
+    var showFloatingSettingsSheet by remember { mutableStateOf(false) }
     var showNotificationSettingsSheet by remember { mutableStateOf(false) }
 
 
@@ -197,6 +202,14 @@ fun ExpressiveSettingsScreen(
                     onClick = { showNotificationSettingsSheet = true }
                 )
                 SettingsItem(
+                    title = "Floating glucose",
+                    subtitle = "Display overlay on other apps",
+                    icon = Icons.Default.PictureInPicture,
+                    iconTint = notifColor,
+                    position = CardPosition.MIDDLE,
+                    onClick = { showFloatingSettingsSheet = true }
+                )
+                SettingsItem(
                     title = "Lock Screen (AOD)",
                     subtitle = "Customize always-on display",
                     icon = Icons.Default.Visibility,
@@ -228,6 +241,9 @@ fun ExpressiveSettingsScreen(
         item(key = "exchange_group") {
             // Theme: Tertiary (Apps/Services)
             val exchangeColor = MaterialTheme.colorScheme.tertiary
+            val xdripEnabled by viewModel.xDripBroadcastEnabled.collectAsState()
+            val glucodataBroadcastEnabled by viewModel.glucodataBroadcastEnabled.collectAsState()
+
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsSwitchItem(
                     title = stringResource(R.string.xdripbroadcast),
@@ -237,6 +253,24 @@ fun ExpressiveSettingsScreen(
                     iconTint = exchangeColor,
                     position = CardPosition.TOP,
                     onCheckedChange = { viewModel.togglePatchedLibreBroadcast(it) }
+                )
+                SettingsSwitchItem(
+                    title = stringResource(R.string.xdrip_compatible_title),
+                    subtitle = stringResource(R.string.xdrip_compatible_desc),
+                    checked = xdripEnabled,
+                    icon = Icons.Default.Radio, 
+                    iconTint = exchangeColor,
+                    position = CardPosition.MIDDLE,
+                    onCheckedChange = { viewModel.toggleXDripBroadcast(it) }
+                )
+                SettingsSwitchItem(
+                    title = stringResource(R.string.aaps_broadcast),
+                    subtitle = stringResource(R.string.glucodata_subtitle),
+                    checked = glucodataBroadcastEnabled,
+                    icon = Icons.AutoMirrored.Filled.Send, 
+                    iconTint = exchangeColor,
+                    position = CardPosition.MIDDLE,
+                    onCheckedChange = { viewModel.toggleGlucodataBroadcast(it) }
                 )
                 SettingsItem(
                     title = stringResource(R.string.mirror),
@@ -486,6 +520,13 @@ fun ExpressiveSettingsScreen(
 
     // ... Bottom of function ...
 
+    if (showFloatingSettingsSheet) {
+        FloatingSettingsSheet(
+            viewModel = viewModel,
+            onDismiss = { showFloatingSettingsSheet = false }
+        )
+    }
+
     if (showAODSettingsSheet) {
         val sheetState = rememberModalBottomSheetState()
         AODSettingsSheet(
@@ -496,7 +537,7 @@ fun ExpressiveSettingsScreen(
     }
 
     if (showNotificationSettingsSheet) {
-        val sheetState = rememberModalBottomSheetState()
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         NotificationSettingsSheet(
             onDismiss = { showNotificationSettingsSheet = false },
             sheetState = sheetState,
@@ -518,6 +559,7 @@ fun NotificationSettingsSheet(
     
     // Font Settings
     var fontSize by remember { mutableFloatStateOf(prefs.getFloat("notification_font_size", 1.0f)) }
+    var fontType by remember { mutableIntStateOf(prefs.getInt("notification_font_family", 0)) } // 0=App, 1=System
     var fontWeight by remember { mutableIntStateOf(prefs.getInt("notification_font_weight", 400)) }
     
     // Arrow Settings
@@ -526,6 +568,8 @@ fun NotificationSettingsSheet(
     
     // Visibility Toggles
     var showStatus by remember { mutableStateOf(prefs.getBoolean("notification_show_status", true)) }
+    var hideStatusIcon by remember { mutableStateOf(prefs.getBoolean("notification_hide_status_icon", false)) }
+    var statusIconScale by remember { mutableFloatStateOf(prefs.getFloat("notification_status_icon_scale", 1.0f)) }
     var collapsedChart by remember { mutableStateOf(prefs.getBoolean("notification_chart_collapsed", false)) }
     var showTargetRange by remember { mutableStateOf(prefs.getBoolean("notification_chart_target_range", true)) }
     
@@ -534,10 +578,13 @@ fun NotificationSettingsSheet(
         scope.launch {
             prefs.edit()
                  .putFloat("notification_font_size", fontSize)
+                 .putInt("notification_font_family", fontType)
                  .putInt("notification_font_weight", fontWeight)
                  .putBoolean("notification_show_arrow", showArrow)
                  .putFloat("notification_arrow_size", arrowSize)
                  .putBoolean("notification_show_status", showStatus)
+                 .putBoolean("notification_hide_status_icon", hideStatusIcon)
+                 .putFloat("notification_status_icon_scale", statusIconScale)
                  .putBoolean("notification_chart_collapsed", collapsedChart)
                  .putBoolean("notification_chart_target_range", showTargetRange)
                  .apply()
@@ -553,7 +600,7 @@ fun NotificationSettingsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 32.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState(50))
         ) {
             Text(
                 "Notification Settings",
@@ -561,8 +608,60 @@ fun NotificationSettingsSheet(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
             )
 
+
+
             // === FONT SECTION ===
-            SectionLabel("Text", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
+            SectionLabel("Font", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
+            
+            // Font Family Toggle
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 24.dp)) {
+                FilterChip(
+                    selected = fontType == 0,
+                    onClick = { fontType = 0; save() },
+                    label = { Text("App (IBM Plex)") }
+//                    leadingIcon = { if(fontType == 0) Icon(Icons.Filled.Check, null) }
+                )
+                FilterChip(
+                    selected = fontType == 1,
+                    onClick = { fontType = 1; save() },
+                    label = { Text("System (Google Sans)") }
+//                    leadingIcon = { if(fontType == 1) Icon(Icons.Filled.Check, null) }
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // Font Weight - only on Android 12+ (API 31) where RemoteViews supports setFontVariationSettings
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                Text("Font Weight", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 24.dp,  vertical = 0.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Simplified Options: Regular (400) and Medium (500)
+                    FilterChip(
+                        selected = fontWeight == 300,
+                        onClick = { fontWeight = 300; save() },
+                        label = { Text("Light") }
+//                        leadingIcon = { if(fontWeight == 300) Icon(Icons.Filled.Check, null) }
+                    )
+                    FilterChip(
+                        selected = fontWeight == 400,
+                        onClick = { fontWeight = 400; save() },
+                        label = { Text("Regular") }
+//                        leadingIcon = { if(fontWeight == 400) Icon(Icons.Filled.Check, null) }
+                    )
+                    FilterChip(
+                        selected = fontWeight == 500,
+                        onClick = { fontWeight = 500; save() },
+                        label = { Text("Medium") }
+//                        leadingIcon = { if(fontWeight == 500) Icon(Icons.Filled.Check, null) }
+                    )
+                }
+            }
+//            Spacer(Modifier.height(16.dp))
+
+//            SectionLabel("Size", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
+            Spacer(Modifier.height(4.dp))
 
             SliderControl(
                 label = "Font Size: ${(fontSize * 100).toInt()}%",
@@ -570,91 +669,98 @@ fun NotificationSettingsSheet(
                 onValueChange = { fontSize = it; save() },
                 range = 0.6f..1.5f
             )
+            Spacer(Modifier.height(4.dp))
 
-            // Font Weight - only on Android 12+ (API 31) where RemoteViews supports setFontVariationSettings
-            if (android.os.Build.VERSION.SDK_INT >= 31) {
-                Text("Font Weight", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                     // Simplified Options: Regular (400) and Medium (500)
-                     FilterChip(
-                         selected = fontWeight == 400,
-                         onClick = { fontWeight = 400; save() },
-                         label = { Text("Regular") }
-                     )
-                     FilterChip(
-                         selected = fontWeight == 500,
-                         onClick = { fontWeight = 500; save() },
-                         label = { Text("Medium") }
-                     )
-                }
-            }
-
-            // === ARROW SECTION ===
-            Spacer(Modifier.height(16.dp))
-            SectionLabel("Trend Arrow", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
-
-            SettingsSwitchItem(
-                title = "Show Arrow",
-                checked = showArrow,
-                onCheckedChange = { showArrow = it; save() },
-                icon = null,
-                position = CardPosition.SINGLE
-            )
-
-            if (showArrow) {
-                SliderControl(
-                    label = "Arrow Size: ${(arrowSize * 100).toInt()}%",
-                    value = arrowSize,
-                    onValueChange = { arrowSize = it; save() },
-                    range = 0.5f..1.5f
-                )
-            }
-
-            // === VISIBILITY SECTION ===
-            Spacer(Modifier.height(16.dp))
-            SectionLabel("Elements", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
-
-            SettingsSwitchItem(
-                title = "Show Status Text",
-                subtitle = "Sensor connection status",
-                checked = showStatus,
-                onCheckedChange = { showStatus = it; save() },
-                icon = null,
-                position = CardPosition.TOP
-            )
-
-            SettingsSwitchItem(
-                title = "Show Chart (Expanded)",
-                subtitle = "Chart when notification is expanded",
-                checked = notificationChartEnabled,
-                onCheckedChange = { viewModel.toggleNotificationChart(it) },
-                icon = null,
-                position = CardPosition.MIDDLE
-            )
-
-            SettingsSwitchItem(
-                title = "Show Chart (Collapsed)",
-                subtitle = "Compact chart in collapsed view",
-                checked = collapsedChart,
-                onCheckedChange = { collapsedChart = it; save() },
-                icon = null,
-                position = CardPosition.MIDDLE
-            )
-
-            SettingsSwitchItem(
-                title = "Show Target Range",
-                subtitle = "Highlight target glucose range on chart",
-                checked = showTargetRange,
-                onCheckedChange = { showTargetRange = it; save() },
-                icon = null,
-                position = CardPosition.BOTTOM
+            SliderControl(
+                label = "Status Bar Icon Size: ${(statusIconScale * 100).toInt()}%",
+                value = statusIconScale,
+                onValueChange = { statusIconScale = it; save() },
+                range = 0.0f..1.25f
+//                    steps = 50
             )
         }
+//        Spacer(Modifier.height(8.dp))
+           // === ARROW SECTION ===
+//            Spacer(Modifier.height(8.dp))
+//            SectionLabel("Trend Arrow", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
+            // === VISIBILITY SECTION ===
+//            Spacer(Modifier.height(16.dp))
+//            SectionLabel("Elements", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
+//            SettingsSwitchItem(
+//                title = "Show Status Text",
+//                subtitle = "Sensor connection status",
+//                checked = showStatus,
+//                onCheckedChange = { showStatus = it; save() },
+//                icon = null,
+//                position = CardPosition.TOP
+//            Column(
+//                    Modifier.fillMaxWidth().padding(horizontal = 24.dp,  vertical = 0.dp)
+//                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp)) {
+                SettingsSwitchItem(
+                    title = "Show Trend Arrow",
+                    checked = showArrow,
+                    onCheckedChange = { showArrow = it; save() },
+                    icon = null,
+                    position = CardPosition.TOP
+                )
+
+                if (showArrow) {
+                    Spacer(Modifier.height(4.dp))
+
+                    SliderControl(
+                        label = "Arrow Size: ${(arrowSize * 100).toInt()}%",
+                        value = arrowSize,
+                        onValueChange = { arrowSize = it; save() },
+                        range = 0.5f..1.5f
+                    )
+                    Spacer(Modifier.height(4.dp))
+
+                }
+                SettingsSwitchItem(
+                    title = "Show Chart (Expanded)",
+                    subtitle = "Chart when notification is expanded",
+                    checked = notificationChartEnabled,
+                    onCheckedChange = { viewModel.toggleNotificationChart(it) },
+                    icon = null,
+                    position = CardPosition.MIDDLE
+                )
+
+                SettingsSwitchItem(
+                    title = "Show Chart (Collapsed)",
+                    subtitle = "Compact chart in collapsed view",
+                    checked = collapsedChart,
+                    onCheckedChange = { collapsedChart = it; save() },
+                    icon = null,
+                    position = CardPosition.MIDDLE
+                )
+
+                SettingsSwitchItem(
+                    title = "Show Target Range",
+                    subtitle = "Highlight target glucose range on chart",
+                    checked = showTargetRange,
+                    onCheckedChange = { showTargetRange = it; save() },
+                    icon = null,
+                    position = CardPosition.BOTTOM
+                )
+                //            SettingsSwitchItem(
+//                title = "Hide Status Bar Icon",
+//                subtitle = "Use transparent icon (minimize clutter)",
+//                checked = hideStatusIcon,
+//                onCheckedChange = { hideStatusIcon = it; save() },
+//                icon = null,
+//                position = CardPosition.MIDDLE
+//            )
+                //            if (!hideStatusIcon) {
+
+//            }
+//            Spacer(Modifier.height(16.dp))
+
+            }
+        }
     }
-}
+
 
 @Composable
 fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: android.content.Context) {
@@ -664,6 +770,8 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
     var textScale by remember { mutableFloatStateOf(prefs.getFloat("aod_text_scale", 1.5f)) }
     var chartScale by remember { mutableFloatStateOf(prefs.getFloat("aod_chart_scale", 1.5f)) }
     var showChart by remember { mutableStateOf(prefs.getBoolean("aod_show_chart", true)) }
+    var showArrow by remember { mutableStateOf(prefs.getBoolean("aod_show_arrow", true)) }
+    var arrowScale by remember { mutableFloatStateOf(prefs.getFloat("aod_arrow_scale", 1.0f)) }
     
     // Position: Multi-select stored as Set<String>
     var positions by remember { 
@@ -686,6 +794,8 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
                  .putFloat("aod_text_scale", textScale)
                  .putFloat("aod_chart_scale", chartScale)
                  .putBoolean("aod_show_chart", showChart)
+                 .putBoolean("aod_show_arrow", showArrow)
+                 .putFloat("aod_arrow_scale", arrowScale)
                  .putStringSet("aod_positions", positions)
                  .putString("aod_alignment", alignment)
                  .putString("aod_font_source", fontSource)
@@ -768,6 +878,9 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
                      label = { Text("Medium") }
                  )
             }
+
+            Spacer(Modifier.height(8.dp))
+
             
             Spacer(Modifier.height(16.dp))
             SectionLabel("Layout", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
@@ -820,13 +933,20 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
             Spacer(Modifier.height(24.dp))
             SectionLabel("Appearance", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
 
-            // Show Chart Toggle
+            // Toggles Group
             SettingsSwitchItem(
                 title = "Show Chart",
                 checked = showChart,
                 onCheckedChange = { showChart = it; save() },
                 icon = null,
-                position = CardPosition.SINGLE
+                position = CardPosition.TOP
+            )
+            SettingsSwitchItem(
+                title = "Show Trend Arrow",
+                checked = showArrow,
+                onCheckedChange = { showArrow = it; save() },
+                icon = null,
+                position = CardPosition.BOTTOM
             )
 
             // Opacity
@@ -854,312 +974,21 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
                     range = 0.5f..2.0f
                 )
             }
-        }
-    }
-}
 
-@Composable
-fun SliderControl(label: String, value: Float, onValueChange: (Float) -> Unit, range: ClosedFloatingPointRange<Float>) {
-    Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = range
-        )
-    }
-}
-
-@Composable
-private fun SectionLabel(text: String, isError: Boolean = false, topPadding: Dp = 24.dp, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(top = topPadding, bottom = 8.dp)
-    )
-}
-
-
-
-
-
-
-
-// ============================================================================
-// CARD POSITION - determines corner radius
-// ============================================================================
-
-enum class CardPosition {
-    SINGLE, // All corners rounded
-    TOP,    // Top corners rounded
-    MIDDLE, // No corners rounded
-    BOTTOM  // Bottom corners rounded
-}
-
-private fun cardShape(position: CardPosition, radius: Dp = 12.dp): RoundedCornerShape {
-    return when (position) {
-        CardPosition.SINGLE -> RoundedCornerShape(radius)
-        CardPosition.TOP -> RoundedCornerShape(topStart = radius, topEnd = radius, bottomStart = 4.dp, bottomEnd = 4.dp)
-        CardPosition.MIDDLE -> RoundedCornerShape(4.dp)
-        CardPosition.BOTTOM -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = radius, bottomEnd = radius)
-    }
-}
-
-
-
-@Composable
-fun SettingsItem(
-    title: String,
-    subtitle: String? = null,
-    showArrow: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    icon: ImageVector? = null,
-    iconTint: Color? = null, // Added tint
-    trailingContent: (@Composable () -> Unit)? = null,
-    position: CardPosition = CardPosition.SINGLE, 
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick ?: {},
-        enabled = onClick != null,
-        modifier = modifier.fillMaxWidth(),
-        shape = cardShape(position),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh // restored color
-    ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 72.dp) // M3 Two-line item standard
-                .padding(horizontal = 16.dp, vertical = 16.dp), // Coherent spacing
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (icon != null) {
-                val tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant
-                // If tint is present, use tonal background. Else match surface.
-                val background = if(iconTint != null) iconTint.copy(alpha = 0.12f) else Color.Transparent
-
-                Surface(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .padding(end = 0.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = background
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                         Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = tint,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium) // Heavier weight (500) for legibility
-                if (subtitle != null) {
-                    Text(
-                        subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (trailingContent != null) {
-                trailingContent()
-            } else if (showArrow) {
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+            // Arrow Scale
+            if (showArrow) {
+                SliderControl(
+                    label = "Arrow Size: ${(arrowScale * 100).toInt()}%",
+                    value = arrowScale,
+                    onValueChange = { arrowScale = it; save() },
+                    range = 0.5f..2.0f
                 )
             }
         }
     }
 }
 
-@Composable
-fun SettingsSwitchItem(
-    title: String,
-    subtitle: String? = null,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    icon: ImageVector? = null,
-    iconTint: Color? = null,
-    position: CardPosition = CardPosition.SINGLE
-) {
-    SettingsItem(
-        title = title,
-        subtitle = subtitle,
-        icon = icon,
-        iconTint = iconTint,
-        onClick = { onCheckedChange(!checked) },
-        trailingContent = {
-            StyledSwitch(
-                checked = checked,
-                onCheckedChange = null // Handled by parent click
-            )
-        },
-        position = position
-    )
-}
-
-@Composable
-fun AlarmItem(
-    title: String,
-    enabled: Boolean,
-    value: Float,
-    unit: String,
-    range: ClosedFloatingPointRange<Float>,
-    soundMode: Int,
-    onToggle: (Boolean) -> Unit,
-    onValueChange: (Float) -> Unit,
-    onSoundChange: (Int) -> Unit,
-    position: CardPosition = CardPosition.SINGLE
-) {
-    var sliderValue by remember(value) { mutableFloatStateOf(value) }
-    val displayValue = if (sliderValue < 30) String.format("%.1f", sliderValue) else sliderValue.toInt().toString()
-
-    Surface(
-        onClick = { onToggle(!enabled) },
-        modifier = Modifier.fillMaxWidth(),
-        shape = cardShape(position),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge)
-                    if (enabled) {
-                        Text("$displayValue $unit", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                Spacer(Modifier.width(16.dp))
-                StyledSwitch(
-                    checked = enabled,
-                    onCheckedChange = null
-                )
-            }
-
-            // Expandable content
-            AnimatedVisibility(visible = enabled) {
-                Column {
-                    Spacer(Modifier.height(16.dp))
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = { sliderValue = it },
-                        onValueChangeFinished = { onValueChange(sliderValue) },
-                        valueRange = range
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.alert_mode), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = soundMode == 0,
-                            onClick = { onSoundChange(0) },
-                            label = { Text(stringResource(R.string.vibrate_only)) },
-                            leadingIcon = { if(soundMode == 0) Icon(Icons.Filled.Check, null) }
-                        )
-                        FilterChip(
-                            selected = soundMode == 1,
-                            onClick = { onSoundChange(1) },
-                            label = { Text(stringResource(R.string.sound_vibrate)) },
-                            leadingIcon = { if(soundMode == 1) Icon(Icons.Filled.Check, null) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SliderItem(
-    title: String,
-    value: Float,
-    unit: String,
-    range: ClosedFloatingPointRange<Float>,
-    onValueChange: (Float) -> Unit,
-    position: CardPosition = CardPosition.SINGLE
-) {
-    var sliderValue by remember(value) { mutableFloatStateOf(value) }
-    val displayValue = if (sliderValue < 30) String.format("%.1f", sliderValue) else sliderValue.toInt().toString()
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = cardShape(position),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row {
-                Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                Text("$displayValue $unit", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.height(8.dp))
-            Slider(
-                value = sliderValue,
-                onValueChange = { sliderValue = it },
-                onValueChangeFinished = { onValueChange(sliderValue) },
-                valueRange = range
-            )
-        }
-    }
-}
-
-@Composable
-fun DangerItem(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    position: CardPosition = CardPosition.SINGLE,
-    severity: DangerSeverity = DangerSeverity.HIGH
-) {
-    val (bgColor, contentColor) = when (severity) {
-        DangerSeverity.LOW -> MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurface
-        DangerSeverity.MEDIUM -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-        DangerSeverity.HIGH -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-    }
-    
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = cardShape(position),
-        color = bgColor
-    ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 72.dp)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .padding(end = 0.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    icon,
-                    null,
-                    tint = contentColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = contentColor)
-                Text(subtitle, style = MaterialTheme.typography.labelMedium, color = contentColor.copy(alpha = 0.7f))
-            }
-        }
-    }
-}
-
-enum class DangerSeverity { LOW, MEDIUM, HIGH }
+// Components moved to tk.glucodata.ui.components.SettingsComponents.kt
 
 // ============================================================================
 // DIALOGS - M3 Expressive Style with proper layout
@@ -1357,7 +1186,7 @@ private fun ExportDataSheet(
                     val startTime = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
                     
                     // Fetch data from Room
-                    val data = tk.glucodata.data.HistoryRepository(context).getHistory(startTime, isMmol)
+                    val data = tk.glucodata.data.GlucoseRepository().getHistory(startTime, isMmol)
                     val unit = if (isMmol) "mmol/L" else "mg/dL"
                     
                     val success = tk.glucodata.data.HistoryExporter.exportToCsv(context, uri, data, unit)
@@ -1382,7 +1211,7 @@ private fun ExportDataSheet(
                     val days = daysText.toLongOrNull() ?: 30L
                     val startTime = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
                     
-                    val data = tk.glucodata.data.HistoryRepository(context).getHistory(startTime, isMmol)
+                    val data = tk.glucodata.data.GlucoseRepository().getHistory(startTime, isMmol)
                     val unit = if (isMmol) "mmol/L" else "mg/dL"
                     
                     val success = tk.glucodata.data.HistoryExporter.exportToReadable(context, uri, data, unit)

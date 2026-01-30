@@ -35,7 +35,14 @@ class HistoryRepository(context: Context = Applic.app) {
         @JvmStatic
         fun getHistoryBlocking(startTime: Long, isMmol: Boolean): List<GlucosePoint> {
             return kotlinx.coroutines.runBlocking {
-                HistoryRepository().getHistory(startTime, isMmol)
+                val raw = HistoryRepository().getHistory(startTime)
+                if (isMmol) {
+                    raw.map { p ->
+                        val v = p.value / 18.0182f
+                        val r = p.rawValue / 18.0182f
+                        GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+                    }
+                } else raw
             }
         }
         
@@ -46,7 +53,22 @@ class HistoryRepository(context: Context = Applic.app) {
         @JvmStatic
         fun getHistoryForNotification(startTime: Long, isMmol: Boolean): List<tk.glucodata.GlucosePoint> {
             return kotlinx.coroutines.runBlocking {
-                val uiPoints = HistoryRepository().getHistory(startTime, isMmol)
+                val uiPoints = HistoryRepository().getHistory(startTime)
+                uiPoints.map { p ->
+                    val v = if (isMmol) p.value / 18.0182f else p.value
+                    val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+                    tk.glucodata.GlucosePoint(p.timestamp, v, r)
+                }
+            }
+        }
+        
+        /**
+         * Blocking version for Notify.java returning raw mg/dL.
+         */
+        @JvmStatic
+        fun getHistoryRawForNotification(startTime: Long): List<tk.glucodata.GlucosePoint> {
+            return kotlinx.coroutines.runBlocking {
+                val uiPoints = HistoryRepository().getHistoryRaw(startTime)
                 uiPoints.map { p ->
                     tk.glucodata.GlucosePoint(p.timestamp, p.value, p.rawValue)
                 }
@@ -96,25 +118,20 @@ class HistoryRepository(context: Context = Applic.app) {
     /**
      * Get history as a Flow for reactive updates.
      */
-    fun getHistoryFlow(startTime: Long = 0L, isMmol: Boolean): kotlinx.coroutines.flow.Flow<List<GlucosePoint>> {
+    /**
+     * Get history as a Flow for reactive updates (Raw mg/dL).
+     */
+    fun getHistoryFlow(startTime: Long = 0L): kotlinx.coroutines.flow.Flow<List<GlucosePoint>> {
         return dao.getHistoryFlow(startTime).map { readings ->
             readings.map { reading ->
-                var value = reading.value
-                var rawValue = reading.rawValue
-                
-                if (isMmol) {
-                    value = value / 18.0182f
-                    rawValue = rawValue / 18.0182f
-                }
-                
                 val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
                     .format(java.util.Date(reading.timestamp))
                 
                 GlucosePoint(
-                    value = value,
+                    value = reading.value,
                     time = timeStr,
                     timestamp = reading.timestamp,
-                    rawValue = rawValue,
+                    rawValue = reading.rawValue,
                     rate = reading.rate
                 )
             }.distinctBy { it.timestamp }
@@ -122,37 +139,54 @@ class HistoryRepository(context: Context = Applic.app) {
     }
 
     /**
-     * Get history for chart display. Returns data in user's preferred unit.
+     * Get history for chart display (Raw mg/dL).
      * @param startTime Start time in milliseconds (0 = all data)
-     * @param isMmol Whether to convert to mmol/L
      */
-    suspend fun getHistory(startTime: Long, isMmol: Boolean): List<GlucosePoint> {
+    suspend fun getHistory(startTime: Long): List<GlucosePoint> {
         return withContext(Dispatchers.IO) {
             try {
                 val readings = dao.getReadingsSince(startTime)
-                // Log.d(TAG, "Room returned ${readings.size} readings since $startTime")
                 readings.map { reading ->
-                    var value = reading.value
-                    var rawValue = reading.rawValue
-                    
-                    if (isMmol) {
-                        value = value / 18.0182f
-                        rawValue = rawValue / 18.0182f
-                    }
-                    
                     val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
                         .format(java.util.Date(reading.timestamp))
                     
                     GlucosePoint(
-                        value = value,
+                        value = reading.value,
                         time = timeStr,
                         timestamp = reading.timestamp,
-                        rawValue = rawValue,
+                        rawValue = reading.rawValue,
                         rate = reading.rate
                     )
-                }.distinctBy { it.timestamp } // Ensure unique timestamps
+                }.distinctBy { it.timestamp }
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting history", e)
+                emptyList()
+            }
+        }
+    }
+
+    /**
+     * Get history in raw mg/dL (no conversion).
+     * Callers must handle formatting/conversion.
+     */
+    suspend fun getHistoryRaw(startTime: Long): List<GlucosePoint> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val readings = dao.getReadingsSince(startTime)
+                readings.map { reading ->
+                    val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                        .format(java.util.Date(reading.timestamp))
+                    
+                    GlucosePoint(
+                        value = reading.value,
+                        time = timeStr,
+                        timestamp = reading.timestamp,
+                        rawValue = reading.rawValue,
+                        rate = reading.rate
+                    )
+                }.distinctBy { it.timestamp }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting raw history", e)
                 emptyList()
             }
         }

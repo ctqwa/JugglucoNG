@@ -145,13 +145,13 @@ fun CalibrationBottomSheet(
 
     // Trend
     val trendResult by produceState(
-        initialValue = TrendEngine.calculateTrend(emptyList(), useRaw = isRawMode),
+        initialValue = TrendEngine.calculateTrend(emptyList<GlucosePoint>(), useRaw = isRawMode, isMmol = isMmol),
         key1 = selectedTimestamp,
         key2 = glucoseHistory
     ) {
         withContext(kotlinx.coroutines.Dispatchers.Default) {
             val historyAtTime = glucoseHistory.filter { it.timestamp <= selectedTimestamp }
-            value = TrendEngine.calculateTrend(historyAtTime, useRaw = isRawMode)
+            value = TrendEngine.calculateTrend(historyAtTime, useRaw = isRawMode, isMmol = isMmol)
         }
     }
 

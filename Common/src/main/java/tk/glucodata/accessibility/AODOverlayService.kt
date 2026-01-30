@@ -199,6 +199,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         }
     }
     
+    @Suppress("DEPRECATION")
     private fun showOverlay() {
         if (overlayView == null) {
             val inflater = LayoutInflater.from(this)
@@ -294,8 +295,9 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         // Text/Arrow scaling is now handled during bitmap generation/textSize setting
         // to ensure high resolution. We do not scale X/Y here.
         
-        chartImg?.scaleX = chartScale
-        chartImg?.scaleY = chartScale
+        // Remove View scaling to prevent blur. Dimensions are handled in bitmap generation.
+        chartImg?.scaleX = 1.0f
+        chartImg?.scaleY = 1.0f
         
         // Apply Alignment to Root Layout (LinearLayout in aod_overlay.xml)
         val rootLayout = view.findViewById<android.widget.LinearLayout>(R.id.aod_root)
@@ -343,11 +345,16 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         // 1. Fetch Data
         val endT = System.currentTimeMillis()
         val startT = endT - 3 * 60 * 60 * 1000L
-        val isMmol = Applic.unit == 1
+        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
 
         var chartPoints: List<GlucosePoint>
         try {
-            chartPoints = tk.glucodata.data.HistoryRepository.getHistoryForNotification(startT, isMmol)
+            val rawPoints = tk.glucodata.data.HistoryRepository.getHistoryRawForNotification(startT)
+            chartPoints = rawPoints.map { p ->
+                val valConverted = if (isMmol) p.value / 18.0182f else p.value
+                val rawConverted = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+                GlucosePoint(p.timestamp, valConverted, rawConverted)
+            }
         } catch (e: Exception) {
             chartPoints = ArrayList()
         }
@@ -415,29 +422,27 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
                 tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseVal, time, isRawMode)
             } else 0f
             
-            fun fmt(v: Float): String = String.format(Locale.US, "%.1f", v).replace(".", ",")
-            
             valStr = when {
                 hasCalibration && (viewMode == 2 || viewMode == 3) -> {
                     // 3 values: Calibrated / Secondary · Tertiary
-                    val secondary = if (viewMode == 3) fmt(rawVal) else fmt(autoVal)
-                    val tertiary = if (viewMode == 3) fmt(autoVal) else fmt(rawVal)
-                    "${fmt(calibratedVal)} / $secondary · $tertiary"
+                    val secondary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
+                    val tertiary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol)
+                    "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} / $secondary · $tertiary"
                 }
                 hasCalibration -> {
                     // 2 values: Calibrated / Base
-                    val base = if (isRawMode) fmt(rawVal) else fmt(autoVal)
-                    "${fmt(calibratedVal)} / $base"
+                    val base = if (isRawMode) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
+                    "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} / $base"
                 }
                 viewMode == 2 || viewMode == 3 -> {
                     // 2 values: Primary / Secondary
-                    val primary = if (viewMode == 3) fmt(rawVal) else fmt(autoVal)
-                    val secondary = if (viewMode == 3) fmt(autoVal) else fmt(rawVal)
+                    val primary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
+                    val secondary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol)
                     "$primary / $secondary"
                 }
                 else -> {
                     // Single value
-                    fmt(if (isRawMode) rawVal else autoVal)
+                    tk.glucodata.ui.util.GlucoseFormatter.format(if (isRawMode) rawVal else autoVal, isMmol)
                 }
             }
             
@@ -447,7 +452,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             val p = chartPoints[chartPoints.size - 1]
             glvalue = p.value
             try {
-                valStr = String.format(Locale.US, "%.1f", glvalue).replace(".", ",")
+                valStr = tk.glucodata.ui.util.GlucoseFormatter.format(glvalue, isMmol)
             } catch (e: Exception) {}
         }
 
@@ -460,6 +465,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         val fontSource = prefs.getString("aod_font_source", "APP") ?: "APP"
         val fontWeight = prefs.getInt("aod_font_weight", 400)
         val textScale = prefs.getFloat("aod_text_scale", 1.5f)
+        val chartScale = prefs.getFloat("aod_chart_scale", 1.5f) // Fetch chart scale too
         val useSystemFont = fontSource == "SYSTEM"
         
         // Arrow Settings
@@ -488,9 +494,9 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
 
         if (showChart) {
             val dm = resources.displayMetrics
-            val w = dm.widthPixels
-            // Base height 200dp
-            val h = (200 * dm.density).toInt()
+            // Generate Scaled Dimensions for High-Res Bitmap
+            val w = (dm.widthPixels * chartScale).toInt()
+            val h = (200 * dm.density * chartScale).toInt()
 
             val chartBitmap = NotificationChartDrawer.drawChart(this, chartPoints, w, h, isMmol, viewMode, true, hasCalibration)
             if (chartImg != null) {
@@ -506,7 +512,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             // Apply Scaling
             statusView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14f * textScale)
             
-            if (statusText != null && statusText.isNotEmpty()) {
+            if (statusText.isNotEmpty()) {
                 statusView.visibility = View.VISIBLE
                 statusView.text = statusText
             } else {

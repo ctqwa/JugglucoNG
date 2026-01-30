@@ -1,14 +1,26 @@
 package tk.glucodata.logic
 
-import tk.glucodata.GlucosePoint
+import tk.glucodata.GlucosePoint as NativeGlucosePoint
+import tk.glucodata.ui.GlucosePoint
 import kotlin.math.abs
 import kotlin.math.sqrt
+import kotlin.jvm.JvmName
 
 /**
  * Sophisticated engine for processing glucose history to determine trend velocity and acceleration.
  * Uses a weighted sliding window to reduce noise and provide stable indicators.
  */
 object TrendEngine {
+
+    /**
+     * Overload for compatibility with Core/Java implementation (Notify.java)
+     */
+    fun calculateTrend(history: List<NativeGlucosePoint>, useRaw: Boolean = false, isMmol: Boolean): TrendResult {
+        val uiHistory = history.map {
+            GlucosePoint(it.value, "", it.timestamp, it.rawValue)
+        }
+        return calculateTrend(uiHistory, useRaw, isMmol)
+    }
 
     enum class TrendState {
         DoubleUp,       // Rapid Rise (> 2.0)
@@ -32,8 +44,10 @@ object TrendEngine {
     /**
      * Calculates the trend based on a list of historical points.
      * @param history List of glucose points, ordered by time descending (newest first).
+     * @param isMmol Whether the input values are in mmol/L (true) or mg/dL (false).
      */
-    fun calculateTrend(history: List<GlucosePoint>, useRaw: Boolean = false): TrendResult {
+    @JvmName("calculateTrendUi")
+    fun calculateTrend(history: List<GlucosePoint>, useRaw: Boolean = false, isMmol: Boolean): TrendResult {
         if (history.size < 2) return TrendResult(TrendState.Flat, 0f, 0f, 0f, 0f)
 
         // Ensure history is Descending (Newest First) for the default logic
@@ -62,8 +76,7 @@ object TrendEngine {
         val pFirst = validPoints.first()
         val firstVal = if (useRaw && pFirst.rawValue > 0) pFirst.rawValue else pFirst.value
 
-        // Detect unit scale (Heuristic: < 30 usually means mmol/L)
-        val isMmol = firstVal < 30f
+        // Use explicit flag
         val conversionFactor = if (isMmol) 18.0182f else 1.0f
 
         // Collect values for noise calculation (in NATIVE units - no conversion!)
