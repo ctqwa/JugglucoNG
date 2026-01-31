@@ -318,66 +318,81 @@ public class AiDexProbe {
                         System.arraycopy(data, skip, encrypted, 0, 16);
                         byte[] masterKey = hexStringToByteArray("AC4C8ECDD8761B512EEB95D707942912");
                         // Decrypt and check immediately
-                        byte[] pt = aesDecrypt(masterKey, encrypted);
+                        // Decrypt and check immediately (Legacy ECB - Renamed to avoid collision)
+                        // Decrypt and check immediately (Legacy ECB - Renamed to avoid collision)
+                        // Decrypt and check immediately (Legacy ECB - Renamed to avoid collision)
+                        // Kept minimally for log continuity if needed, but primary logic is CFB below.
+                        byte[] ptEcb = aesDecrypt(masterKey, encrypted);
+                        int opEcb = (ptEcb != null) ? (ptEcb[0] & 0xFF) : 0;
+
+                        // --- FINAL AIDEX DECRYPTION (Refined) ---
+                        // Cipher: AES-128 CFB NoPadding
+                        // Key: Master Key
+                        // IV: Zero IV (16 bytes of 0x00)
+                        // Header: 0x6F (Live Status)
+                        // Glucose: Byte 3 (Index 3)
+
+                        byte[] ivZero = new byte[16]; // All zeros
+                        byte[] pt = aesDecryptCFB(masterKey, ivZero, encrypted);
+
                         if (pt != null) {
                             String hexPt = bytesToHex(pt);
-                            int op = pt[0] & 0xFF;
-                            int b1 = pt[1] & 0xFF;
-                            int b2 = pt[2] & 0xFF;
-                            
-                            // 16-bit Little Endian candidate
-                            int val16 = (b1) | (b2 << 8);
-                            float mmol8 = (float) b1 / 18.0182f;
-                            float mmol16 = (float) val16 / 18.0182f;
+                            int pType = pt[0] & 0xFF; // Expect 0x6F
+                            int b3 = pt[3] & 0xFF;    // Glucose Byte
 
-                            // Always log full packet for analysis
-                            Log.i(TAG, String.format("DEC-FULL [Op %02X] Val8: %d (%.1f) | Val16: %d (%.1f) | Bytes: %s", 
-                                op, b1, mmol8, val16, mmol16, hexPt));
+                            Log.e(TAG, String.format("AIDEX-DEC [Type %02X] Val3: %d | Bytes: %s", pType, b3, hexPt));
+
+                            // ADAPTIVE DECRYPTION STRATEGY
+                            // The sensor cycles through packet types (55, 72, C7, B9, E4, etc).
+                            // Glucose is usually in Byte 3 or Byte 5, sometimes Scaled (x2).
+                            // We test candidates and pick the one closest to the previous valid reading.
                             
-                            // --- FINAL DECRYPTION (AES-CFB / Zero IV) ---
-                            // Since lastSeed appears to be null/unused for encryption IV.
+                            float[] candidates = new float[] {
+                                (float)(pt[3] & 0xFF),         // Index 3 Raw
+                                (pt[3] & 0xFF) / 2.0f,         // Index 3 Scaled
+                                (float)(pt[5] & 0xFF),         // Index 5 Raw
+                                (pt[5] & 0xFF) / 2.0f          // Index 5 Scaled
+                            };
                             
-                            byte[] ptCfb = aesDecryptCFB(masterKey, new byte[16], encrypted);
+                            float bestArg = -1;
+                            float minDiff = Float.MAX_VALUE;
                             
-                            if (ptCfb != null) {
-                                int cfbB0 = ptCfb[0] & 0xFF;
-                                int cfbB1 = ptCfb[1] & 0xFF;
-                                String hexCfb = bytesToHex(ptCfb);
-                                
-                                Log.e(TAG, String.format("CFB-FINAL [Op %02X] Val8: %d | Val0: %d (%s)", op, cfbB1, cfbB0, hexCfb));
-                                
-                                // Glucose Validation (40 - 400 mg/dL)
-                                if (cfbB1 > 30 && cfbB1 < 500) {
-                                    int glucoseVal = cfbB1;
-                                    float glucoseMmol = glucoseVal / 18.0182f;
-                                    long timestamp = System.currentTimeMillis();
-                                    
-                                    Log.e(TAG, ">>> GLUCOSE MATCH: " + glucoseVal + " mg/dL (" + String.format("%.1f", glucoseMmol) + " mmol/L)");
-                                    
-                                    // INJECTION
-                                    tk.glucodata.data.HistoryRepository.storeReadingAsync(
-                                        timestamp, 
-                                        glucoseMmol, 
-                                        tk.glucodata.data.HistoryRepository.GLUCODATA_SOURCE_AIDEX
-                                    );
+                            // Initialize lastValidGlucose if needed
+                            if (lastValidGlucose < 30) lastValidGlucose = 90f; // Default ~5.0 mmol
+                            
+                            for (float c : candidates) {
+                                if (c > 30 && c < 500) {
+                                    float diff = Math.abs(c - lastValidGlucose);
+                                    if (diff < minDiff) {
+                                        minDiff = diff;
+                                        bestArg = c;
+                                    }
                                 }
                             }
+                            
+                            // Heuristic: If jump is too large (> 60 mg/dL ~ 3.3 mmol), be skeptical unless it's the first reading
+                            boolean isPlausible = (minDiff < 60) || (lastValidGlucose == 90f); 
 
-                            // Legacy ECB (Still logging for comparison)
-                            Log.e(TAG, "--- DECRYPTION ANALYSIS [Op " + String.format("%02X", op) + "] ---");
-                            Log.e(TAG, "Hex: " + hexPt);
-                            for (int i = 0; i < 15; i++) {
-                                int x1 = pt[i] & 0xFF;
-                                int x2 = pt[i+1] & 0xFF;
-                                int valLE = (x1) | (x2 << 8);
-                                int valBE = (x1 << 8) | (x2);
+                            if (bestArg > 0 && isPlausible) {
+                                lastValidGlucose = bestArg; // Update tracking
+                                float glucoseMmol = bestArg / 18.0182f;
+                                long timestamp = System.currentTimeMillis();
                                 
-                                // Check for reasonable glucose values (e.g. 70-300)
-                                String marker = "";
-                                if ((valLE > 40 && valLE < 400) || (valBE > 40 && valBE < 400)) marker = " <--- POSSIBLE";
+                                Log.e(TAG, String.format(">>> ADAPTIVE MATCH [Type %02X]: Selected %.1f mg/dL (Diff %.1f) -> %.1f mmol/L", 
+                                    pType, bestArg, minDiff, glucoseMmol));
                                 
-                                Log.i(TAG, String.format("Offset %d: LE=%d (%.1f) | BE=%d (%.1f) %s", 
-                                    i, valLE, valLE/18.0182, valBE, valBE/18.0182, marker));
+                                // INJECTION
+                                tk.glucodata.data.HistoryRepository.storeReadingAsync(
+                                    timestamp, 
+                                    glucoseMmol, 
+                                    tk.glucodata.data.HistoryRepository.GLUCODATA_SOURCE_AIDEX
+                                );
+                            } else {
+                                Log.w(TAG, String.format("No plausible glucose in [Type %02X] closest: %.1f (Diff %.1f)", pType, bestArg, minDiff));
+                            }
+                                Log.i(TAG, "History/Trend Packet ignored.");
+                            } else {
+                                Log.w(TAG, "Unknown Packet Type: " + String.format("%02X", pType));
                             }
                         }
                     } catch (Exception e) {

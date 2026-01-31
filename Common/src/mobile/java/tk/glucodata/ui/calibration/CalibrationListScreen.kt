@@ -1,6 +1,7 @@
 package tk.glucodata.ui.calibration
 
 import androidx.compose.animation.AnimatedVisibility
+import tk.glucodata.aidex.AiDexProbe
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
