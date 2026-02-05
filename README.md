@@ -2,17 +2,16 @@
 # JugglucoNG
   ![Screenshot](alpha0.3.1.png)
 ## 0.3.1-Alpha
-New landings page, redesigned sensors and settings menus
-Sibionics connection options (QR from photo, manual QR, fake QR and transmitter BT auto-connect for Sibionics 2)
-AOD, Floating glucose
-Notification shade charts
-Noise levels (xdrip-like) algorithm
-Sensor-independent DB with export/import
-Custom alarms system
-Trending arrow endgine
-App restart/clear/reset
-Basic calibration
-…
+- New landings page, redesigned sensors and settings menus
+- Sibionics connection options (QR from photo, manual QR, fake QR and transmitter BT auto-connect for Sibionics 2)
+- AOD, Floating glucose
+- Notification shade charts
+- Noise levels (xdrip-like) algorithm
+- Sensor-independent DB with export/import
+- Custom alarms system 
+- Trending arrow endgine
+- App restart/clear/reset 
+- Basic calibration
 ## 0.2.0-Alpha
 Initial build with Material 3 UI.
 Sibionics 2 Auto Reset, more buttons.
