@@ -176,6 +176,26 @@ class HistoryRepository(context: Context = Applic.app) {
     }
 
     /**
+     * Get the latest reading as a reactive Flow.
+     * This is the Single Source of Truth for the UI.
+     */
+    fun getLatestReadingFlow(): kotlinx.coroutines.flow.Flow<GlucosePoint?> {
+        return dao.getLatestReadingFlow().map { reading ->
+            reading?.let {
+                val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                    .format(java.util.Date(it.timestamp))
+                GlucosePoint(
+                    value = it.value,
+                    time = timeStr,
+                    timestamp = it.timestamp,
+                    rawValue = it.rawValue,
+                    rate = it.rate
+                )
+            }
+        }.flowOn(Dispatchers.IO)
+    }
+
+    /**
      * Get history for chart display (Raw mg/dL).
      * @param startTime Start time in milliseconds (0 = all data)
      */

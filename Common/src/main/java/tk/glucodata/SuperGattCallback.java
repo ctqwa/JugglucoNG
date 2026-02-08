@@ -87,7 +87,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     // private final UUID mSIGDeviceInfoServiceUUID =
     // UUID.fromString("0000180a-0000-1000-8000-00805f9b34fb");
     public final long starttime = System.currentTimeMillis();
-    long connectTime = 0L;
+    public long connectTime = 0L;
     public String SerialNumber;
     public String mActiveDeviceAddress;
     public long dataptr = 0L;
@@ -201,6 +201,22 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             int versch = wa - prevsus;
             nextalarm[kind] += versch * 60;
         }
+    }
+
+    // New methods to handle scan data
+    public void onScanResult(android.bluetooth.le.ScanResult result) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            android.bluetooth.le.ScanRecord record = result.getScanRecord();
+            if (record != null) {
+                byte[] bytes = record.getBytes();
+                if (bytes != null)
+                    onScanRecord(bytes);
+            }
+        }
+    }
+
+    public void onScanRecord(byte[] scanRecord) {
+        // Default empty implementation
     }
 
     static final int mininterval = 55;
@@ -703,15 +719,21 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     private Runnable getConnectDevice() {
         var cb = this;
+        if (cb.mBluetoothGatt != null) {
+            if (doLog)
+                Log.d(LOG_ID, SerialNumber + " getConnectDevice: already connected");
+            return null;
+        }
         close();
         if (cb.mActiveDeviceAddress == null || cb.mActiveBluetoothDevice == null) {
             {
                 if (doLog) {
                     Log.i(LOG_ID, SerialNumber + " " + "cb.mActiveBluetoothDevice == null");
                 }
-                ;
             }
-            ;
+            if (blueone != null) {
+                blueone.scanStarter(0);
+            }
             foundtime = 0L;
             return null;
         }

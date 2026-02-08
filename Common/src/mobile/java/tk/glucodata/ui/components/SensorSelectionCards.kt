@@ -77,6 +77,16 @@ fun SensorSelectionCards(
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 onClick = { onSensorSelected(SensorType.DEXCOM) }
             )
+            
+            // AiDex / LinX
+            SensorCard(
+                icon = Icons.Default.Bluetooth,
+                title = "AiDex / LinX",
+                subtitle = "Connect AiDex or LinX CGM",
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = { onSensorSelected(SensorType.AIDEX) }
+            )
         }
     }
 }

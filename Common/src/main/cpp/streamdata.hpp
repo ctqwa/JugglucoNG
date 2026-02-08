@@ -36,6 +36,10 @@ struct accustream : streamdata {
       : streamdata(0x20, sensindex, sens) {};
 };
 #endif
+struct aidexstream : streamdata {
+  aidexstream(int sensindex, SensorGlucoseData *sens)
+      : streamdata(0x100, sensindex, sens) {};
+};
 #ifdef SIBIONICS
 #include "sibionics/SiContext.hpp"
 struct sistream : streamdata {

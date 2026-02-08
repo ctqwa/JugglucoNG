@@ -208,8 +208,9 @@ public class bluediag {
             if (clearAllButton != null)
                 clearAllButton.setVisibility(resetvis ? VISIBLE : GONE);
             if (calibRow != null) {
-                calibRow.setVisibility(resetvis ? VISIBLE : GONE);
-                if (resetvis && calibSpinner != null) {
+                final boolean showViewMode = resetvis || gatt instanceof tk.glucodata.drivers.aidex.AiDexSensor;
+                calibRow.setVisibility(showViewMode ? VISIBLE : GONE);
+                if (showViewMode && calibSpinner != null) {
                     calibSpinner.setSelection(Natives.getViewMode(gatt.dataptr));
                 }
             }
@@ -747,7 +748,7 @@ public class bluediag {
                 public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (gatts != null && gatts.size() > gattselected) {
                         final SuperGattCallback gatt = gatts.get(gattselected);
-                        if (gatt.sensorgen == 0x10) {
+                        if (gatt.sensorgen == 0x10 || gatt instanceof tk.glucodata.drivers.aidex.AiDexSensor) {
                             Natives.setViewMode(gatt.dataptr, pos);
                             act.requestRender();
                         }

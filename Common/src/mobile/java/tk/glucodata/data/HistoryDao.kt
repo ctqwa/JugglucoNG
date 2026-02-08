@@ -28,6 +28,9 @@ interface HistoryDao {
     
     @Query("SELECT * FROM history_readings ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatestReading(): HistoryReading?
+
+    @Query("SELECT * FROM history_readings ORDER BY timestamp DESC LIMIT 1")
+    fun getLatestReadingFlow(): Flow<HistoryReading?>
     
     @Query("SELECT COUNT(*) FROM history_readings")
     suspend fun getCount(): Int

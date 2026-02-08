@@ -511,22 +511,19 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(str2sensorptr)(JNIEnv *env,
     LOGAR("ERROR: sensors==null");
     return 0LL;
   }
-  constexpr const int shortsensorlen = 11;
-  jint getlen = env->GetStringUTFLength(jsensor);
-  if (getlen != shortsensorlen) {
-    LOGGER("sensorlen=%d\n", getlen);
-  }
-  char sensor[shortsensorlen + 1];
-  env->GetStringUTFRegion(jsensor, 0, shortsensorlen, sensor);
-  sensor[sizeof(sensor) - 1] = '\0';
+  const char *sensorChars = env->GetStringUTFChars(jsensor, nullptr);
+  if (sensorChars == nullptr)
+    return 0LL;
 
-  int sensorindex = sensors->sensorindexshort(sensor);
+  int sensorindex = sensors->sensorindexshort(sensorChars);
   if (sensorindex < 0) {
-    LOGGER("ERROR: %s unknown sensor\n", sensor);
+    LOGGER("ERROR: %s unknown sensor\n", sensorChars);
+    env->ReleaseStringUTFChars(jsensor, sensorChars);
     return 0LL;
   }
   SensorGlucoseData *sens = sensors->getSensorData(sensorindex);
   sens->sensorerror = false;
+  env->ReleaseStringUTFChars(jsensor, sensorChars);
   return reinterpret_cast<jlong>(sens);
 }
 
@@ -537,52 +534,65 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(getSensorEndData)(JNIEnv *env,
     LOGAR("ERROR: sensors==null");
     return 0LL;
   }
-  constexpr const int shortsensorlen = 11;
-  jint getlen = env->GetStringUTFLength(jsensor);
-  if (getlen != shortsensorlen) {
-    LOGGER("sensorlen=%d\n", getlen);
-  }
-  char sensor[shortsensorlen + 1];
-  env->GetStringUTFRegion(jsensor, 0, shortsensorlen, sensor);
-  sensor[sizeof(sensor) - 1] = '\0';
+  const char *sensorChars = env->GetStringUTFChars(jsensor, nullptr);
+  if (sensorChars == nullptr)
+    return 0LL;
 
-  const SensorGlucoseData *sens = sensors->gethistshort(sensor);
+  const SensorGlucoseData *sens = sensors->gethistshort(sensorChars);
   if (sens == nullptr) {
-    LOGGER("Unknown sensor %s\n", sensor);
+    LOGGER("ERROR: %s unknown sensor addr\n", sensorChars);
+    env->ReleaseStringUTFChars(jsensor, sensorChars);
     return 0LL;
   }
+  env->ReleaseStringUTFChars(jsensor, sensorChars);
   jlong show = (!(sens->pollcount() && sens->isLibre3() > 0));
   return sens->expectedEndTime() | show << 32;
 }
 extern "C" JNIEXPORT jlong JNICALL fromjava(getdataptr)(JNIEnv *env, jclass cl,
                                                         jstring jsensor) {
+  if (!jsensor) {
+    LOGAR("ERROR: getdataptr jsensor==null");
+    return 0LL;
+  }
   if (!sensors) {
     LOGAR("ERROR: sensors==null");
     return 0LL;
   }
-  constexpr const int shortsensorlen = 11;
-  jint getlen = env->GetStringUTFLength(jsensor);
-  if (getlen != shortsensorlen) {
-    LOGGER("sensorlen=%d\n", getlen);
-  }
-  char sensor[shortsensorlen + 1];
-  env->GetStringUTFRegion(jsensor, 0, shortsensorlen, sensor);
-  sensor[sizeof(sensor) - 1] = '\0';
 
-  int sensorindex = sensors->sensorindexshort(sensor);
-  if (sensorindex < 0) {
-    LOGGER("ERROR: %s unknown sensor\n", sensor);
+  const char *sensor_chars = env->GetStringUTFChars(jsensor, nullptr);
+  if (!sensor_chars) {
     return 0LL;
   }
+  std::string_view sensor(sensor_chars);
+
+  int sensorindex = sensors->sensorindexshort(sensor_chars);
+  if (sensorindex < 0) {
+    if (sensor.length() >= 2 && sensor.substr(0, 2) == "X-") {
+      sensorindex = sensors->addsensor(sensor);
+    } else {
+      LOGGER("ERROR: %.*s unknown sensor\n", (int)sensor.length(),
+             sensor.data());
+      env->ReleaseStringUTFChars(jsensor, sensor_chars);
+      return 0LL;
+    }
+  }
+
   SensorGlucoseData *sens = sensors->getSensorData(sensorindex);
+  if (!sens) {
+    LOGGER("ERROR: getSensorData(%d) returns null\n", sensorindex);
+    env->ReleaseStringUTFChars(jsensor, sensor_chars);
+    return 0LL;
+  }
   sens->sensorerror = false;
-  streamdata *data;
+  streamdata *data = nullptr;
+
 #ifdef SIBIONICS
   if (sens->isSibionics()) {
-    LOGGER("getdataptr(%s) isSibinics notchinese=%d\n", sensor,
-           sens->notchinese());
+    LOGGER("getdataptr(%.*s) isSibionics notchinese=%d\n", (int)sensor.length(),
+           sensor.data(), sens->notchinese());
     if (!siInit(sens->notchinese())) {
       LOGAR("siInit()==false");
+      env->ReleaseStringUTFChars(jsensor, sensor_chars);
       return 0LL;
     }
     data = new sistream(sensorindex, sens);
@@ -591,23 +601,27 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(getdataptr)(JNIEnv *env, jclass cl,
   {
 #ifdef DEXCOM
     if (sens->isDexcom()) {
-      LOGGER("getdataptr(%s) Dexcom\n", sensor);
+      LOGGER("getdataptr(%.*s) Dexcom\n", (int)sensor.length(), sensor.data());
       data = new dexcomstream(sensorindex, sens);
     } else
 #endif
     {
       if (sens->isLibre3()) {
-        LOGGER("getdataptr(%s) Libre3\n", sensor);
+        LOGGER("getdataptr(%.*s) Libre3\n", (int)sensor.length(),
+               sensor.data());
         data = new libre3stream(sensorindex, sens);
       } else {
-#ifdef DEXCOM
         if (sens->isAccuChek()) {
-          LOGGER("getdataptr(%s) AccuChek\n", sensor);
+          LOGGER("getdataptr(%.*s) AccuChek\n", (int)sensor.length(),
+                 sensor.data());
           data = new accustream(sensorindex, sens);
-        } else
-#endif
-        {
-          LOGGER("getdataptr(%s) Libre2\n", sensor);
+        } else if (sens->isAiDex()) {
+          LOGGER("getdataptr(%.*s) AiDex\n", (int)sensor.length(),
+                 sensor.data());
+          data = new aidexstream(sensorindex, sens);
+        } else {
+          LOGGER("getdataptr(%.*s) Libre2\n", (int)sensor.length(),
+                 sensor.data());
           data = new libre2stream(sensorindex, sens);
           if (streamHistory()) {
             if (!sens->getinfo()->startedwithStreamhistory) {
@@ -619,12 +633,20 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(getdataptr)(JNIEnv *env, jclass cl,
       }
     }
   }
-  if (data->good()) {
+
+  env->ReleaseStringUTFChars(jsensor, sensor_chars);
+
+  if (data && data->good()) {
     LOGGER("getdataptr()=%p sens=%p\n", data, sens);
     return reinterpret_cast<jlong>(data);
   }
-  LOGSTRING("getdataptr(): !data->good()\n");
-  delete data;
+
+  if (data) {
+    LOGSTRING("getdataptr(): !data->good()\n");
+    delete data;
+  } else {
+    LOGSTRING("getdataptr(): data==null\n");
+  }
   return 0LL;
 }
 extern "C" JNIEXPORT void JNICALL fromjava(freedataptr)(JNIEnv *envin,
@@ -776,7 +798,8 @@ extern "C" JNIEXPORT jstring JNICALL fromjava(getDeviceAddress)(
     return nullptr;
   }
   if (usedhist->isAccuChek() ||
-      (getnew && !usedhist->scannedAddress && !usedhist->isLibre())) {
+      (getnew && !usedhist->scannedAddress && !usedhist->isLibre() &&
+       !usedhist->isAiDex())) {
     LOGAR("getDeviceAddress() !libre getnew");
     return nullptr;
   }
@@ -788,8 +811,12 @@ extern strconcat getsensortext(const SensorGlucoseData *hist);
 extern "C" JNIEXPORT jstring JNICALL fromjava(getsensortext)(JNIEnv *envin,
                                                              jclass cl,
                                                              jlong dataptr) {
+  if (!dataptr)
+    return envin->NewStringUTF("");
   const streamdata *str = reinterpret_cast<const streamdata *>(dataptr);
   const SensorGlucoseData *usedhist = str->hist;
+  if (!usedhist)
+    return envin->NewStringUTF("");
   return envin->NewStringUTF(getsensortext(usedhist).data());
 }
 
@@ -1006,6 +1033,118 @@ extern "C" JNIEXPORT jlongArray JNICALL fromjava(getlastGlucose)(JNIEnv *env,
     }
   }
   return nullptr;
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseInjection)(
+    JNIEnv *env, jclass cl, jlong timestamp, jfloat glucose, jstring sensorId) {
+  if (!sensors || !sensorId)
+    return;
+  const char *str = env->GetStringUTFChars(sensorId, NULL);
+  if (!str)
+    return;
+
+  if (timestamp > 0) {
+    int ind = -1;
+    auto *list = sensors->sensorlist();
+    if (list) {
+      ind = sensors->sensorindexshort(str);
+      if (ind < 0) {
+        ind = sensors->addsensor(std::string_view(str));
+      }
+    }
+
+    if (ind >= 0) {
+      if (SensorGlucoseData *hist = sensors->getSensorData(ind)) {
+        if (hist->error()) {
+          env->ReleaseStringUTFChars(sensorId, str);
+          return;
+        }
+
+        auto *info = hist->getinfo();
+        if (!info) {
+          env->ReleaseStringUTFChars(sensorId, str);
+          return;
+        }
+
+        uint32_t start = hist->getstarttime();
+        if (!start && timestamp > 3600) {
+          start = timestamp - 3600;
+          info->starttime = start;
+        }
+
+        int lifeCount = 0;
+        if (start > 0 && timestamp >= start) {
+          lifeCount = (timestamp - start) / 60;
+        }
+
+        uint16_t mgVal = (uint16_t)(glucose * 10.0f);
+        int pos = hist->getScanendhistory();
+
+        if (pos >= 0 && pos < hist->maxpos()) {
+          hist->savenewhistory(pos, lifeCount, mgVal);
+        }
+
+        setstreaming(hist);
+      }
+    }
+  }
+  env->ReleaseStringUTFChars(sensorId, str);
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
+    JNIEnv *env, jclass cl, jlong timestamp, jfloat glucose, jstring sensorId) {
+  if (!sensors || !sensorId)
+    return;
+  const char *str = env->GetStringUTFChars(sensorId, NULL);
+  if (!str)
+    return;
+
+  if (timestamp > 0) {
+    int ind = -1;
+    auto *list = sensors->sensorlist();
+    if (list) {
+      ind = sensors->sensorindexshort(str);
+      if (ind < 0) {
+        ind = sensors->addsensor(std::string_view(str));
+      }
+    }
+
+    if (ind >= 0) {
+      if (SensorGlucoseData *hist = sensors->getSensorData(ind)) {
+        if (hist->error()) {
+          env->ReleaseStringUTFChars(sensorId, str);
+          return;
+        }
+
+        auto *info = hist->getinfo();
+        if (!info) {
+          env->ReleaseStringUTFChars(sensorId, str);
+          return;
+        }
+
+        uint32_t start = info->starttime;
+        if (!start && timestamp > 3600) {
+          start = timestamp - 3600;
+          info->starttime = start;
+        }
+
+        int lifeCount = 0;
+        if (start > 0 && timestamp >= start) {
+          lifeCount = (timestamp - start) / 60;
+        }
+
+        uint16_t mgVal = (uint16_t)(glucose * 10.0f);
+
+        // Use savepollallIDs to update the stream data (index = lifeCount)
+        if (lifeCount >= 0 && lifeCount < hist->maxstreampos()) {
+          hist->savepollallIDs<60>(timestamp, lifeCount, mgVal, 0, 0.0f);
+        }
+
+        setstreaming(hist);
+      }
+    }
+  }
+  env->ReleaseStringUTFChars(sensorId, str);
 }
 
 extern double calibrateNow(const SensorGlucoseData *sens,
@@ -1241,7 +1380,11 @@ fromjava(namefromSensorptr)(JNIEnv *env, jclass cl, jlong sensorptr) {
 
 extern "C" JNIEXPORT jstring JNICALL
 fromjava(sensortextfromSensorptr)(JNIEnv *envin, jclass cl, jlong sensorptr) {
+  if (!sensorptr)
+    return envin->NewStringUTF("");
   const auto *sens = reinterpret_cast<const SensorGlucoseData *>(sensorptr);
+  if (!sens)
+    return envin->NewStringUTF("");
   return envin->NewStringUTF(getsensortext(sens).data());
 }
 
@@ -1263,9 +1406,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
   LOGGER("activeSensors libre3 len=%d\n", len);
   for (int i = 0; i < len; i++) {
     int index = usedsensors[i];
-    const char *name = sensors->shortsensorname(index)->data();
-    //       const char *name=sensors->showsensorname(index); //gives problems
-    //       in getdataptr
+    const char *name = sensors->shortsensorname_chars(index);
     LOGGER("active: %s\n", name);
     env->SetObjectArrayElement(sensjar, i, env->NewStringUTF(name));
   }
@@ -1284,7 +1425,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
     int index = usedsensors[i];
     const SensorGlucoseData *sens = sensors->getSensorData(index);
     if (sens && !sens->isLibre3())
-      names[uitlen++] = sensors->shortsensorname(index)->data();
+      names[uitlen++] = sensors->shortsensorname_chars(index);
   }
   jobjectArray sensjar = env->NewObjectArray(uitlen, JNIString, nullptr);
   for (int i = 0; i < uitlen; i++)

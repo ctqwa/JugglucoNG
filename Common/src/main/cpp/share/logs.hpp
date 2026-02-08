@@ -21,6 +21,15 @@
 #pragma once
 
 #include "../config.h"
+#ifdef __cplusplus
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#else
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#endif
 #ifndef NOTAPP
 #ifndef LASTDIR
 #define LASTDIR "trace"
@@ -102,10 +111,44 @@ extern
     if (0)                                                                     \
       ((void)0);                                                               \
   } while (0)
-#define loggert(...) __android_log_print(ANDROID_LOG_INFO, "cpp", __VA_ARGS__)
+
+static inline bool logcat_should_drop(const char *msg) {
+  if (!msg) {
+    return false;
+  }
+#ifdef __cplusplus
+  return (std::strstr(msg, "streaminterval()=") != nullptr) ||
+         (std::strstr(msg, "end getlaststream") != nullptr) ||
+         (std::strstr(msg, "watchvalue:") != nullptr);
+#else
+  return (strstr(msg, "streaminterval()=") != NULL) ||
+         (strstr(msg, "end getlaststream") != NULL) ||
+         (strstr(msg, "watchvalue:") != NULL);
+#endif
+}
+
+static inline int loggert(const char *format, ...) {
+  const int maxbuf = 512;
+  char buf[maxbuf];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buf, maxbuf, format, args);
+  va_end(args);
+  if (logcat_should_drop(buf)) {
+    return 0;
+  }
+  return __android_log_print(ANDROID_LOG_INFO, "cpp", "%s", buf);
+}
+
+static inline void logstring(const char *msg) {
+  if (logcat_should_drop(msg)) {
+    return;
+  }
+  __android_log_write(ANDROID_LOG_INFO, "cpp", msg);
+}
 
 #define LOGGER(...) loggert(__VA_ARGS__)
-#define LOGSTRING(pformat) __android_log_write(ANDROID_LOG_INFO, "cpp", pformat)
+#define LOGSTRING(pformat) logstring(pformat)
 #define LOGAR(x) LOGGER("%s\n", x)
 
 #define logger(x) LOGAR(x)
@@ -114,16 +157,24 @@ extern
 // __android_log_print(ANDROID_LOG_INFO,"write","%.*s",len>120?120:len,buf)
 #define logwriter(buf, len) donothing
 
-#define logprint(...)                                                          \
-  __android_log_print(ANDROID_LOG_INFO, "print", __VA_ARGS__)
+static inline int logprint(const char *format, ...) {
+  const int maxbuf = 512;
+  char buf[maxbuf];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buf, maxbuf, format, args);
+  va_end(args);
+  if (logcat_should_drop(buf)) {
+    return 0;
+  }
+  return __android_log_print(ANDROID_LOG_INFO, "print", "%s", buf);
+}
 
 #define LOGGERN(buf, len)                                                      \
-  __android_log_print(ANDROID_LOG_INFO, "logn", "%.*s", len > 120 ? 120 : len, \
-                      buf)
+  loggert("%.*s", len > 120 ? 120 : len, buf)
 
 #define LOGGERNO(buf, len, x)                                                  \
-  __android_log_print(ANDROID_LOG_INFO, "logno", "%.*s",                       \
-                      len > 120 ? 120 : len, buf)
+  loggert("%.*s", len > 120 ? 120 : len, buf)
 
 inline void lerror(const char *str) {
   int waser = errno;

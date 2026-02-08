@@ -705,6 +705,10 @@ public class Natives {
 
         public static native long lastglucosetime();
 
+        public static native void addGlucoseInjection(long time, float glucose, String sensorId);
+
+        public static native void addGlucoseStream(long time, float glucose, String sensorId);
+
         public static native byte[] bytesettings();
 
         public static native boolean ontbytesettings(byte[] ar);
@@ -1435,6 +1439,11 @@ public class Natives {
         public static native byte[] accuAskValues(long dataptr);
 
         public static native long accuProcessData(long dataptr, byte[] value, long mmsec);
+
+        public static native long aidexProcessData(long dataptr, byte[] value, long mmsec, float glucose,
+                                                   float rawGlucose, float calibrationFactor);
+
+        public static native void aidexSetStartTime(long dataptr, long timeMs);
 
         public static native void accuSetStartTime(long dataptr, byte[] value);
 

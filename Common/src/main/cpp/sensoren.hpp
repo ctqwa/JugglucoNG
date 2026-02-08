@@ -50,14 +50,19 @@ struct sensor {
   //   uint8_t reserved[4];
   uint16_t next;
   uint16_t prev;
+  const char *shortsensorname_chars() const {
+    if (name[0] == 'X' && name[1] == '-')
+      return name;
+    return name + 5;
+  }
   const sensorname_t *shortsensorname() const {
-    return reinterpret_cast<const sensorname_t *>(name + 5);
+    return reinterpret_cast<const sensorname_t *>(shortsensorname_chars());
   }
   const char *showsensorname() const {
-    const char *name = shortsensorname()->data();
-    if (!memcmp(name, "XX", 2))
-      return name + 2;
-    return name;
+    const char *sname = shortsensorname_chars();
+    if (!memcmp(sname, "XX", 2))
+      return sname + 2;
+    return sname;
   }
   uint32_t wearduration() const {
     if (halfdays >= (stdMaxDaysSI * 2))
@@ -312,8 +317,19 @@ public:
       setmaxhistory(last() * 2);
     }
     const int32_t lastpos = infoblockptr()->last;
-    SensorGlucoseData *histel =
-        new SensorGlucoseData(pathconcat(inbasedir, name), lastpos);
+    pathconcat sdir(inbasedir, name);
+    mkdir(sdir.data(), 0700);
+    SensorGlucoseData::initInfoFile(pathconcat(sdir, "info.dat"), 14, 3);
+    SensorGlucoseData *histel = new SensorGlucoseData(sdir, lastpos);
+    if (!histel->error()) {
+      std::string_view svname(name);
+      if (svname.length() >= 2 && svname.substr(0, 2) == "X-") {
+        auto info = histel->getinfo();
+        if (info) {
+          info->aidex = 1;
+        }
+      }
+    }
     hist[lastpos] = histel;
     LOGGER("hist[%d]=%p\n", lastpos, histel);
     sensorlist()[lastpos].starttime = histel->getstarttime();
@@ -634,6 +650,9 @@ public:
     const sensor *end = sensorlist() + last() + 1;
     const sensor *sens =
         find_if(sensorlist(), end, [name](const sensor &sens) -> bool {
+          if (name[0] == 'X' && name[1] == '-') {
+            return !strcmp(name, sens.name);
+          }
           return !memcmp(name, sens.name + 5, 11);
         });
     if (end == sens)
@@ -951,16 +970,25 @@ public:
 
   typedef array<char, 11> sensorname_t;
 
-  const sensorname_t *shortsensorname(int index) const {
+  const char *shortsensorname_chars(int index) const {
     const sensor *sens = getsensor(index);
-    return sens->shortsensorname();
-    //   return reinterpret_cast<const sensorname_t *>( sens->name+5);
+    return sens->shortsensorname_chars();
+  }
+  const sensorname_t *shortsensorname(int index) const {
+    return reinterpret_cast<const sensorname_t *>(shortsensorname_chars(index));
   }
   const char *showsensorname(int index) const {
     const sensor *sens = getsensor(index);
     return sens->showsensorname();
   }
 
+  const char *shortsensorname_chars() const {
+    if (int l = infoblockptr()->current; l >= 0)
+      return shortsensorname_chars(l);
+    if (int l = last(); l >= 0)
+      return shortsensorname_chars(l);
+    return nullptr;
+  }
   const sensorname_t *shortsensorname() const {
     // Use current() (the user-selected main sensor) instead of last() (the most
     // recently added) This enables the "Main Sensor Toggle" feature

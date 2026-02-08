@@ -149,6 +149,10 @@
             android:name=".receivers.AlarmActionReceiver"
             android:enabled="true"
             android:exported="false" />
+        <receiver
+            android:name=".drivers.aidex.AiDexScanReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <service
             android:name="tk.glucodata.keeprunning"

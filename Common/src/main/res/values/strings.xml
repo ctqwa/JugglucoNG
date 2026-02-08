@@ -550,6 +550,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="raw">Raw</string>
     <string name="auto_raw">Auto+Raw</string>
     <string name="raw_auto">Raw+Auto</string>
+    <string name="broadcast_only">Broadcast</string>
     <string name="reset_autocal_button">Restart auto-calibration</string>
 
     <!-- Trend Descriptions -->

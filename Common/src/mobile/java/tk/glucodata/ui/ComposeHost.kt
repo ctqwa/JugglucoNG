@@ -23,25 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.BluetoothConnected
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material.icons.filled.SettingsBackupRestore
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.Slider
 import tk.glucodata.ui.components.StyledSwitch
@@ -785,6 +768,8 @@ fun DashboardScreen(
     var showLibreWizard by remember { mutableStateOf(false) }
     var showDexcomWizard by remember { mutableStateOf(false) }
     
+    var showAiDexWizard by remember { mutableStateOf(false) }
+
     val coroutineScope = rememberCoroutineScope()
     
     // Import launcher for CSV files
@@ -839,6 +824,18 @@ fun DashboardScreen(
         )
         return
     }
+
+    // AiDex Setup Wizard
+    if (showAiDexWizard) {
+        tk.glucodata.ui.setup.AiDexSetupWizard(
+            onDismiss = { showAiDexWizard = false },
+            onComplete = {
+                showAiDexWizard = false
+                viewModel.refreshData()
+            }
+        )
+        return
+    }
     
     // Snackbar state for undo actions
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
@@ -883,6 +880,7 @@ fun DashboardScreen(
                         tk.glucodata.ui.components.SensorType.SIBIONICS -> showSibionicsWizard = true
                         tk.glucodata.ui.components.SensorType.LIBRE -> showLibreWizard = true
                         tk.glucodata.ui.components.SensorType.DEXCOM -> showDexcomWizard = true
+                        tk.glucodata.ui.components.SensorType.AIDEX -> showAiDexWizard = true
                     }
                 },
                 onImportHistory = {
@@ -1826,6 +1824,7 @@ fun InteractiveGlucoseChart(
 
                     // --- DRAW BASED ON VIEW MODE ---
                     // ViewMode logic simplified
+                    // ViewMode only uses 0-3. Broadcast-only is a separate connection option in AiDexSensor.
                     val drawRaw = viewMode == 1 || viewMode == 2 || viewMode == 3
                     val drawAuto = viewMode == 0 || viewMode == 2 || viewMode == 3
                     val isRawModeChart = viewMode == 1 || viewMode == 3
@@ -3863,6 +3862,7 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
     var showSibionicsWizard by remember { mutableStateOf(false) }
     var showLibreWizard by remember { mutableStateOf(false) }
     var showDexcomWizard by remember { mutableStateOf(false) }
+    var showAiDexWizard by remember { mutableStateOf(false) }
     
     // Sensor Type Picker Bottom Sheet
     if (showSensorPicker) {
@@ -3873,6 +3873,7 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
                     tk.glucodata.ui.components.SensorType.SIBIONICS -> showSibionicsWizard = true
                     tk.glucodata.ui.components.SensorType.LIBRE -> showLibreWizard = true
                     tk.glucodata.ui.components.SensorType.DEXCOM -> showDexcomWizard = true
+                    tk.glucodata.ui.components.SensorType.AIDEX -> showAiDexWizard = true
                 }
             }
         )
@@ -3934,6 +3935,7 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
                             tk.glucodata.ui.components.SensorType.SIBIONICS -> showSibionicsWizard = true
                             tk.glucodata.ui.components.SensorType.LIBRE -> showLibreWizard = true
                             tk.glucodata.ui.components.SensorType.DEXCOM -> showDexcomWizard = true
+                            tk.glucodata.ui.components.SensorType.AIDEX -> showAiDexWizard = true
                         }
                     }
                 )
@@ -4045,6 +4047,15 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     var showWipeDialog by remember { mutableStateOf(false) }
     var wipeDataChecked by remember { mutableStateOf(false) }
     var keepDataChecked by remember { mutableStateOf(false) }
+
+    // AiDex Maintenance Dialogs
+    var showAiDexResetDialog by remember { mutableStateOf(false) }
+    var showAiDexShelfDialog by remember { mutableStateOf(false) }
+    var showAiDexBondDialog by remember { mutableStateOf(false) }
+    var showAiDexClearDialog by remember { mutableStateOf(false) }
+    var showAiDexForceDeleteDialog by remember { mutableStateOf(false) }
+    var showAiDexNewSensorDialog by remember { mutableStateOf(false) }
+
     val scope = rememberCoroutineScope() // Fix: Add missing scope
 
     if (showTerminateDialog) {
@@ -4234,6 +4245,117 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             },
             dismissButton = {
                 TextButton(onClick = { showWipeDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showAiDexResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiDexResetDialog = false },
+            title = { Text("Reset AiDex Sensor?") },
+            text = { Text("Perform a multi-strategy hardware reset. Tries vendor native lib, direct BLE command, then bond removal as fallback. The sensor will restart and re-initialize.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetAiDexSensor(sensor.serial)
+                    showAiDexResetDialog = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiDexResetDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showAiDexShelfDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiDexShelfDialog = false },
+            title = { Text("Enter Shelf Mode?") },
+            text = { Text("CAUTION: This puts the sensor into deep sleep for storage. You may need to re-insert or use a specific trigger to wake it up.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.sendAiDexMaintenanceCommand(sensor.serial, 2)
+                        showAiDexShelfDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Enter Shelf Mode") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiDexShelfDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showAiDexBondDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiDexBondDialog = false },
+            title = { Text("Delete Bluetooth Bond?") },
+            text = { Text("Remove the pairing information from the sensor. You will need to re-pair it manually.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.sendAiDexMaintenanceCommand(sensor.serial, 3)
+                    showAiDexBondDialog = false
+                }) { Text("Delete Bond") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiDexBondDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showAiDexClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiDexClearDialog = false },
+            title = { Text("Clear Sensor Storage?") },
+            text = { Text("CAUTION: This clears ALL history data stored inside the physical sensor. This cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.sendAiDexMaintenanceCommand(sensor.serial, 4)
+                        showAiDexClearDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Clear Storage") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiDexClearDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showAiDexForceDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiDexForceDeleteDialog = false },
+            title = { Text("Force Delete?") },
+            text = { Text("In case of device loss or damage, perform this operation. Locally removes the sensor from the app. NOTE: The physical sensor will remain locked if it cannot be reached to delete the bond.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.forgetSensor(sensor.serial)
+                        showAiDexForceDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Force Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiDexForceDeleteDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showAiDexNewSensorDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiDexNewSensorDialog = false },
+            title = { Text("Start New Sensor?") },
+            text = { Text("Register a new sensor session with the current date/time. Tries vendor native lib, then direct BLE command, then full reset as fallback. Use this when inserting a fresh sensor.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.startNewAiDexSensor(sensor.serial)
+                    showAiDexNewSensorDialog = false
+                }) { Text("Start New") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiDexNewSensorDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -4472,8 +4594,8 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 //            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 //            Spacer(modifier = Modifier.height(16.dp))
 
-            // Calibration Mode (Sibionics Only) - M3 Expressive Connected Button Group
-            if (sensor.isSibionics) {
+            // Calibration Mode (Sibionics + AiDex) - M3 Expressive Connected Button Group
+            if (sensor.isSibionics || sensor.isAidex) {
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -4489,7 +4611,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // M3 Expressive Trailing Action (Compact)
-                    if (sensor.viewMode != 1) {
+                    if (sensor.isSibionics && sensor.viewMode != 1) {
                         FilledTonalButton(
                         onClick = { showClearDialog = true },
                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
@@ -4520,6 +4642,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     val rawStr = stringResource(R.string.raw)
                     val autoRawStr = stringResource(R.string.auto_raw)
                     val rawAutoStr = stringResource(R.string.raw_auto)
+                    // Note: Broadcast Only is a separate connection option (checkbox), not a viewMode
 
                     val modes = listOf(autoStr, rawStr, autoRawStr, rawAutoStr)
                     modes.forEachIndexed { index, title ->
@@ -4599,6 +4722,76 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 //                    }
 //                }
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (sensor.isAidex) {
+                // Broadcast-Only Connection Option
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = sensor.broadcastOnlyConnection,
+                        onCheckedChange = { viewModel.setBroadcastOnlyConnection(sensor.serial, it) }
+                    )
+                    Column {
+                        Text(
+                            stringResource(R.string.broadcast_only),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            "Use BLE advertisements only (no GATT connection)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Maintenance",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AssistChip(
+                        onClick = { showAiDexResetDialog = true },
+                        label = { Text("Reset") },
+                        leadingIcon = { Icon(Icons.Default.RestartAlt, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    AssistChip(
+                        onClick = { showAiDexShelfDialog = true },
+                        label = { Text("Shelf") },
+                        leadingIcon = { Icon(Icons.Default.PowerSettingsNew, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    AssistChip(
+                        onClick = { showAiDexBondDialog = true },
+                        label = { Text("Bond") },
+                        leadingIcon = { Icon(Icons.Default.LinkOff, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    AssistChip(
+                        onClick = { showAiDexClearDialog = true },
+                        label = { Text("Storage") },
+                        leadingIcon = { Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    AssistChip(
+                        onClick = { showAiDexForceDeleteDialog = true },
+                        label = { Text("Force Delete") },
+                        leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    AssistChip(
+                        onClick = { showAiDexNewSensorDialog = true },
+                        label = { Text("New Sensor") },
+                        leadingIcon = { Icon(Icons.Default.FiberNew, null, modifier = Modifier.size(18.dp)) }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
 

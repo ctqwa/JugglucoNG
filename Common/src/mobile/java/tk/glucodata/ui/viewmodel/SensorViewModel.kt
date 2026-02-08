@@ -54,6 +54,7 @@ data class SensorInfo(
     val autoResetDays: Int,
     val isSibionics: Boolean,
     val isSibionics2: Boolean,
+    val isAidex: Boolean,
     val startMs: Long,
     val officialEndMs: Long,
     val expectedEndMs: Long,
@@ -61,7 +62,8 @@ data class SensorInfo(
     val customCalIndex: Int,
     val customCalAutoReset: Boolean,
     val detailedStatus: String = "",
-    val isActive: Boolean = false  // True if this is the primary data source
+    val isActive: Boolean = false,  // True if this is the primary data source
+    val broadcastOnlyConnection: Boolean = false  // AiDex: use BLE advertisements only
 ) {
     /** Get the assigned color for this sensor */
     val color: Color get() = SensorColors.getColor(serial)
@@ -139,103 +141,123 @@ class SensorViewModel : ViewModel() {
             } catch (e: Exception) {
                 null
             }
+
+
             
             val sensorList = gatts.map { gatt ->
                 try {
-                    val officialEndMs = Natives.getSensorEndTime(gatt.dataptr, true)
-                    val expectedEndMs = Natives.getSensorEndTime(gatt.dataptr, false)
-                    val startMs = Natives.getSensorStartmsec(gatt.dataptr)
-                    val currentViewMode = Natives.getViewMode(gatt.dataptr)
-                    var autoResetDays = Natives.getAutoResetDays(gatt.dataptr)
-                    val isSi2 = Natives.isSibionics2(gatt.dataptr)
-                    val isSi = Natives.isSibionics(gatt.dataptr)
-                    // If 0 (Fresh), force to 21 (Default ON)
-                    if (isSi2 && autoResetDays == 0) {
-                        Natives.setAutoResetDays(gatt.dataptr, 21)
-                        autoResetDays = 21
-                    }
-
-                    // Get custom calibration settings
-                    val customSettings = Natives.getCustomCalibrationSettings(gatt.dataptr)
-                    val customEnabled = (customSettings and 1L) != 0L
-                    val customAutoReset = (customSettings and 2L) != 0L
-                    val customIndex = ((customSettings ushr 8) and 0xFF).toInt()
-
-                    // Get detailed status from native code which has accurate logic
-                    val nativeStatus = Natives.getsensortext(gatt.dataptr) ?: ""
-                    val bleStatus = gatt.constatstatusstr ?: ""
-                    
-                    // Calculate streaming status first - needed for status resolution
-                    val isActivelyReceiving = nativeStatus.isNotEmpty() // If native status returns text, we are likely properly connected/receiving
-                                                || gatt.streamingEnabled()
-                    
-                    
-                    // Map common BLE status codes to user-friendly messages
-                    fun mapBleStatus(status: String): String = when {
-                        status == "Status=22" -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_bluetooth_off)
-                        status == "Status=133" -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_connection_failed)
-                        status.startsWith("Status=") -> status // Keep other Status= codes as-is
-                        else -> status
-                    }
-                    
-                    // Determine final display status with smart priority
-                    val finalStatus = when {
-                        // Priority 1: Meaningful native sensor states (errors, warming up, receiving history)
-                        // TRUST THE NATIVE CODE: If it returns a string, it's important context.
-                        nativeStatus.isNotEmpty() -> nativeStatus
+                    // KOTLIN SENSOR SUPPORT (AiDex)
+                    if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                         // Map pure Kotlin fields to SensorInfo
+                         val meaningfulStatus = gatt.getDetailedBleStatus()
+                         val rawBleStatus = gatt.constatstatusstr ?: ""
+                         // Only show BLE status if it's a raw Status= code (not our custom strings)
+                         val bleStatusForDisplay = if (rawBleStatus.startsWith("Status=")) rawBleStatus else ""
+                         
+                         val aiDexDataptr = gatt.dataptr
+                         val startMs = if (aiDexDataptr != 0L) Natives.getSensorStartmsec(aiDexDataptr) else 0L
+                         val officialEndMs = if (aiDexDataptr != 0L) Natives.getSensorEndTime(aiDexDataptr, true) else 0L
+                         val expectedEndMs = if (aiDexDataptr != 0L) Natives.getSensorEndTime(aiDexDataptr, false) else 0L
+                         val currentViewMode = if (aiDexDataptr != 0L) Natives.getViewMode(aiDexDataptr) else 0
+                         
+                         SensorInfo(
+                            serial = gatt.SerialNumber ?: "AiDex",
+                            deviceAddress = gatt.mActiveDeviceAddress ?: "Unknown",
+                            connectionStatus = bleStatusForDisplay,  // Raw BLE status (Status=X) or empty
+                            starttime = if (startMs > 0) tk.glucodata.bluediag.datestr(startMs) else "",
+                            streaming = true, 
+                            rssi = gatt.readrssi,
+                            dataptr = aiDexDataptr, 
+                            officialEnd = if (officialEndMs > 0) tk.glucodata.bluediag.datestr(officialEndMs) else "",
+                            expectedEnd = if (expectedEndMs > 0) tk.glucodata.bluediag.datestr(expectedEndMs) else "",
+                            viewMode = currentViewMode, 
+                            autoResetDays = 0,
+                            isSibionics = false,
+                            isSibionics2 = false,
+                            isAidex = true,
+                            startMs = startMs,
+                            officialEndMs = officialEndMs,
+                            expectedEndMs = expectedEndMs,
+                            customCalEnabled = false,
+                            customCalIndex = 0,
+                            customCalAutoReset = false,
+                            detailedStatus = meaningfulStatus,  // Meaningful status (Broadcast Mode, Scanning, etc.)
+                            isActive = (activeSensorSerial == gatt.SerialNumber),
+                            broadcastOnlyConnection = gatt.broadcastOnlyConnection
+                        )
+                    } else {
+                        // LEGACY NATIVE SENSOR LOGIC
+                        val officialEndMs = Natives.getSensorEndTime(gatt.dataptr, true)
+                        val expectedEndMs = Natives.getSensorEndTime(gatt.dataptr, false)
+                        val startMs = Natives.getSensorStartmsec(gatt.dataptr)
+                        val currentViewMode = Natives.getViewMode(gatt.dataptr)
+                        var autoResetDays = Natives.getAutoResetDays(gatt.dataptr)
+                        val isSi2 = Natives.isSibionics2(gatt.dataptr)
+                        val isSi = Natives.isSibionics(gatt.dataptr)
+                        // If 0 (Fresh), force to 21 (Default ON)
+                        if (isSi2 && autoResetDays == 0) {
+                            Natives.setAutoResetDays(gatt.dataptr, 21)
+                            autoResetDays = 21
+                        }
+    
+                        // Get custom calibration settings
+                        val customSettings = Natives.getCustomCalibrationSettings(gatt.dataptr)
+                        val customEnabled = (customSettings and 1L) != 0L
+                        val customAutoReset = (customSettings and 2L) != 0L
+                        val customIndex = ((customSettings ushr 8) and 0xFF).toInt()
+    
+                        // Get detailed status from native code
+                        val nativeStatus = Natives.getsensortext(gatt.dataptr) ?: ""
+                        val bleStatus = gatt.constatstatusstr ?: ""
                         
-                        // Priority 2: ANY BLE status issues (Status=X codes, BT off, searching, loss of signal)
-                        // These indicate real connection problems that should always show
-                        bleStatus.isNotEmpty() &&
-                        (bleStatus.startsWith("Status=") ||
-                         bleStatus.contains("Bluetooth off", ignoreCase = true) ||
-                         bleStatus.contains("search", ignoreCase = true) ||
-                         bleStatus.contains("Loss of signal", ignoreCase = true)) -> bleStatus
+                        val isActivelyReceiving = nativeStatus.isNotEmpty() || gatt.streamingEnabled()
                         
-                        // Priority 3: Show "Connected" when actively receiving AND no BLE problems
-                        // Only trust streaming flag if BLE status is normal (empty or just "Disconnected")
-                        isActivelyReceiving && 
-                        (bleStatus.isEmpty() || bleStatus == "Disconnected") -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_connected)
+                        fun mapBleStatus(status: String): String = when {
+                            status == "Status=22" -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_bluetooth_off)
+                            status == "Status=133" -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_connection_failed)
+                            status.startsWith("Status=") -> status 
+                            else -> status
+                        }
                         
-                        // Fallback: Show disconnected
-                        else -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_disconnected)
+                        val finalStatus = when {
+                            nativeStatus.isNotEmpty() -> nativeStatus
+                            bleStatus.isNotEmpty() && (bleStatus.startsWith("Status=") || bleStatus.contains("Bluetooth off", ignoreCase = true) || bleStatus.contains("search", ignoreCase = true) || bleStatus.contains("Loss of signal", ignoreCase = true)) -> bleStatus
+                            isActivelyReceiving && (bleStatus.isEmpty() || bleStatus == "Disconnected") -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_connected)
+                            else -> tk.glucodata.Applic.app.getString(tk.glucodata.R.string.status_disconnected)
+                        }
+                        
+                        val displayStatus = mapBleStatus(finalStatus)
+                        val sensorSerial = gatt.SerialNumber ?: "Unknown"
+                        val isActiveSensor = activeSensorSerial != null && sensorSerial == activeSensorSerial
+    
+                        SensorInfo(
+                            serial = sensorSerial,
+                            deviceAddress = gatt.mActiveDeviceAddress ?: "Unknown",
+                            connectionStatus = if (bleStatus.startsWith("Status=")) mapBleStatus(bleStatus) else "",
+                            starttime = if (startMs > 0) tk.glucodata.bluediag.datestr(startMs) else "",
+                            streaming = isActivelyReceiving,
+                            rssi = gatt.readrssi,
+                            dataptr = gatt.dataptr,
+                            officialEnd = if(officialEndMs > 0) tk.glucodata.bluediag.datestr(officialEndMs) else "",
+                            expectedEnd = if(expectedEndMs > 0) tk.glucodata.bluediag.datestr(expectedEndMs) else "",
+                            viewMode = currentViewMode,
+                            autoResetDays = autoResetDays,
+                            isSibionics = isSi,
+                            isSibionics2 = isSi2,
+                            isAidex = false,
+                            startMs = startMs,
+                            officialEndMs = officialEndMs,
+                            expectedEndMs = expectedEndMs,
+                            customCalEnabled = customEnabled,
+                            customCalIndex = customIndex,
+                            customCalAutoReset = customAutoReset,
+                            detailedStatus = displayStatus,
+                            isActive = isActiveSensor,
+                            broadcastOnlyConnection = false
+                        )
                     }
-                    
-                    // Apply user-friendly mapping to final status
-                    val displayStatus = mapBleStatus(finalStatus)
-                    
-                    // Check if this sensor is the active/primary one
-                    val sensorSerial = gatt.SerialNumber ?: "Unknown"
-                    val isActiveSensor = activeSensorSerial != null && sensorSerial == activeSensorSerial
-
-
-                    SensorInfo(
-                        serial = sensorSerial,
-                        deviceAddress = gatt.mActiveDeviceAddress ?: "Unknown",
-                        // connectionStatus: Only show REAL BLE status codes (Status=X), not app messages
-                        connectionStatus = if (bleStatus.startsWith("Status=")) mapBleStatus(bleStatus) else "",
-                        starttime = if (startMs > 0) tk.glucodata.bluediag.datestr(startMs) else "",
-                        streaming = isActivelyReceiving,
-                        rssi = gatt.readrssi,
-                        dataptr = gatt.dataptr,
-                        officialEnd = if(officialEndMs > 0) tk.glucodata.bluediag.datestr(officialEndMs) else "",
-                        expectedEnd = if(expectedEndMs > 0) tk.glucodata.bluediag.datestr(expectedEndMs) else "",
-                        viewMode = currentViewMode,
-                        autoResetDays = autoResetDays,
-                        isSibionics = isSi,
-                        isSibionics2 = isSi2,
-                        startMs = startMs,
-                        officialEndMs = officialEndMs,
-                        expectedEndMs = expectedEndMs,
-                        customCalEnabled = customEnabled,
-                        customCalIndex = customIndex,
-                        customCalAutoReset = customAutoReset,
-                        detailedStatus = displayStatus,
-                        isActive = isActiveSensor
-                    )
                 } catch (e: Exception) {
                     android.util.Log.e("SensorViewModel", "Error loading sensor ${gatt.SerialNumber}", e)
-                    // Return placeholder sensor with error status instead of skipping it
                     SensorInfo(
                         serial = gatt.SerialNumber ?: "Error",
                         deviceAddress = gatt.mActiveDeviceAddress ?: "Unknown",
@@ -250,6 +272,7 @@ class SensorViewModel : ViewModel() {
                         autoResetDays = 0,
                         isSibionics = false,
                         isSibionics2 = false,
+                        isAidex = false,
                         startMs = 0L,
                         officialEndMs = 0L,
                         expectedEndMs = 0L,
@@ -257,7 +280,8 @@ class SensorViewModel : ViewModel() {
                         customCalIndex = 0,
                         customCalAutoReset = false,
                         detailedStatus = "Error: ${e.message}",
-                        isActive = false
+                        isActive = false,
+                        broadcastOnlyConnection = false
                     )
                 }
             }
@@ -279,11 +303,23 @@ class SensorViewModel : ViewModel() {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
-            if (wipeData) {
-                Natives.siWipeDataOnly(gatt.dataptr)
+            try {
+                if (wipeData && gatt.dataptr != 0L) {
+                    Natives.siWipeDataOnly(gatt.dataptr)
+                }
+                if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                    // AiDex native finishSensor path is unstable; close GATT instead.
+                    gatt.close()
+                    SensorBluetooth.sensorEnded(serial)
+                } else {
+                    gatt.finishSensor()
+                    SensorBluetooth.sensorEnded(serial)
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e("SensorViewModel", "terminateSensor($serial) crashed: ${t.message}", t)
+                // Still try to clean up
+                try { SensorBluetooth.sensorEnded(serial) } catch (_: Throwable) {}
             }
-            gatt.finishSensor()
-            SensorBluetooth.sensorEnded(serial)
             refreshSensors()
         }
     }
@@ -292,18 +328,23 @@ class SensorViewModel : ViewModel() {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
-            gatt.searchforDeviceAddress()
             gatt.close()
-            SensorBluetooth.startscan()
-            refreshSensors()
         }
+        // Properly notify system that sensor is ended/removed from list
+        SensorBluetooth.sensorEnded(serial)
+        refreshSensors()
     }
 
     fun resetSensor(serial: String) {
          val gatts = SensorBluetooth.mygatts()
          val gatt = gatts.find { it.SerialNumber == serial }
          if (gatt != null) {
-             Natives.setResetSibionics2(gatt.dataptr, true)
+             if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                 // Route AiDex to multi-strategy reset (runs on IO thread)
+                 resetAiDexSensor(serial)
+             } else {
+                 Natives.setResetSibionics2(gatt.dataptr, true)
+             }
          }
     }
 
@@ -327,7 +368,19 @@ class SensorViewModel : ViewModel() {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
+            if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                gatt.viewMode = mode
+            }
             Natives.setViewMode(gatt.dataptr, mode)
+            refreshSensors()
+        }
+    }
+
+    fun setBroadcastOnlyConnection(serial: String, enabled: Boolean) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+            gatt.setBroadcastOnlyConnection(enabled)
             refreshSensors()
         }
     }
@@ -385,6 +438,51 @@ class SensorViewModel : ViewModel() {
             }
         } else {
             android.util.Log.d("SensorViewModel", "Gatt not found for serial: $serial")
+        }
+    }
+
+    fun sendAiDexMaintenanceCommand(serial: String, opCode: Int) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val success = gatt.sendMaintenanceCommand(opCode)
+                if (success) {
+                    refreshSensors()
+                }
+            }
+        }
+    }
+
+    /**
+     * Multi-strategy AiDex sensor reset: vendor native lib -> FF32 direct write -> BLE bond removal.
+     * Must run on IO dispatcher (uses Thread.sleep internally).
+     */
+    fun resetAiDexSensor(serial: String) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val success = gatt.resetSensor()
+                android.util.Log.i("SensorVM", "AiDex resetSensor result: $success")
+                refreshSensors()
+            }
+        }
+    }
+
+    /**
+     * Multi-strategy AiDex start new sensor: vendor native lib -> FF32 direct write -> full reset fallback.
+     * Must run on IO dispatcher (uses Thread.sleep internally).
+     */
+    fun startNewAiDexSensor(serial: String) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val success = gatt.startNewSensor()
+                android.util.Log.i("SensorVM", "AiDex startNewSensor result: $success")
+                refreshSensors()
+            }
         }
     }
 }

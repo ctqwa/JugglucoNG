@@ -283,19 +283,22 @@ fromjava(getbackupActiveOnly)(JNIEnv *envin, jclass cl, jint pos) {
 extern "C" JNIEXPORT void JNICALL fromjava(setreceiveport)(JNIEnv *env,
                                                            jclass cl,
                                                            jstring jport) {
-  jint portlen = env->GetStringUTFLength(jport);
+  if (jport == nullptr)
+    return;
+  const char *port_chars = env->GetStringUTFChars(jport, nullptr);
+  if (port_chars == nullptr)
+    return;
+  jint portlen = strlen(port_chars);
   if (portlen < 6) {
-    char newport[portlen + 1];
-    jint jlen = env->GetStringLength(jport);
-    env->GetStringUTFRegion(jport, 0, jlen, newport);
     if (backup->getupdatedata()->port[portlen] ||
-        memcmp(newport, backup->getupdatedata()->port, portlen)) {
-      memcpy(backup->getupdatedata()->port, newport, portlen);
+        memcmp(port_chars, backup->getupdatedata()->port, portlen)) {
+      memcpy(backup->getupdatedata()->port, port_chars, portlen);
       backup->getupdatedata()->port[portlen] = '\0';
       //        backup->stopreceiver();
       backup->startreceiver(true);
     }
   }
+  env->ReleaseStringUTFChars(jport, port_chars);
 }
 extern "C" JNIEXPORT jstring JNICALL fromjava(getreceiveport)(JNIEnv *env,
                                                               jclass cl) {
@@ -349,33 +352,30 @@ extern "C" JNIEXPORT jint JNICALL fromjava(changebackuphost)(
          pos, jnames, nr, detect, jport, nums, stream, scans, recover, receive,
          activeonly, passiveonly, jpass, starttime, jlabel, testip,
          hashostname);
-  jint portlen = env->GetStringUTFLength(jport);
-  jint jlen = env->GetStringLength(jport);
-  char port[portlen + 1];
-  env->GetStringUTFRegion(jport, 0, jlen, port);
-  port[portlen] = '\0';
-  char *passptr = nullptr;
-  jint passlen = 0;
-  if (jpass) {
-    passlen = env->GetStringUTFLength(jpass);
+  const char *port = env->GetStringUTFChars(jport, nullptr);
+  if (!port)
+    return -1;
+  int portlen = strlen(port);
 
-    jint jpasslen = env->GetStringLength(jpass);
-    passptr = (char *)alloca(passlen + 1);
-    env->GetStringUTFRegion(jpass, 0, jpasslen, passptr);
-    passptr[passlen] = '\0';
+  const char *passptr = nullptr;
+  if (jpass) {
+    passptr = env->GetStringUTFChars(jpass, nullptr);
   }
   const char *label = jlabel ? env->GetStringUTFChars(jlabel, NULL) : nullptr;
 
   const int arlen = std::min(env->GetArrayLength(jnames), nr);
   // Note: Existing backup->changehost likely doesn't support jicelabel/side
   // yet. We pass hashostname which was previous Arg 17.
-  jint res = backup->changehost(pos, env, jnames, arlen, detect,
-                                std::string_view(port, portlen), nums, stream,
-                                scans, recover, receive, activeonly,
-                                std::string_view(passptr, passlen), starttime,
-                                passiveonly, label, testip, true, hashostname);
+  jint res = backup->changehost(
+      pos, env, jnames, arlen, detect, std::string_view(port, portlen), nums,
+      stream, scans, recover, receive, activeonly,
+      passptr ? std::string_view(passptr) : std::string_view(), starttime,
+      passiveonly, label, testip, true, hashostname);
   if (jlabel)
     env->ReleaseStringUTFChars(jlabel, label);
+  if (jpass)
+    env->ReleaseStringUTFChars(jpass, passptr);
+  env->ReleaseStringUTFChars(jport, port);
   return res;
 }
 extern "C" JNIEXPORT jboolean JNICALL fromjava(isreceiving)(JNIEnv *env,

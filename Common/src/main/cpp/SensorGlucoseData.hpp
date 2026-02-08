@@ -181,11 +181,6 @@ class SensorGlucoseData {
   string sensordir;
   // inline static  const string basedir{FILEDIR};
 public:
-  inline static const int blocksize = sysconf(_SC_PAGESIZE);
-
-private:
-  static constexpr uint16_t defaultinterval = 15 * 60;
-
   struct updatestate {
     uint32_t scanstart;
     uint32_t histstart;
@@ -274,7 +269,8 @@ private:
     int8_t streamingIsEnabled;
     int8_t patchState;
     uint16_t autoResetDays : 8;
-    uint16_t reserved4 : 4;
+    uint16_t reserved4 : 3;
+    uint16_t aidex : 1;
     uint16_t useCustomCalibration : 1;
     uint16_t autoResetAlgorithm : 1;
     uint16_t accuChek : 1;
@@ -494,11 +490,42 @@ private:
               static_cast<size_t>((auth12 ? 12 : 10))};
     }
   };
+
+  static void initInfoFile(const char *filename, uint8_t days = 14,
+                           uint8_t dupl = 3,
+                           uint16_t interval = defaultinterval) {
+    struct stat st;
+    if (stat(filename, &st) == 0 && st.st_size >= sizeof(Info)) {
+      Readall<uint8_t> inf(filename);
+      if (inf.data() && inf.size() >= sizeof(Info)) {
+        const Info *in = reinterpret_cast<const Info *>(inf.data());
+        if (in->starttime > 1000000000 && in->days >= 10 && in->dupl > 0)
+          return;
+      }
+    }
+    Info inf = {0};
+    inf.days = days;
+    inf.dupl = dupl;
+    inf.interval = interval;
+    inf.starttime = time(nullptr);
+    inf.lastscantime = inf.starttime;
+    inf.ident.len = 8;
+    inf.info.len = 6;
+    writeall(filename, &inf, sizeof(inf));
+  }
+
+  inline static const int blocksize = sysconf(_SC_PAGESIZE);
+
+private:
+  static constexpr uint16_t defaultinterval = 15 * 60;
   // pathconcat sensordir;
   // pathconcat scanfile;
   Mmap<unsigned char> meminfo;
   int getelsize() const {
-    return sizeof(uint32_t) + (getinfo()->dupl + 1) * sizeof(uint16_t);
+    auto *info = getinfo();
+    if (!info)
+      return 0;
+    return sizeof(uint32_t) + (info->dupl + 1) * sizeof(uint16_t);
   }
   Mmap<uint8_t> historydata;
 
@@ -552,7 +579,8 @@ public:
     const int gen = getsensorgen();
     if (gen > 2)
       return false;
-    return gen == 2 || getinfo()->wearduration > 20160;
+    auto *info = getinfo();
+    return info && (gen == 2 || info->wearduration > 20160);
   }
   void setsensorgen() {
     /*    extern void setlastGen(int gen);
@@ -567,11 +595,15 @@ public:
       return 0x10;
     if (isAccuChek())
       return 0x20;
-    if (getinfo()->interval == interval5)
+    auto *info = getinfo();
+    if (info && info->interval == interval5)
       return 3;
     return 2;
   }
-  char *deviceaddress() { return getinfo()->deviceaddress; }
+  char *deviceaddress() {
+    auto *info = getinfo();
+    return info ? info->deviceaddress : nullptr;
+  }
 #ifdef JUGGLUCO_APP
 #ifdef SKIPTRIEDOFTEN
   std::vector<address_t> usedAddresses;
@@ -579,7 +611,10 @@ public:
   uint32_t lastNewMatch = 0;
 #endif
 #endif
-  const char *deviceaddress() const { return getinfo()->deviceaddress; }
+  const char *deviceaddress() const {
+    auto *info = getinfo();
+    return info ? info->deviceaddress : nullptr;
+  }
   const int glucosebytes() const { return getelsize(); }
   const ScanData *getPollsData() const { return polls.data(); }
   const RawData *getRawPollsData() const { return rawpolls.data(); }
@@ -596,7 +631,8 @@ public:
     if (isSibionics()) {
       return maxSIhours * perhour();
     }
-    return getinfo()->days * 24 * perhour();
+    auto *info = getinfo();
+    return info ? (info->days * 24 * perhour()) : 0;
   }
 
   int streamperhour() const {
@@ -611,13 +647,23 @@ public:
     if (isSibionics1()) {
       return maxSIhours * streamperhour();
     }
-    auto days = getinfo()->days;
+    auto *info = getinfo();
+    if (!info)
+      return 0;
+    auto days = info->days;
     if (days < 15 && !isDexcom())
       days = 15;
     return days * 24 * streamperhour();
   }
-  int streamingIsEnabled() const { return getinfo()->streamingIsEnabled; }
-  void setbluetoothOn(int val) { getinfo()->streamingIsEnabled = val; }
+  int streamingIsEnabled() const {
+    auto *info = getinfo();
+    return info ? info->streamingIsEnabled : 0;
+  }
+  void setbluetoothOn(int val) {
+    auto *info = getinfo();
+    if (info)
+      info->streamingIsEnabled = val;
+  }
   uint32_t getfirsttime() const {
     if (isLibre()) {
       uint32_t locfirstpos = getstarthistory() + 1;
@@ -664,17 +710,21 @@ public:
       }
      */
   int getinterval() const {
-    if (getinfo()->interval)
-      return getinfo()->interval;
+    auto *info = getinfo();
+    if (info && info->interval)
+      return info->interval;
     return defaultinterval;
   }
   int getmininterval() const { return getinterval() / 60; }
 
   const int perhour() const { return 60 / getmininterval(); }
   int getweardurationMIN() const {
+    auto *info = getinfo();
+    if (!info)
+      return 14 * 24 * 60;
     const int wear = (isLibre2() || isDexcom() || isAccuChek())
-                         ? getinfo()->wearduration
-                         : getinfo()->wearduration2;
+                         ? info->wearduration
+                         : info->wearduration2;
     if (wear)
       return wear;
     return 14 * 24 * 60;
@@ -682,9 +732,12 @@ public:
   int getweardurationSEC() const { return getweardurationMIN() * 60; }
 
   int getWarmupMIN() const {
+    auto *info = getinfo();
+    if (!info)
+      return 60;
     const int warmup = (isLibre2() || isAccuChek() || isDexcom())
-                           ? getinfo()->warmup
-                           : getinfo()->warmup2;
+                           ? info->warmup
+                           : info->warmup2;
     if (warmup)
       return warmup;
     return 60;
@@ -714,15 +767,17 @@ public:
   }
 
   uint32_t getmaxtime() const {
+    auto *info = getinfo();
+    if (!info)
+      return 0;
 #if 1
-    const int hours =
-        isSibionics1() ? maxSIhours
-                       : ((isAccuChek() ? maxdaysAccu : getinfo()->days) * 24);
+    const int hours = isSibionics1()
+                          ? maxSIhours
+                          : ((isAccuChek() ? maxdaysAccu : info->days) * 24);
 #else
     const int hours =
-        isSibionics1()
-            ? maxSIhours
-            : ((isAccuChek() ? maxdaysAccu : getinfo()->days + 1) * 24);
+        isSibionics1() ? maxSIhours
+                       : ((isAccuChek() ? maxdaysAccu : info->days + 1) * 24);
 #endif
     uint32_t maxtime = hours * 60 * 60 + getstarttime();
 
@@ -730,7 +785,7 @@ public:
     // If user enabled Custom Calibration (index != 0), we allow the sensor to
     // remain active even if physically expired, to enable history backfill and
     // analysis.
-    if (getinfo()->useCustomCalibration) {
+    if (info->useCustomCalibration) {
       time_t now = ::time(nullptr);
       if (maxtime < now) {
         // Sensor is expired but Custom Cal is active. Extend logical life.
@@ -739,12 +794,19 @@ public:
     }
     return maxtime;
   }
-  uint32_t getstarttime() const { return getinfo()->starttime; }
-  int32_t getstarthistory() const { return getinfo()->starthistory; }
+  uint32_t getstarttime() const {
+    auto *info = getinfo();
+    return info ? info->starttime : 0;
+  }
+  int32_t getstarthistory() const {
+    auto *info = getinfo();
+    return info ? info->starthistory : 0;
+  }
   inline void setstarthistory(int pos) {
     LOGGER("setstarthistory(%d)\n", pos);
-    if (pos != getinfo()->starthistory) {
-      getinfo()->starthistory = pos;
+    auto *info = getinfo();
+    if (info && pos != info->starthistory) {
+      info->starthistory = pos;
       setsendhiststart();
     }
   }
@@ -974,8 +1036,20 @@ public:
     return *reinterpret_cast<const std::array<uint8_t, 4> *>(
         sensordir.data() + sensordir.length() - 4);
   }
-  // typedef array<char,11>  sensorname_t;
+  [[nodiscard]] std::string_view sensid() const {
+    size_t last_slash = sensordir.find_last_of('/');
+    if (last_slash != std::string::npos) {
+      return std::string_view(sensordir.data() + last_slash + 1,
+                              sensordir.length() - last_slash - 1);
+    }
+    return sensordir;
+  }
+  typedef std::array<char, 11> sensorname_t;
   [[nodiscard]] const sensorname_t *shortsensorname() const {
+    std::string_view sid = sensid();
+    if (sid.length() >= 2 && sid[0] == 'X' && sid[1] == '-') {
+      return reinterpret_cast<const sensorname_t *>(sid.data());
+    }
     return reinterpret_cast<const sensorname_t *>(sensordir.data() +
                                                   sensordir.length() - 11);
   }
@@ -992,7 +1066,12 @@ public:
     } else {
       if (isLibre3())
         return std::string_view(sensordir.data() + sensordir.length() - 9, 9);
+      if (isAiDex())
+        return sensid();
     }
+    std::string_view sid = sensid();
+    if (sid.length() == 11)
+      return sid;
     return std::string_view(shortsensorname()->data(), 11);
   }
   /*
@@ -1144,9 +1223,9 @@ static int getgeneration(const char *info) {
     return !(isSibionics() || isDexcom() || isAccuChek());
   }
   bool isAccuChek() const { return getinfo()->accuChek; }
+  bool isAiDex() const { return getinfo()->aidex; }
   int streaminterval() const {
     const int res = (isDexcom() || isAccuChek()) ? 5 : 1;
-    LOGGER("streaminterval()=%d\n", res);
     return res;
   }
   /*
@@ -1676,17 +1755,20 @@ uint32_t getlastpolltime() const {
     }
     while (index > 0 && polls[index].id > id)
       --index;
-    while (index < getinfo()->pollcount && polls[index].id < id) {
+    auto *info = getinfo();
+    if (!info)
+      return true;
+    while (index < info->pollcount && polls[index].id < id) {
       ++index;
     }
     polls[index] = {static_cast<uint32_t>(tim), id, (int32_t)glu, trend,
                     change};
     rawpolls[index] = {(uint16_t)raw};
     const int count = index + 1;
-    if (count < getinfo()->pollcount) {
+    if (count < info->pollcount) {
       return true;
     }
-    getinfo()->pollcount = count;
+    info->pollcount = count;
     return false;
   }
   void saveglucosedata(Mmap<ScanData> &streamscans, uint32_t &count, time_t tim,
@@ -2096,7 +2178,10 @@ void setbackuptime(int ind,uint32_t starttime) {
 
   void setupdatechange(int maxind, uint32_t updatestate::*member,
                        uint32_t value) {
-    updatestate *up = getinfo()->update;
+    auto *info = getinfo();
+    if (!info)
+      return;
+    updatestate *up = info->update;
     for (int i = 0; i < maxind; i++) {
       if (up[i].*member > value)
         up[i].*member = value;
@@ -2119,7 +2204,10 @@ void setbackuptime(int ind,uint32_t starttime) {
       } */
 
   void setsendstreaming(int maxind) {
-    updatestate *up = getinfo()->update;
+    auto *info = getinfo();
+    if (!info)
+      return;
+    updatestate *up = info->update;
     for (int i = 0; i < maxind; i++) {
       up[i].sendstreaming = true;
     }

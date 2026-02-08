@@ -38,6 +38,8 @@ import android.os.Build;
 import android.os.ParcelUuid;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -174,6 +176,14 @@ public class SensorBluetooth {
             for (var cb : gattcallbacks) {
                 if (cb.mActiveDeviceAddress != null && address.equals(cb.mActiveDeviceAddress))
                     return cb;
+            }
+
+            // 2. If no address match, try name match
+            if (deviceName == null) {
+                return null;
+            }
+
+            for (var cb : gattcallbacks) {
                 if (cb.matchDeviceName(deviceName, address)) {
                     cb.mDeviceName = deviceName;
                     return cb;
@@ -307,6 +317,10 @@ public class SensorBluetooth {
                 }
                 ;
                 processScanResult(scanResult);
+                SuperGattCallback cb = getCallback(scanResult.getDevice());
+                if (cb != null) {
+                    cb.onScanResult(scanResult);
+                }
             }
 
             @Override
@@ -363,14 +377,21 @@ public class SensorBluetooth {
 
         @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
         public boolean init() {
-            {
-                if (doLog) {
-                    Log.i(LOG_ID, "Scanner21.init");
+            if (mBluetoothAdapter == null) {
+                BluetoothManager mBluetoothManager = (BluetoothManager) Applic.app
+                        .getSystemService(Context.BLUETOOTH_SERVICE);
+                if (mBluetoothManager != null) {
+                    mBluetoothAdapter = mBluetoothManager.getAdapter();
                 }
-                ;
             }
-            ;
-            return ((mBluetoothLeScanner = SensorBluetooth.mBluetoothAdapter.getBluetoothLeScanner()) != null);
+            if (doLog) {
+                Log.i(LOG_ID, "Scanner21.init adapter=" + (mBluetoothAdapter != null));
+            }
+            if (mBluetoothAdapter == null) {
+                return false;
+            }
+            mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+            return (mBluetoothLeScanner != null);
         }
 
         private int scanTries = 0;
@@ -380,50 +401,38 @@ public class SensorBluetooth {
         public boolean start() {
             if (mBluetoothLeScanner != null) {
                 if (doLog) {
-                    Log.i(LOG_ID, "Scanner21.start");
+                    Log.i(LOG_ID, "Scanner21.start ENTRY");
                 }
-                ;
                 List<ScanFilter> mScanFilters = new ArrayList<>();
-                if (alwaysfilter || scanTries++ % 2 == 0) {
+                // Remove the %2 logic to ensure we always scan when requested
+                if (true) {
                     if (doLog) {
-                        Log.d(LOG_ID, "SCAN: starting scan.");
+                        Log.d(LOG_ID, "SCAN: preparing filters for " + gattcallbacks.size() + " devices");
                     }
-                    ;
                     for (var cb : gattcallbacks) {
-                        if (doLog) {
-                            final var address = Natives.getDeviceAddress(cb.dataptr, false);
-                            if (address != null) {
-                                Log.d(LOG_ID, "serial number: " + cb.SerialNumber + " address: " + address);
-                            } else {
-                                Log.d(LOG_ID, "serial number: " + cb.SerialNumber + " no address");
-                            }
-                        }
                         final var service = cb.getService();
                         if (service == null) {
                             if (doLog) {
-                                Log.i(LOG_ID, "SCAN: getService should return UUID");
+                                Log.i(LOG_ID, "SCAN: " + cb.SerialNumber + " has no service filter");
                             }
-                            ;
                             mScanFilters = null;
+                            break; // If one is null, we scan without filters
                         } else {
                             if (mScanFilters != null) {
                                 if (doLog) {
-                                    Log.i(LOG_ID, "SCAN: filter " + service.toString());
+                                    Log.i(LOG_ID, "SCAN: add filter " + service.toString() + " for " + cb.SerialNumber);
                                 }
-                                ;
                                 ScanFilter.Builder builder2 = new ScanFilter.Builder();
                                 builder2.setServiceUuid(new ParcelUuid(service));
                                 mScanFilters.add(builder2.build());
                             }
                         }
                     }
-                } else {
-                    mScanFilters = null;
-                    if (doLog) {
-                        Log.i(LOG_ID, "SCAN: start no filter ");
-                    }
-                    ;
+                }
 
+                if (doLog) {
+                    Log.i(LOG_ID, "SCAN: calling startScan with "
+                            + (mScanFilters == null ? "NO FILTERS" : mScanFilters.size() + " filters"));
                 }
                 try {
                     this.mBluetoothLeScanner.startScan(mScanFilters, mScanSettings, mScanCallback);
@@ -465,6 +474,10 @@ public class SensorBluetooth {
             @Override
             public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
                 checkdevice(device);
+                SuperGattCallback cb = getCallback(device);
+                if (cb != null) {
+                    cb.onScanRecord(scanRecord);
+                }
             }
         };
 
@@ -523,6 +536,21 @@ public class SensorBluetooth {
         if (mBluetoothAdapter != null) {
             return mBluetoothAdapter.isEnabled();
         }
+        // Fallback: try to get adapter from system service
+        try {
+            if (Applic.app != null) {
+                android.bluetooth.BluetoothManager bm = (android.bluetooth.BluetoothManager) Applic.app
+                        .getSystemService(Context.BLUETOOTH_SERVICE);
+                if (bm != null) {
+                    android.bluetooth.BluetoothAdapter adapter = bm.getAdapter();
+                    if (adapter != null)
+                        return adapter.isEnabled();
+                }
+            }
+        } catch (Throwable t) {
+            String msg = t.getMessage();
+            Log.e(LOG_ID, "bluetoothIsEnabled fallback failed: " + (msg != null ? msg : t.toString()));
+        }
         return false;
     }
 
@@ -536,32 +564,39 @@ public class SensorBluetooth {
     final private Runnable scanRunnable = new Runnable() {
         @Override
         public void run() {
-            if (doLog) {
-                Log.i(LOG_ID, "scanRunnable");
-            }
-            ;
-            ;
-            scantime = System.currentTimeMillis();
-            SensorBluetooth sensorBluetooth = SensorBluetooth.this;
-            if (bluetoothIsEnabled() && gattcallbacks.size() != 0) {
-                if (!scanner.init()) {
-                    return;
+            try {
+                if (doLog) {
+                    Log.i(LOG_ID, "scanRunnable ENTRY");
                 }
-                if (scanner.start()) {
-                    mScanning = true;
-                    if (scanOnUI) {
-                        Applic.app.getHandler().postDelayed(mScanTimeoutRunnable, scantimeout);
+                scantime = System.currentTimeMillis();
+                if (bluetoothIsEnabled() && gattcallbacks.size() != 0) {
+                    if (!scanner.init()) {
+                        Log.w(LOG_ID, "Scanner init failed, retrying in 2s...");
+                        if (scanOnUI) {
+                            Applic.app.getHandler().postDelayed(scanRunnable, 2000);
+                        } else {
+                            scanFuture = Applic.scheduler.schedule(scanRunnable, 2000, TimeUnit.MILLISECONDS);
+                        }
+                        return;
+                    }
+                    if (scanner.start()) {
+                        mScanning = true;
+                        if (scanOnUI) {
+                            Applic.app.getHandler().postDelayed(mScanTimeoutRunnable, scantimeout);
+                        } else {
+                            timeoutFuture = Applic.scheduler.schedule(mScanTimeoutRunnable, scantimeout,
+                                    TimeUnit.MILLISECONDS);
+                        }
+                        Log.i(LOG_ID, "scanRunnable: Scanner STARTED");
                     } else {
-                        timeoutFuture = Applic.scheduler.schedule(mScanTimeoutRunnable, scantimeout,
-                                TimeUnit.MILLISECONDS);
+                        Log.w(LOG_ID, "scanRunnable: Scanner START FAILED");
+                        return;
                     }
                 } else {
-                    if (doLog) {
-                        Log.d(LOG_ID, "Start scan failed");
-                    }
-                    ;
-                    return;
+                    Log.i(LOG_ID, "scanRunnable: nothing to scan (BT off or no callbacks)");
                 }
+            } catch (Exception e) {
+                Log.stack(LOG_ID, "scanRunnable EXCEPTION", e);
             }
         }
 
@@ -570,7 +605,7 @@ public class SensorBluetooth {
     static private final boolean scanOnUI = false;
     ScheduledFuture<?> scanFuture = null, timeoutFuture = null;
 
-    private boolean scanStarter(long delayMillis) {
+    public boolean scanStarter(long delayMillis) {
         {
             if (doLog) {
                 Log.i(LOG_ID, "scanStarter(" + delayMillis + ")");
@@ -591,6 +626,13 @@ public class SensorBluetooth {
         }
         for (SuperGattCallback cb : gattcallbacks) {
             if (cb.mBluetoothGatt == null) {
+                // Skip AiDex sensors in broadcast mode - they manage their own status
+                if (cb instanceof tk.glucodata.drivers.aidex.AiDexSensor) {
+                    tk.glucodata.drivers.aidex.AiDexSensor aidex = (tk.glucodata.drivers.aidex.AiDexSensor) cb;
+                    if (aidex.getBroadcastOnlyConnection()) {
+                        continue;
+                    }
+                }
                 cb.constatstatusstr = "Searching for sensors";
             }
         }
@@ -742,6 +784,12 @@ public class SensorBluetooth {
     private void setDevices(String[] names) {
         for (String name : names) {
             if (name != null) {
+                if (!isValidShortSensorName(name)) {
+                    if (doLog) {
+                        Log.w(LOG_ID, "setDevice skip invalid name " + name);
+                    }
+                    continue;
+                }
                 {
                     if (doLog) {
                         Log.i(LOG_ID, "setDevice " + name);
@@ -757,6 +805,33 @@ public class SensorBluetooth {
             }
         }
         Natives.setmaxsensors(gattcallbacks.size());
+    }
+
+    // --- KOTLIN SENSORS (AiDex) SUPPORT ---
+    public static void addAiDexSensor(Context context, String name, String address) {
+        // Add to persistent storage
+        android.content.SharedPreferences prefs = context.getSharedPreferences("tk.glucodata_preferences",
+                Context.MODE_PRIVATE);
+        java.util.Set<String> sensors = prefs.getStringSet("aidex_sensors", new java.util.HashSet<>());
+        java.util.Set<String> newSensors = new java.util.HashSet<>(sensors);
+        newSensors.add(name + "|" + address);
+        prefs.edit().putStringSet("aidex_sensors", newSensors).apply();
+
+        // If SensorBluetooth is alive, add it immediately
+        if (blueone != null) {
+            String serial = name;
+            // Check if already added (avoid duplicates)
+            for (SuperGattCallback cb : blueone.gattcallbacks) {
+                if (cb.SerialNumber != null && cb.SerialNumber.equals(serial)) {
+                    return;
+                }
+            }
+            long dataptr = Natives.getdataptr(name);
+            SuperGattCallback cb = new tk.glucodata.drivers.aidex.AiDexSensor(Applic.app, name, dataptr);
+            cb.mActiveDeviceAddress = address;
+            blueone.gattcallbacks.add(cb);
+            cb.connectDevice(0);
+        }
     }
 
     public void startDevices(String[] names) {
@@ -779,6 +854,7 @@ public class SensorBluetooth {
             stopScan(false);
         removeDevices();
         setDevices(Natives.activeSensors());
+        updateDevicers();
         return initializeBluetooth();
     }
 
@@ -787,6 +863,24 @@ public class SensorBluetooth {
             if (el.equals(ar[i]))
                 return i;
         return -1;
+    }
+
+    private static boolean isValidShortSensorName(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        if (name.startsWith("X-")) {
+            return name.length() > 2;
+        }
+        if (name.length() != 11) {
+            return false;
+        }
+        for (int i = 0; i < 11; i++) {
+            if (!Character.isLetterOrDigit(name.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void connectNamedDevice(String id, long delayMillis) {
@@ -837,7 +931,41 @@ public class SensorBluetooth {
             ;
         }
         ;
-        String[] devs = Natives.activeSensors();
+        String[] nativeDevs = Natives.activeSensors();
+
+        // Merge with AiDex sensors from Preferences
+        Set<String> aidexSet = Applic.app.getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+                .getStringSet("aidex_sensors", new HashSet<>());
+        Set<String> cleanedAiDex = new HashSet<>();
+
+        ArrayList<String> allDevs = new ArrayList<>();
+        HashSet<String> added = new HashSet<>();
+        if (nativeDevs != null) {
+            for (String s : nativeDevs) {
+                if (isValidShortSensorName(s) && added.add(s))
+                    allDevs.add(s);
+            }
+        }
+        for (String entry : aidexSet) {
+            String[] parts = entry.split("\\|");
+            if (parts.length > 0) {
+                String serial = parts[0];
+                if (isValidShortSensorName(serial)) {
+                    cleanedAiDex.add(entry);
+                    if (added.add(serial)) {
+                        allDevs.add(serial); // Add Serial
+                    }
+                } else if (doLog) {
+                    Log.w(LOG_ID, "dropping invalid AiDex entry " + entry);
+                }
+            }
+        }
+        if (cleanedAiDex.size() != aidexSet.size()) {
+            Applic.app.getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+                    .edit().putStringSet("aidex_sensors", cleanedAiDex).apply();
+        }
+
+        String[] devs = allDevs.toArray(new String[0]);
         ArrayList<Integer> rem = new ArrayList<>();
         int gatnr = gattcallbacks.size();
         {
@@ -940,6 +1068,12 @@ public class SensorBluetooth {
         if (devs != null) {
             for (String dev : devs) {
                 if (dev != null) {
+                    if (!isValidShortSensorName(dev)) {
+                        if (doLog) {
+                            Log.w(LOG_ID, "add skip invalid name " + dev);
+                        }
+                        continue;
+                    }
                     {
                         if (doLog) {
                             Log.i(LOG_ID, "add " + dev);
@@ -947,8 +1081,9 @@ public class SensorBluetooth {
                         ;
                     }
                     ;
-                    long dataptr = Natives.getdataptr(dev);
-                    if (dataptr != 0L) {
+                    long dataptr = 0L;
+                    dataptr = Natives.getdataptr(dev);
+                    if (dataptr != 0L || dev.startsWith("X-")) {
                         gattcallbacks.add(getGattCallback(dev, dataptr));
                         increasedwait = startincreasedwait;
                         index++;
@@ -1016,6 +1151,9 @@ public class SensorBluetooth {
     }
 
     SuperGattCallback getGattCallback(String name, long dataptr) {
+        if (name.startsWith("X-")) {
+            return new tk.glucodata.drivers.aidex.AiDexSensor(Applic.app, name, dataptr);
+        }
         if (libreVersion == 3 || tk.glucodata.BuildConfig.SiBionics == 1 || tk.glucodata.BuildConfig.DexCom == 1) {
             int vers = Natives.getLibreVersion(dataptr);
             if (libreVersion == 3) {

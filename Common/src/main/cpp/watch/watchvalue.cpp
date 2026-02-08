@@ -29,8 +29,9 @@
 #include "datbackup.hpp"
 #include "gluconfig.hpp"
 
-#define LOGGERTAG(...) LOGGER("watchvalue: " __VA_ARGS__)
-#define LOGSTRINGTAG(...) LOGSTRING("watchvalue: " __VA_ARGS__)
+// Suppress verbose watchvalue spam in normal builds.
+#define LOGGERTAG(...)
+#define LOGSTRINGTAG(...)
 extern Sensoren *sensors;
 extern std::vector<int> usedsensors;
 const int maxwatchage=maxbluetoothage;
@@ -90,7 +91,6 @@ std::pair<const SensorGlucoseData *,int> getlaststream(const uint32_t nu) {
     keepnet(mintime,nu,minutes);
    if(total>1)
       ++pos;
-    LOGAR("end getlaststream");
     return {take,pos};
     }
 
@@ -216,6 +216,4 @@ extern "C" JNIEXPORT jbyteArray JNICALL   fromjava(glucose2bytearray)(JNIEnv *en
 */
 //    jbyteArray uit = envin->NewByteArray(uitlen);
  //   envin->SetByteArrayRegion(uit, 0, uitlen, key->data());
-
-
 

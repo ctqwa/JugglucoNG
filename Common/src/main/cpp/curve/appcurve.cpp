@@ -210,7 +210,6 @@ void logmenupos() {
 #define logmenupos()
 #endif
 extern std::vector<int> usedsensors;
-static bool inmenu(float x, float y);
 
 const float JCurve::getsetlen(NVGcontext *avg, float x, float y,
                               const char *set, const char *setend,
@@ -1049,7 +1048,11 @@ strconcat getsensortext(const SensorGlucoseData *hist) {
   }
 
   // Check connection status
-  int state = hist->getinfo()->patchState;
+  auto *info = hist->getinfo();
+  if (!info) {
+    return strconcat(std::string_view(""), std::string_view(""));
+  }
+  int state = info->patchState;
   if (state == 0 || state == 4) {
     return strconcat(std::string_view(""), std::string_view(""));
   } else if (state > 4) {

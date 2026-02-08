@@ -19,7 +19,8 @@ import tk.glucodata.R
 enum class SensorType {
     SIBIONICS,
     LIBRE,
-    DEXCOM
+    DEXCOM,
+    AIDEX
 }
 
 /**
@@ -81,6 +82,19 @@ fun SensorTypePicker(
                 subtitle = stringResource(R.string.dexcom_sensor_desc),
                 onClick = {
                     onSensorSelected(SensorType.DEXCOM)
+                    onDismiss()
+                }
+            )
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // AiDex / LinX
+            SensorTypeItem(
+                icon = Icons.Default.Bluetooth,
+                title = "AiDex / LinX", // TODO: R.string.aidex_sensor
+                subtitle = "Configure AiDex or LinX CGM via Bluetooth",
+                onClick = {
+                    onSensorSelected(SensorType.AIDEX)
                     onDismiss()
                 }
             )

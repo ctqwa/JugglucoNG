@@ -131,8 +131,34 @@ return strftime(buf, max, "%Y-%m-%d-%H:%M:%S", &tms);
 */
 extern bool dolog;
 bool dolog=true;
+
+static bool contains_substr(const char *buf, int len, const char *needle) {
+    if (!buf || !needle) {
+        return false;
+    }
+    const int nlen = ::strlen(needle);
+    if (nlen <= 0 || len < nlen) {
+        return false;
+    }
+    for (int i = 0; i <= (len - nlen); ++i) {
+        if (buf[i] == needle[0] && ::memcmp(buf + i, needle, nlen) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool should_drop_log(const char *buf, int len) {
+    return contains_substr(buf, len, "streaminterval()=") ||
+           contains_substr(buf, len, "end getlaststream") ||
+           contains_substr(buf, len, "watchvalue:");
+}
+
 void logwriter(const char *buf,const int len) {
 	if(dolog) {
+		if (should_drop_log(buf, len)) {
+			return;
+		}
 		static int handle=STDERR_FILENO;
 	#ifndef NOTAPP
 		 if(handle==STDERR_FILENO)
@@ -146,6 +172,11 @@ void logwriter(const char *buf,const int len) {
 
 static void logwritev(const struct iovec *iov, int iovcnt) {
 	if(dolog) {
+		for (int i = 0; i < iovcnt; ++i) {
+			if (should_drop_log(reinterpret_cast<const char *>(iov[i].iov_base), static_cast<int>(iov[i].iov_len))) {
+				return;
+			}
+		}
 		static int handle=STDERR_FILENO;
 	#ifndef NOTAPP
 		 if(handle==STDERR_FILENO)
