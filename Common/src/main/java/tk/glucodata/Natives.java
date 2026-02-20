@@ -138,6 +138,10 @@ public class Natives {
 
         public static native long getsensorptr(long dataptr);
 
+        // Temperature data for Sibionics sensors - returns int array from temppolls.dat
+        // Values are in 0.1°C units. Returns null if not a Sibionics sensor.
+        public static native int[] getTemperatureData(long sensorptr);
+
         public static native boolean sameSensor(long one, long two);
 
         public static native String getSensorName(long dataptr);
@@ -698,6 +702,13 @@ public class Natives {
 
         public static native long[] getGlucoseHistory(long starttime);
 
+        /**
+         * Multi-sensor variant: get glucose history for a specific sensor by its short name.
+         * Returns same format as getGlucoseHistory: [time_sec, auto_mgdl*10, raw_mgdl*10, ...]
+         * Returns null if sensor not found or has no data.
+         */
+        public static native long[] getGlucoseHistoryForSensor(String sensorName, long starttime);
+
         public static native byte[] getmynetinfo(String name, boolean create, int watchhassensor, boolean galaxy,
                         int setnums);
 
@@ -970,6 +981,8 @@ public class Natives {
 
         public static native void finishSensor(long dataptr);
 
+        public static native void unfinishSensor(long dataptr);
+
         public static native long manualLibreAccountIDnumber();
 
         public static native void setApiSecret(String japisecret);
@@ -1170,6 +1183,8 @@ public class Natives {
         // public static native long makeSIdataptr(String gegs);
         // public static native int getSIindex(long dataptr);
         public static native void siSaveDeviceName(long dataptr, String deviceName);
+
+        public static native void siClearTransmitterBinding(long dataptr);
 
         public static native String siGetDeviceName(long dataptr);
 
@@ -1412,6 +1427,10 @@ public class Natives {
 
         public static native void siWipeDataOnly(long dataptr);
 
+        public static native void siLocalReplay(long dataptr);
+
+        public static native boolean siRestoreOriginalPolls(long dataptr);
+
         public static native void setViewMode(long dataptr, int mode);
 
         public static native int getViewMode(long dataptr);
@@ -1444,6 +1463,8 @@ public class Natives {
                                                    float rawGlucose, float calibrationFactor);
 
         public static native void aidexSetStartTime(long dataptr, long timeMs);
+
+        public static native void aidexSetWearDays(long dataptr, int days);
 
         public static native void accuSetStartTime(long dataptr, byte[] value);
 

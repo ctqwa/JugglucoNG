@@ -222,7 +222,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     static final int mininterval = 55;
     static long nexttime = 0L; // secs
     public static tk.glucodata.GlucoseAlarms glucosealarms = null;
-    static notGlucose previousglucose = null;
+    public static notGlucose previousglucose = null;
     static float previousglucosevalue = 0.0f;
 
     static public void initAlarmTalk() {
@@ -335,6 +335,35 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             Log.e(LOG_ID, "glucosealarms==null");
             return;
         }
+
+        // Multi-sensor fix: Check if this sensor is the user-selected main sensor.
+        // Non-main sensors still store data (already done before this call), but should
+        // NOT trigger notifications, alarms, broadcasts, or exchange data — those should
+        // only reflect the main sensor's values to avoid confusing switching behavior.
+        boolean isMainSensor = true;
+        try {
+            String mainName = Natives.lastsensorname();
+            if (mainName != null && !mainName.isEmpty() && SerialNumber != null) {
+                // Match by equality or by checking if one contains the other
+                // (AiDex uses "X-..." prefix, Sibionics/Libre have different formats)
+                isMainSensor = mainName.equals(SerialNumber) || SerialNumber.contains(mainName)
+                        || mainName.contains(SerialNumber);
+            }
+        } catch (Throwable t) {
+            // If we can't determine main sensor, default to allowing (safety)
+            isMainSensor = true;
+        }
+
+        if (!isMainSensor) {
+            if (doLog) {
+                Log.i(LOG_ID, "Multi-sensor: Skipping notifications/broadcasts for non-main sensor "
+                        + SerialNumber + " (main=" + Natives.lastsensorname() + ")");
+            }
+            // Still update the screen so charts/history reflect all sensors
+            Applic.updatescreen();
+            return;
+        }
+
         glucosealarms.setagealarm(timmsec, showtime);
         final long tim = timmsec / 1000L;
         boolean waiting = false;

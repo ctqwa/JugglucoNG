@@ -214,11 +214,19 @@ public class PhotoScan {
                                             MainActivity.onSensorScanResult.onResult(sensorNameFinal, ptrFinal, type);
                                         }
                                     });
-                                    // Handled by Compose wizard - skip legacy dialog
-                                    // return; // We still need the bottom part? No, bottom part sets up bluetooth,
-                                    // which should happen AFTER wizard complete.
-                                    // Actually, wizard calls finishSetup which calls SensorBluetooth.updateDevices.
-                                    // So we SHOULD return here to avoid double initialization or legacy callbacks.
+                                    // Set up BLE immediately so sensor connects while wizard runs.
+                                    // updateDevices is idempotent — wizard's finishSetup can safely call it again.
+                                    if (Natives.getusebluetooth()) {
+                                        var res = SensorBluetooth.updateDevices();
+                                        SuperGattCallback.glucosealarms.setLossAlarm();
+                                        if (res) {
+                                            act.finepermission();
+                                        } else
+                                            act.systemlocation();
+                                    } else {
+                                        Natives.updateUsedSensors();
+                                    }
+                                    Applic.wakemirrors();
                                     return;
                                 } else {
                                     selectType(name, sensorptr, act);

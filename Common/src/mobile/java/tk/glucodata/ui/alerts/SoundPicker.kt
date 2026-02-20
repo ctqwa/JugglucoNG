@@ -41,9 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import tk.glucodata.Applic
 import tk.glucodata.Natives
+import tk.glucodata.R
 
 /**
  * Special marker values for sound selection:
@@ -63,9 +65,9 @@ data class SoundItem(val uri: String?, val title: String)
  */
 fun getSoundDisplayText(uri: String?, alertTypeId: Int = 0): String {
     return when {
-        uri.isNullOrEmpty() -> "App Default Sound"
-        uri == SYSTEM_DEFAULT_SOUND -> "System Default Sound"
-        else -> "Custom Sound Selected"
+        uri.isNullOrEmpty() -> Applic.app.getString(R.string.app_default_sound)
+        uri == SYSTEM_DEFAULT_SOUND -> Applic.app.getString(R.string.system_default_sound)
+        else -> Applic.app.getString(R.string.custom_sound_selected)
     }
 }
 
@@ -139,8 +141,8 @@ fun SoundPicker(
         
         // Load system sounds
         val soundList = mutableListOf<SoundItem>()
-        soundList.add(SoundItem(null, "App Default Sound"))
-        soundList.add(SoundItem(SYSTEM_DEFAULT_SOUND, "System Default Sound"))
+        soundList.add(SoundItem(null, context.getString(R.string.app_default_sound)))
+        soundList.add(SoundItem(SYSTEM_DEFAULT_SOUND, context.getString(R.string.system_default_sound)))
 
         val ringtoneManager = RingtoneManager(context)
         ringtoneManager.setType(RingtoneManager.TYPE_NOTIFICATION)
@@ -208,7 +210,7 @@ fun SoundPicker(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Alert Sound") },
+        title = { Text(stringResource(R.string.select_alert_sound)) },
         text = {
             LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                 // === ADD CUSTOM SOUND (at top) ===
@@ -236,7 +238,7 @@ fun SoundPicker(
                         )
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            text = "Add Custom Sound",
+                            text = stringResource(R.string.add_custom_sound),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -248,7 +250,7 @@ fun SoundPicker(
                 if (customSounds.isNotEmpty()) {
                     items(customSounds.toList()) { uri ->
                         SoundRow(
-                            title = "Custom: ${uri.substringAfterLast("/").take(25)}",
+                            title = context.getString(R.string.custom_sound_prefix, uri.substringAfterLast("/").take(25)),
                             isSelected = selectedUri == uri,
                             isPlaying = isPlaying && playingUri == uri,
                             onClick = { selectedUri = uri },
@@ -274,7 +276,7 @@ fun SoundPicker(
                 stopSound()
                 onSoundSelected(selectedUri)
             }) {
-                Text("OK")
+                Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
@@ -282,7 +284,7 @@ fun SoundPicker(
                 stopSound()
                 onDismiss()
             }) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -312,7 +314,7 @@ private fun SoundRow(
         IconButton(onClick = onPlay) {
             Icon(
                 imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                contentDescription = if (isPlaying) "Stop" else "Preview"
+                contentDescription = if (isPlaying) stringResource(R.string.stop) else stringResource(R.string.preview)
             )
         }
     }

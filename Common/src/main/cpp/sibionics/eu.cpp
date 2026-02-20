@@ -317,21 +317,33 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
   }
   //   int recorded=recordsprint;
   recordsprint = -1;
-  LOGGER("nritems=%d\n", nritems);
-  LOGGER("%s\n", jsonuit.data->data());
-  logbytes("bar2", (const uint8_t *)bar2.data->data(), bar2.data->size());
+#ifndef NOLOG
+  static THREADLOCAL uint32_t splitLogCounter = 0;
+  const bool logSplitDetail = (nritems <= 0) || ((++splitLogCounter & 0x3F) == 0);
+  if (logSplitDetail) {
+    LOGGER("nritems=%d\n", nritems);
+    if (nritems <= 0) {
+      LOGGER("%s\n", jsonuit.data->data());
+      logbytes("bar2", (const uint8_t *)bar2.data->data(), bar2.data->size());
+    }
+  }
+#else
+  constexpr bool logSplitDetail = false;
+#endif
   int *idat = jiar.data->data();
 #ifndef NOLOG
-  {
-    char tmpbuf[80];
-    const char str[] = "jiar:";
-    memcpy(tmpbuf, str, sizeof(str) - 1);
-    char *ptr = tmpbuf + sizeof(str) - 1;
-    for (int i = 0; i < jiar.data->size(); i++) {
-      ptr += sprintf(ptr, " %d", idat[i]);
+  if (logSplitDetail) {
+    {
+      char tmpbuf[80];
+      const char str[] = "jiar:";
+      memcpy(tmpbuf, str, sizeof(str) - 1);
+      char *ptr = tmpbuf + sizeof(str) - 1;
+      for (int i = 0; i < jiar.data->size(); i++) {
+        ptr += sprintf(ptr, " %d", idat[i]);
+      }
+      *ptr++ = '\n';
+      LOGGERN(tmpbuf, ptr - tmpbuf);
     }
-    *ptr++ = '\n';
-    LOGGERN(tmpbuf, ptr - tmpbuf);
   }
 #endif
   jlong *basear = sprintargs;
@@ -391,8 +403,11 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
       double temp = basear[1] / 10.0;
       auto current = basear[2];
       double value = current / 10.0;
-      LOGGER("current=%" PRId64 " %.1f mmol/L\n", current, value);
       int reindex = (int)basear[4];
+      const bool logPacket = (reindex == 0) || ((index & 0x3F) == 0);
+      if (logPacket) {
+        LOGGER("current=%" PRId64 " %.1f mmol/L\n", current, value);
+      }
       auto trend = (int)basear[6];
 
       double newvalue;
@@ -412,17 +427,40 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
       }
 
       // Sanity check with streak counter - only reset after consecutive bad
-      // values
-      static int badValueStreak = 0;
+      // values (per-sensor via SiContext::badValueStreak member)
       constexpr int MAX_BAD_STREAK = 5;
+      constexpr int RESET_COOLDOWN_SECS = 300; // 5 min cooldown between resets
       if (newvalue > 50.0) {
         badValueStreak++;
         LOGGER("SIprocess: newvalue=%f is out of range. Streak=%d\n", newvalue,
                badValueStreak);
         if (badValueStreak >= MAX_BAD_STREAK) {
-          LOGGER("SIprocess: %d consecutive bad values, resetting algorithm\n",
-                 badValueStreak);
-          this->reset(sens);
+          // Edit 85: Skip reset if already in reset mode (replaying history).
+          // During replay, the algorithm processes old data with a fresh context
+          // and regularly produces out-of-range values — this is expected and
+          // should NOT trigger another reset (which would loop).
+          if (sens->isInResetMode()) {
+            LOGGER("SIprocess: in reset mode, ignoring bad streak (%d)\n",
+                   badValueStreak);
+          } else {
+            // Edit 79: Cooldown guard — prevent reset loop after fresh algorithm start
+            uint32_t lastReset = sens->getinfo()->lastCalResetTime;
+            uint32_t now = (uint32_t)time(nullptr);
+            if (lastReset > 0 && (now - lastReset) < RESET_COOLDOWN_SECS) {
+              LOGGER("SIprocess: reset cooldown active (%d sec since last reset), skipping\n",
+                     (int)(now - lastReset));
+            } else {
+              LOGGER("SIprocess: %d consecutive bad values, resetting algorithm\n",
+                     badValueStreak);
+              // Only reset when custom calibration is active — in native mode
+              // (Auto), bad streaks are transient and the algorithm self-corrects.
+              if (sens->getinfo()->useCustomCalibration) {
+                this->reset(sens);
+              } else {
+                LOGSTRING("SIprocess: custom cal not enabled, skipping reset\n");
+              }
+            }
+          }
           badValueStreak = 0;
         }
         // Fallback to raw sensor value
@@ -436,19 +474,27 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
       const float change = sitrend2RateOfChange(trend2);
       const int abbottrend = sitrend2abbott(trend2);
       const int totalIndex = sens->siAddedIndex(index);
-      LOGGER("totalIndex=%d index=%d temp=%f value=%f newvalue=%f trend=(%d?) "
-             "%d %d %1.f itime=%" PRIu64 " %s",
-             totalIndex, index, temp, value, newvalue, trend, trend2,
-             abbottrend, change, eventTime, ctime(&eventTime));
+      if (logPacket) {
+        LOGGER("totalIndex=%d index=%d temp=%f value=%f newvalue=%f "
+               "trend=(%d?) %d %d %1.f itime=%" PRIu64 " %s",
+               totalIndex, index, temp, value, newvalue, trend, trend2,
+               abbottrend, change, eventTime, ctime(&eventTime));
+      }
       // Valid range check: 0.5-40 mmol/L. Values outside trigger sensorerror.
       // Aligned with sanity check above which auto-resets for same
       // thresholds.
       if (newvalue > 1 && newvalue < 30) {
         sens->savestream(eventTime, totalIndex, mgdL, abbottrend, change,
-                         (int)current);
+                         (int)current, (uint16_t)basear[1]);
         sens->setSiIndex(index + 1);
         sens->retried = 0;
         if (!reindex) {
+          // Current-time data (not replay). If we were in reset mode,
+          // replay is done — exit reset mode so normal operation resumes.
+          if (sens->isInResetMode()) {
+            LOGGER("SIprocess (eu): replay reached current data (eventTime=%ld), exiting reset mode\n", (long)eventTime);
+            sens->exitResetMode();
+          }
           sens->sensorerror = false;
           if (sensor->finished) {
             sensor->finished = 0;

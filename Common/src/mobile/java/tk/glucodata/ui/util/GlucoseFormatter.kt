@@ -4,6 +4,8 @@ import java.util.Locale
 
 object GlucoseFormatter {
 
+    const val MGDL_TO_MMOL = 0.0555f
+
     /**
      * Format a glucose value based on the unit type.
      * mg/dL -> No decimals (e.g. "100")
@@ -15,6 +17,30 @@ object GlucoseFormatter {
         } else {
             String.format(Locale.getDefault(), "%.0f", value)
         }
+    }
+
+    /**
+     * Convert mg/dL to mmol/L
+     */
+    fun mgToMmol(mgDl: Float): Float = mgDl * MGDL_TO_MMOL
+
+    /**
+     * Convert mmol/L to mg/dL
+     */
+    fun mmolToMg(mmol: Float): Float = mmol / MGDL_TO_MMOL
+
+    /**
+     * Convert an internal mg/dL value to the currently displayed unit value.
+     */
+    fun displayFromMgDl(valueMgDl: Float, isMmol: Boolean): Float {
+        return if (isMmol) mgToMmol(valueMgDl) else valueMgDl
+    }
+
+    /**
+     * Format a value stored in mg/dL to the selected display unit.
+     */
+    fun formatFromMgDl(valueMgDl: Float, isMmol: Boolean): String {
+        return format(displayFromMgDl(valueMgDl, isMmol), isMmol)
     }
 
     /**

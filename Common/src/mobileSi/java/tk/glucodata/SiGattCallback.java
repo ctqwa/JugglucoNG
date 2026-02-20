@@ -520,6 +520,12 @@ public class SiGattCallback extends SuperGattCallback {
       if (savedname != null && deviceName.equals(savedname))
          return true;
 
+      // Sibionics 2 requires explicit transmitter pairing (second QR/manual code).
+      // Do not auto-learn from 4-digit suffix matching when no transmitter is saved.
+      if (Natives.getSiSubtype(dataptr) == 3) {
+         return false;
+      }
+
       final var len = deviceName.length();
       final String bluetoothNum = Natives.getSiBluetoothNum(dataptr);
       if (bluetoothNum.regionMatches(0, deviceName, len - 4, 4)) {

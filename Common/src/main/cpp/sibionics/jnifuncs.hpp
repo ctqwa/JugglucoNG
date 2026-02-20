@@ -177,8 +177,30 @@ AlgorithmContext *vers(initAlgorithm)(SensorGlucoseData *sens,
       vers(setBinaryStructAlgorithmContext)(subenv, nullptr, jalg,
                                             (jbyteArray)saved);
     } else {
-      LOGAR("resetSiIndex()");
-      sens->resetSiIndex();
+      // binState is empty. This happens legitimately after:
+      // 1. SiContext::reset() zeroes binState + deletes the file
+      // 2. Replay completes → exitResetMode()
+      // 3. sistream destroyed (pause/disconnect) → binState mmap lost
+      // 4. NEW sistream created (reconnect) → opens fresh empty binState file
+      //
+      // In this case, lastCalResetTime will be recent (set by SiContext::reset
+      // or resetSiIndex). Calling resetSiIndex() here would re-enter reset
+      // mode, trigger another full replay, exit reset mode, and then the NEXT
+      // getdataptr() call repeats the cycle — an infinite loop.
+      //
+      // Instead: check if a reset was performed recently. If so, skip the
+      // resetSiIndex — the algorithm will build state from incoming data.
+      uint32_t lastReset = sens->getinfo()->lastCalResetTime;
+      time_t now = time(nullptr);
+      bool recentReset = (lastReset > 0 && (now - lastReset) < 30 * 60);
+      if (recentReset) {
+        LOGGER("initAlgorithm: binState empty but recent reset (%ld sec ago), "
+               "skipping resetSiIndex (siIndex=%d)\n",
+               (long)(now - lastReset), sens->getSiIndex());
+      } else {
+        LOGAR("resetSiIndex()");
+        sens->resetSiIndex();
+      }
     }
   }
   return reinterpret_cast<AlgorithmContext *>(jalg);

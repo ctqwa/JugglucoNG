@@ -65,12 +65,20 @@ static void keepnet(uint32_t wastime,uint32_t nu,int minutes) {
 
 extern std::pair<const SensorGlucoseData *,int> getlaststream(const uint32_t nu) ;
 std::pair<const SensorGlucoseData *,int> getlaststream(const uint32_t nu) {
-//     uint32_t mintime=nu-maxwatchage;
    uint32_t mintime=0;
    const SensorGlucoseData *take=nullptr;
    int pos=-1;
    const int total=usedsensors.size();
    int  minutes=15;
+
+   // Multi-sensor fix: Prefer the user-selected main sensor (infoblockptr()->current)
+   // instead of blindly picking whichever sensor has the newest timestamp.
+   // Only fall back to most-recent-timestamp if the main sensor has no valid stream
+   // or its data is too stale (> 10 minutes old).
+   const int mainIndex = sensors->infoblockptr()->current;
+   const SensorGlucoseData *mainHist = nullptr;
+   int mainPos = -1;
+   const uint32_t maxStaleAge = 10 * 60; // 10 minutes — if main sensor data is older, fall back
 
     for(int i=0;i<total ;i++) {
         const int index=usedsensors[i];
@@ -81,6 +89,11 @@ std::pair<const SensorGlucoseData *,int> getlaststream(const uint32_t nu) {
         const ScanData *poll=hist->lastValidStream();
         if(poll) {
             uint32_t then=poll->t;
+            // Track the main sensor separately
+            if(index == mainIndex) {
+                mainHist = hist;
+                mainPos = i;
+            }
             if(then>mintime) {
                 mintime=then;
                 take=hist;
@@ -88,6 +101,20 @@ std::pair<const SensorGlucoseData *,int> getlaststream(const uint32_t nu) {
                 }
             }
         }
+
+   // If the main sensor has recent valid data, prefer it over the most-recent fallback
+   if(mainHist) {
+       const ScanData *mainPoll = mainHist->lastValidStream();
+       if(mainPoll) {
+           const uint32_t mainAge = (nu > mainPoll->t) ? (nu - mainPoll->t) : 0;
+           if(mainAge <= maxStaleAge) {
+               take = mainHist;
+               pos = mainPos;
+               mintime = mainPoll->t;
+           }
+       }
+   }
+
     keepnet(mintime,nu,minutes);
    if(total>1)
       ++pos;

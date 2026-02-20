@@ -411,9 +411,14 @@ public class NotificationChartDrawer {
             }
         }
 
+        boolean hideInitialWhenCalibrated = hasCalibration &&
+                tk.glucodata.data.calibration.CalibrationManager.INSTANCE.shouldHideInitialWhenCalibrated();
+        boolean isRawModeForCal = (viewMode == 1 || viewMode == 3);
         // Determine which lines to show
-        boolean showAuto = (viewMode == 0 || viewMode == 2 || viewMode == 3);
-        boolean showRaw = (viewMode == 1 || viewMode == 2 || viewMode == 3);
+        boolean hideRawSource = hideInitialWhenCalibrated && isRawModeForCal;
+        boolean hideAutoSource = hideInitialWhenCalibrated && !isRawModeForCal;
+        boolean showAuto = !hideAutoSource && (viewMode == 0 || viewMode == 2 || viewMode == 3);
+        boolean showRaw = !hideRawSource && (viewMode == 1 || viewMode == 2 || viewMode == 3);
 
         // Determine line colors based on ViewMode and Calibration
         int autoColor = lineColor; // Default Primary
@@ -476,6 +481,21 @@ public class NotificationChartDrawer {
             if (p.rawValue > 0) {
                 minY = Math.min(minY, p.rawValue);
                 maxY = Math.max(maxY, p.rawValue);
+            }
+        }
+        if (hasCalibration) {
+            for (GlucosePoint p : visiblePoints) {
+                float baseVal = isRawModeForCal ? p.rawValue : p.value;
+                if (baseVal > 0) {
+                    float calVal = tk.glucodata.data.calibration.CalibrationManager.INSTANCE.getCalibratedValue(
+                            baseVal,
+                            p.timestamp,
+                            isRawModeForCal);
+                    if (calVal > 0.1f) {
+                        minY = Math.min(minY, calVal);
+                        maxY = Math.max(maxY, calVal);
+                    }
+                }
             }
         }
 

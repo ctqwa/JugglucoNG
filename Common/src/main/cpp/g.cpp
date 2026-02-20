@@ -444,6 +444,7 @@ extern "C" JNIEXPORT jboolean JNICALL
 fromjava(getHidefromSensorptr)(JNIEnv *env, jclass cl, jlong sensorptr) {
   return reinterpret_cast<const SensorGlucoseData *>(sensorptr)->hide;
 }
+
 extern "C" JNIEXPORT void JNICALL fromjava(healthConnectReset)(JNIEnv *env,
                                                                jclass cl) {
   sensors->onallsensors([](SensorGlucoseData *sens) {
@@ -500,6 +501,25 @@ extern "C" JNIEXPORT void JNICALL fromjava(finishSensor)(JNIEnv *env, jclass cl,
   int sensorindex = sdata->sensorindex;
   finishsensor(sensorptr, sensorindex);
 }
+
+static void unfinishsensor(SensorGlucoseData *sensorptr, int sensorindex) {
+  LOGGER("unfinishSensor %s\n", sensorptr->showsensorname().data());
+  sensors->unfinishsensor(sensorindex);
+  setusedsensors();
+}
+extern "C" JNIEXPORT void JNICALL fromjava(unfinishSensor)(JNIEnv *env,
+                                                           jclass cl,
+                                                           jlong dataptr) {
+  streamdata *sdata = reinterpret_cast<streamdata *>(dataptr);
+  if (!sdata) {
+    LOGAR("unfinishSensor dataptr=null");
+    return;
+  }
+  SensorGlucoseData *sensorptr = sdata->hist;
+  int sensorindex = sdata->sensorindex;
+  unfinishsensor(sensorptr, sensorindex);
+}
+
 extern bool streamHistory();
 #ifdef SIBIONICS
 extern bool siInit(bool);
@@ -1152,8 +1172,12 @@ extern double calibrateNow(const SensorGlucoseData *sens,
 
 extern "C" JNIEXPORT jlongArray JNICALL
 fromjava(getGlucoseHistory)(JNIEnv *env, jclass cl, jlong starttime) {
-  auto nu = time(nullptr);
-  const auto [hist, _] = getlaststream(nu);
+  // Use the user-selected main sensor instead of getlaststream() which picks
+  // whichever sensor updated most recently — causing cross-sensor
+  // contamination.
+  const int mainIdx = sensors->infoblockptr()->current;
+  const SensorGlucoseData *hist =
+      (mainIdx >= 0) ? sensors->getSensorData(mainIdx) : nullptr;
 
   if (!hist)
     return nullptr;
@@ -1183,6 +1207,68 @@ fromjava(getGlucoseHistory)(JNIEnv *env, jclass cl, jlong starttime) {
       // rawVal is 'current' (value*10 from eu.cpp)
       // valRaw (mg/dL * 10) = (current / 10.0) * 18.0182 * 10 = current
       // * 18.0182
+      valRaw = (jlong)(rawVal * convfactordL);
+
+      result.push_back((jlong)item.t);
+      result.push_back(valAuto);
+      result.push_back(valRaw);
+    }
+  }
+
+  if (result.empty())
+    return nullptr;
+
+  jlongArray jresult = env->NewLongArray(result.size());
+  env->SetLongArrayRegion(jresult, 0, result.size(), result.data());
+  return jresult;
+}
+
+/**
+ * Multi-sensor variant: get glucose history for a SPECIFIC sensor by its short
+ * name. Unlike getGlucoseHistory() which always reads infoblockptr()->current,
+ * this allows the Kotlin layer to sync ALL sensors into Room DB individually.
+ *
+ * Returns the same format: [time_sec, auto_mgdl*10, raw_mgdl*10, ...]
+ * Returns null if sensor not found or has no data.
+ */
+extern "C" JNIEXPORT jlongArray JNICALL fromjava(getGlucoseHistoryForSensor)(
+    JNIEnv *env, jclass cl, jstring sensorName, jlong starttime) {
+  if (!sensorName)
+    return nullptr;
+
+  const char *name = env->GetStringUTFChars(sensorName, NULL);
+  if (!name)
+    return nullptr;
+
+  // Try full name first, then short name
+  SensorGlucoseData *hist = sensors->getSensorData(name);
+  if (!hist)
+    hist = sensors->gethistshort(name);
+
+  env->ReleaseStringUTFChars(sensorName, name);
+
+  if (!hist)
+    return nullptr;
+
+  std::vector<jlong> result;
+  result.reserve(900);
+
+  auto polls = hist->getPolldata();
+  static const double convfactordL = 18.0182;
+
+  for (const auto &item : polls) {
+    if (item.valid() && item.t > starttime) {
+      double cali = calibrateNow(hist, item);
+      jlong valAuto;
+      jlong valRaw;
+
+      if (!isnan(cali)) {
+        valAuto = (jlong)(cali * 10);
+      } else {
+        valAuto = (jlong)item.g * 10;
+      }
+
+      uint16_t rawVal = hist->getRawForPoll(&item);
       valRaw = (jlong)(rawVal * convfactordL);
 
       result.push_back((jlong)item.t);

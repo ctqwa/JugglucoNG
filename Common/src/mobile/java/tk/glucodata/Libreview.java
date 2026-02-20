@@ -222,6 +222,15 @@ static boolean postgetauth(boolean libre3) {
    String password=getlibrepass();
 
    String login=getlibreemail();
+
+   // Edit 62e: Don't attempt auth if credentials are empty/null.
+   // Without this check, the server gets "Password":"null","UserName":""
+   // and locks the account after repeated failures.
+   if(login == null || login.isEmpty() || password == null || "null".equals(password) || password.isEmpty()) {
+      librestatus = "LibreView: no credentials configured";
+      Log.e(LOG_ID, "postgetauth: skipping — empty credentials (login=" + (login != null ? login.length() : "null") + " chars, pass=" + (password != null && !"null".equals(password) ? "set" : "empty") + ")");
+      return false;
+   }
    {if(doLog) {Log.i(LOG_ID,"postgetauth "+login+" "+password);};};
 
    var loc= Locale.getDefault();
@@ -281,7 +290,35 @@ static boolean postgetauth(boolean libre3) {
          JSONObject object = readJSONObject(urlConnection);
          int status=object.getInt("status");
          if(status!=0) {
-            String reason=object.getString("reason");
+            // Edit 62e: Handle status=429 (rate limited/locked) — extract lockout info
+            // and don't retry. The server response has no "reason" field for 429,
+            // only {"status":429,"data":{"code":60,"data":{...,"lockout":300},"message":"locked"}}.
+            if(status == 429) {
+               String message = "locked";
+               int lockoutSeconds = 300;
+               try {
+                  JSONObject data = object.optJSONObject("data");
+                  if(data != null) {
+                     message = data.optString("message", "locked");
+                     JSONObject innerData = data.optJSONObject("data");
+                     if(innerData != null) {
+                        lockoutSeconds = innerData.optInt("lockout", 300);
+                     }
+                  }
+               } catch(Throwable ignored) {}
+               librestatus = "LibreView: account locked (" + lockoutSeconds + "s cooldown)";
+               Log.e(LOG_ID, "postgetauth: account locked (status=429, message=" + message + ", lockout=" + lockoutSeconds + "s) — NOT retrying");
+               return false;
+            }
+            // Edit 62e: Use optString instead of getString to avoid JSONException
+            // when server response has "message" instead of "reason" (e.g. for status 429).
+            String reason = object.optString("reason", null);
+            if(reason == null) {
+               // Try nested data.message as fallback
+               JSONObject data = object.optJSONObject("data");
+               if(data != null) reason = data.optString("message", "unknown");
+               else reason = "unknown";
+            }
             String poststatus="postgetauth: status="+status+" reason="+reason;
             Log.e(LOG_ID,poststatus);
             if(status==20) {
@@ -918,11 +955,21 @@ public static void  config(MainActivity act, View settingsview,CheckBox sendto,b
       });
          layout.setBackgroundResource(R.drawable.dialogbackground);
          int pad= (int)tk.glucodata.GlucoseCurve.metrics.density*7;
-      layout.setPadding(pad,0,pad,pad);
-      act.addContentView(layout, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-   
-   }
+       layout.setPadding(pad,0,pad,pad);
+       act.addContentView(layout, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+    
+    }
 
+    // Edit 48f: Accessors for Compose LibreViewSettingsScreen
+    public static String getStatus() {
+        String s = librestatus;
+        if (s == success && posttime != null) return posttime + ": " + s;
+        return s != null ? s : "";
+    }
+
+    public static String getPostTime() {
+        return posttime != null ? posttime : "";
+    }
 
 
 }

@@ -3,6 +3,7 @@ package tk.glucodata.ui.calibration
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,11 +53,15 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tk.glucodata.GlucosePoint
+import tk.glucodata.R
+import tk.glucodata.data.HistoryRepository
 import tk.glucodata.data.calibration.CalibrationEntity
 import tk.glucodata.data.calibration.CalibrationManager
 import tk.glucodata.logic.TrendEngine
@@ -77,17 +83,65 @@ fun CalibrationBottomSheet(
     onNavigateToHistory: () -> Unit
 ) {
     val view = LocalView.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val historyRepository = remember { HistoryRepository(context) }
 
     val isRawMode = viewMode == 1 || viewMode == 3
-    val modeLabel = if (isRawMode) "Raw" else "Auto"
+    val modeLabel = if (isRawMode) stringResource(R.string.raw) else stringResource(R.string.auto)
 
     // State
     var editingEntity by remember { mutableStateOf<CalibrationEntity?>(null) }
+    val currentSensor = tk.glucodata.Natives.lastsensorname() ?: ""
+    var selectedTimestamp by remember { mutableLongStateOf(initialTimestamp) }
+
+    val nearestHistoryPoint = remember(selectedTimestamp, glucoseHistory) {
+        glucoseHistory.minByOrNull { abs(it.timestamp - selectedTimestamp) }
+    }
+    val selectedAutoValue = nearestHistoryPoint?.value ?: initialValueAuto
+    val selectedRawValue = nearestHistoryPoint?.rawValue ?: initialValueRaw
+    val visualContinuity = CalibrationManager.shouldVisualContinuity()
+    val sensorOverride = currentSensor.takeIf { it.isNotBlank() }
+    val visualBaselineValue = if (visualContinuity) {
+        val modeBaseValue = if (isRawMode) selectedRawValue else selectedAutoValue
+        if (
+            modeBaseValue > 0f &&
+            CalibrationManager.hasActiveCalibration(isRawMode, currentSensor)
+        ) {
+            CalibrationManager.getCalibratedValue(
+                value = modeBaseValue,
+                timestamp = selectedTimestamp,
+                isRawMode = isRawMode,
+                sensorIdOverride = sensorOverride
+            )
+        } else {
+            modeBaseValue
+        }
+    } else {
+        null
+    }
+    val defaultInputValue = when {
+        visualContinuity -> visualBaselineValue?.takeIf { it > 0f }
+            ?: if (isRawMode) selectedRawValue.takeIf { it > 0f } else selectedAutoValue.takeIf { it > 0f }
+        isRawMode -> selectedRawValue.takeIf { it > 0f } ?: selectedAutoValue.takeIf { it > 0f }
+        else -> selectedAutoValue.takeIf { it > 0f } ?: selectedRawValue.takeIf { it > 0f }
+    } ?: initialValueAuto
+
+    fun triggerRewriteOverwrittenHistory(startTimestamp: Long = 0L) {
+        if (!CalibrationManager.shouldOverwriteSensorValues()) return
+        if (currentSensor.isBlank()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            historyRepository.rewriteSensorValuesWithCalibration(
+                sensorSerial = currentSensor,
+                isRawMode = isRawMode,
+                startTimestamp = startTimestamp
+            )
+        }
+    }
 
     // Values
-    val startValue = editingEntity?.userValue ?: (if (isRawMode) initialValueRaw else initialValueAuto)
+    val startValue = editingEntity?.userValue ?: defaultInputValue
 
     var userValue by remember(editingEntity) { mutableFloatStateOf(startValue) }
 
@@ -109,16 +163,21 @@ fun CalibrationBottomSheet(
     val originalValue = if (editingEntity != null) {
         if (isRawMode) editingEntity!!.sensorValueRaw else editingEntity!!.sensorValue
     } else {
-        if (isRawMode) initialValueRaw else initialValueAuto
+        if (visualContinuity) {
+            visualBaselineValue ?: if (isRawMode) selectedRawValue else selectedAutoValue
+        } else {
+            if (isRawMode) selectedRawValue else selectedAutoValue
+        }
     }
 
     // Data Flow
     val duplicateThresholdMs = 60_000L
     val allCalibrations by CalibrationManager.getCalibrationsFlow()?.collectAsState(initial = emptyList())
         ?: remember { mutableStateOf(emptyList()) }
-    val calibrations = allCalibrations.filter { it.isRawMode == isRawMode }.sortedByDescending { it.timestamp }
-
-    var selectedTimestamp by remember { mutableLongStateOf(initialTimestamp) }
+    val calibrations = allCalibrations
+        .filter { it.isRawMode == isRawMode }
+        .filter { it.sensorId == currentSensor || it.sensorId.isEmpty() }
+        .sortedByDescending { it.timestamp }
 
     // --- SMART MODE SWITCHING LOGIC ---
     // Track if we started in Edit Mode (to handle Cancel behavior)
@@ -195,7 +254,7 @@ fun CalibrationBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (editingEntity != null) "Edit Calibration" else "New Calibration ($modeLabel)",
+                    text = if (editingEntity != null) stringResource(R.string.edit_calibration_title) else stringResource(R.string.new_calibration_with_mode, modeLabel),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -208,6 +267,7 @@ fun CalibrationBottomSheet(
                             onClick = {
                                 scope.launch {
                                     CalibrationManager.updateCalibration(editingEntity!!.copy(isEnabled = !editingEntity!!.isEnabled))
+                                    triggerRewriteOverwrittenHistory(editingEntity!!.timestamp)
                                 }
                             },
                             colors = IconButtonDefaults.iconButtonColors(
@@ -220,7 +280,7 @@ fun CalibrationBottomSheet(
                         ) {
                             Icon(
                                 if (editingEntity!!.isEnabled) Icons.Default.Close else Icons.Default.Check,
-                                contentDescription = if (editingEntity!!.isEnabled) "Disable" else "Enable"
+                                contentDescription = null
                             )
                         }
 
@@ -228,15 +288,17 @@ fun CalibrationBottomSheet(
                         IconButton(
                             onClick = {
                                 scope.launch {
+                                     val deletedTimestamp = editingEntity!!.timestamp
                                      CalibrationManager.deleteCalibration(editingEntity!!)
                                      selectedTimestamp = System.currentTimeMillis()
                                      onDismiss()
+                                     triggerRewriteOverwrittenHistory(deletedTimestamp)
                                 }
                             },
                             colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            Icon(Icons.Default.Delete, contentDescription = null)
                         }
                     }
                 }
@@ -268,7 +330,7 @@ fun CalibrationBottomSheet(
                             Column {
 //                                Text("Time", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    text = if (isNow) "Now" else dateFormatter.format(Date(selectedTimestamp)),
+                                    text = if (isNow) stringResource(R.string.now) else dateFormatter.format(Date(selectedTimestamp)),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -283,7 +345,7 @@ fun CalibrationBottomSheet(
                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text("Now")
+                                    Text(stringResource(R.string.now))
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                             }
@@ -355,6 +417,7 @@ fun CalibrationBottomSheet(
                 step = step,
                 isMmol = isMmol,
                 originalValue = originalValue,
+                isEditMode = editingEntity != null,
                 hasChanged = hasChanged || editingEntity != null, // Edit mode always shows old → new
                 view = view,
                 onValueChange = { newVal, newText ->
@@ -387,7 +450,7 @@ fun CalibrationBottomSheet(
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    val statusText = if (isStable) "Conditions Optimal" else "Wait 15m (Unstable)"
+                    val statusText = if (isStable) stringResource(R.string.conditions_optimal) else stringResource(R.string.wait_15m_unstable)
                     Text(
                         text = statusText,
                         style = MaterialTheme.typography.labelMedium,
@@ -413,13 +476,13 @@ fun CalibrationBottomSheet(
                             } else {
                                 // Started as New -> Reset to New
                                 selectedTimestamp = System.currentTimeMillis()
-                                userValue = if (isRawMode) initialValueRaw else initialValueAuto
+                                userValue = defaultInputValue
                                 textValue = TextFieldValue(if (isMmol) String.format("%.1f", userValue) else String.format("%.0f", userValue))
                             }
                         },
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.cancel))
                     }
                 }
 
@@ -427,31 +490,33 @@ fun CalibrationBottomSheet(
                     onClick = {
                         scope.launch {
                             if (editingEntity != null) {
+                                val previousTimestamp = editingEntity!!.timestamp
                                 CalibrationManager.updateCalibration(
                                     editingEntity!!.copy(
                                         userValue = userValue,
                                         timestamp = selectedTimestamp
                                     )
                                 )
-                                // After update, close
                                 onDismiss()
+                                triggerRewriteOverwrittenHistory(minOf(previousTimestamp, selectedTimestamp))
                             } else {
                                 // New
                                 CalibrationManager.addCalibration(
                                     timestamp = selectedTimestamp,
-                                    sensorValue = initialValueAuto,
-                                    sensorValueRaw = initialValueRaw,
+                                    sensorValue = selectedAutoValue,
+                                    sensorValueRaw = selectedRawValue,
                                     userValue = userValue,
                                     isRawMode = isRawMode
                                 )
                                 onDismiss()
+                                triggerRewriteOverwrittenHistory(selectedTimestamp)
                             }
                         }
                     },
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text(if (editingEntity != null) "Update" else "Save")
+                    Text(if (editingEntity != null) stringResource(R.string.update) else stringResource(R.string.save))
                 }
             }
 
@@ -626,7 +691,7 @@ private fun CalibrationHistoryList(
             ) {
                 Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Previous calibrations")
+                Text(stringResource(R.string.previous_calibrations))
             }
         }
     }
@@ -640,6 +705,7 @@ private fun CalibrationHeroSection(
     step: Float,
     isMmol: Boolean,
     originalValue: Float, // Original sensor value (for edit mode) or initial value (for new mode)
+    isEditMode: Boolean,
     hasChanged: Boolean, // True if user has modified the value
     onValueChange: (Float, TextFieldValue) -> Unit,
     view: android.view.View
@@ -650,6 +716,8 @@ private fun CalibrationHeroSection(
     
     // Show dual display when: value has changed AND values don't match
     val showDual = hasChanged && !valuesMatch
+    val heroEnterDuration = if (isEditMode) 140 else 220
+    val heroExitDuration = if (isEditMode) 110 else 180
     
     // Focus and selection handling for better UX
     val focusRequester = remember { FocusRequester() }
@@ -679,8 +747,16 @@ private fun CalibrationHeroSection(
         // Original value above (vertical layout)
         AnimatedVisibility(
             visible = showDual,
-            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+            enter = fadeIn(animationSpec = tween(heroEnterDuration)) +
+                    expandVertically(
+                        expandFrom = Alignment.Bottom,
+                        animationSpec = tween(heroEnterDuration)
+                    ),
+            exit = fadeOut(animationSpec = tween(heroExitDuration)) +
+                    shrinkVertically(
+                        shrinkTowards = Alignment.Bottom,
+                        animationSpec = tween(heroExitDuration)
+                    )
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -715,7 +791,7 @@ private fun CalibrationHeroSection(
                 },
                 modifier = Modifier.size(64.dp)
             ) {
-                Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(32.dp))
+                Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(32.dp))
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -789,7 +865,7 @@ private fun CalibrationHeroSection(
                 },
                 modifier = Modifier.size(64.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(32.dp))
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(32.dp))
             }
         }
     }

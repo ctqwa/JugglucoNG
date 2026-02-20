@@ -339,10 +339,13 @@ public:
     sensorlist()[lastpos].endtime = 0;
     sensorlist()[lastpos].finished = 0;
     sensorlist()[lastpos].initialized = false;
-      infoblockptr()->current = lastpos;
+      // Multi-sensor fix: Only auto-set the new sensor as main if there is no current
+      // main sensor. This prevents silently overriding the user's selection when a
+      // second sensor is added (e.g., adding Sibionics while AiDex is already main).
       if (infoblockptr()->current < 0) {
           infoblockptr()->current = lastpos;
-      }    makelinks(lastpos, endindex);
+      }
+      makelinks(lastpos, endindex);
 #ifndef NOLOG
     time_t tim = sensorlist()[lastpos].starttime;
     LOGGER("add sensor %.16s starttime=%d %s", name.data(), tim, ctime(&tim));
@@ -915,6 +918,11 @@ public:
   void finishsensor(int ind) {
     if (ind >= 0 && ind <= last()) {
       sensorlist()[ind].finished = 1;
+    }
+  }
+  void unfinishsensor(int ind) {
+    if (ind >= 0 && ind <= last()) {
+      sensorlist()[ind].finished = 0;
     }
   }
   template <typename F> bool checkinfo(const int ind, uint32_t nu, F dont) {

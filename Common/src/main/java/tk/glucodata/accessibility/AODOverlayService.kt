@@ -378,6 +378,8 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         
         val isRawMode = (viewMode == 1 || viewMode == 3)
         val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawMode)
+        val hideInitialWhenCalibrated = hasCalibration &&
+            tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
 
         // Current Value
         val last: strGlucose? = Natives.lastglucose()
@@ -423,6 +425,23 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             } else 0f
             
             valStr = when {
+                hasCalibration && hideInitialWhenCalibrated && viewMode == 2 -> {
+                    val calText = tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
+                    val rawSecondary = rawVal.takeIf { it > 0.1f }?.let {
+                        tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol)
+                    }
+                    if (rawSecondary != null) "$calText / $rawSecondary" else calText
+                }
+                hasCalibration && hideInitialWhenCalibrated && viewMode == 3 -> {
+                    val calText = tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
+                    val autoSecondary = autoVal.takeIf { it > 0.1f }?.let {
+                        tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol)
+                    }
+                    if (autoSecondary != null) "$calText / $autoSecondary" else calText
+                }
+                hasCalibration && hideInitialWhenCalibrated -> {
+                    tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
+                }
                 hasCalibration && (viewMode == 2 || viewMode == 3) -> {
                     // 3 values: Calibrated / Secondary · Tertiary
                     val secondary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)

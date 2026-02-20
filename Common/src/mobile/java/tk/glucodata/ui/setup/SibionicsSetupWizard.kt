@@ -1,11 +1,9 @@
 package tk.glucodata.ui.setup
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -323,6 +321,7 @@ fun SibionicsSetupWizard(
     onDismiss: () -> Unit,
     onComplete: () -> Unit
 ) {
+    val ui = rememberWizardUiMetrics()
     var currentStep by remember { mutableStateOf(SibionicsSetupStep.SELECT_TYPE) }
     var selectedType by remember { mutableStateOf(SibionicsType.EU) }
     var sensorPtr by remember { mutableStateOf(0L) }
@@ -412,6 +411,7 @@ fun SibionicsSetupWizard(
         ) { step ->
             when (step) {
                 SibionicsSetupStep.SELECT_TYPE -> SelectTypeStep(
+                    compact = ui.compact,
                     selectedType = selectedType,
                     onTypeSelected = { type ->
                         selectedType = type
@@ -427,6 +427,7 @@ fun SibionicsSetupWizard(
                 )
 
                 SibionicsSetupStep.SCAN_SENSOR -> ScanSensorStep(
+                    compact = ui.compact,
                     selectedType = selectedType,
                     onScanClick = {
                         tk.glucodata.MainActivity.launchQrScan(
@@ -452,6 +453,7 @@ fun SibionicsSetupWizard(
                 )
 
                 SibionicsSetupStep.SCAN_TRANSMITTER -> ScanTransmitterStep(
+                    compact = ui.compact,
                     resetEnabled = resetTransmitter,
                     onResetChanged = { resetTransmitter = it },
                     onScanClick = {
@@ -525,7 +527,7 @@ fun SibionicsSetupWizard(
                     }
                 )
 
-                SibionicsSetupStep.CONNECTING -> ConnectingStep()
+                SibionicsSetupStep.CONNECTING -> ConnectingStep(compact = ui.compact)
             }
         }
     }
@@ -533,10 +535,17 @@ fun SibionicsSetupWizard(
 
 @Composable
 fun ScanSensorStep(
+    compact: Boolean,
     selectedType: SibionicsType,
     onScanClick: () -> Unit,
     onManualEntry: (String) -> Unit
 ) {
+    val contentPadding = if (compact) 12.dp else 16.dp
+    val heroSize = if (compact) 96.dp else 120.dp
+    val heroInnerPadding = if (compact) 24.dp else 32.dp
+    val heroBottomPadding = if (compact) 16.dp else 24.dp
+    val sectionGap = if (compact) 8.dp else 12.dp
+    val buttonHeight = if (compact) 46.dp else 48.dp
     var showManualEntry by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -570,21 +579,21 @@ fun ScanSensorStep(
     
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(contentPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top 
     ) {
         item {
-            Spacer(modifier = Modifier.height(24.dp)) 
+            Spacer(modifier = Modifier.height(if (compact) 16.dp else 24.dp)) 
             Surface(
-                modifier = Modifier.size(120.dp).padding(bottom = 24.dp), 
+                modifier = Modifier.size(heroSize).padding(bottom = heroBottomPadding), 
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Icon(
                     imageVector = Icons.Default.QrCodeScanner,
                     contentDescription = null,
-                    modifier = Modifier.padding(32.dp),
+                    modifier = Modifier.padding(heroInnerPadding),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -593,31 +602,31 @@ fun ScanSensorStep(
         item {
             Text(
                 text = stringResource(R.string.scan_sensor_title),
-                style = MaterialTheme.typography.headlineLarge,
+                style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = if (compact) 12.dp else 16.dp)
             )
 
             Text(
                 text = stringResource(R.string.scan_sensor_instruction),
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(bottom = if (compact) 20.dp else 32.dp)
             )
         }
 
         item {
             Button(
                 onClick = onScanClick,
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
             ) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.scan_qr_button))
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sectionGap))
 
             // Add Gallery Button
             OutlinedButton(
@@ -626,7 +635,7 @@ fun ScanSensorStep(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     ) 
                 },
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
             ) {
                 Icon(Icons.Default.Image, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -636,7 +645,7 @@ fun ScanSensorStep(
             // Skip Button for Sibionics 2 - allows bypassing sensor scan since it uses Bluetooth connection
             // We pass a randomly generated valid-looking sensor code.
             if (SibionicsType.SIBIONICS2 == selectedType) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sectionGap))
                 OutlinedButton(
                     onClick = {
                         // random 16-char alphanumeric serial
@@ -646,17 +655,17 @@ fun ScanSensorStep(
                         val randomCode = "FAKEBATCH$" + randomSerial + "X" 
                         onManualEntry(randomCode)
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                    modifier = Modifier.fillMaxWidth().height(buttonHeight)
                 ) {
                    Text(stringResource(R.string.skip_fake_sensor)) 
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (compact) 12.dp else 16.dp))
 
             TextButton(
                 onClick = { showManualEntry = true },
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                        modifier = Modifier.fillMaxWidth().height(buttonHeight)
 
             ) {
                 Text(stringResource(R.string.enter_code_manually))
@@ -669,29 +678,35 @@ fun ScanSensorStep(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SelectTypeStep(
+    compact: Boolean,
     selectedType: SibionicsType,
     onTypeSelected: (SibionicsType) -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit
 ) {
+    val horizontalPadding = if (compact) 16.dp else 24.dp
+    val verticalPadding = if (compact) 12.dp else 16.dp
+    val listGap = if (compact) 12.dp else 16.dp
+    val cardPadding = if (compact) 16.dp else 20.dp
+    val buttonHeight = if (compact) 46.dp else 48.dp
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
         // Header with generous spacing
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
         Text(
             text = stringResource(R.string.select_sibionics_type),
-            style = MaterialTheme.typography.headlineMedium
+            style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(if (compact) 6.dp else 8.dp))
         Text(
             text = stringResource(R.string.choose_sibionics_variant),
-            style = MaterialTheme.typography.bodyLarge,
+            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(if (compact) 20.dp else 32.dp))
 
         // Selection Cards (M3 Expressive - no dividers, surface tonality)
         val listScrollState = rememberScrollState()
@@ -700,7 +715,7 @@ fun SelectTypeStep(
                 .weight(1f)
                 .verticalScroll(listScrollState)
                 .selectableGroup(),
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Generous spacing instead of dividers
+            verticalArrangement = Arrangement.spacedBy(listGap) // Generous spacing instead of dividers
         ) {
             SibionicsType.values().forEach { type ->
                 val isSelected = (type == selectedType)
@@ -744,7 +759,7 @@ fun SelectTypeStep(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(cardPadding),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Content
@@ -768,9 +783,9 @@ fun SelectTypeStep(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = "Selected",
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(if (compact) 20.dp else 24.dp)
                             )
                         }
                     }
@@ -778,14 +793,14 @@ fun SelectTypeStep(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(if (compact) 16.dp else 24.dp))
         
         // Full-width Next button (M3 Expressive - prominent primary action)
         Button(
             onClick = onNext,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .height(buttonHeight),
             shape = MaterialTheme.shapes.large
         ) {
             Text(
@@ -794,12 +809,12 @@ fun SelectTypeStep(
             )
         }
         
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
         
         // Secondary cancel action
         TextButton(
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth().height(48.dp),
+            modifier = Modifier.fillMaxWidth().height(buttonHeight),
 
             ) {
             Text(stringResource(R.string.cancel))
@@ -809,6 +824,7 @@ fun SelectTypeStep(
 
 @Composable
 fun ScanTransmitterStep(
+    compact: Boolean,
     resetEnabled: Boolean,
     onResetChanged: (Boolean) -> Unit,
     onScanClick: () -> Unit,
@@ -819,6 +835,10 @@ fun ScanTransmitterStep(
     var isScanning by remember { mutableStateOf(true) } // Active by default
     var foundDevices by remember { mutableStateOf(setOf<String>()) }
     var showManualEntry by remember { mutableStateOf(false) }
+    val contentPadding = if (compact) 12.dp else 16.dp
+    val heroSize = if (compact) 96.dp else 120.dp
+    val heroInnerPadding = if (compact) 24.dp else 32.dp
+    val buttonHeight = if (compact) 46.dp else 48.dp
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -832,7 +852,7 @@ fun ScanTransmitterStep(
                 if (decoded != null) {
                     onManualEntry(decoded)
                 } else {
-                    tk.glucodata.Applic.Toaster("No QR code found in image")
+                    tk.glucodata.Applic.Toaster(tk.glucodata.Applic.app.getString(R.string.no_qr_found))
                 }
             }
         }
@@ -865,37 +885,37 @@ fun ScanTransmitterStep(
     
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(contentPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top 
     ) {
         item {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(if (compact) 16.dp else 24.dp))
             Surface(
-                modifier = Modifier.size(120.dp).padding(bottom = 24.dp), 
+                modifier = Modifier.size(heroSize).padding(bottom = if (compact) 16.dp else 24.dp), 
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Icon(
                     imageVector = Icons.Default.QrCodeScanner,
                     contentDescription = null,
-                    modifier = Modifier.padding(32.dp),
+                    modifier = Modifier.padding(heroInnerPadding),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
             Text(
                 text = stringResource(R.string.scan_transmitter_title),
-                style = MaterialTheme.typography.headlineLarge,
+                style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
              Text(
                 text = stringResource(R.string.scan_transmitter_desc),
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                  textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(bottom = if (compact) 20.dp else 32.dp)
             )
         }
         
@@ -904,11 +924,11 @@ fun ScanTransmitterStep(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp)
+                    .padding(vertical = if (compact) 12.dp else 16.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onResetChanged(!resetEnabled) }
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(16.dp),
+                    .padding(if (compact) 12.dp else 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -923,23 +943,23 @@ fun ScanTransmitterStep(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(if (compact) 12.dp else 16.dp))
                 StyledSwitch(
                     checked = resetEnabled,
                     onCheckedChange = null // Handled by Row click
                 )
             }
             
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(if (compact) 16.dp else 24.dp))
 
             // Bluetooth Scanning Section (Moved to Top)
             OutlinedButton(
                 onClick = { isScanning = !isScanning },
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
             ) {
                 if (isScanning) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(if (compact) 20.dp else 24.dp),
                         color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 2.dp
                     )
@@ -951,7 +971,7 @@ fun ScanTransmitterStep(
                     Text(stringResource(R.string.search_bluetooth))
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
         }
 
         if (foundDevices.isNotEmpty()) {
@@ -974,9 +994,9 @@ fun ScanTransmitterStep(
                 )
             }
             item {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
                 HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
             }
         } else if (isScanning) {
              item {
@@ -985,7 +1005,7 @@ fun ScanTransmitterStep(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(if (compact) 16.dp else 24.dp))
              }
         }
 
@@ -997,18 +1017,18 @@ fun ScanTransmitterStep(
                modifier = Modifier.fillMaxWidth(),
                textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
     
             Button(
                 onClick = onScanClick,
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
             ) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.scan_transmitter_button))
             }
             
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (compact) 6.dp else 8.dp))
 
             // Add Gallery Button (Transmitter)
             OutlinedButton(
@@ -1017,48 +1037,52 @@ fun ScanTransmitterStep(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     ) 
                 },
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
             ) {
                 Icon(Icons.Default.Image, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Select from Gallery")
+                Text(stringResource(R.string.select_gallery_button))
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (compact) 6.dp else 8.dp))
             
             TextButton(
                 onClick = { showManualEntry = true },
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
             ) {
-                 Text("Enter Code Manually")
+                 Text(stringResource(R.string.enter_code_manually))
             }
             
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(if (compact) 16.dp else 24.dp))
         }
     }
 }
 
 @Composable
-fun ConnectingStep() {
+fun ConnectingStep(compact: Boolean) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = if (compact) 16.dp else 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         CircularProgressIndicator(
-             modifier = Modifier.size(64.dp),
-             strokeWidth = 6.dp
+             modifier = Modifier.size(if (compact) 54.dp else 64.dp),
+             strokeWidth = if (compact) 5.dp else 6.dp
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(if (compact) 16.dp else 24.dp))
         Text(
-            text = "Connecting to Sensor...",
-            style = MaterialTheme.typography.headlineMedium
+            text = stringResource(R.string.connecting_to_sensor),
+            style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(if (compact) 6.dp else 8.dp))
         Text(
-            text = "Please wait while we establish connection.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = stringResource(R.string.connecting_to_sensor_wait),
+            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     }
 }

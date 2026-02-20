@@ -67,6 +67,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Keep;
 import androidx.annotation.MainThread;
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
@@ -79,9 +80,10 @@ import java.util.concurrent.TimeUnit;
 import tk.glucodata.nums.AllData;
 import tk.glucodata.nums.numio;
 import tk.glucodata.settings.Broadcasts;
+import java.util.concurrent.Executors;
 //import static tk.glucodata.MessageSender.messagesender;
 
-public class Applic extends Application {
+public class Applic extends Application implements androidx.work.Configuration.Provider {
     static final boolean ALLGALAXY = true;
     static final boolean hasNotChinese = true;
     public static final boolean scrollbar = true;
@@ -198,6 +200,8 @@ public class Applic extends Application {
             numdata = new AllData();
         }
     }
+
+
 
     void setnotify(boolean on) {
         Notify.alertwatch = on;
@@ -843,6 +847,14 @@ public class Applic extends Application {
 
     public static int stopprogram = 0;
 
+    @NonNull
+    @Override
+    public androidx.work.Configuration getWorkManagerConfiguration() {
+        return new androidx.work.Configuration.Builder()
+                .setMinimumLoggingLevel(android.util.Log.INFO)
+                .build();
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -1225,5 +1237,7 @@ public class Applic extends Application {
         }
         return false;
     }
+
+
 
 }

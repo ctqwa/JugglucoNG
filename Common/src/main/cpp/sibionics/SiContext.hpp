@@ -34,6 +34,8 @@ private:
   multimmap binState;
   AlgorithmContext *algcontext;
   bool notchinese;
+  int badValueStreak =
+      0; // Per-sensor streak counter (was static — shared across sensors)
 
   double process2(int index, double value, double temp);
   double process3(int index, double value, double temp);
@@ -52,5 +54,11 @@ public:
   void reset(SensorGlucoseData *sens);
   void resetAll(SensorGlucoseData *sens);
   void wipeDataOnly(SensorGlucoseData *sens);
+  void localReplay(SensorGlucoseData *sens);
+  bool reloadFromPersistedState(SensorGlucoseData *sens);
+  // Edit 86: Allow JNI to clear the bad-value streak counter when
+  // custom calibration settings change, preventing stale streaks
+  // from triggering an immediate algorithm reset.
+  void clearBadValueStreak() { badValueStreak = 0; }
 };
 #endif

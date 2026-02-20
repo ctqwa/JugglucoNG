@@ -1884,6 +1884,8 @@ public class Notify {
             boolean isRawMode = (viewMode == 1 || viewMode == 3);
             boolean hasCalibration = tk.glucodata.data.calibration.CalibrationManager.INSTANCE
                     .hasActiveCalibration(isRawMode);
+            boolean hideInitialWhenCalibrated = hasCalibration
+                    && tk.glucodata.data.calibration.CalibrationManager.INSTANCE.shouldHideInitialWhenCalibrated();
 
             // If calibration is active, 'glvalue' passed in IS the calibrated value.
             // We need to find the Base values (Raw & Auto) from the points.
@@ -1941,7 +1943,13 @@ public class Notify {
             // We can't use local func in Java, so standard code
 
             if (hasCalibration) {
-                if (viewMode == 2 || viewMode == 3) {
+                if (hideInitialWhenCalibrated) {
+                    if (viewMode == 2 && rawVal > 0.1f) {
+                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, rawVal);
+                    } else if (viewMode == 3 && autoVal > 0.1f) {
+                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, autoVal);
+                    }
+                } else if (viewMode == 2 || viewMode == 3) {
                     // 3 Values: Calibrated / Sec · Ter
                     // Mode 2 (Auto+Raw): Sec=Auto, Ter=Raw
                     // Mode 3 (Raw+Auto): Sec=Raw, Ter=Auto

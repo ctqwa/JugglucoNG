@@ -25,8 +25,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertConfig
 import tk.glucodata.alerts.AlertType
 import tk.glucodata.alerts.AlertDeliveryMode
@@ -80,13 +82,13 @@ fun GlobalAlertSettingsCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                      Text(
-                        text = "Master Alert Control",
+                        text = stringResource(R.string.master_alert_control),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     if (!isExpanded) {
                         Text(
-                            text = if (isMasterEnabled) "Global: Active" else "Global: All Alerts Disabled",
+                            text = if (isMasterEnabled) stringResource(R.string.global_active) else stringResource(R.string.global_all_alerts_disabled),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
@@ -140,7 +142,7 @@ fun GlobalAlertSettingsCard(
                     ) {
                         Icon(Icons.Default.DoneAll, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Apply to All Alerts")
+                        Text(stringResource(R.string.apply_to_all_alerts))
                     }
                  }
             }

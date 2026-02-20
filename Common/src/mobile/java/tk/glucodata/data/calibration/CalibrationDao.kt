@@ -25,6 +25,9 @@ interface CalibrationDao {
 
     @Query("SELECT * FROM calibrations WHERE sensorId = :sensorId ORDER BY timestamp DESC")
     fun getAllForSensor(sensorId: String): Flow<List<CalibrationEntity>>
+
+    @Query("DELETE FROM calibrations WHERE sensorId = :sensorId")
+    suspend fun deleteForSensor(sensorId: String): Int
     
     @Query("DELETE FROM calibrations")
     suspend fun deleteAll()

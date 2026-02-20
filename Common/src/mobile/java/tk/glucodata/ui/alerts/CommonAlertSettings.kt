@@ -12,9 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import tk.glucodata.R
 import tk.glucodata.alerts.AlertConfig
 import tk.glucodata.alerts.AlertDeliveryMode
 import tk.glucodata.alerts.VolumeProfile
@@ -55,7 +57,7 @@ fun CommonAlertSettings(
          ) {
              Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
              Spacer(Modifier.width(8.dp))
-             Text("Test Alert")
+             Text(stringResource(R.string.test_alert))
          }
          
          // === Header (Thresholds/Durations) ===
@@ -67,7 +69,7 @@ fun CommonAlertSettings(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
-            Text("Modes")
+            Text(stringResource(R.string.modes))
             val modes = listOf("Sound", "Vibrate", "Flash")
             val selectedModes = mutableListOf<String>().apply {
                 if (config.soundEnabled) add("Sound")
@@ -88,7 +90,14 @@ fun CommonAlertSettings(
                     }
                     onConfigChange(newConfig)
                 },
-                label = { Text(it) },
+                label = {
+                    val labelRes = when (it) {
+                        "Sound" -> R.string.soundname
+                        "Vibrate" -> R.string.vibrationname
+                        else -> R.string.flash
+                    }
+                    Text(stringResource(labelRes))
+                },
                 icon = { mode ->
                     when(mode) {
                          "Sound" -> if(selectedModes.contains(mode)) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.VolumeOff
@@ -110,7 +119,7 @@ fun CommonAlertSettings(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
-            Text("Alert Style")
+            Text(stringResource(R.string.alert_style))
             ConnectedButtonGroup(
                 options = AlertDeliveryMode.entries,
                 selectedOption = config.deliveryMode,
@@ -129,7 +138,7 @@ fun CommonAlertSettings(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
-            Text("Intensity")
+            Text(stringResource(R.string.intensity))
             ConnectedButtonGroup(
                 options = listOf(VolumeProfile.HIGH, VolumeProfile.MEDIUM, VolumeProfile.ASCENDING),
                 selectedOption = if (config.volumeProfile in listOf(VolumeProfile.VIBRATE_ONLY, VolumeProfile.SILENT)) VolumeProfile.MEDIUM else config.volumeProfile,
@@ -168,7 +177,7 @@ fun CommonAlertSettings(
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Alert Sound",
+                            stringResource(R.string.alert_sound),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -188,8 +197,8 @@ fun CommonAlertSettings(
                 // Override Silent Mode toggle (inside Sound section)
                 ClickableToggleRow(
                     icon = Icons.Default.VolumeOff,
-                    title = "Override Silent Mode",
-                    subtitle = "Play sound even when phone is on silent",
+                    title = stringResource(R.string.override_silent_mode),
+                    subtitle = stringResource(R.string.override_silent_mode_desc),
                     checked = config.overrideDND,
                     onCheckedChange = { onConfigChange(config.copy(overrideDND = it)) }
                 )
@@ -220,7 +229,7 @@ fun CommonAlertSettings(
         
         // === Snooze ===
         DurationSlider(
-            label = "Default Snooze",
+            label = stringResource(R.string.default_snooze),
             value = config.defaultSnoozeMinutes,
             range = 5..60,
             stepSize = 5,

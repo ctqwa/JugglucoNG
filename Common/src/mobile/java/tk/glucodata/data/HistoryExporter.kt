@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import tk.glucodata.Natives
 import tk.glucodata.ui.GlucosePoint
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -24,16 +25,26 @@ object HistoryExporter {
 
     /**
      * Export data to a CSV file.
-     * Format: Timestamp(ms),Date,Value,RawValue,Unit
+     * Format: Timestamp(ms),Date,Value,RawValue,Unit,SensorSerial
      * Values are always exported in the User's preferred unit for consistency with what they see.
+     * Multi-sensor: includes SensorSerial column for re-import with proper tagging.
      */
     suspend fun exportToCsv(context: Context, uri: Uri, data: List<GlucosePoint>, unit: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
+                // Get all readings from Room to access sensorSerial
+                val dao = HistoryDatabase.getInstance(context).historyDao()
+                // Build a map of timestamp -> sensorSerial for enriching export
+                val allReadings = dao.getReadingsSince(0L)
+                val serialByTimestamp = HashMap<Long, String>(allReadings.size)
+                for (reading in allReadings) {
+                    serialByTimestamp[reading.timestamp] = reading.sensorSerial
+                }
+
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.bufferedWriter().use { writer ->
-                        // Header
-                        writer.write("Timestamp,Date,Value,RawValue,Unit\n")
+                        // Header — new format with SensorSerial
+                        writer.write("Timestamp,Date,Value,RawValue,Unit,SensorSerial\n")
                         
                         // Data
                         for (point in data) {
@@ -41,8 +52,9 @@ object HistoryExporter {
                             // Ensure dot decimal separator for CSV
                             val valueStr = tk.glucodata.ui.util.GlucoseFormatter.formatCsv(point.value, unit)
                             val rawStr = tk.glucodata.ui.util.GlucoseFormatter.formatCsv(point.rawValue, unit)
+                            val serial = serialByTimestamp[point.timestamp] ?: "unknown"
                             
-                            writer.write("${point.timestamp},$dateStr,$valueStr,$rawStr,$unit\n")
+                            writer.write("${point.timestamp},$dateStr,$valueStr,$rawStr,$unit,$serial\n")
                         }
                     }
                 }
@@ -56,11 +68,19 @@ object HistoryExporter {
 
     /**
      * Export data to a human-readable text file.
-     * Format: Mon, 01 Jan 2024 12:00: 5.5 mmol/L (Raw: 5.4)
+     * Format: Mon, 01 Jan 2024 12:00: 5.5 mmol/L (Raw: 5.4) [SensorSerial]
      */
     suspend fun exportToReadable(context: Context, uri: Uri, data: List<GlucosePoint>, unit: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
+                // Get serial map for enriching export
+                val dao = HistoryDatabase.getInstance(context).historyDao()
+                val allReadings = dao.getReadingsSince(0L)
+                val serialByTimestamp = HashMap<Long, String>(allReadings.size)
+                for (reading in allReadings) {
+                    serialByTimestamp[reading.timestamp] = reading.sensorSerial
+                }
+
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.bufferedWriter().use { writer ->
                         writer.write("JugglucoNG Glucose History Export\n")
@@ -72,8 +92,10 @@ object HistoryExporter {
                             val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit)
                             val valueStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.value, isMmol)
                             val rawStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.rawValue, isMmol)
+                            val serial = serialByTimestamp[point.timestamp] ?: ""
                             
-                            val line = "$dateStr: $valueStr $unit (Raw: $rawStr)\n"
+                            val sensorTag = if (serial.isNotEmpty() && serial != "unknown") " [$serial]" else ""
+                            val line = "$dateStr: $valueStr $unit (Raw: $rawStr)$sensorTag\n"
                             writer.write(line)
                         }
                     }
@@ -88,9 +110,12 @@ object HistoryExporter {
 
     /**
      * Import data from a CSV file.
-     * Expected Format via exportToCsv.
-     * Note: This assumes file follows our export format. 
-     * Handles unit conversion if the file unit differs from internal storage (mg/dL).
+     * Handles both old format (5 columns: Timestamp,Date,Value,RawValue,Unit)
+     * and new format (6 columns: Timestamp,Date,Value,RawValue,Unit,SensorSerial).
+     *
+     * Old format: defaults sensorSerial to current main sensor.
+     * New format: uses the SensorSerial column from the CSV.
+     *
      * Internal storage is ALWAYS mg/dL.
      */
     suspend fun importFromCsv(context: Context, uri: Uri): ImportResult {
@@ -98,6 +123,8 @@ object HistoryExporter {
             var successCount = 0
             var failCount = 0
             val readings = mutableListOf<HistoryReading>()
+            // Default serial for old-format CSVs that don't have a SensorSerial column
+            val defaultSerial = Natives.lastsensorname() ?: "imported"
 
             try {
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -107,6 +134,8 @@ object HistoryExporter {
                         if (header == null || !header.startsWith("Timestamp")) {
                             return@withContext ImportResult(0, 0, false, "Invalid CSV format")
                         }
+                        // Detect new format by checking if header has SensorSerial
+                        val hasSerialColumn = header.contains("SensorSerial")
 
                         reader.forEachLine { line ->
                             try {
@@ -124,7 +153,20 @@ object HistoryExporter {
                                         rawValue *= 18.0182f
                                     }
 
-                                    readings.add(HistoryReading(timestamp, value, rawValue, 0f))
+                                    // Use serial from CSV if available, otherwise default
+                                    val serial = if (hasSerialColumn && parts.size >= 6) {
+                                        parts[5].trim().ifEmpty { defaultSerial }
+                                    } else {
+                                        defaultSerial
+                                    }
+
+                                    readings.add(HistoryReading(
+                                        timestamp = timestamp,
+                                        sensorSerial = serial,
+                                        value = value,
+                                        rawValue = rawValue,
+                                        rate = 0f
+                                    ))
                                     successCount++
                                 }
                             } catch (e: Exception) {

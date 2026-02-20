@@ -66,6 +66,7 @@ import java.util.UUID
 fun AlertSettingsScreen(
     navController: NavController
 ) {
+    val context = LocalContext.current
     val isMmol = Applic.unit == 1
     
     // Load all alert configs
@@ -87,7 +88,7 @@ fun AlertSettingsScreen(
     
     fun createDefaultCustomAlert(type: CustomAlertType) {
         val existingCount = customAlerts.count { it.type == type }
-        val baseName = if (type == CustomAlertType.HIGH) "Custom High" else "Custom Low"
+        val baseName = if (type == CustomAlertType.HIGH) context.getString(R.string.custom_high) else context.getString(R.string.custom_low)
         val newName = "$baseName ${existingCount + 1}"
         
         // Default values respecting isMmol
@@ -268,7 +269,7 @@ fun AlertSettingsScreen(
             // === HIGH ALERTS SECTION ===
             item {
                 SectionHeader(
-                    title = "High Alerts",
+                    title = stringResource(R.string.high_alerts_title),
                     icon = Icons.AutoMirrored.Filled.TrendingUp // Using TrendingUp for Highs
                 )
             }
@@ -357,7 +358,7 @@ fun AlertSettingsScreen(
             // Add High Alert Button
             item {
                 AddCustomAlertButton(
-                    text = "Add High Alert",
+                    text = stringResource(R.string.add_high_alert),
                     onClick = { createDefaultCustomAlert(CustomAlertType.HIGH) }
                 )
             }
@@ -366,7 +367,7 @@ fun AlertSettingsScreen(
             item {
                 Spacer(Modifier.height(8.dp))
                 SectionHeader(
-                    title = "Low Alerts",
+                    title = stringResource(R.string.low_alerts_title),
                     icon = Icons.AutoMirrored.Filled.TrendingDown // Using TrendingDown for Lows
                 )
             }
@@ -455,7 +456,7 @@ fun AlertSettingsScreen(
             // Add Low Alert Button
             item {
                 AddCustomAlertButton(
-                    text = "Add Low Alert",
+                    text = stringResource(R.string.add_low_alert),
                     onClick = { createDefaultCustomAlert(CustomAlertType.LOW) }
                 )
             }
@@ -464,7 +465,7 @@ fun AlertSettingsScreen(
             item {
                 Spacer(Modifier.height(8.dp))
                 SectionHeader(
-                    title = "Predictive Alerts",
+                    title = stringResource(R.string.predictive_alerts),
                     icon = Icons.AutoMirrored.Filled.TrendingDown
                 )
             }
@@ -501,7 +502,7 @@ fun AlertSettingsScreen(
             item {
                 Spacer(Modifier.height(16.dp))
                 SectionHeader(
-                    title = "Other Alerts",
+                    title = stringResource(R.string.other_alerts),
                     icon = Icons.Default.NotificationsActive
                 )
             }
@@ -605,7 +606,7 @@ fun CustomAlertCard(
     val accentColor = if (alert.type == CustomAlertType.HIGH) Color(0xFFFF9800) else Color(0xFFF44336) 
     
     // For Title/Subtitle
-    val title = alert.name.ifEmpty { if (alert.type == CustomAlertType.HIGH) "High Alert" else "Low Alert" }
+    val title = alert.name.ifEmpty { if (alert.type == CustomAlertType.HIGH) stringResource(R.string.high_alert) else stringResource(R.string.low_alert) }
     val subtitle = buildString {
         append(formatThreshold(alert.threshold, isMmol))
         
@@ -620,7 +621,7 @@ fun CustomAlertCard(
         }
         
         if (!alert.enabled) {
-            append(" • Disabled")
+            append(" • ${stringResource(R.string.disabled_status)}")
         }
     }
 
@@ -733,7 +734,7 @@ fun CustomAlertCard(
                     ) {
                         Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Delete Custom Alert")
+                        Text(stringResource(R.string.delete_custom_alert))
                     }
                     Spacer(Modifier.height(8.dp))
 
@@ -783,13 +784,13 @@ fun CustomAlertCard(
                             OutlinedTextField(
                                 value = alert.name,
                                 onValueChange = { onUpdate(alert.copy(name = it)) },
-                                label = { Text("Alert Name") },
+                                label = { Text(stringResource(R.string.alert_name)) },
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                             )
                             
                             // Threshold Slider using generic UI
                              ThresholdSlider(
-                                label = "Threshold",
+                                label = stringResource(R.string.threshold_label),
                                 value = alert.threshold,
                                 isMmol = isMmol,
                                 range = if (isMmol) {
@@ -927,7 +928,7 @@ private fun AlertCard(
                         config.threshold?.let { append(formatThreshold(it, isMmol)) }
                         config.durationMinutes?.let {
                             if (isNotEmpty()) append(" • ")
-                            append("$it min")
+                            append(stringResource(R.string.minutes_short_format, it))
                         }
                         // Add time range if enabled
                         if (config.timeRangeEnabled) {
@@ -940,7 +941,7 @@ private fun AlertCard(
                         }
                         if (!config.enabled) {
                             if (isNotEmpty()) append(" • ")
-                            append("Disabled")
+                            append(stringResource(R.string.disabled_status))
                         }
                     }
                     if (subtitle.isNotEmpty()) {
@@ -1023,7 +1024,7 @@ private fun AlertSettingsExpanded(
                  // === Threshold Section (If applicable) ===
                 if (config.threshold != null) {
                     ThresholdSlider(
-                        label = "Threshold",
+                        label = stringResource(R.string.threshold_label),
                         value = config.threshold,
                         isMmol = isMmol,
                         range = getThresholdRange(config.type, isMmol),
@@ -1037,7 +1038,7 @@ private fun AlertSettingsExpanded(
                         config.durationMinutes?.let {
                             Box(Modifier.weight(1f)) {
                                 DurationSlider(
-                                    label = "Alert after",
+                                    label = stringResource(R.string.alert_after),
                                     value = it,
                                     range = 5..120,
                                     stepSize = 5,
@@ -1048,7 +1049,7 @@ private fun AlertSettingsExpanded(
                         config.forecastMinutes?.let {
                             Box(Modifier.weight(1f)) {
                                 DurationSlider(
-                                    label = "Look ahead",
+                                    label = stringResource(R.string.look_ahead),
                                     value = it,
                                     range = 10..60,
                                     stepSize = 5,
@@ -1147,7 +1148,7 @@ internal fun DurationSlider(
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Text(
-                "$displayValue min",
+                stringResource(R.string.minutes_short_format, displayValue),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -1175,7 +1176,7 @@ private fun DeliveryModeSelector(
 ) {
     Column {
         Text(
-            "Alert Style",
+            stringResource(R.string.alert_style),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -1205,7 +1206,7 @@ private fun VolumeProfileSelector(
 ) {
     Column {
         Text(
-            "Volume/Vibration Profile",
+            stringResource(R.string.volume_vibration_profile),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -1246,7 +1247,7 @@ private fun SnoozeDurationSelector(
     onMinutesChange: (Int) -> Unit
 ) {
     DurationSlider(
-        label = "Default snooze",
+        label = stringResource(R.string.default_snooze),
         value = minutes,
         range = 5..120,
         stepSize = 5,
@@ -1309,13 +1310,13 @@ private fun PreemptiveSnoozeCard() {
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Preemptive Snooze",
+                    stringResource(R.string.preemptive_snooze),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    "Snooze alerts before they trigger",
+                    stringResource(R.string.preemptive_snooze_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
                 )
@@ -1347,11 +1348,11 @@ private fun PreemptiveSnoozeDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Snooze, contentDescription = null) },
-        title = { Text("Preemptive Snooze") },
+        title = { Text(stringResource(R.string.preemptive_snooze)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
-                    "Snooze alerts before they trigger. Useful after eating or taking insulin.",
+                    stringResource(R.string.preemptive_snooze_desc),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -1363,7 +1364,7 @@ private fun PreemptiveSnoozeDialog(
                     FilterChip(
                         selected = snoozeLow,
                         onClick = { snoozeLow = !snoozeLow },
-                        label = { Text("Low Alerts") },
+                        label = { Text(stringResource(R.string.low_alerts)) },
                         leadingIcon = if (snoozeLow) {
                             { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
                         } else null
@@ -1371,7 +1372,7 @@ private fun PreemptiveSnoozeDialog(
                     FilterChip(
                         selected = snoozeHigh,
                         onClick = { snoozeHigh = !snoozeHigh },
-                        label = { Text("High Alerts") },
+                        label = { Text(stringResource(R.string.high_alerts)) },
                         leadingIcon = if (snoozeHigh) {
                             { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
                         } else null
@@ -1379,7 +1380,7 @@ private fun PreemptiveSnoozeDialog(
                 }
                 
                 DurationSlider(
-                    label = "Duration",
+                    label = stringResource(R.string.duration_label),
                     value = snoozeDuration,
                     range = 15..120,
                     stepSize = 15,
@@ -1397,12 +1398,12 @@ private fun PreemptiveSnoozeDialog(
                 },
                 enabled = snoozeLow || snoozeHigh
             ) {
-                Text("Snooze")
+                Text(stringResource(R.string.snooze))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1429,8 +1430,8 @@ internal fun TimeRangeSettings(
     Column {
         ExpressiveExpandableHeader(
             icon = Icons.Default.Schedule,
-            title = "Active time range",
-            subtitle = if (enabled) "${formatTime(startH, startM)} – ${formatTime(endH, endM)}" else "Only alert during specific hours",
+            title = stringResource(R.string.active_time_range_title),
+            subtitle = if (enabled) stringResource(R.string.time_range_summary, formatTime(startH, startM), formatTime(endH, endM)) else stringResource(R.string.only_alert_during_hours),
             enabled = enabled,
             onEnabledChange = onEnabledChange,
             iconTint = MaterialTheme.colorScheme.tertiary
@@ -1469,7 +1470,7 @@ internal fun TimeRangeSettings(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TimeChip(
-                        label = "Start",
+                        label = stringResource(R.string.start),
                         hour = startH,
                         minute = startM,
                         onTimeChange = onStartChange
@@ -1483,7 +1484,7 @@ internal fun TimeRangeSettings(
                     )
                     
                     TimeChip(
-                        label = "End",
+                        label = stringResource(R.string.end),
                         hour = endH,
                         minute = endM,
                         onTimeChange = onEndChange
@@ -1496,9 +1497,9 @@ internal fun TimeRangeSettings(
                 val endMins = endH * 60 + endM
                 Text(
                     text = if (startMins < endMins) {
-                        "Alert active from ${formatTime(startH, startM)} to ${formatTime(endH, endM)}"
+                        stringResource(R.string.alert_active_from_to, formatTime(startH, startM), formatTime(endH, endM))
                     } else {
-                        "Alert active from ${formatTime(startH, startM)} to ${formatTime(endH, endM)} (next day)"
+                        stringResource(R.string.alert_active_from_to_next_day, formatTime(startH, startM), formatTime(endH, endM))
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1664,7 +1665,7 @@ private fun TimeChip(
     if (showTimePicker) {
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("Select $label Time") },
+            title = { Text(stringResource(R.string.select_time_for_label, label)) },
             text = {
                 TimePicker(
                     state = timePickerState,
@@ -1676,12 +1677,12 @@ private fun TimeChip(
                     onTimeChange(timePickerState.hour, timePickerState.minute)
                     showTimePicker = false
                 }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showTimePicker = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -1710,8 +1711,8 @@ internal fun RetrySettings(
     Column {
         ExpressiveExpandableHeader(
             icon = Icons.Default.Refresh,
-            title = "Retry if no reaction",
-            subtitle = if (enabled) "Every ${intervalMinutes}min, up to $retryCount times" else "Re-alert if not dismissed",
+            title = stringResource(R.string.retry_if_no_reaction),
+            subtitle = if (enabled) stringResource(R.string.retry_summary, intervalMinutes, retryCount) else stringResource(R.string.realert_if_not_dismissed),
             enabled = enabled,
             onEnabledChange = onEnabledChange,
             iconTint = MaterialTheme.colorScheme.error
@@ -1723,7 +1724,7 @@ internal fun RetrySettings(
             exit = shrinkVertically(animationSpec = tween(durationMillis = 200))
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp)) {
-                Text("Retry every", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.retry_every), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(4.dp))
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -1733,14 +1734,14 @@ internal fun RetrySettings(
                         FilterChip(
                             selected = intervalMinutes == minutes,
                             onClick = { onIntervalChange(minutes) },
-                            label = { Text("${minutes}m") }
+                            label = { Text(stringResource(R.string.minutes_short_format, minutes)) }
                         )
                     }
                 }
                 
                 Spacer(Modifier.height(12.dp))
                 
-                Text("Max retries", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.max_retries), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(4.dp))
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -1806,7 +1807,7 @@ internal fun SoundSelector(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Sound",
+            stringResource(R.string.soundname),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -1823,15 +1824,15 @@ internal fun SoundSelector(
                 Column {
                    Text(
                         text = when {
-                            currentUri.isNullOrEmpty() -> "App Default Sound"
-                            currentUri == SYSTEM_DEFAULT_SOUND -> "System Default Sound"
-                            else -> "Custom Sound Selected"
+                            currentUri.isNullOrEmpty() -> stringResource(R.string.app_default_sound)
+                            currentUri == SYSTEM_DEFAULT_SOUND -> stringResource(R.string.system_default_sound)
+                            else -> stringResource(R.string.custom_sound_selected)
                         },
                         style = MaterialTheme.typography.bodyLarge
                    )
                    if (!currentUri.isNullOrEmpty()) {
                        Text(
-                           text = "Tap to change",
+                           text = stringResource(R.string.tap_to_change),
                            style = MaterialTheme.typography.bodySmall,
                            color = MaterialTheme.colorScheme.onSurfaceVariant
                        )

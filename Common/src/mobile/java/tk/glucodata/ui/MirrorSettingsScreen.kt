@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
+import tk.glucodata.R
 import tk.glucodata.Natives
 import tk.glucodata.QRmake
 import tk.glucodata.TurnServer
@@ -56,7 +58,7 @@ fun QRCodeImage(content: String, size: Int = 500) {
     bitmap?.let {
         androidx.compose.foundation.Image(
             bitmap = it.asImageBitmap(),
-            contentDescription = "QR Code",
+            contentDescription = null,
             modifier = Modifier.size(250.dp)
         )
     }
@@ -77,83 +79,83 @@ fun AutoQRDialog(onDismiss: () -> Unit, act: tk.glucodata.MainActivity) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { qrContent = null }) { Text("Close") }
+                TextButton(onClick = { qrContent = null }) { Text(stringResource(R.string.close)) }
             }
         )
     } else {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Auto QR") },
+            title = { Text(stringResource(R.string.auto_qr)) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Send to", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.sendto), style = MaterialTheme.typography.titleSmall)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         Button(onClick = { 
                             try {
                                 val idx = Natives.makeHomeSender()
                                 if (idx >= 0) {
                                     qrContent = Natives.getbackJson(idx)
-                                    qrTitle = "Home Net Sender"
+                                    qrTitle = act.getString(R.string.home_net_sender)
                                 } else {
-                                     android.widget.Toast.makeText(act, "Error: $idx", android.widget.Toast.LENGTH_SHORT).show()
+                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, "Not implemented natively", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
                             }
-                        }) { Text("Home net") }
+                        }) { Text(stringResource(R.string.homenet)) }
                         
                         Button(onClick = { 
                             try {
                                 val idx = Natives.makeICESender()
                                 if (idx >= 0) {
                                     qrContent = Natives.getbackJson(idx)
-                                    qrTitle = "Internet Sender"
+                                    qrTitle = act.getString(R.string.internet_sender)
                                 } else {
-                                     android.widget.Toast.makeText(act, "Error: $idx", android.widget.Toast.LENGTH_SHORT).show()
+                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                              } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, "Not implemented natively", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
                             }
-                        }) { Text("Internet") }
+                        }) { Text(stringResource(R.string.internet)) }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text("Receive from", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.receivefrom), style = MaterialTheme.typography.titleSmall)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         Button(onClick = { 
                             try {
                                 val idx = Natives.makeHomeReceiver()
                                 if (idx >= 0) {
                                     qrContent = Natives.getbackJson(idx)
-                                    qrTitle = "Home Net Receiver"
+                                    qrTitle = act.getString(R.string.home_net_receiver)
                                 } else {
-                                     android.widget.Toast.makeText(act, "Error: $idx", android.widget.Toast.LENGTH_SHORT).show()
+                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                              } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, "Not implemented natively", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
                             }
-                        }) { Text("Home net") }
+                        }) { Text(stringResource(R.string.homenet)) }
                         
                         Button(onClick = { 
                             try {
                                 val idx = Natives.makeICEReceiver()
                                 if (idx >= 0) {
                                     qrContent = Natives.getbackJson(idx)
-                                    qrTitle = "Internet Receiver"
+                                    qrTitle = act.getString(R.string.internet_receiver)
                                 } else {
-                                     android.widget.Toast.makeText(act, "Error: $idx", android.widget.Toast.LENGTH_SHORT).show()
+                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                              } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, "Not implemented natively", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
                             }
-                        }) { Text("Internet") }
+                        }) { Text(stringResource(R.string.internet)) }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
             },
             dismissButton = {
-                TextButton(onClick = { /* Help action */ }) { Text("Help") }
+                TextButton(onClick = { /* Help action */ }) { Text(stringResource(R.string.help)) }
             }
         )
     }
@@ -179,17 +181,17 @@ fun MirrorSettingsScreen(navController: NavController) {
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Mirror Settings") },
+                title = { Text(stringResource(R.string.mirror_settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 actions = {
                     TextButton(onClick = {
                          (context as? tk.glucodata.MainActivity)?.let { TurnServer.show(it, it.findViewById(android.R.id.content)) }
                      }) {
-                         Text("Turn Server")
+                         Text(stringResource(R.string.turnserver))
                      }
                 }
             )
@@ -198,32 +200,32 @@ fun MirrorSettingsScreen(navController: NavController) {
             FloatingActionButton(onClick = {
                 navController.navigate("settings/mirror/edit/-1")
             }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Connection")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_connection))
             }
         },
         bottomBar = {
              BottomAppBar {
                  IconButton(onClick = { 
-                     tk.glucodata.help.help("Mirror settings allow you to sync data between devices.", context as android.app.Activity) 
-                 }) {
-                     Icon(Icons.Filled.Help, contentDescription = "Help")
-                 }
-                 Spacer(Modifier.weight(1f))
-                 TextButton(onClick = { tk.glucodata.Applic.wakemirrors(); android.widget.Toast.makeText(context, "Syncing...", android.widget.Toast.LENGTH_SHORT).show() }) {
-                     Icon(Icons.Filled.Sync, contentDescription = null)
-                     Spacer(Modifier.width(4.dp))
-                     Text("Sync")
-                 }
-                 TextButton(onClick = { Natives.resetnetwork(); tk.glucodata.Applic.wakemirrors(); android.widget.Toast.makeText(context, "Re-init...", android.widget.Toast.LENGTH_SHORT).show() }) {
-                     Icon(Icons.Filled.Refresh, contentDescription = null)
-                     Spacer(Modifier.width(4.dp))
-                     Text("Reinit")
-                 }
-                 TextButton(onClick = { showAutoQR = true }) {
-                     // AutoQR Icon? Using generic Code/QrCode or just text
-                     Text("Auto QR")
-                 }
-             }
+                      tk.glucodata.help.help(context.getString(R.string.mirror_settings_help_text), context as android.app.Activity) 
+                  }) {
+                     Icon(Icons.Filled.Help, contentDescription = stringResource(R.string.help))
+                  }
+                  Spacer(Modifier.weight(1f))
+                  TextButton(onClick = { tk.glucodata.Applic.wakemirrors(); android.widget.Toast.makeText(context, context.getString(R.string.syncing), android.widget.Toast.LENGTH_SHORT).show() }) {
+                      Icon(Icons.Filled.Sync, contentDescription = null)
+                      Spacer(Modifier.width(4.dp))
+                      Text(stringResource(R.string.sync))
+                  }
+                  TextButton(onClick = { Natives.resetnetwork(); tk.glucodata.Applic.wakemirrors(); android.widget.Toast.makeText(context, context.getString(R.string.reinit_progress), android.widget.Toast.LENGTH_SHORT).show() }) {
+                      Icon(Icons.Filled.Refresh, contentDescription = null)
+                      Spacer(Modifier.width(4.dp))
+                      Text(stringResource(R.string.reinit))
+                  }
+                  TextButton(onClick = { showAutoQR = true }) {
+                      // AutoQR Icon? Using generic Code/QrCode or just text
+                      Text(stringResource(R.string.auto_qr))
+                  }
+              }
         }
     ) { padding ->
         LazyColumn(
@@ -260,14 +262,14 @@ fun MirrorItemRow(mirror: MirrorItemData, navController: NavController, onRefres
     if (qrContent != null) {
         AlertDialog(
             onDismissRequest = { qrContent = null },
-             title = { Text(if (!mirror.label.isNullOrEmpty()) mirror.label else "Connection ${mirror.index}") },
+             title = { Text(if (!mirror.label.isNullOrEmpty()) mirror.label else stringResource(R.string.connection_number, mirror.index)) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     QRCodeImage(qrContent!!)
                 }
             },
             confirmButton = {
-                TextButton(onClick = { qrContent = null }) { Text("Close") }
+                TextButton(onClick = { qrContent = null }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -283,7 +285,7 @@ fun MirrorItemRow(mirror: MirrorItemData, navController: NavController, onRefres
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (!mirror.label.isNullOrEmpty()) mirror.label else mirror.names?.firstOrNull() ?: "Connection ${mirror.index}",
+                    text = if (!mirror.label.isNullOrEmpty()) mirror.label else mirror.names?.firstOrNull() ?: context.getString(R.string.connection_number, mirror.index),
                     style = MaterialTheme.typography.titleMedium,
                     color = if (mirror.isDeactivated) Color.Gray else Color.Unspecified
                 )
@@ -302,7 +304,7 @@ fun MirrorItemRow(mirror: MirrorItemData, navController: NavController, onRefres
                       it.text = Html.fromHtml(mirror.status, Html.FROM_HTML_MODE_LEGACY)
                  })
             } else {
-                Text("Deactivated", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.deactivated), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -338,7 +340,7 @@ fun MirrorStatusDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Connection ${mirror.index}") },
+        title = { Text(stringResource(R.string.connection_number, mirror.index)) },
         text = {
             Column {
                  AndroidView<TextView>(factory = { ctx ->
@@ -352,14 +354,14 @@ fun MirrorStatusDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = onModify) { Text("Modify") }
-                TextButton(onClick = onQR) { Text("QR") }
+                TextButton(onClick = onModify) { Text(stringResource(R.string.edit)) }
+                TextButton(onClick = onQR) { Text(stringResource(R.string.qr)) }
                 TextButton(onClick = onToggleOff) { 
-                    Text(if (mirror.isDeactivated) "Enable" else "Disable") 
+                    Text(if (mirror.isDeactivated) stringResource(R.string.enable) else stringResource(R.string.disable)) 
                 }
             }
         }
@@ -461,18 +463,18 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text(if (isNew) "Add Connection" else "Edit Connection") },
+                title = { Text(if (isNew) stringResource(R.string.add_connection) else stringResource(R.string.edit_connection)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 actions = {
                     // Help
                     IconButton(onClick = {
-                         tk.glucodata.help.help("Mirror connection settings.", context as android.app.Activity) 
+                         tk.glucodata.help.help(context.getString(R.string.mirror_connection_settings_help_text), context as android.app.Activity) 
                     }) {
-                        Icon(Icons.Filled.Info, contentDescription = "Help")
+                        Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.help))
                     }
                     
                     // Delete (only if not new, or maybe allow deleting new? new hasn't been saved yet so deleting it just means popping)
@@ -485,7 +487,7 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                         isDeleted = true
                         navController.popBackStack()
                     }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
                     }
                 }
             )
@@ -505,7 +507,7 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                     OutlinedTextField(
                         value = port,
                         onValueChange = { port = it },
-                        label = { Text("Port") },
+                        label = { Text(stringResource(R.string.port)) },
                         modifier = Modifier.width(100.dp),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -513,12 +515,12 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = hasHostname, onCheckedChange = { hasHostname = it })
-                        Text("hostname")
+                        Text(stringResource(R.string.hostname))
                     }
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = detect, onCheckedChange = { detect = it })
-                        Text("Detect")
+                        Text(stringResource(R.string.detect))
                     }
                 }
             }
@@ -526,21 +528,21 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
             // --- ROW 2: ICE Checkbox ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = isICE, onCheckedChange = { isICE = it })
-                Text("ICE")
+                Text(stringResource(R.string.ICE))
                 if (isICE) {
                     Spacer(Modifier.width(16.dp))
                     OutlinedTextField(
                         value = iceLabel,
                         onValueChange = { iceLabel = it },
-                        label = { Text("ICE label") },
+                        label = { Text(stringResource(R.string.icelabel)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
                     Spacer(Modifier.width(8.dp))
                     RadioButton(selected = iceSide == 0, onClick = { iceSide = 0 })
-                    Text("0")
+                    Text(stringResource(R.string.zero))
                     RadioButton(selected = iceSide == 1, onClick = { iceSide = 1 })
-                    Text("1")
+                    Text(stringResource(R.string.one))
                 }
             }
 
@@ -551,7 +553,7 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                 OutlinedTextField(
                     value = hostname,
                     onValueChange = { hostname = it },
-                    label = { Text("Hostname / IP") },
+                    label = { Text(stringResource(R.string.hostname_ip)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -562,12 +564,12 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                  if (!isICE && !hasHostname) { // Test IP only when Hostname OFF?
                      Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = testIP, onCheckedChange = { testIP = it })
-                        Text("Test IP")
+                        Text(stringResource(R.string.testip))
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = testLabel, onCheckedChange = { testLabel = it })
-                    Text("Test Label")
+                    Text(stringResource(R.string.testlabel))
                 }
                 
                 // Master Label (User) ?
@@ -575,7 +577,7 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                     OutlinedTextField(
                         value = iceLabel, // Reusing icelabel for master/user?
                         onValueChange = { iceLabel = it },
-                        label = { Text("master") },
+                        label = { Text(stringResource(R.string.master)) },
                         modifier = Modifier.width(120.dp),
                          singleLine = true
                     )
@@ -586,41 +588,41 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = mode == 0, onClick = { mode = 0 })
-                        Text("Passive only")
+                        Text(stringResource(R.string.passiveonly))
                     } 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = mode == 1, onClick = { mode = 1 })
-                        Text("Active only")
+                        Text(stringResource(R.string.activeonly))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = mode == 2, onClick = { mode = 2 })
-                        Text("Both")
+                        Text(stringResource(R.string.both))
                     }
                 }
             }
 
             // --- ROW 6: Send/Receive ---
-            Text("Send/Receive", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.send_receive), style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = receiveFrom, onCheckedChange = { receiveFrom = it })
-                        Text("Receive from")
+                        Text(stringResource(R.string.receivefrom))
                     }
-                    Text("Send to:", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start=12.dp, top=4.dp))
+                    Text(stringResource(R.string.send_to_colon), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start=12.dp, top=4.dp))
                 }
                 Column {
                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = sendAmounts, onCheckedChange = { sendAmounts = it })
-                        Text("Amounts")
+                        Text(stringResource(R.string.amountsname))
                    } 
                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = sendScans, onCheckedChange = { sendScans = it })
-                        Text("Scans")
+                        Text(stringResource(R.string.scansname))
                    }
                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = sendStream, onCheckedChange = { sendStream = it })
-                        Text("Stream")
+                        Text(stringResource(R.string.streamname))
                    }
                 }
             }
@@ -629,19 +631,19 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
 
             // --- ROW 7: Time ---
             if (!isICE && hasHostname) {
-                Text("Data present on receiver until:", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.data_present_until), style = MaterialTheme.typography.labelLarge)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = startMode == 0, onClick = { startMode = 0 })
-                        Text("Start")
+                        Text(stringResource(R.string.start))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = startMode == 1, onClick = { startMode = 1 })
-                        Text("Now")
+                        Text(stringResource(R.string.now))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = startMode == 2, onClick = { startMode = 2 })
-                        val dateStr = if (startMode == 2) DateFormat.format("yyyy-MM-dd", customDate).toString() else "Date"
+                        val dateStr = if (startMode == 2) DateFormat.format("yyyy-MM-dd", customDate).toString() else context.getString(R.string.date)
                         Text(dateStr)
                     }
                 }
@@ -651,14 +653,14 @@ fun MirrorEditScreen(navController: NavController, pos: Int) {
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text(stringResource(R.string.password)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(imageVector = image, contentDescription = if (passwordVisible) "Hide password" else "Show password")
+                        Icon(imageVector = image, contentDescription = if (passwordVisible) stringResource(R.string.hide_password) else stringResource(R.string.show_password))
                     }
                 }
             )

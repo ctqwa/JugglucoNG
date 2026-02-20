@@ -78,10 +78,31 @@ extern "C" JNIEXPORT void JNICALL fromjava(aidexSetStartTime)(JNIEnv *env,
                                                               jlong timeMs) {
   aidexstream *sdata = reinterpret_cast<aidexstream *>(dataptr);
   if (sdata && sdata->hist) {
-    sdata->hist->getinfo()->starttime = timeMs / 1000L;
-    // AiDex sensors usually last 14 days
-    sdata->hist->getinfo()->days = 14;
-    LOGGER("aidexSetStartTime: %ld -> starttime=%u\n", timeMs,
-           sdata->hist->getinfo()->starttime);
+    auto *info = sdata->hist->getinfo();
+    info->starttime = timeMs / 1000L;
+    if (info->days < 10 || info->days > maxdays) {
+      info->days = 15;
+    }
+    if (!info->wearduration2) {
+      info->wearduration2 = static_cast<uint16_t>(info->days * 24 * 60);
+    }
+    LOGGER("aidexSetStartTime: %ld -> starttime=%u days=%u wear=%u\n", timeMs,
+           info->starttime, info->days, info->wearduration2);
+  }
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(aidexSetWearDays)(JNIEnv *env,
+                                                             jclass cl,
+                                                             jlong dataptr,
+                                                             jint days) {
+  if (days < 10 || days > maxdays) {
+    return;
+  }
+  aidexstream *sdata = reinterpret_cast<aidexstream *>(dataptr);
+  if (sdata && sdata->hist) {
+    auto *info = sdata->hist->getinfo();
+    info->days = static_cast<uint8_t>(days);
+    info->wearduration2 = static_cast<uint16_t>(days * 24 * 60);
+    LOGGER("aidexSetWearDays: days=%d wear=%u\n", days, info->wearduration2);
   }
 }

@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include <algorithm>
@@ -277,7 +278,8 @@ public:
     bool auth12 : 1;
     char deviceaddress[deviceaddresslen];
     uint16_t libreviewScan;
-    uint8_t customCalIndex; // 0=12H, 1=24H, 2=2D, 3=3D, 4=7D, 5=14D, 6=20D
+    uint8_t customCalIndex; // 0=12H, 1=1D, 2=2D, 3=3D, 4=5D, 5=7D, 6=10D,
+                            // 7=14D, 8=18D, 9=MAX
 
     uint8_t reserved : 2;
     // CLEAN REFACTOR: Use timestamp instead of bool for reset mode.
@@ -532,6 +534,8 @@ private:
   const size_t scansize;
   Mmap<ScanData> scans, polls;
   Mmap<RawData> rawpolls;
+  Mmap<uint16_t> temppolls; // temperature in 0.1°C units, separate file to
+                            // avoid rawpolls migration
   Mmap<std::array<uint16_t, 16>> trends;
   // static constexpr int getinfo()->dupl=3,days=15;
   const int historybytes(int perhour = 4) {
@@ -624,6 +628,12 @@ public:
     const ptrdiff_t idx = poll - polls.data();
     if (idx >= 0 && idx < (ptrdiff_t)polls.size())
       return rawpolls[idx].raw;
+    return 0;
+  }
+  const uint16_t *getTempPollsData() const { return temppolls.data(); }
+  uint16_t getTempForPoll(int idx) const {
+    if (idx >= 0 && idx < (ptrdiff_t)temppolls.size())
+      return temppolls[idx];
     return 0;
   }
   bool waiting = true;
@@ -725,6 +735,13 @@ public:
     const int wear = (isLibre2() || isDexcom() || isAccuChek())
                          ? info->wearduration
                          : info->wearduration2;
+    if (isAiDex()) {
+      if (wear)
+        return wear;
+      if (info->days >= 10 && info->days <= maxdays)
+        return info->days * 24 * 60;
+      return 15 * 24 * 60;
+    }
     if (wear)
       return wear;
     return 14 * 24 * 60;
@@ -1179,32 +1196,33 @@ static int getgeneration(const char *info) {
     LOGSTRING("Reset mode exited\n");
   }
 
-  // Check if in reset mode - exits only when gap closes (data flows again)
+  // Check if in reset mode.
+  // Reset mode is cleared ONLY by:
+  //   1. exitResetMode() called explicitly from eu.cpp/process.cpp when
+  //      savestream() stores data with a timestamp near current time
+  //   2. 30-minute timeout fallback (prevents permanent stuck state)
+  //
+  // Previously this also auto-cleared when lastused() was within 5 min of
+  // now ("gap-close" heuristic). That was wrong because SiContext::reset()
+  // does NOT zero pollcount, so getlastpolltime() returns the OLD pre-reset
+  // entry's recent timestamp, causing isInResetMode() to auto-clear
+  // immediately while replay is still in progress.
   bool isInResetMode() const {
     uint32_t start = getinfo()->resetModeStartTime;
     if (!start)
       return false;
 
-    // Exit when gap closes (lastused within 5 min of now)
+    // Edit 84: Timeout fallback — prevent permanent stuck state.
+    // Native mode replay of 18K+ points completes in seconds. If reset mode
+    // has been active for >30 minutes, something went wrong (cascade/race).
+    // Clear it so the sensor can resume normal operation.
     time_t now = time(nullptr);
-    uint32_t last = lastused();
-    if (last && (now - last) < 5 * 60) {
+    time_t elapsed = now - start;
+    if (elapsed > 30 * 60) {
       const_cast<Info *>(getinfo())->resetModeStartTime = 0;
-      LOGSTRING("Reset mode auto-cleared (gap closed)\n");
+      LOGSTRING("Reset mode auto-expired (30 min timeout)\n");
       return false;
     }
-
-    // ALTERNATIVE: Timeout fallback (commented out)
-    // Risk: If backfill takes >30min, sensor gets killed mid-process.
-    // The "gap closes" condition above is sufficient and safer.
-    // Uncomment only if you need to detect truly dead sensors during reset:
-    //
-    // time_t elapsed = now - start;
-    // if (elapsed > 30 * 60) {
-    //   const_cast<Info *>(getinfo())->resetModeStartTime = 0;
-    //   LOGSTRING("Reset mode auto-expired (30 min timeout)\n");
-    //   return false;
-    // }
 
     return true;
   }
@@ -1510,6 +1528,8 @@ private:
   int specstart;
   static constexpr const char infopdat[] = "info.dat";
   pathconcat polluit;
+  pathconcat rawpolluit;
+  pathconcat temppolluit;
   pathconcat infopath;
   pathconcat updateinfopath;
   pathconcat histpath;
@@ -1525,8 +1545,10 @@ private:
         scansize(maxscansize()), scans(sensordir, "current.dat", scansize),
         polls(sensordir, "polls.dat", maxstreampos()),
         rawpolls(sensordir, "rawpolls.dat", maxstreampos()),
+        temppolls(sensordir, "temppolls.dat", maxstreampos()),
         trends(sensordir, trendsdat, scansize), specstart(spec),
-        polluit(baseuit, "polls.dat"), infopath(baseuit, infopdat),
+        polluit(baseuit, "polls.dat"), rawpolluit(baseuit, "rawpolls.dat"),
+        temppolluit(baseuit, "temppolls.dat"), infopath(baseuit, infopdat),
         updateinfopath(baseuit, "updateinfo.dat"),
         histpath(baseuit, "data.dat"), scanpath(baseuit, "current.dat"),
         trendspath(baseuit, trendsdat), statefile(sensordir, "state.json"),
@@ -1581,6 +1603,8 @@ private:
   }
 
 public:
+  // Slider indices: 0=12H, 1=1D, 2=2D, 3=3D, 4=5D, 5=7D, 6=10D, 7=14D, 8=18D,
+  // 9=MAX
   static int getCustomCalHours(uint8_t index) {
     switch (index) {
     case 0:
@@ -1592,11 +1616,17 @@ public:
     case 3:
       return 72;
     case 4:
-      return 168; // 7 days
+      return 120; // 5 days
     case 5:
-      return 336; // 14 days
+      return 168; // 7 days
     case 6:
-      return 480; // 20 days
+      return 240; // 10 days
+    case 7:
+      return 336; // 14 days
+    case 8:
+      return 432; // 18 days
+    case 9:
+      return 0; // MAX — sentinel: replay all available data
     default:
       return 24;
     }
@@ -1730,25 +1760,25 @@ uint32_t getlastpolltime() const {
   }
 
   void savestreamonly(time_t tim, int id, int glu, int trend, float change,
-                      int raw = 0) {
+                      int raw = 0, uint16_t temp = 0) {
     saveglucosedata(polls, getinfo()->pollcount, tim, id, glu, trend, change,
-                    raw);
+                    raw, temp);
   }
 
   void savestream(time_t tim, int id, int glu, int trend, float change,
-                  int raw = 0) {
+                  int raw = 0, uint16_t temp = 0) {
     if (isInResetMode()) {
       // In reset mode, use special insert logic that doesn't corrupt history
-      saveStreamAgain(tim, id, glu, trend, change, raw);
+      saveStreamAgain(tim, id, glu, trend, change, raw, temp);
       return;
     } else {
       saveglucosedata(polls, getinfo()->pollcount, tim, id, glu, trend, change,
-                      raw);
+                      raw, temp);
     }
   }
 
   bool saveStreamAgain(time_t tim, int id, int glu, int trend, float change,
-                       int raw = 0) {
+                       int raw = 0, uint16_t temp = 0) {
     int index = id - 5;
     if (index < 0) {
       return true;
@@ -1764,6 +1794,7 @@ uint32_t getlastpolltime() const {
     polls[index] = {static_cast<uint32_t>(tim), id, (int32_t)glu, trend,
                     change};
     rawpolls[index] = {(uint16_t)raw};
+    temppolls[index] = temp;
     const int count = index + 1;
     if (count < info->pollcount) {
       return true;
@@ -1772,11 +1803,13 @@ uint32_t getlastpolltime() const {
     return false;
   }
   void saveglucosedata(Mmap<ScanData> &streamscans, uint32_t &count, time_t tim,
-                       int id, int glu, int trend, float change, int raw = 0) {
+                       int id, int glu, int trend, float change, int raw = 0,
+                       uint16_t temp = 0) {
     streamscans[count] = {static_cast<uint32_t>(tim), id, (int32_t)glu, trend,
                           change};
     if (&streamscans == &polls) {
       rawpolls[count] = {(uint16_t)raw};
+      temppolls[count] = temp;
     }
     count++;
   }
@@ -1785,7 +1818,7 @@ uint32_t getlastpolltime() const {
   }
   template <int secs>
   int savepollallIDsonly(time_t tim, const int id, int glu, int trend,
-                         float change, int raw = 0) {
+                         float change, int raw = 0, uint16_t temp = 0) {
     int count = getinfo()->pollcount;
     if (count < id) {
       LOGGER("savepollallIDsonly count=%d<id=%d\n", count, id);
@@ -1805,6 +1838,7 @@ uint32_t getlastpolltime() const {
         if (!polls[count].t || polls[count].id != count) {
           polls[count] = {timiter, count, 0, 0, 0};
           rawpolls[count] = {0};
+          temppolls[count] = 0;
         }
       }
       if (!count) {
@@ -1815,12 +1849,14 @@ uint32_t getlastpolltime() const {
            id, glu / convfactordL, trend, change, ctime(&tim));
     polls[id] = {static_cast<uint32_t>(tim), id, (int32_t)glu, trend, change};
     rawpolls[id] = {(uint16_t)raw};
+    temppolls[id] = temp;
     return count;
   }
   template <int secs>
   bool savepollallIDs(time_t tim, const int id, int glu, int trend,
-                      float change, int raw = 0) {
-    int count = savepollallIDsonly<secs>(tim, id, glu, trend, change, raw);
+                      float change, int raw = 0, uint16_t temp = 0) {
+    int count =
+        savepollallIDsonly<secs>(tim, id, glu, trend, change, raw, temp);
     if (id == count)
       getinfo()->pollcount = id + 1;
     else {
@@ -1940,6 +1976,163 @@ uint32_t getlastpolltime() const {
   int nextlock() { return getinfo()->lockcount++; }
   void setlock(uint32_t lock) { getinfo()->lockcount = lock; }
   const string &getsensordir() const { return sensordir; }
+
+  // --- Polls backup/restore for custom calibration ---
+private:
+  static bool copyFile(const char *src, const char *dst) {
+    int srcfd = open(src, O_RDONLY);
+    if (srcfd < 0) {
+      LOGGER("copyFile: open(%s) failed: %s\n", src, strerror(errno));
+      return false;
+    }
+    int dstfd = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (dstfd < 0) {
+      LOGGER("copyFile: create(%s) failed: %s\n", dst, strerror(errno));
+      close(srcfd);
+      return false;
+    }
+    char buf[65536];
+    ssize_t n;
+    bool ok = true;
+    while ((n = read(srcfd, buf, sizeof(buf))) > 0) {
+      if (write(dstfd, buf, n) != n) {
+        LOGGER("copyFile: write(%s) failed: %s\n", dst, strerror(errno));
+        ok = false;
+        break;
+      }
+    }
+    close(srcfd);
+    close(dstfd);
+    return ok;
+  }
+
+public:
+  bool hasBackupPolls() const {
+    pathconcat bakpath(sensordir, "polls.dat.bak");
+    return access(bakpath.data(), F_OK) == 0;
+  }
+
+  // Backup polls.dat, state.bin, state.json, and pollinterval before custom
+  // cal replay. Only creates backup once — won't overwrite existing backup.
+  bool backupPolls() {
+    if (hasBackupPolls()) {
+      LOGSTRING("backupPolls: backup already exists, skipping\n");
+      return true;
+    }
+    // Flush polls mmap to disk
+    if (polls.data()) {
+      msync(polls.data(), polls.count() * sizeof(ScanData), MS_SYNC);
+    }
+    // Backup polls.dat
+    pathconcat srcPolls(sensordir, "polls.dat");
+    pathconcat bakPolls(sensordir, "polls.dat.bak");
+    if (!copyFile(srcPolls.data(), bakPolls.data())) {
+      LOGSTRING("backupPolls: polls.dat copy failed\n");
+      return false;
+    }
+    // Backup state.bin (binState — algorithm accumulated state)
+    pathconcat srcBin(sensordir, "state.bin");
+    pathconcat bakBin(sensordir, "state.bin.bak");
+    if (access(srcBin.data(), F_OK) == 0) {
+      copyFile(srcBin.data(), bakBin.data());
+    }
+    // Backup state.json
+    pathconcat srcJson(sensordir, "state.json");
+    pathconcat bakJson(sensordir, "state.json.bak");
+    if (access(srcJson.data(), F_OK) == 0) {
+      copyFile(srcJson.data(), bakJson.data());
+    }
+    // Backup pollinterval
+    auto *info = getinfo();
+    if (info) {
+      pathconcat pipath(sensordir, "pollinterval.bak");
+      writeall(pipath.data(), &info->pollinterval, sizeof(info->pollinterval));
+    }
+    LOGSTRING("backupPolls: full backup created successfully\n");
+    return true;
+  }
+
+  // Restore all backed-up files: polls.dat, state.bin, state.json,
+  // pollinterval. After this, algorithm state matches what it was before any
+  // custom cal replay.
+  bool restorePolls() {
+    if (!hasBackupPolls()) {
+      LOGSTRING("restorePolls: no backup found\n");
+      return false;
+    }
+    pathconcat bakPolls(sensordir, "polls.dat.bak");
+
+    // Guard against stale backups creating large chart gaps:
+    // if backup snapshot is much older than current latest poll, skip restore
+    // and let caller fall back to native replay.
+    uint32_t currentLastPoll = getlastpolltime();
+    struct stat bakStat {};
+    if (currentLastPoll > 0 && stat(bakPolls.data(), &bakStat) == 0 &&
+        bakStat.st_mtime > 0) {
+      const uint32_t backupSnapshotTime = (uint32_t)bakStat.st_mtime;
+      constexpr uint32_t kMaxSafeBackupLagSec = 5 * 60;
+      if (currentLastPoll > backupSnapshotTime &&
+          (currentLastPoll - backupSnapshotTime) > kMaxSafeBackupLagSec) {
+        LOGGER("restorePolls: backup too old (currentLast=%u backupTime=%u "
+               "lag=%u sec), skipping restore to avoid data gaps\n",
+               currentLastPoll, backupSnapshotTime,
+               currentLastPoll - backupSnapshotTime);
+        // Drop stale backup so next custom replay can create a fresh snapshot.
+        removeBackupPolls();
+        return false;
+      }
+    }
+
+    // Restore polls.dat
+    pathconcat dstPolls(sensordir, "polls.dat");
+    if (!copyFile(bakPolls.data(), dstPolls.data())) {
+      LOGSTRING("restorePolls: polls.dat restore failed\n");
+      return false;
+    }
+    // Invalidate mmap pages so in-memory data reflects restored file
+    if (polls.data()) {
+      msync(polls.data(), polls.count() * sizeof(ScanData), MS_INVALIDATE);
+    }
+    // Restore state.bin (binState)
+    pathconcat bakBin(sensordir, "state.bin.bak");
+    pathconcat dstBin(sensordir, "state.bin");
+    if (access(bakBin.data(), F_OK) == 0) {
+      copyFile(bakBin.data(), dstBin.data());
+      LOGSTRING("restorePolls: state.bin restored\n");
+    }
+    // Restore state.json
+    pathconcat bakJson(sensordir, "state.json.bak");
+    pathconcat dstJson(sensordir, "state.json");
+    if (access(bakJson.data(), F_OK) == 0) {
+      copyFile(bakJson.data(), dstJson.data());
+    }
+    // Restore pollinterval
+    auto *info = getinfo();
+    if (info) {
+      pathconcat pipath(sensordir, "pollinterval.bak");
+      double pi;
+      if (readfile(pipath.data(), &pi, sizeof(pi)) == sizeof(pi)) {
+        info->pollinterval = pi;
+        LOGGER("restorePolls: pollinterval restored to %f\n", pi);
+      }
+    }
+    LOGSTRING("restorePolls: full restore completed successfully\n");
+    return true;
+  }
+
+  void removeBackupPolls() {
+    pathconcat p1(sensordir, "polls.dat.bak");
+    pathconcat p2(sensordir, "pollinterval.bak");
+    pathconcat p3(sensordir, "state.bin.bak");
+    pathconcat p4(sensordir, "state.json.bak");
+    unlink(p1.data());
+    unlink(p2.data());
+    unlink(p3.data());
+    unlink(p4.data());
+    LOGSTRING("removeBackupPolls: all backup files removed\n");
+  }
+  // --- End polls backup/restore ---
+
   void removeoldstates() {
     extern void removeoldstates(const std::string_view dirin);
     removeoldstates(sensordir);
@@ -2315,6 +2508,30 @@ public:
                     startstreambuf + streamend, polluit)) {
         LOGSTRING("GLU: senddata polls.dat failed\n");
         return 0;
+      }
+
+      // Send rawpolls.dat (raw sensor values) for the same range
+      {
+        const struct RawData *rawbuf = rawpolls.data();
+        if (rawbuf) {
+          if (!senddata(pass, sock, streamstart, rawbuf + streamstart,
+                        rawbuf + streamend, rawpolluit)) {
+            LOGSTRING("GLU: senddata rawpolls.dat failed\n");
+            return 0;
+          }
+        }
+      }
+
+      // Send temppolls.dat (temperature values) for the same range
+      {
+        const uint16_t *tempbuf = temppolls.data();
+        if (tempbuf) {
+          if (!senddata(pass, sock, streamstart, tempbuf + streamstart,
+                        tempbuf + streamend, temppolluit)) {
+            LOGSTRING("GLU: senddata temppolls.dat failed\n");
+            return 0;
+          }
+        }
       }
 
       struct {

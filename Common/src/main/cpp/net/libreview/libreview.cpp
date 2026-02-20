@@ -1140,6 +1140,12 @@ void libreviewthread() {
                     initlibreconfig(true, alwaysnewstatus3))) {
             alwaysnewstatus3 = false;
             LOGAR("initlibreconfig failed");
+            // Edit 64b: Clear askforaccount on failure to prevent infinite
+            // 10-minute retry loop. User can retry from the wizard button.
+            if (askforaccount && !settings->data()->haslibre3) {
+              askforaccount = false;
+              LOGAR("askforaccount cleared after failure (no actual L3 sensors)");
+            }
             continue;
           }
           LOGGER("initlibreconfig success %d\n", settings->data()->libreinit3);

@@ -717,6 +717,10 @@ public class SensorBluetooth {
                 gatt.free();
                 gattcallbacks.remove(i);
                 Natives.setmaxsensors(gattcallbacks.size());
+                // AiDex sensors live in SharedPrefs — remove so updateDevicers() can't resurrect
+                if (str.startsWith("X-")) {
+                    removeAiDexFromPrefs(str);
+                }
                 for (; i < gattcallbacks.size(); ++i) {
                     gatt = gattcallbacks.get(i);
                     gatt.stopHealth = false;
@@ -733,6 +737,23 @@ public class SensorBluetooth {
             ;
         }
         ;
+    }
+
+    /** Remove an AiDex sensor from SharedPrefs so updateDevicers() won't resurrect it. */
+    private static void removeAiDexFromPrefs(String serial) {
+        try {
+            android.content.SharedPreferences prefs = Applic.app.getSharedPreferences(
+                    "tk.glucodata_preferences", Context.MODE_PRIVATE);
+            java.util.Set<String> sensors = prefs.getStringSet("aidex_sensors", new java.util.HashSet<>());
+            java.util.Set<String> updated = new java.util.HashSet<>(sensors);
+            boolean removed = updated.removeIf(e -> e.startsWith(serial + "|") || e.equals(serial));
+            if (removed) {
+                prefs.edit().putStringSet("aidex_sensors", updated).commit();
+                if (doLog) Log.i(LOG_ID, "removeAiDexFromPrefs: removed " + serial);
+            }
+        } catch (Throwable t) {
+            Log.e(LOG_ID, "removeAiDexFromPrefs failed: " + t.getMessage());
+        }
     }
 
     private void removeDevices() {
@@ -807,6 +828,14 @@ public class SensorBluetooth {
         Natives.setmaxsensors(gattcallbacks.size());
     }
 
+    // Edit 85: Public accessor for the `stop` (paused) state of a gatt callback.
+    // SuperGattCallback.stop is protected, so it's not accessible from Kotlin
+    // code in a different package. SensorBluetooth is in the same package, so it
+    // can read it and expose it publicly.
+    public static boolean isSensorPaused(SuperGattCallback gatt) {
+        return gatt != null && gatt.stop;
+    }
+
     // --- KOTLIN SENSORS (AiDex) SUPPORT ---
     public static void addAiDexSensor(Context context, String name, String address) {
         // Add to persistent storage
@@ -827,6 +856,17 @@ public class SensorBluetooth {
                 }
             }
             long dataptr = Natives.getdataptr(name);
+            // Clear finished flag so sensor appears in activeSensors/bluetoothactive
+            if (dataptr != 0L) {
+                Natives.unfinishSensor(dataptr);
+            }
+            // Multi-sensor fix: Do NOT force this sensor as main on reconnect.
+            // The user's main sensor selection should be respected. The old code
+            // (Edit 85) called setcurrentsensor() here, which caused the main
+            // sensor to silently switch to AiDex whenever it reconnected, even
+            // if the user had intentionally set another sensor (e.g. Sibionics)
+            // as main. The main sensor is now only changed explicitly by the user
+            // or when the first-ever sensor is added (via addsensor() in C++).
             SuperGattCallback cb = new tk.glucodata.drivers.aidex.AiDexSensor(Applic.app, name, dataptr);
             cb.mActiveDeviceAddress = address;
             blueone.gattcallbacks.add(cb);
@@ -866,21 +906,11 @@ public class SensorBluetooth {
     }
 
     private static boolean isValidShortSensorName(String name) {
-        if (name == null || name.isEmpty()) {
-            return false;
-        }
-        if (name.startsWith("X-")) {
-            return name.length() > 2;
-        }
-        if (name.length() != 11) {
-            return false;
-        }
-        for (int i = 0; i < 11; i++) {
-            if (!Character.isLetterOrDigit(name.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
+        // Accept any non-null, non-blank name. Sensor name formats vary by vendor:
+        //   Libre: 11 alphanumeric chars
+        //   AiDex/LinX: "X-" prefix
+        //   Sibionics: native-layer serial (variable format)
+        return name != null && !name.trim().isEmpty();
     }
 
     public void connectNamedDevice(String id, long delayMillis) {
@@ -962,7 +992,7 @@ public class SensorBluetooth {
         }
         if (cleanedAiDex.size() != aidexSet.size()) {
             Applic.app.getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
-                    .edit().putStringSet("aidex_sensors", cleanedAiDex).apply();
+                    .edit().putStringSet("aidex_sensors", cleanedAiDex).commit();
         }
 
         String[] devs = allDevs.toArray(new String[0]);
@@ -1084,6 +1114,10 @@ public class SensorBluetooth {
                     long dataptr = 0L;
                     dataptr = Natives.getdataptr(dev);
                     if (dataptr != 0L || dev.startsWith("X-")) {
+                        // Clear finished flag so sensor appears in activeSensors
+                        if (dataptr != 0L) {
+                            Natives.unfinishSensor(dataptr);
+                        }
                         gattcallbacks.add(getGattCallback(dev, dataptr));
                         increasedwait = startincreasedwait;
                         index++;

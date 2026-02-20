@@ -10,6 +10,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,9 +31,11 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -53,6 +60,7 @@ import kotlinx.coroutines.withContext
 import tk.glucodata.Natives
 import tk.glucodata.R
 import tk.glucodata.SensorBluetooth
+import tk.glucodata.data.calibration.CalibrationManager
 import tk.glucodata.ui.components.StyledSwitch
 import tk.glucodata.ui.theme.labelLargeExpressive
 import tk.glucodata.ui.viewmodel.DashboardViewModel
@@ -86,6 +94,12 @@ fun ExpressiveSettingsScreen(
     val patchedLibreEnabled by viewModel.patchedLibreBroadcastEnabled.collectAsState()
     val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsState()
     val alertsSummary by viewModel.alertsSummary.collectAsState()
+    val viewMode by viewModel.viewMode.collectAsState()
+    val isRawCalibrationMode = viewMode == 1 || viewMode == 3
+    val calibrationEnabledRaw by CalibrationManager.isEnabledForRaw.collectAsState()
+    val calibrationEnabledAuto by CalibrationManager.isEnabledForAuto.collectAsState()
+    val calibrationEnabled = if (isRawCalibrationMode) calibrationEnabledRaw else calibrationEnabledAuto
+    val calibrationModeLabel = if (isRawCalibrationMode) "Raw" else "Auto"
     
     // Auto-refresh data when screen becomes active (e.g. returning from Alerts screen)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -120,6 +134,7 @@ fun ExpressiveSettingsScreen(
     var showAODSettingsSheet by remember { mutableStateOf(false) }
     var showFloatingSettingsSheet by remember { mutableStateOf(false) }
     var showNotificationSettingsSheet by remember { mutableStateOf(false) }
+    var targetRangeExpanded by rememberSaveable { mutableStateOf(false) }
 
 
 
@@ -150,27 +165,17 @@ fun ExpressiveSettingsScreen(
                 style = MaterialTheme.typography.displaySmall,
                 modifier = Modifier.padding(start = 16.dp, bottom = 24.dp)
             )
-        }     // === GENERAL SECTION ===
-//        item(key = "general_label") { SectionLabel(stringResource(R.string.general_settings), topPadding = 0.dp) }
+        }
 
         item(key = "general_group") {
-            // Theme: Primary (Core)
             val generalColor = MaterialTheme.colorScheme.primary
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SettingsItem(
-                    title = stringResource(R.string.unit),
-                    subtitle = unit,
-                    icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.List,
-                    iconTint = generalColor,
-                    position = CardPosition.TOP,
-                    onClick = { showUnitDialog = true }
-                )
                 SettingsItem(
                     title = stringResource(R.string.theme_title),
                     subtitle = themeLabel,
                     icon = if(themeMode == ThemeMode.LIGHT) Icons.Default.LightMode else Icons.Default.DarkMode,
                     iconTint = generalColor,
-                    position = CardPosition.MIDDLE,
+                    position = CardPosition.TOP,
                     onClick = { showThemeDialog = true }
                 )
 
@@ -185,6 +190,45 @@ fun ExpressiveSettingsScreen(
             }
         }
 
+        item(key = "general_glucose_group") {
+            val glucoseColor = MaterialTheme.colorScheme.primary
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
+                SettingsItem(
+                    title = stringResource(R.string.unit),
+                    subtitle = unit,
+                    icon = Icons.AutoMirrored.Filled.List,
+                    iconTint = glucoseColor,
+                    position = CardPosition.TOP,
+                    onClick = { showUnitDialog = true }
+                )
+
+                TargetRangeExpandableSettingsItem(
+                    lowValue = targetLowValue,
+                    highValue = targetHighValue,
+                    unit = unit,
+                    isMmol = isMmol,
+                    expanded = targetRangeExpanded,
+                    onExpandedChange = { targetRangeExpanded = it },
+                    onLowValueChange = { viewModel.setTargetLow(it) },
+                    onHighValueChange = { viewModel.setTargetHigh(it) },
+                    iconTint = glucoseColor,
+                    position = CardPosition.MIDDLE
+                )
+
+                ManualCalibrationSettingsItem(
+                    calibrationEnabled = calibrationEnabled,
+                    modeLabel = calibrationModeLabel,
+                    onToggleEnabled = { CalibrationManager.setEnabledForMode(isRawCalibrationMode, it) },
+                    onOpenCalibration = { navController.navigate("settings/calibrations") },
+                    iconTint = glucoseColor,
+                    position = CardPosition.BOTTOM
+                )
+            }
+        }
+
         // === NOTIFICATIONS ===
         item(key = "notif_label") { SectionLabel(stringResource(R.string.notifications)) }
 
@@ -192,13 +236,22 @@ fun ExpressiveSettingsScreen(
             // Theme: Secondary (Accent)
             val notifColor = MaterialTheme.colorScheme.secondary
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                SettingsItem(
+                    title = stringResource(R.string.glucose_alerts_title),
+                    subtitle = alertsSummary,
+                    icon = Icons.Default.AddAlert,
+                    iconTint = MaterialTheme.colorScheme.error,
+                    showArrow = true,
+                    position = CardPosition.TOP,
+                    onClick = { navController.navigate("settings/alerts") }
+                )
 
                 SettingsItem(
                     title = "Notification Settings",
                     subtitle = "Customize notification shade",
                     icon = Icons.Default.ClearAll,
                     iconTint = notifColor,
-                    position = CardPosition.TOP,
+                    position = CardPosition.MIDDLE,
                     onClick = { showNotificationSettingsSheet = true }
                 )
                 SettingsItem(
@@ -214,17 +267,8 @@ fun ExpressiveSettingsScreen(
                     subtitle = "Customize always-on display",
                     icon = Icons.Default.Visibility,
                     iconTint = notifColor,
-                    position = CardPosition.MIDDLE,
-                    onClick = { showAODSettingsSheet = true }
-                )
-                SettingsItem(
-                    title = stringResource(R.string.glucose_alerts_title),
-                    subtitle = alertsSummary,
-                    icon = Icons.Default.AddAlert,
-                    iconTint = MaterialTheme.colorScheme.error, // Semantic Red for Alerts
-                    showArrow = true,
                     position = CardPosition.BOTTOM,
-                    onClick = { navController.navigate("settings/alerts") }
+                    onClick = { showAODSettingsSheet = true }
                 )
             }
         }
@@ -281,45 +325,30 @@ fun ExpressiveSettingsScreen(
                     position = CardPosition.MIDDLE,
                     onClick = { navController.navigate("settings/mirror") }
                 )
+                // Edit 67b: Determine if LibreView is visible to adjust card positions
+                val showLibreView = Natives.getuselibreview() || Natives.getlibreAccountIDnumber() > 0L
                 SettingsItem(
                     title = stringResource(R.string.nightscout_config),
                     subtitle = stringResource(R.string.nightscout_desc),
                     showArrow = true,
                     icon = Icons.Default.CloudUpload,
                     iconTint = exchangeColor,
-                    position = CardPosition.BOTTOM,
+                    position = if (showLibreView) CardPosition.MIDDLE else CardPosition.BOTTOM,
                     onClick = { navController.navigate("settings/nightscout") }
                 )
+                if (showLibreView) {
+                    SettingsItem(
+                        title = stringResource(R.string.libreview_config),
+                        subtitle = stringResource(R.string.libreview_desc),
+                        showArrow = true,
+                        icon = Icons.Default.Cloud,
+                        iconTint = exchangeColor,
+                        position = CardPosition.BOTTOM,
+                        onClick = { navController.navigate("settings/libreview") }
+                    )
+                }
             }
         }
-
-
-
-
-        // === TARGETS ===
-        item(key = "targets_label") { SectionLabel(stringResource(R.string.target_range_title)) }
-
-        item(key = "targets_group") {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SliderItem(
-                    title = stringResource(R.string.low_label),
-                    value = targetLowValue,
-                    unit = unit,
-                    range = if (isMmol) 2.0f..8.0f else 40f..140f,
-                    position = CardPosition.TOP,
-                    onValueChange = { viewModel.setTargetLow(it) }
-                )
-                SliderItem(
-                    title = stringResource(R.string.high_label),
-                    value = targetHighValue,
-                    unit = unit,
-                    range = if (isMmol) 6.0f..16.0f else 100f..350f,
-                    position = CardPosition.BOTTOM,
-                    onValueChange = { viewModel.setTargetHigh(it) }
-                )
-            }
-        }
-
         // === ADVANCED ===
         item(key = "adv_label") { SectionLabel(stringResource(R.string.advanced_title)) }
 
@@ -548,6 +577,186 @@ fun ExpressiveSettingsScreen(
 }
 
 @Composable
+private fun SettingsLeadingIcon(
+    icon: ImageVector,
+    tint: Color
+) {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = tint.copy(alpha = 0.12f)
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TargetRangeExpandableSettingsItem(
+    lowValue: Float,
+    highValue: Float,
+    unit: String,
+    isMmol: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onLowValueChange: (Float) -> Unit,
+    onHighValueChange: (Float) -> Unit,
+    iconTint: Color,
+    position: CardPosition
+) {
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "targetRangeChevron"
+    )
+    var lowSlider by remember(lowValue) { mutableFloatStateOf(lowValue) }
+    var highSlider by remember(highValue) { mutableFloatStateOf(highValue) }
+
+    val lowText = if (isMmol) String.format(Locale.getDefault(), "%.1f", lowSlider) else lowSlider.toInt().toString()
+    val highText = if (isMmol) String.format(Locale.getDefault(), "%.1f", highSlider) else highSlider.toInt().toString()
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = cardShape(position),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onExpandedChange(!expanded) }
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingsLeadingIcon(icon = Icons.Default.TrackChanges, tint = iconTint)
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.target_range_title),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "$lowText-$highText $unit",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = chevronRotation }
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Low: ${if (isMmol) String.format(Locale.getDefault(), "%.1f", lowSlider) else lowSlider.toInt()} $unit",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Slider(
+                            value = lowSlider,
+                            onValueChange = { lowSlider = it },
+                            onValueChangeFinished = { onLowValueChange(lowSlider) },
+                            valueRange = if (isMmol) 2.0f..8.0f else 40f..140f
+                        )
+
+                        Text(
+                            text = "High: ${if (isMmol) String.format(Locale.getDefault(), "%.1f", highSlider) else highSlider.toInt()} $unit",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Slider(
+                            value = highSlider,
+                            onValueChange = { highSlider = it },
+                            onValueChangeFinished = { onHighValueChange(highSlider) },
+                            valueRange = if (isMmol) 6.0f..16.0f else 100f..350f
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ManualCalibrationSettingsItem(
+    calibrationEnabled: Boolean,
+    modeLabel: String,
+    onToggleEnabled: (Boolean) -> Unit,
+    onOpenCalibration: () -> Unit,
+    iconTint: Color,
+    position: CardPosition
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onOpenCalibration,
+        shape = cardShape(position),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SettingsLeadingIcon(icon = Icons.Default.WaterDrop, tint = iconTint)
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.manual_calibration),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "$modeLabel - ${if (calibrationEnabled) "active" else "paused"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                VerticalDivider(
+                    modifier = Modifier.height(30.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                StyledSwitch(
+                    checked = calibrationEnabled,
+                    onCheckedChange = onToggleEnabled
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun NotificationSettingsSheet(
     onDismiss: () -> Unit,
     sheetState: SheetState,
@@ -618,13 +827,13 @@ fun NotificationSettingsSheet(
                 FilterChip(
                     selected = fontType == 0,
                     onClick = { fontType = 0; save() },
-                    label = { Text("App (IBM Plex)") }
+                    label = { Text(stringResource(R.string.font_app_plex)) }
 //                    leadingIcon = { if(fontType == 0) Icon(Icons.Filled.Check, null) }
                 )
                 FilterChip(
                     selected = fontType == 1,
                     onClick = { fontType = 1; save() },
-                    label = { Text("System (Google Sans)") }
+                    label = { Text(stringResource(R.string.font_system_google_sans)) }
 //                    leadingIcon = { if(fontType == 1) Icon(Icons.Filled.Check, null) }
                 )
             }
@@ -632,7 +841,7 @@ fun NotificationSettingsSheet(
 
             // Font Weight - only on Android 12+ (API 31) where RemoteViews supports setFontVariationSettings
             if (android.os.Build.VERSION.SDK_INT >= 31) {
-                Text("Font Weight", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                Text(stringResource(R.string.font_weight_label), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 24.dp,  vertical = 0.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -641,19 +850,19 @@ fun NotificationSettingsSheet(
                     FilterChip(
                         selected = fontWeight == 300,
                         onClick = { fontWeight = 300; save() },
-                        label = { Text("Light") }
+                        label = { Text(stringResource(R.string.theme_light)) }
 //                        leadingIcon = { if(fontWeight == 300) Icon(Icons.Filled.Check, null) }
                     )
                     FilterChip(
                         selected = fontWeight == 400,
                         onClick = { fontWeight = 400; save() },
-                        label = { Text("Regular") }
+                        label = { Text(stringResource(R.string.regular)) }
 //                        leadingIcon = { if(fontWeight == 400) Icon(Icons.Filled.Check, null) }
                     )
                     FilterChip(
                         selected = fontWeight == 500,
                         onClick = { fontWeight = 500; save() },
-                        label = { Text("Medium") }
+                        label = { Text(stringResource(R.string.medium)) }
 //                        leadingIcon = { if(fontWeight == 500) Icon(Icons.Filled.Check, null) }
                     )
                 }
@@ -836,10 +1045,10 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
             )
 
             // === VISUALS SECTION ===
-            Text("Visuals", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            Text(stringResource(R.string.visuals), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
 
             // FONT SOURCE
-            Text("Font Source", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+            Text(stringResource(R.string.font_source), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -847,17 +1056,17 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
                  FilterChip(
                      selected = fontSource == "APP",
                      onClick = { fontSource = "APP"; save() },
-                     label = { Text("App (IBM Plex)") }
+                     label = { Text(stringResource(R.string.font_app_plex)) }
                  )
                  FilterChip(
                      selected = fontSource == "SYSTEM",
                      onClick = { fontSource = "SYSTEM"; save() },
-                     label = { Text("System (Google Sans)") }
+                     label = { Text(stringResource(R.string.font_system_google_sans)) }
                  )
             }
 
             // FONT WEIGHT
-            Text("Font Weight", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+            Text(stringResource(R.string.font_weight_label), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -865,17 +1074,17 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
                  FilterChip(
                      selected = fontWeight == 300,
                      onClick = { fontWeight = 300; save() },
-                     label = { Text("Light") }
+                     label = { Text(stringResource(R.string.theme_light)) }
                  )
                  FilterChip(
                      selected = fontWeight == 400,
                      onClick = { fontWeight = 400; save() },
-                     label = { Text("Regular") }
+                     label = { Text(stringResource(R.string.regular)) }
                  )
                  FilterChip(
                      selected = fontWeight == 500,
                      onClick = { fontWeight = 500; save() },
-                     label = { Text("Medium") }
+                     label = { Text(stringResource(R.string.medium)) }
                  )
             }
 
@@ -886,7 +1095,7 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
             SectionLabel("Layout", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
 
             // Multi-Position Selection
-            Text("Active Positions (Randomized)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+            Text(stringResource(R.string.active_positions_randomized), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -915,7 +1124,7 @@ fun AODSettingsSheet(onDismiss: () -> Unit, sheetState: SheetState, context: and
             Spacer(Modifier.height(12.dp))
 
             // Alignment Selection
-            Text("Text Alignment", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+            Text(stringResource(R.string.text_alignment), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1193,7 +1402,7 @@ private fun ExportDataSheet(
                     
                     withContext(Dispatchers.Main) {
                         isExporting = false
-                        Toast.makeText(context, if (success) "Export Successful" else "Export Failed", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (success) context.getString(R.string.export_successful) else context.getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
                         onDismiss()
                     }
                 }
@@ -1218,7 +1427,7 @@ private fun ExportDataSheet(
                     
                     withContext(Dispatchers.Main) {
                         isExporting = false
-                        Toast.makeText(context, if (success) "Export Successful" else "Export Failed", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (success) context.getString(R.string.export_successful) else context.getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
                         onDismiss()
                     }
                 }
@@ -1265,7 +1474,7 @@ private fun ExportDataSheet(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.List, null, modifier = Modifier.padding(end = 8.dp))
-                        Text("Export complete CSV") 
+                        Text(stringResource(R.string.export_complete_csv)) 
                     }
                     
                     OutlinedButton(
@@ -1276,7 +1485,7 @@ private fun ExportDataSheet(
                         modifier = Modifier.fillMaxWidth()
                     ) { 
                          Icon(androidx.compose.material.icons.Icons.Default.Info, null, modifier = Modifier.padding(end = 8.dp))
-                         Text("Export readable report") 
+                         Text(stringResource(R.string.export_readable_report)) 
                     }
                 }
             }

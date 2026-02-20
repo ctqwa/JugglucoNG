@@ -19,6 +19,8 @@ import android.os.Handler
 import android.os.Looper
 import tk.glucodata.Applic
 import tk.glucodata.Log
+import tk.glucodata.Natives
+import tk.glucodata.R
 import tk.glucodata.data.HistoryRepository
 import java.util.Queue
 import java.util.LinkedList
@@ -78,6 +80,28 @@ class AiDexProbe private constructor() {
     companion object {
         private const val TAG = "AIDEX_RAW"
         private const val SCAN_PERIOD: Long = 10000
+
+        /**
+         * Check if an AiDex sensor is the current main sensor.
+         * Uses Natives.lastsensorname() which reads infoblockptr()->current.
+         * AiDex sensor serials are normalized by AiDexSetupWizard.normalizeAiDexSerial()
+         * to the format "X-ABCD1234" (always starts with "X-").
+         * If AiDex is not main, we must NOT insert readings into Room
+         * to avoid cross-sensor chart contamination.
+         */
+        private fun isAiDexMainSensor(): Boolean {
+            return try {
+                val mainName = Natives.lastsensorname()
+                // AiDex serials are normalized to "X-..." by normalizeAiDexSerial().
+                // That's what addAiDexSensor() passes to setcurrentsensor().
+                // Also check raw BLE name patterns as a fallback.
+                mainName != null && (mainName.startsWith("X-")
+                    || mainName.contains("AiDEX", ignoreCase = true)
+                    || mainName.contains("Linx", ignoreCase = true))
+            } catch (e: Exception) {
+                false
+            }
+        }
         private const val CONTINUOUS_SCAN_INTERVAL: Long = 60_000L  // Scan every 60 seconds
         
         // Persist history across class instances (e.g. Activity restarts)
@@ -117,7 +141,7 @@ class AiDexProbe private constructor() {
     fun startProbe() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
             Log.e(TAG, "Bluetooth not enabled")
-            Applic.Toaster("Enable Bluetooth first!")
+            Applic.Toaster(Applic.app.getString(R.string.enable_bluetooth_first))
             return
         }
 
@@ -274,7 +298,7 @@ class AiDexProbe private constructor() {
             isScanning = true
             bluetoothLeScanner?.startScan(scanCallback)
             Log.i(TAG, "Scan started...")
-            Applic.Toaster("AiDex Probe: Scanning...")
+            Applic.Toaster(Applic.app.getString(R.string.aidex_probe_scanning))
         } else {
             isScanning = false
             bluetoothLeScanner?.stopScan(scanCallback)
@@ -327,7 +351,7 @@ class AiDexProbe private constructor() {
                                 
                                 // Parse Sensor Age (Hypothesis: Byte 4 is Age in Hours)
                                 val ageHours = data[4].toInt() and 0xFF
-                                val daysLeft = 14.0 - (ageHours / 24.0)
+                                val daysLeft = 15.0 - (ageHours / 24.0)
                                 Log.i(TAG, "Sensor Status: Age=${ageHours}h, DaysLeft=${"%.1f".format(daysLeft)}d (Raw Byte4=${String.format("%02X", ageHours)})")
                                 
                                 // Store if in valid range AND enough time has passed
@@ -335,11 +359,16 @@ class AiDexProbe private constructor() {
                                     if (now - lastBroadcastTime >= MIN_READING_INTERVAL_MS) {
                                         lastBroadcastTime = now
                                         lastValidGlucose = glucoseMmol
-                                        HistoryRepository.storeReadingAsync(
-                                            now,
-                                            glucoseMmol,
-                                            HistoryRepository.GLUCODATA_SOURCE_AIDEX
-                                        )
+                                        // Only insert into Room if AiDex is the main sensor.
+                                        // Otherwise the normal sync path (getGlucoseHistory)
+                                        // will pick up the main sensor's data instead.
+                                        if (isAiDexMainSensor()) {
+                                            HistoryRepository.storeReadingAsync(
+                                                now,
+                                                glucoseMmol,
+                                                HistoryRepository.GLUCODATA_SOURCE_AIDEX
+                                            )
+                                        }
                                         Log.i(TAG, "Stored glucose: $glucoseMgDl mg/dL")
                                     } else {
                                         Log.d(TAG, "Skipping duplicate reading (too soon)")
@@ -807,8 +836,10 @@ class AiDexProbe private constructor() {
                                    
                                    Log.i(TAG, ">>> DECRYPTED F003: Raw=$bestVal * Factor $currentFactor = $correctedMgDl mg/dL ($correctedMmol mmol/L)")
                                    
-                                   // Store the corrected value
-                                   HistoryRepository.storeReadingAsync(System.currentTimeMillis(), correctedMmol, HistoryRepository.GLUCODATA_SOURCE_AIDEX)
+                                   // Store the corrected value (only if AiDex is main sensor)
+                                   if (isAiDexMainSensor()) {
+                                       HistoryRepository.storeReadingAsync(System.currentTimeMillis(), correctedMmol, HistoryRepository.GLUCODATA_SOURCE_AIDEX)
+                                   }
                                }
                               
                          } catch (e: Exception) {
@@ -904,7 +935,9 @@ class AiDexProbe private constructor() {
                     val progress = if (historyTotalCount > 0) "($currentCount/$historyTotalCount)" else ""
                     
                     Log.i(TAG, "Parsed History $progress: Glucose=$correctedVal TimeOff=$timeOffset TS=${ts}")
-                    HistoryRepository.storeReadingAsync(ts, glucoseMmol, HistoryRepository.GLUCODATA_SOURCE_AIDEX)
+                    if (isAiDexMainSensor()) {
+                        HistoryRepository.storeReadingAsync(ts, glucoseMmol, HistoryRepository.GLUCODATA_SOURCE_AIDEX)
+                    }
                 }
             }
         } catch (e: Exception) {

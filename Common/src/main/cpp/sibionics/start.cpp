@@ -109,6 +109,39 @@ extern "C" JNIEXPORT void JNICALL fromjava(siSaveDeviceName)(
   backup->wakebackup(Backup::wakeall);
   // sendstreaming(sens);
 }
+
+static bool clearSiTransmitterBinding(SensorGlucoseData *sens) {
+  if (!sens || !sens->isSibionics()) {
+    return false;
+  }
+  auto *info = sens->getinfo();
+  info->siToken = '\0';
+  info->siDeviceNamelen = 0;
+  memset(info->siDeviceName, 0, sizeof(info->siDeviceName));
+  char *address = sens->deviceaddress();
+  if (address) {
+    address[0] = '\0';
+  }
+  sens->scannedAddress = false;
+  return true;
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(siClearTransmitterBinding)(
+    JNIEnv *env, jclass cl, jlong dataptr) {
+  if (!dataptr)
+    return;
+  streamdata *sdata = reinterpret_cast<streamdata *>(dataptr);
+  auto *sens = sdata->hist;
+  if (!clearSiTransmitterBinding(sens)) {
+    return;
+  }
+  sendstreaming(sens);
+  if (backup) {
+    backup->resendResetDevices();
+    backup->wakebackup(Backup::wakeall);
+  }
+  LOGSTRING("siClearTransmitterBinding: cleared saved transmitter identity\n");
+}
 extern "C" JNIEXPORT void JNICALL fromjava(setSensorptrResetSibionics2)(
     JNIEnv *env, jclass cl, jlong sensorptr, jboolean val) {
   if (!sensorptr)
@@ -208,9 +241,22 @@ extern "C" JNIEXPORT void JNICALL fromjava(setCustomCalibrationSettings)(
     info->useCustomCalibration = enabled;
     info->customCalIndex = index;
     info->autoResetAlgorithm = autoReset;
+    // Edit 86: When toggling custom calibration, reset the bad-value streak
+    // counter to prevent pre-existing streaks from immediately triggering
+    // an algorithm reset (which causes a pause/play reset loop).
+    stream->sicontext.clearBadValueStreak();
+    // Fix: Reset viewMode to Auto (0) when calibration settings change.
+    // viewMode is persisted in mmap and checked independently in C++
+    // (eu.cpp, curve.cpp) and Java (SuperGattCallback.java). If the user
+    // previously set viewMode=1 (raw), it stays set even after enabling
+    // custom calibration, causing the chart to mix raw and calibrated data.
+    uint32_t oldViewMode = info->viewMode;
+    if (info->viewMode != 0) {
+      info->viewMode = 0;
+    }
     LOGGER("JNI setCustomCalibrationSettings: enabled=%d, index=%d, "
-           "autoReset=%d\n",
-           enabled, index, autoReset);
+           "autoReset=%d, viewMode=%d->%d (streak cleared)\n",
+           enabled, index, autoReset, oldViewMode, info->viewMode);
   }
 }
 
@@ -245,8 +291,11 @@ extern "C" JNIEXPORT void JNICALL fromjava(setViewMode)(JNIEnv *env, jclass cl,
   if (!dataptr)
     return;
   sistream *stream = reinterpret_cast<sistream *>(dataptr);
-  if (stream->hist)
+  if (stream->hist) {
+    uint32_t old = stream->hist->getinfo()->viewMode;
     stream->hist->getinfo()->viewMode = mode;
+    LOGGER("JNI setViewMode: %d -> %d\n", old, mode);
+  }
 }
 
 extern "C" JNIEXPORT jint JNICALL fromjava(getViewMode)(JNIEnv *env, jclass cl,
@@ -254,8 +303,11 @@ extern "C" JNIEXPORT jint JNICALL fromjava(getViewMode)(JNIEnv *env, jclass cl,
   if (!dataptr)
     return 0;
   sistream *stream = reinterpret_cast<sistream *>(dataptr);
-  if (stream->hist)
-    return stream->hist->getinfo()->viewMode;
+  if (stream->hist) {
+    jint vm = stream->hist->getinfo()->viewMode;
+    LOGGER("JNI getViewMode: %d\n", vm);
+    return vm;
+  }
   return 0;
 }
 /*
@@ -673,13 +725,18 @@ void SiContext::reset(SensorGlucoseData *sens) {
 
   binState.reset(); // Reset allocator headers
 
-  // Force delete binState file to ensure fresh algorithm state on disk
-  unlink(sens->binstatefile.c_str());
+  // Keep state.bin mapped and zeroed in-place.
+  // Unlinking a currently mapped file makes future SiContext instances reopen
+  // an empty new inode while the old context keeps writing to the deleted one.
+  // That causes "binState empty" loops and breaks restore/replay continuity.
   // Also delete JSON backups to prevent reloading old state
   unlink(sens->statefile.c_str());
   unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
 
   auto *info = sens->getinfo();
+
+  // Record reset timestamp for cooldown guard (prevents reset loops)
+  info->lastCalResetTime = (uint32_t)time(nullptr);
 
   // Clear old calibration
   info->caliNr = 0;
@@ -705,42 +762,53 @@ void SiContext::reset(SensorGlucoseData *sens) {
   int windowSize = 0;
   int newIndex = 1;
 
+  // Custom calibration: rewind siIndex by the rolling window size so
+  // the algorithm replays enough history to recalibrate.
+  // viewMode is independent of useCustomCalibration — viewMode controls
+  // which value (auto/raw/custom) is DISPLAYED, not whether the
+  // calibration algorithm runs.
   if (info->useCustomCalibration) {
     int hoursWindow =
         SensorGlucoseData::getCustomCalHours(info->customCalIndex);
-    // Dynamic interval calculation (mirrors resetSiIndex in glucose.cpp)
-    float interval = sens->getinfo()->pollinterval;
-    if (interval < 59.0f) {
-      interval =
-          60.0f; // Fallback to 1 min (most common for custom cal sensors)
-      LOGGER("SiContext::reset (Custom): interval too small (%.1f), using "
-             "fallback 60.0s\n",
-             sens->getinfo()->pollinterval);
-    }
-    windowSize = (int)((hoursWindow * 3600.0f) / interval);
-    // Idempotent Reset: Calculate from TIME, not current index
-    // This prevents repeated resets from drifting infinitely backward.
-    time_t now = time(NULL);
-    uint32_t starttime = sens->getinfo()->starttime;
-
-    // Safety check for starttime
-    if (starttime > 0 && now > starttime) {
-      float calcInterval = interval > 0.1f ? interval : 60.0f;
-      int maxIndex = (int)((now - starttime) / calcInterval);
-
-      // Target is "Now - Window", regardless of current siIndex state
-      newIndex = maxIndex > windowSize ? (maxIndex - windowSize) : 1;
-
-      LOGGER("SiContext::reset() Custom (Time-Based): now=%ld start=%d "
-             "elapsed=%d maxIndex=%d windowSize=%d newIndex=%d\n",
-             now, starttime, (int)(now - starttime), maxIndex, windowSize,
-             newIndex);
+    if (hoursWindow <= 0) {
+      // MAX mode: replay all history from index 1
+      newIndex = 1;
+      LOGSTRING("SiContext::reset() Custom MAX mode: resetting to index 1\n");
     } else {
-      // Fallback if time is invalid
-      newIndex = savedSiIndex > windowSize ? (savedSiIndex - windowSize) : 1;
-      LOGGER("SiContext::reset() Custom (Fallback): Time invalid, using "
-             "savedSiIndex. newIndex=%d\n",
-             newIndex);
+      // Dynamic interval calculation (mirrors resetSiIndex in glucose.cpp)
+      float interval = sens->getinfo()->pollinterval;
+      if (interval < 59.0f) {
+        interval =
+            60.0f; // Fallback to 1 min (most common for custom cal sensors)
+        LOGGER("SiContext::reset (Custom): interval too small (%.1f), using "
+               "fallback 60.0s\n",
+               sens->getinfo()->pollinterval);
+      }
+      windowSize = (int)((hoursWindow * 3600.0f) / interval);
+      // Idempotent Reset: Calculate from TIME, not current index
+      // This prevents repeated resets from drifting infinitely backward.
+      time_t now = time(NULL);
+      uint32_t starttime = sens->getinfo()->starttime;
+
+      // Safety check for starttime
+      if (starttime > 0 && now > starttime) {
+        float calcInterval = interval > 0.1f ? interval : 60.0f;
+        int maxIndex = (int)((now - starttime) / calcInterval);
+
+        // Target is "Now - Window", regardless of current siIndex state
+        newIndex = maxIndex > windowSize ? (maxIndex - windowSize) : 1;
+
+        LOGGER("SiContext::reset() Custom (Time-Based): now=%ld start=%d "
+               "elapsed=%d maxIndex=%d windowSize=%d newIndex=%d\n",
+               now, starttime, (int)(now - starttime), maxIndex, windowSize,
+               newIndex);
+      } else {
+        // Fallback if time is invalid
+        newIndex = savedSiIndex > windowSize ? (savedSiIndex - windowSize) : 1;
+        LOGGER("SiContext::reset() Custom (Fallback): Time invalid, using "
+               "savedSiIndex. newIndex=%d\n",
+               newIndex);
+      }
     }
 
     // info->useCustomCalibration = false; // DON'T CLEAR: Keeps UI switch
@@ -774,7 +842,6 @@ void SiContext::resetAll(SensorGlucoseData *sens) {
   }
 
   binState.reset();
-  unlink(sens->binstatefile.c_str());
   unlink(sens->statefile.c_str());
   unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
 
@@ -813,7 +880,6 @@ void SiContext::wipeDataOnly(SensorGlucoseData *sens) {
   }
 
   binState.reset();
-  unlink(sens->binstatefile.c_str());
   unlink(sens->statefile.c_str());
   unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
 
@@ -839,7 +905,299 @@ void SiContext::wipeDataOnly(SensorGlucoseData *sens) {
       "SiContext::wipeDataOnly() Local data wiped without sensor reset.\n");
 }
 
+extern int sitrend2abbott(int sitrend);
+extern float sitrend2RateOfChange(int sitrend);
+
+void SiContext::localReplay(SensorGlucoseData *sens) {
+  LOGGER("SiContext::localReplay() called for sensor %s\n",
+         sens->deviceaddress());
+
+  // Step 0: Backup original polls+binState only for custom-calibration replay.
+  // Native-mode replay (used as disable fallback) should not create/overwrite
+  // custom backups.
+  if (sens->getinfo()->useCustomCalibration) {
+    sens->backupPolls();
+  }
+
+  // Step 1: Destroy existing algorithm context
+  release();
+
+  // Step 2: Wipe binState (same as reset())
+  if (binState.map.data() && binState.map.size() > 0) {
+    memset(binState.map.data(), 0, binState.map.size());
+  }
+  binState.reset();
+  unlink(sens->statefile.c_str());
+  unlink(pathconcat(sens->getsensordir(), "state3.json").c_str());
+
+  auto *info = sens->getinfo();
+  info->lastCalResetTime = (uint32_t)time(nullptr);
+  info->caliNr = 0;
+  info->reset = false;
+
+  // Step 3: Recreate fresh algorithm context (siIndex=0 to skip binState
+  // restore)
+  const int savedSiIndex = sens->getSiIndex();
+  sens->setSiIndex(0);
+  if (notchinese) {
+    algcontext = initAlgorithm2(sens, binState);
+  } else {
+    algcontext = initAlgorithm3(sens, binState);
+  }
+
+  if (!algcontext) {
+    LOGSTRING("localReplay: initAlgorithm returned null, aborting\n");
+    sens->setSiIndex(savedSiIndex);
+    return;
+  }
+
+  // Step 4: Calculate replay window start
+  const int totalPolls = info->pollcount;
+  int replayStart = 0;
+
+  if (info->useCustomCalibration) {
+    int hoursWindow =
+        SensorGlucoseData::getCustomCalHours(info->customCalIndex);
+    if (hoursWindow <= 0) {
+      // MAX mode: replay all stored data
+      replayStart = 0;
+      LOGGER("localReplay: custom cal MAX mode, replaying all %d polls\n",
+             totalPolls);
+    } else {
+      float interval = info->pollinterval;
+      if (interval < 59.0f)
+        interval = 60.0f;
+      int windowSize = (int)((hoursWindow * 3600.0f) / interval);
+      replayStart = totalPolls > windowSize ? (totalPolls - windowSize) : 0;
+      LOGGER("localReplay: custom cal window=%dH, windowSize=%d, "
+             "replayStart=%d, totalPolls=%d\n",
+             hoursWindow, windowSize, replayStart, totalPolls);
+    }
+  } else {
+    // Native mode: replay everything
+    replayStart = 0;
+    LOGGER("localReplay: native mode, replaying all %d polls\n", totalPolls);
+  }
+
+  // Step 5: Replay stored raw data through the algorithm
+  // Key insight: process2/process3 only return a calibrated value every ~5th
+  // poll. For intermediate polls the result is 0. The live BLE path (eu.cpp,
+  // process.cpp) handles this via pollinterval interpolation:
+  //   - On a calibrated poll: pollinterval = newvalue - value (offset)
+  //   - On intermediate polls: newvalue = value + pollinterval
+  // We must replicate this logic exactly, otherwise 4/5 polls get raw values.
+  const ScanData *pollsData = sens->getPollsData();
+  const RawData *rawData = sens->getRawPollsData();
+  const uint16_t *tempData = sens->getTempPollsData();
+  int processed = 0;
+  int skipped = 0;
+
+  // Start from zero — a fresh algorithm has no prior calibration offset.
+  // Seeding from info->pollinterval (last known) was wrong because that value
+  // was computed by the OLD algorithm state; using it with a FRESH algorithm
+  // produces incorrect interpolation for the first ~5 polls.
+  double replayPollInterval = 0;
+
+  // Bad-value streak counter (matches eu.cpp:416-456)
+  int replayBadStreak = 0;
+  constexpr int REPLAY_MAX_BAD_STREAK = 5;
+
+  for (int i = replayStart; i < totalPolls; i++) {
+    // Match live BLE path exactly (eu.cpp:398-456).
+    // The live path:
+    //   if (current > 1 && value < 3000 && (newvalue=process2(..)) > 1 &&
+    //   (index % 5 == 0))
+    //       pollinterval = newvalue - value;
+    //   else
+    //       if (pollinterval < 40) newvalue = value + pollinterval;
+    //   if (newvalue > 50) newvalue = value;  // sanity fallback
+
+    const uint16_t rawVal = rawData[i].raw;
+    if (rawVal == 0) {
+      skipped++;
+      continue;
+    }
+
+    int current = (int)rawVal; // raw in 0.1 mmol/L units, same as BLE 'current'
+    double value = current / 10.0;
+    int index = pollsData[i].id;
+
+    double temp;
+    if (tempData && tempData[i] > 0) {
+      temp = tempData[i] / 10.0;
+    } else {
+      temp = 36.0;
+    }
+
+    // Initialize to raw value — prevents UB when pollinterval >= 40
+    // (same implicit behavior as eu.cpp:398 where newvalue is uninitialized
+    //  but always set before use via process2 or the else branch)
+    double newvalue = value;
+
+    if (algcontext) {
+      // Exact eu.cpp:402-408 logic
+      if (current > 1 && value < 3000.0 &&
+          (newvalue = (notchinese ? process2(index, value, temp)
+                                  : process3(index, value, temp))) > 1 &&
+          (index % 5 == 0)) {
+        replayPollInterval = newvalue - value;
+      } else {
+        if (replayPollInterval < 40)
+          newvalue = value + replayPollInterval;
+      }
+    } else {
+      newvalue = value;
+    }
+
+    // Bad-value streak logic (matches eu.cpp:414-456)
+    // Prevents one bad calibration from snowballing through pollinterval
+    if (newvalue > 50.0) {
+      replayBadStreak++;
+      if (replayBadStreak >= REPLAY_MAX_BAD_STREAK) {
+        // Re-init algorithm (same as eu.cpp:443 reset for custom cal)
+        LOGGER("localReplay: %d consecutive bad values at poll %d, "
+               "re-initializing algorithm\n",
+               replayBadStreak, i);
+        release();
+        if (binState.map.data() && binState.map.size() > 0) {
+          memset(binState.map.data(), 0, binState.map.size());
+        }
+        binState.reset();
+        sens->setSiIndex(0);
+        if (notchinese) {
+          algcontext = initAlgorithm2(sens, binState);
+        } else {
+          algcontext = initAlgorithm3(sens, binState);
+        }
+        replayPollInterval = 0;
+        replayBadStreak = 0;
+      }
+      newvalue = value; // fallback to raw
+    } else {
+      replayBadStreak = 0;
+    }
+
+    if (newvalue > 1 && newvalue < 30) {
+      const int mgdL = (int)std::round(newvalue * convfactordL);
+      const int trend = algcontext ? algcontext->ig_trend : 0;
+      const float change = sitrend2RateOfChange(trend);
+      const int abbotttrend = sitrend2abbott(trend);
+
+      // Overwrite existing poll entry with recalibrated value
+      // Pass stored temp through to preserve it in temppolls
+      uint16_t storedTemp = (tempData && tempData[i] > 0) ? tempData[i] : 0;
+      sens->saveStreamAgain(pollsData[i].t, index, mgdL, abbotttrend, change,
+                            (int)rawVal, storedTemp);
+      processed++;
+    } else {
+      skipped++;
+    }
+  }
+
+  // Write final pollinterval back so live BLE path continues smoothly
+  info->pollinterval = replayPollInterval;
+
+  // Step 6: Restore siIndex to where it was (BLE continues from here)
+  sens->setSiIndex(savedSiIndex);
+
+  // Reset bad value streak since we just rebuilt everything
+  badValueStreak = 0;
+
+  LOGGER("localReplay: done. processed=%d, skipped=%d, siIndex restored to "
+         "%d\n",
+         processed, skipped, savedSiIndex);
+  // Do NOT enter reset mode — this was synchronous, no BLE replay needed
+}
+
+bool SiContext::reloadFromPersistedState(SensorGlucoseData *sens) {
+  if (!sens) {
+    LOGAR("SiContext::reloadFromPersistedState sens==null");
+    return false;
+  }
+
+  auto *info = sens->getinfo();
+  const int savedSiIndex = sens->getSiIndex() > 0 ? sens->getSiIndex() : 1;
+  LOGGER("SiContext::reloadFromPersistedState() start: siIndex=%d\n",
+         savedSiIndex);
+
+  // Restore path must import state.bin immediately. initAlgorithm only imports
+  // binary state when not in reset mode, so force reset mode off here.
+  sens->exitResetMode();
+  // Mark this as a recent reset-style operation so initAlgorithm doesn't
+  // trigger resetSiIndex() if the restored binState is unexpectedly empty.
+  info->lastCalResetTime = (uint32_t)time(nullptr);
+
+  release();
+
+  // Re-open mmap so restored state.bin contents are visible immediately.
+  binState.map.extend(sens->binstatefile, 4096);
+  if (!binState.map.data()) {
+    LOGSTRING("SiContext::reloadFromPersistedState: remap state.bin failed\n");
+  }
+
+  sens->setSiIndex(savedSiIndex);
+  if (notchinese) {
+    algcontext = initAlgorithm2(sens, binState);
+  } else {
+    algcontext = initAlgorithm3(sens, binState);
+  }
+
+  if (!algcontext) {
+    LOGSTRING("SiContext::reloadFromPersistedState: init failed, retrying with "
+              "fresh binState\n");
+    if (binState.map.data() && binState.map.size() > 0) {
+      memset(binState.map.data(), 0, binState.map.size());
+    }
+    binState.reset();
+    sens->setSiIndex(1);
+    if (notchinese) {
+      algcontext = initAlgorithm2(sens, binState);
+    } else {
+      algcontext = initAlgorithm3(sens, binState);
+    }
+    sens->setSiIndex(savedSiIndex);
+  }
+
+  clearBadValueStreak();
+  LOGGER(
+      "SiContext::reloadFromPersistedState() done: ok=%d mNativeContext=%lld "
+      "siIndex=%d\n",
+      algcontext != nullptr, algcontext ? algcontext->mNativeContext : 0LL,
+      sens->getSiIndex());
+  return algcontext != nullptr;
+}
+
 SiContext::~SiContext() { release(); };
+
+// Temperature data for Sibionics sensors - returns values from temppolls.dat
+extern "C" JNIEXPORT jintArray JNICALL
+fromjava(getTemperatureData)(JNIEnv *env, jclass cl, jlong sensorptr) {
+  if (!sensorptr)
+    return nullptr;
+  const auto *sens = reinterpret_cast<const SensorGlucoseData *>(sensorptr);
+  if (!sens->isSibionics())
+    return nullptr;
+
+  const uint16_t *tempData = sens->getTempPollsData();
+  const int count = sens->pollcount();
+  if (!tempData || count <= 0)
+    return nullptr;
+
+  jintArray result = env->NewIntArray(count);
+  if (!result)
+    return nullptr;
+
+  jint *buf = env->GetIntArrayElements(result, nullptr);
+  if (!buf)
+    return nullptr;
+
+  for (int i = 0; i < count; i++) {
+    buf[i] = (jint)tempData[i]; // Temperature in 0.1°C units
+  }
+
+  env->ReleaseIntArrayElements(result, buf, 0);
+  return result;
+}
 
 extern "C" JNIEXPORT jlong JNICALL
 fromjava(SIprocessData)(JNIEnv *envin, jclass cl, jlong dataptr,
@@ -888,6 +1246,22 @@ fromjava(SIprocessData)(JNIEnv *envin, jclass cl, jlong dataptr,
         }
       }
     }
+    // Daily auto-replay: when autoResetAlgorithm ("Restart daily") is enabled
+    // AND custom calibration is active, trigger a localReplay every 24 hours.
+    // This is independent of autoResetDays (hardware reset cycle).
+    if (info->autoResetAlgorithm && info->useCustomCalibration) {
+      uint32_t lastReplay = info->lastCalResetTime;
+      if (lastReplay > 0 && timsec > lastReplay) {
+        uint32_t elapsed = timsec - lastReplay;
+        if (elapsed >= 24 * 3600) {
+          LOGGER("Daily auto-replay triggered: elapsed=%u sec since last "
+                 "replay\n",
+                 elapsed);
+          sdata->sicontext.localReplay(sens);
+          // localReplay already sets lastCalResetTime internally
+        }
+      }
+    }
     const jlong res = sdata->sicontext.processData2(sens, timsec, bluedata,
                                                     sdata->sensorindex);
     LOGGER("processData2=%lld\n", res);
@@ -909,6 +1283,59 @@ extern "C" JNIEXPORT void JNICALL fromjava(siWipeDataOnly)(JNIEnv *env,
   auto *sens = stream->hist;
   if (sens)
     stream->sicontext.wipeDataOnly(sens);
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(siLocalReplay)(JNIEnv *env,
+                                                          jclass cl,
+                                                          jlong dataptr) {
+  if (!dataptr)
+    return;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (sens) {
+    // Reset viewMode to Auto before replay — user wants to see recalibrated
+    // data
+    auto *info = sens->getinfo();
+    uint32_t oldVM = info->viewMode;
+    if (info->viewMode != 0) {
+      info->viewMode = 0;
+      LOGGER("siLocalReplay: viewMode %d -> 0\n", oldVM);
+    }
+    stream->sicontext.localReplay(sens);
+  }
+}
+
+// Restore original manufacturer-calibrated values (polls + binState).
+// Called when disabling custom calibration (custom ON -> OFF transition).
+extern "C" JNIEXPORT jboolean JNICALL
+fromjava(siRestoreOriginalPolls)(JNIEnv *env, jclass cl, jlong dataptr) {
+  if (!dataptr)
+    return JNI_FALSE;
+  sistream *stream = reinterpret_cast<sistream *>(dataptr);
+  auto *sens = stream->hist;
+  if (!sens || !sens->hasBackupPolls()) {
+    LOGSTRING("siRestoreOriginalPolls: no backup available\n");
+    return JNI_FALSE;
+  }
+
+  // Restore polls.dat, state.bin, state.json, pollinterval from backup.
+  // polls mmap is invalidated by restorePolls() so chart shows original values
+  // immediately.
+  if (!sens->restorePolls()) {
+    LOGSTRING("siRestoreOriginalPolls: restore failed\n");
+    return JNI_FALSE;
+  }
+
+  // Rebind active algorithm context immediately so restored state.bin is used
+  // without waiting for reconnect/app restart.
+  stream->sicontext.reloadFromPersistedState(sens);
+
+  LOGSTRING("siRestoreOriginalPolls: original values restored successfully\n");
+
+  // Remove backup files since we've restored to original state
+  sens->removeBackupPolls();
+
+  return JNI_TRUE;
 }
 
 #else

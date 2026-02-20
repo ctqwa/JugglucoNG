@@ -10,128 +10,233 @@ import tk.glucodata.Natives
 
 /**
  * Singleton that synchronizes native glucose history with the Room database.
- * 
- * This is the ONLY source of data for the Room database.
- * Called from DashboardViewModel.refreshData() when data needs to be displayed.
+ *
+ * Multi-sensor: Iterates ALL active sensors via [Natives.activeSensors] and syncs
+ * each one independently using [Natives.getGlucoseHistoryForSensor]. Each reading
+ * is tagged with its sensor serial so data from different sensors coexists in the
+ * same Room table without conflict.
+ *
+ * NO MORE clearAllTables() — sensor switching is handled by querying the appropriate
+ * sensorSerial, not by destroying and rebuilding the database.
  */
 object HistorySync {
-    
+
     private const val TAG = "HistorySync"
-    
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val historyRepository = HistoryRepository(Applic.app)
-    
+
     // Track if we've done the initial full sync this session
     @Volatile
     private var initialSyncDone = false
-    
-    // Throttle: don't re-sync more often than every 30 seconds
+
+    // Per-sensor backfill stability tracking.
+    // Key = sensor serial, Value = (lastReadingCount, stableCount).
+    private val sensorStability = HashMap<String, Pair<Int, Int>>()
+    private const val STABLE_THRESHOLD = 2
+    private const val STABLE_GROWTH_TOLERANCE = 2
+
+    // Throttle: don't re-sync more often than every 30 seconds for full syncs,
+    // 15 seconds for incremental
     @Volatile
     private var lastSyncTimeMs = 0L
-    private const val MIN_SYNC_INTERVAL_MS = 30_000L
-    
+    private const val MIN_FULL_SYNC_INTERVAL_MS = 30_000L
+    private const val MIN_INCR_SYNC_INTERVAL_MS = 15_000L
+
     // Incremental overlap: 5 minutes catches any very-recent backfill without
-    // re-processing thousands of readings every call.  The full 24-hour sweep
-    // only happens on forceFullSync() (called after vendor history download).
+    // re-processing thousands of readings every call.
     private const val INCREMENTAL_OVERLAP_MS = 5 * 60 * 1000L
-    
+
     /**
-     * Sync data from native layer to Room.
-     * 
-     * Strategy:
-     * - First call per session: Full sync (fetch ALL data from time 0) to catch old sensor history
-     * - Subsequent calls: Incremental sync (only fetch new data) for performance
-     * 
-     * The DAO uses OnConflictStrategy.IGNORE so duplicates are handled efficiently.
+     * Sync data from native layer to Room for ALL active sensors.
+     *
+     * Adaptive sync strategy per sensor:
+     * - First call per session: Full sync (all data from time 0) for every sensor
+     * - Subsequent calls: Keep doing full syncs per sensor until BLE backfill stabilizes
+     *   (same reading count for [STABLE_THRESHOLD] consecutive full syncs)
+     * - After backfill stabilizes: Switch to incremental sync (only last 5 min overlap)
+     *
+     * The DAO uses IGNORE on the (timestamp, sensorSerial) unique index so duplicates
+     * from full syncs are handled efficiently.
      */
     @JvmOverloads
     fun syncFromNative(forceFull: Boolean = false) {
-        // Throttle: skip if called too frequently (unless it's the first sync or forced)
         val now = System.currentTimeMillis()
-        if (!forceFull && initialSyncDone && (now - lastSyncTimeMs) < MIN_SYNC_INTERVAL_MS) {
+
+        // Determine if ALL sensors have stabilized for throttle interval selection
+        val allStable = sensorStability.values.all { (_, stable) -> stable >= STABLE_THRESHOLD }
+        val minInterval = if (allStable && initialSyncDone) MIN_INCR_SYNC_INTERVAL_MS else MIN_FULL_SYNC_INTERVAL_MS
+
+        // Throttle: skip if called too frequently (unless it's the first sync or forced)
+        if (!forceFull && initialSyncDone && (now - lastSyncTimeMs) < minInterval) {
             return  // too soon, skip
         }
-        
-        scope.launch {
-            try {
-                // Determine start time for fetch
-                val startSec: Long
-                val isFullSync: Boolean
-                
-                if (forceFull || !initialSyncDone) {
-                    // First sync of session OR forced: get ALL data
-                    startSec = 0L
-                    isFullSync = true
-                } else {
-                    // Incremental: only overlap by 5 minutes to pick up very-recent writes.
-                    // Room's OnConflictStrategy.IGNORE handles duplicates; this avoids
-                    // re-fetching and re-inserting thousands of readings on every call.
-                    val lastTimestamp = historyRepository.getLatestTimestamp()
-                    val startMs = if (lastTimestamp > INCREMENTAL_OVERLAP_MS) lastTimestamp - INCREMENTAL_OVERLAP_MS else 0L
-                    startSec = startMs / 1000L
-                    isFullSync = false
+
+        scope.launch { doSyncAllSensors(forceFull) }
+    }
+
+    /**
+     * Sync all active sensors. Iterates [Natives.activeSensors] and syncs each one
+     * via [Natives.getGlucoseHistoryForSensor].
+     */
+    private suspend fun doSyncAllSensors(forceFull: Boolean) {
+        try {
+            val activeSensors = Natives.activeSensors()
+            if (activeSensors == null || activeSensors.isEmpty()) {
+                // No active sensors — try the main sensor as fallback
+                val mainSensor = Natives.lastsensorname()
+                if (mainSensor.isNullOrEmpty()) {
+                    Log.w(TAG, "No active sensors and no main sensor — nothing to sync")
+                    lastSyncTimeMs = 0L
+                    return
                 }
-                
-                val rawHistory = Natives.getGlucoseHistory(startSec)
-                if (rawHistory == null) {
-                    // No data available, but mark initial sync as done
-                    if (isFullSync) initialSyncDone = true
-                    return@launch
+                // Sync just the main sensor
+                doSyncSensor(mainSensor, forceFull)
+            } else {
+                // Sync every active sensor
+                for (serial in activeSensors) {
+                    if (serial.isNullOrEmpty()) continue
+                    doSyncSensor(serial, forceFull)
                 }
-                
-                val readings = mutableListOf<HistoryReading>()
-                
-                for (i in rawHistory.indices step 3) {
-                    if (i + 2 >= rawHistory.size) break
-                    
-                    val timeSec = rawHistory[i]
-                    val timeMs = timeSec * 1000L
-                    
-                    val valueAutoRaw = rawHistory[i + 1]
-                    val valueRawRaw = rawHistory[i + 2]
-                    
-                    // Values from native are in mg/dL * 10
-                    val value = valueAutoRaw / 10f
-                    val rawValue = valueRawRaw / 10f
-                    
-                    // Rate is not available in historical ScanData, only in real-time GlucoseNow
-                    // Leave as null - the database field is nullable
-                    
-                    if (value > 0 || rawValue > 0) {
-                        readings.add(HistoryReading(
-                            timestamp = timeMs,
-                            value = value,
-                            rawValue = rawValue,
-                            rate = null  // ScanData doesn't store rate - only available in real-time
-                        ))
-                    }
-                }
-                
-                if (readings.isNotEmpty()) {
-                    historyRepository.storeReadings(readings)
-                    if (isFullSync) {
-                        Log.d(TAG, "Synced ${readings.size} readings (full)")
-                    }
-                    // Incremental syncs are silent — only log when there's actually new data,
-                    // and that happens inside HistoryRepository/DAO via IGNORE conflict detection.
-                }
-                
-                lastSyncTimeMs = System.currentTimeMillis()
-                
-                // Mark initial sync as complete
-                if (isFullSync) initialSyncDone = true
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error syncing from native", e)
             }
+
+            lastSyncTimeMs = System.currentTimeMillis()
+            if (!initialSyncDone) {
+                initialSyncDone = true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing all sensors: ${e.message}")
         }
     }
-    
+
     /**
-     * Force a full resync.
-     * Useful after sensor data wipe + reconnect.
+     * Sync a single sensor's native data into Room.
+     */
+    private suspend fun doSyncSensor(serial: String, forceFull: Boolean) {
+        try {
+            val (lastCount, stableCount) = sensorStability[serial] ?: Pair(-1, 0)
+            val sensorStable = stableCount >= STABLE_THRESHOLD
+
+            val startSec: Long
+            val isFullSync: Boolean
+
+            if (forceFull || !initialSyncDone || !sensorStable) {
+                // Full sync: first sync, forced, or backfill still in progress for this sensor
+                startSec = 0L
+                isFullSync = true
+            } else {
+                // Backfill done for this sensor: incremental only
+                val latestTs = historyRepository.getLatestTimestampForSensor(serial)
+                val startMs = if (latestTs > INCREMENTAL_OVERLAP_MS) latestTs - INCREMENTAL_OVERLAP_MS else 0L
+                startSec = startMs / 1000L
+                isFullSync = false
+            }
+
+            val rawHistory = Natives.getGlucoseHistoryForSensor(serial, startSec)
+            if (rawHistory == null) {
+                // Sensor not found or no data yet — skip, don't reset state
+                Log.d(TAG, "getGlucoseHistoryForSensor($serial, $startSec) returned null — skipping")
+                return
+            }
+
+            val readings = mutableListOf<HistoryReading>()
+
+            for (i in rawHistory.indices step 3) {
+                if (i + 2 >= rawHistory.size) break
+
+                val timeSec = rawHistory[i]
+                val timeMs = timeSec * 1000L
+
+                val valueAutoRaw = rawHistory[i + 1]
+                val valueRawRaw = rawHistory[i + 2]
+
+                val value = valueAutoRaw / 10f
+                val rawValue = valueRawRaw / 10f
+
+                if (value > 0 || rawValue > 0) {
+                    readings.add(HistoryReading(
+                        timestamp = timeMs,
+                        sensorSerial = serial,
+                        value = value,
+                        rawValue = rawValue,
+                        rate = null
+                    ))
+                }
+            }
+
+            if (readings.isNotEmpty()) {
+                historyRepository.storeReadings(readings)
+                if (isFullSync) {
+                    Log.i(TAG, "Full sync [$serial]: ${readings.size} readings (lastCount=$lastCount, stable=$stableCount)")
+                } else if (readings.size > 10) {
+                    Log.i(TAG, "Incremental sync [$serial]: ${readings.size} readings")
+                }
+            }
+
+            // Track backfill progress per sensor
+            if (isFullSync) {
+                val currentCount = readings.size
+                val growth = if (lastCount >= 0) currentCount - lastCount else Int.MAX_VALUE
+                if (growth in 0..STABLE_GROWTH_TOLERANCE) {
+                    val newStable = stableCount + 1
+                    sensorStability[serial] = Pair(currentCount, newStable)
+                    if (newStable >= STABLE_THRESHOLD) {
+                        Log.i(TAG, "Backfill stabilized [$serial] after $newStable near-stable full syncs ($currentCount readings, growth=$growth)")
+                    }
+                } else {
+                    // New data arrived — reset stability counter for this sensor
+                    sensorStability[serial] = Pair(currentCount, 0)
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing sensor $serial: ${e.message}")
+        }
+    }
+
+    /**
+     * Force a full resync of ALL active sensors.
+     * Useful after vendor history download or sensor data changes.
+     *
+     * Multi-sensor: NO LONGER clears the entire Room DB. Instead, resets sync
+     * state and does a full re-sync for every active sensor. Data from all sensors
+     * coexists via the sensorSerial column. The DAO's IGNORE strategy handles
+     * duplicates efficiently.
      */
     fun forceFullSync() {
-        syncFromNative(forceFull = true)
+        Log.i(TAG, "forceFullSync() called — resetting sync state for all sensors (NO clearAllTables)")
+        lastSyncTimeMs = 0L
+        initialSyncDone = false
+        sensorStability.clear()
+        scope.launch {
+            doSyncAllSensors(forceFull = true)
+        }
+    }
+
+    /**
+     * Force a full resync of a SPECIFIC sensor with DELETE-then-INSERT.
+     *
+     * After localReplay(), the native polls[] have been overwritten with
+     * recalibrated values, but the Room DB still has the OLD values.
+     * Since the DAO uses IGNORE on conflict (timestamp + sensorSerial),
+     * a plain re-sync would silently skip the updated values.
+     *
+     * Fix: DELETE all Room rows for this sensor first, then re-insert from native.
+     * This triggers Room's Flow observers so the chart redraws instantly.
+     */
+    fun forceFullSyncForSensor(serial: String) {
+        Log.i(TAG, "forceFullSyncForSensor($serial) — deleting Room data then re-syncing")
+        sensorStability.remove(serial)
+        lastSyncTimeMs = 0L  // Allow immediate sync
+        scope.launch {
+            // Step 1: Delete existing Room data for this sensor
+            try {
+                historyRepository.deleteForSensor(serial)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting Room data for $serial before resync: ${e.message}")
+            }
+            // Step 2: Re-sync from native (all data for this sensor)
+            doSyncSensor(serial, forceFull = true)
+        }
     }
 }

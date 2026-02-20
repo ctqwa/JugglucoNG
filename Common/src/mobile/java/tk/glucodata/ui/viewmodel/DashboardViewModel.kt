@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 import tk.glucodata.Natives
 import tk.glucodata.data.GlucoseRepository
 import tk.glucodata.data.HistorySync
@@ -104,9 +105,12 @@ class DashboardViewModel(
     /**
      * Called when the app resumes from background.
      * Refreshes data to prevent stale chart state after Home button.
+     * Also updates the sensor serial in GlucoseRepository so flows
+     * re-subscribe to the correct sensor's data.
      */
     fun onResume() {
-        refreshData()
+        glucoseRepository.refreshSensorSerial()
+        refreshData(syncHistory = false)
     }
     private fun startCollection() {
         viewModelScope.launch {
@@ -115,18 +119,21 @@ class DashboardViewModel(
                     val valueToDisplay = if (viewMode.value == 1 || viewMode.value == 3) point.rawValue else point.value
                     _currentGlucose.value = if (valueToDisplay < 30) String.format("%.1f", valueToDisplay) else valueToDisplay.toInt().toString()
                     _currentRate.value = point.rate ?: 0f
-                    
-                    val currentHistory = _glucoseHistory.value
-                    if (currentHistory.isEmpty() || currentHistory.last().timestamp != point.timestamp) {
-                        _glucoseHistory.value = currentHistory + point
-                    }
+                    // Don't append to _glucoseHistory here — the Room Flow in
+                    // startHistoryCollection() handles it. Appending here caused
+                    // a triple-write race (append + 24h Flow + full Flow) that
+                    // triggered redundant full-screen recompositions.
                 }
             }
         }
     }
 
-    fun refreshData() {
+    fun refreshData(syncHistory: Boolean = true) {
         viewModelScope.launch {
+            // Update the sensor serial in GlucoseRepository — if it changed,
+            // all flatMapLatest flows will automatically re-subscribe
+            glucoseRepository.refreshSensorSerial()
+            
             val unitVal = Natives.getunit()
             val isMmol = unitVal == 1
             _unit.value = if (isMmol) "mmol/L" else "mg/dL"
@@ -241,8 +248,10 @@ class DashboardViewModel(
 
             // PERFORMANCE FIX: Sync history asynchronously in background
             // Prevents blocking UI thread on cold start (Back button)
-            viewModelScope.launch {
-                HistorySync.syncFromNative()
+            if (syncHistory) {
+                viewModelScope.launch {
+                    HistorySync.syncFromNative()
+                }
             }
             
             // Note: History is now collected reactively via startHistoryCollection()
@@ -257,34 +266,42 @@ class DashboardViewModel(
                 
                 // TWO-STAGE LOADING for instant UI with full history:
                 // Stage 1: Load last 24h immediately (fast, for instant render)
+                // Stage 2: After first emission, switch to full history and CANCEL stage 1
                 val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
                 
-                // First collect: recent data only (instant)
-                var isFirstLoad = true
-                glucoseRepository.getHistoryFlowRaw(oneDayAgo).collect { rawHistory ->
-                    val converted = rawHistory.map { p ->
-                        val v = if (isMmol) p.value / 18.0182f else p.value
-                        val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
-                        tk.glucodata.ui.GlucosePoint(v, p.time, p.timestamp, r, p.rate)
-                    }
-                    _glucoseHistory.value = converted
-                    _isLoading.value = false
-                    
-                    // Stage 2: After first render, switch to full history (background)
-                    if (isFirstLoad) {
-                        isFirstLoad = false
-                        viewModelScope.launch {
-                            // Switch to loading ALL history
-                            glucoseRepository.getHistoryFlowRaw(0L).collect { fullHistory ->
-                                val fullConverted = fullHistory.map { p ->
+                var stage1Job: kotlinx.coroutines.Job? = null
+                stage1Job = viewModelScope.launch {
+                    var switchedToFull = false
+                    glucoseRepository.getHistoryFlowRaw(oneDayAgo)
+                        .collect { rawHistory ->
+                            if (!switchedToFull) {
+                                // First emission from stage 1: render immediately
+                                val converted = rawHistory.map { p ->
                                     val v = if (isMmol) p.value / 18.0182f else p.value
                                     val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
                                     tk.glucodata.ui.GlucosePoint(v, p.time, p.timestamp, r, p.rate)
                                 }
-                                _glucoseHistory.value = fullConverted
+                                _glucoseHistory.value = converted
+                                _isLoading.value = false
+                                switchedToFull = true
+                                
+                                // Stage 2: Launch full history collector and cancel this one
+                                viewModelScope.launch {
+                                    glucoseRepository.getHistoryFlowRaw(0L)
+                                        .distinctUntilChanged()
+                                        .collect { fullHistory ->
+                                            val fullConverted = fullHistory.map { p ->
+                                                val v = if (isMmol) p.value / 18.0182f else p.value
+                                                val r = if (isMmol) p.rawValue / 18.0182f else p.rawValue
+                                                tk.glucodata.ui.GlucosePoint(v, p.time, p.timestamp, r, p.rate)
+                                            }
+                                            _glucoseHistory.value = fullConverted
+                                        }
+                                }
+                                // Cancel stage 1 — stage 2 now owns _glucoseHistory
+                                stage1Job?.cancel()
                             }
                         }
-                    }
                 }
             }
         }

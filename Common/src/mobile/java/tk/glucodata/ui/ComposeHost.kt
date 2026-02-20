@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
@@ -36,10 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -68,6 +71,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.graphics.RectangleShape
+import tk.glucodata.ui.util.ConnectedButtonGroup
 import tk.glucodata.ui.util.findActivity
 import tk.glucodata.ui.util.hardRestart
 import androidx.compose.ui.graphics.graphicsLayer
@@ -80,6 +84,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.gestures.rememberScrollableState
@@ -89,6 +94,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.AnimatedContent
@@ -142,6 +148,12 @@ import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.outlined.Sensors
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.outlined.Analytics
+import androidx.compose.material.icons.outlined.LegendToggle
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingFlat
@@ -157,10 +169,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import kotlin.math.max
 import kotlin.math.min
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -300,9 +314,34 @@ fun getDisplayValues(
     val rawStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.rawValue, isMmol)
     val valStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.value, isMmol)
     val calStr = calibratedValue?.let { tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol) }
+    val hideInitialWhenCalibrated = calibratedValue != null &&
+        tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
     
     // If calibration is active, it becomes primary and everything shifts down
     if (calibratedValue != null && calStr != null) {
+        if (hideInitialWhenCalibrated) {
+            return when (viewMode) {
+                2 -> DisplayValues( // Auto + Raw → Calibrated primary, Raw secondary
+                    primaryValue = calibratedValue,
+                    secondaryValue = point.rawValue,
+                    primaryStr = calStr,
+                    secondaryStr = rawStr,
+                    fullFormatted = "$calStr · $rawStr $unit"
+                )
+                3 -> DisplayValues( // Raw + Auto → Calibrated primary, Auto secondary
+                    primaryValue = calibratedValue,
+                    secondaryValue = point.value,
+                    primaryStr = calStr,
+                    secondaryStr = valStr,
+                    fullFormatted = "$calStr · $valStr $unit"
+                )
+                else -> DisplayValues(
+                    primaryValue = calibratedValue,
+                    primaryStr = calStr,
+                    fullFormatted = "$calStr $unit"
+                )
+            }
+        }
         return when (viewMode) {
             1 -> DisplayValues( // Raw → Calibrated primary, Raw secondary
                 primaryValue = calibratedValue,
@@ -379,7 +418,12 @@ enum class TimeRange(val label: String, val hours: Int) {
     H6("6H", 6),
     H12("12H", 12),
     H24("24H", 24),
-    D3("3D", 72)
+    D3("3D", 72);
+
+    companion object {
+        fun fromPreference(value: String?): TimeRange =
+            values().firstOrNull { it.name == value } ?: H3
+    }
 }
 
 @Keep
@@ -502,6 +546,8 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
     val glucoseHistory by dashboardViewModel.glucoseHistory.collectAsState()
     val unit by dashboardViewModel.unit.collectAsState()
     val viewMode by dashboardViewModel.viewMode.collectAsState()
+    val targetLow by dashboardViewModel.targetLow.collectAsState()
+    val targetHigh by dashboardViewModel.targetHigh.collectAsState()
     val currentGlucose by dashboardViewModel.currentGlucose.collectAsState()
     
     // Reactive Calibration State
@@ -532,13 +578,14 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
 
     // Navigation Items Logic (Shared)
     // Top-level routes that appear in the navbar
-    val topLevelRoutes = setOf("dashboard", "sensors", "settings")
+    val topLevelRoutes = setOf("dashboard", "stats", "sensors", "settings")
     
     // Map subpages to their parent top-level destination
     fun getParentRoute(route: String?): String? = when {
         route == null -> null
         route.startsWith("settings/") -> "settings"
         route.startsWith("sensors/") -> "sensors"
+        route == "history" -> "dashboard"
         route == "calibrations" -> "dashboard"  // calibrations is a dashboard subpage
         else -> null
     }
@@ -563,7 +610,8 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
     // Define items for use in both Bar and Rail
     data class NavItem(val route: String, val label: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector)
     val navItems = listOf(
-        NavItem("dashboard", stringResource(R.string.dashboard), Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
+        NavItem("stats", stringResource(R.string.statistics_title), Icons.Filled.BarChart, Icons.Outlined.BarChart),
+        NavItem("dashboard", stringResource(R.string.dashboard), Icons.Filled.LegendToggle, Icons.Outlined.LegendToggle),
         NavItem("sensors", stringResource(R.string.sensor), Icons.Filled.Sensors, Icons.Outlined.Sensors),
         NavItem("settings", stringResource(R.string.settings), Icons.Filled.Settings, Icons.Outlined.Settings)
     )
@@ -583,7 +631,9 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                                 isSelected = isSelected,
                                 selectedIcon = item.selectedIcon,
                                 unselectedIcon = item.unselectedIcon,
-                                description = item.label
+                                description = item.label,
+                                isDashboard = item.route == "dashboard",
+                                isStatistics = item.route == "stats"
                             )
                         },
                         label = { Text(item.label) },
@@ -606,12 +656,29 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                             viewModel = dashboardViewModel,
                             calibrations = calibrations,
                             onNavigateToCalibrations = { navController.navigate("calibrations") },
+                            onNavigateToHistory = { navController.navigate("history") },
                             onTriggerCalibration = onTriggerCalibration
                         ) 
                     }
+                    composable("history") {
+                        HistoryBrowseScreen(
+                            glucoseHistory = glucoseHistory,
+                            unit = unit,
+                            viewMode = viewMode,
+                            targetLow = targetLow,
+                            targetHigh = targetHigh,
+                            calibrations = calibrations,
+                            onBack = { navController.popBackStack() },
+                            onPointClick = { point ->
+                                onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
+                            }
+                        )
+                    }
+                    composable("stats") { tk.glucodata.ui.stats.StatsScreen() }
                     composable("sensors") { SensorScreen() }
                     composable("settings") { ExpressiveSettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
                     composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
+                    composable("settings/libreview") { LibreViewSettingsScreen(navController) }
                     composable("settings/mirror") { MirrorSettingsScreen(navController) }
                     composable("settings/mirror/edit/{pos}") { backStackEntry ->
                         val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
@@ -619,6 +686,24 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     }
                     composable("settings/debug") { DebugSettingsScreen(navController) }
                     composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
+                    composable("settings/calibrations") {
+                        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
+                        val viewMode by dashboardViewModel.viewMode.collectAsState()
+                        tk.glucodata.ui.calibration.CalibrationListScreen(
+                            navController = navController,
+                            isMmol = isMmol,
+                            viewMode = viewMode,
+                            onAdd = {
+                                val latest = glucoseHistory.firstOrNull()
+                                val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                                val rawVal = latest?.rawValue ?: autoVal
+                                onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
+                            },
+                            onEdit = { entity ->
+                                onTriggerCalibration(CalibrationSheetState.Edit(entity))
+                            }
+                        )
+                    }
                     composable("calibrations") { 
                         val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
                         val viewMode by dashboardViewModel.viewMode.collectAsState()
@@ -656,7 +741,9 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                                     isSelected = isSelected,
                                     selectedIcon = item.selectedIcon,
                                     unselectedIcon = item.unselectedIcon,
-                                    description = item.label
+                                    description = item.label,
+                                    isDashboard = item.route == "dashboard",
+                                    isStatistics = item.route == "stats"
                                 )
                             },
                             label = { Text(item.label) },
@@ -681,13 +768,31 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("dashboard") { 
                     DashboardScreen(
                         viewModel = dashboardViewModel, 
+                        calibrations = calibrations,
                         onNavigateToCalibrations = { navController.navigate("calibrations") },
+                        onNavigateToHistory = { navController.navigate("history") },
                         onTriggerCalibration = onTriggerCalibration
                     ) 
                 }
+                composable("history") {
+                    HistoryBrowseScreen(
+                        glucoseHistory = glucoseHistory,
+                        unit = unit,
+                        viewMode = viewMode,
+                        targetLow = targetLow,
+                        targetHigh = targetHigh,
+                        calibrations = calibrations,
+                        onBack = { navController.popBackStack() },
+                        onPointClick = { point ->
+                            onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
+                        }
+                    )
+                }
+                composable("stats") { tk.glucodata.ui.stats.StatsScreen() }
                 composable("sensors") { SensorScreen() }
                 composable("settings") { ExpressiveSettingsScreen(navController, themeMode, onThemeChanged, dashboardViewModel) }
                 composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
+                composable("settings/libreview") { LibreViewSettingsScreen(navController) }
                 composable("settings/mirror") { MirrorSettingsScreen(navController) }
                 composable("settings/mirror/edit/{pos}") { backStackEntry ->
                     val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
@@ -695,6 +800,24 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 }
                 composable("settings/debug") { DebugSettingsScreen(navController) }
                 composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
+                composable("settings/calibrations") {
+                    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
+                    val viewMode by dashboardViewModel.viewMode.collectAsState()
+                    tk.glucodata.ui.calibration.CalibrationListScreen(
+                        navController = navController,
+                        isMmol = isMmol,
+                        viewMode = viewMode,
+                        onAdd = {
+                            val latest = glucoseHistory.firstOrNull()
+                            val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                            val rawVal = latest?.rawValue ?: autoVal
+                            onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
+                        },
+                        onEdit = { entity ->
+                            onTriggerCalibration(CalibrationSheetState.Edit(entity))
+                        }
+                    )
+                }
                 composable("calibrations") { 
                     val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
                     val viewMode by dashboardViewModel.viewMode.collectAsState()
@@ -748,14 +871,33 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = viewModel(),
     calibrations: List<tk.glucodata.data.calibration.CalibrationEntity> = emptyList(),
     onNavigateToCalibrations: () -> Unit = {},
+    onNavigateToHistory: () -> Unit = {},
     onTriggerCalibration: (CalibrationSheetState) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val dashboardPrefs = remember(context) {
+        context.getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+    }
+    var timeRange by rememberSaveable {
+        mutableStateOf(
+            TimeRange.fromPreference(
+                dashboardPrefs.getString("dashboard_chart_time_range", TimeRange.H3.name)
+            )
+        )
+    }
+    LaunchedEffect(timeRange) {
+        dashboardPrefs.edit().putString("dashboard_chart_time_range", timeRange.name).apply()
+    }
+    var hasHandledInitialResume by rememberSaveable { mutableStateOf(false) }
 
     // This runs every time the Activity/Fragment/Screen hits the ON_RESUME state
     // PERFORMANCE FIX: Refreshes stale data after Home button to prevent chart issues
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        viewModel.onResume()
+        if (hasHandledInitialResume) {
+            viewModel.onResume()
+        } else {
+            hasHandledInitialResume = true
+        }
     }
 
     val currentGlucose by viewModel.currentGlucose.collectAsState()
@@ -784,7 +926,8 @@ fun DashboardScreen(
     var showSibionicsWizard by remember { mutableStateOf(false) }
     var showLibreWizard by remember { mutableStateOf(false) }
     var showDexcomWizard by remember { mutableStateOf(false) }
-    
+    var showAccuChekWizard by remember { mutableStateOf(false) }
+    var showCareSensAirWizard by remember { mutableStateOf(false) }
     var showAiDexWizard by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -797,10 +940,18 @@ fun DashboardScreen(
             coroutineScope.launch {
                 val result = tk.glucodata.data.HistoryExporter.importFromCsv(context, uri)
                 if (result.success) {
-                    android.widget.Toast.makeText(context, "Imported ${result.successCount} readings", android.widget.Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.imported_readings_count, result.successCount),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                     viewModel.refreshData()
                 } else {
-                    android.widget.Toast.makeText(context, "Import failed: ${result.errorMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.import_failed_with_error, result.errorMessage ?: ""),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -842,6 +993,30 @@ fun DashboardScreen(
         return
     }
 
+    // Accu-Chek Setup Wizard
+    if (showAccuChekWizard) {
+        tk.glucodata.ui.setup.AccuChekSetupWizard(
+            onDismiss = { showAccuChekWizard = false },
+            onScan = {
+                tk.glucodata.MainActivity.launchQrScan()
+                showAccuChekWizard = false
+            }
+        )
+        return
+    }
+
+    // CareSens Air Setup Wizard
+    if (showCareSensAirWizard) {
+        tk.glucodata.ui.setup.CareSensAirSetupWizard(
+            onDismiss = { showCareSensAirWizard = false },
+            onScan = {
+                tk.glucodata.MainActivity.launchQrScan()
+                showCareSensAirWizard = false
+            }
+        )
+        return
+    }
+
     // AiDex Setup Wizard
     if (showAiDexWizard) {
         tk.glucodata.ui.setup.AiDexSetupWizard(
@@ -865,6 +1040,62 @@ fun DashboardScreen(
         val latestPoint = remember(glucoseHistory) { glucoseHistory.maxByOrNull { it.timestamp } }
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val isCompactScreen = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+        val listState = rememberLazyListState()
+        val collapseDistancePx = with(LocalDensity.current) { 220.dp.toPx() }
+        val collapseFraction by remember(listState, collapseDistancePx, isLandscape) {
+            derivedStateOf {
+                if (isLandscape) {
+                    1f
+                } else if (listState.firstVisibleItemIndex > 0) {
+                    1f
+                } else {
+                    (listState.firstVisibleItemScrollOffset / collapseDistancePx).coerceIn(0f, 1f)
+                }
+            }
+        }
+        var isChartExpanded by remember(isLandscape) { mutableStateOf(!isLandscape) }
+        LaunchedEffect(collapseFraction, isLandscape) {
+            if (isLandscape) {
+                isChartExpanded = false
+            } else {
+                isChartExpanded = if (isChartExpanded) {
+                    collapseFraction < 0.72f
+                } else {
+                    collapseFraction < 0.48f
+                }
+            }
+        }
+        val expandedProgressTarget = if (isLandscape) 0f else (1f - collapseFraction).coerceIn(0f, 1f)
+        val expandedProgress by animateFloatAsState(
+            targetValue = expandedProgressTarget,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "DashboardExpandedProgress"
+        )
+        val contentHorizontalPadding = if (isCompactScreen) 12.dp else 16.dp
+        val contentGap = if (isCompactScreen) 12.dp else 16.dp
+        val portraitChartMaxHeight = remember(configuration.screenHeightDp, isCompactScreen) {
+            // Compact screens: protect list visibility.
+            // Larger/high-DPI screens: allow fuller chart without reverting to full-screen dominance.
+            val targetFraction = if (isCompactScreen) 0.545f else 0.585f
+            val minHeight = if (isCompactScreen) 420.dp else 380.dp
+            val maxHeight = if (isCompactScreen) 520.dp else 520.dp
+            (configuration.screenHeightDp * targetFraction).dp.coerceIn(minHeight, maxHeight)
+        }
+        val portraitExpandedChartHeight = remember(configuration.screenHeightDp, isCompactScreen) {
+            val targetFraction = if (isCompactScreen) 0.54f else 0.58f
+            val minHeight = if (isCompactScreen) 316.dp else 446.dp
+            val maxHeight = if (isCompactScreen) 472.dp else 560.dp
+            val baseExpanded = (configuration.screenHeightDp * targetFraction).dp.coerceIn(minHeight, maxHeight)
+            val reservedForHeader = if (isCompactScreen) 138.dp else 104.dp
+            val reservedForReadings = if (isCompactScreen) 170.dp else 88.dp
+            val maxHeightForRows = (configuration.screenHeightDp.dp - reservedForHeader - reservedForReadings)
+                .coerceAtLeast(if (isCompactScreen) 280.dp else 312.dp)
+            minOf(baseExpanded, maxHeightForRows)
+        }
 
         // --- REUSABLE UI SECTIONS ---
 
@@ -882,9 +1113,6 @@ fun DashboardScreen(
             } else null
         }
 
-        // Dashboard State
-        var timeRange by rememberSaveable { mutableStateOf(TimeRange.H3) } // Default to 3 Hours
-
         // --- LAYOUT LOGIC ---
         
         // Empty state check
@@ -897,13 +1125,16 @@ fun DashboardScreen(
                         tk.glucodata.ui.components.SensorType.SIBIONICS -> showSibionicsWizard = true
                         tk.glucodata.ui.components.SensorType.LIBRE -> showLibreWizard = true
                         tk.glucodata.ui.components.SensorType.DEXCOM -> showDexcomWizard = true
+                        tk.glucodata.ui.components.SensorType.ACCUCHEK -> showAccuChekWizard = true
+                        tk.glucodata.ui.components.SensorType.CARESENS_AIR -> showCareSensAirWizard = true
                         tk.glucodata.ui.components.SensorType.AIDEX -> showAiDexWizard = true
                     }
                 },
                 onImportHistory = {
                     importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*"))
                 },
-                modifier = Modifier.padding(padding)
+                modifier = Modifier
+                    .padding(padding)
             )
         } else if (isLandscape) {
             // LANDSCAPE: SPLIT VIEW
@@ -911,8 +1142,8 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 16.dp), // Check inset handling
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = contentHorizontalPadding),
+                horizontalArrangement = Arrangement.spacedBy(contentGap)
             ) {
                 // Left Pane: Status + Info + History (Scrollable)
                 LazyColumn(
@@ -948,7 +1179,8 @@ fun DashboardScreen(
                         RecentReadingsCard(
                             recentReadings = recentReadings,
                             unit = unit,
-                            viewMode = viewMode
+                            viewMode = viewMode,
+                            onViewHistory = onNavigateToHistory
                         ) { index, item ->
                             ReadingRow(
                                 point = item,
@@ -981,6 +1213,9 @@ fun DashboardScreen(
                         viewMode = viewMode,
                         onTimeRangeSelected = { timeRange = it },
                         selectedTimeRange = timeRange,
+                        isExpanded = false,
+                        expandedProgress = 0f,
+                        onToggleExpanded = null,
                         onPointClick = { point -> 
                             onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
                         },
@@ -998,96 +1233,185 @@ fun DashboardScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp), // Gap between Header, Chart, History
-                contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
+                    .padding(padding),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 12.dp)
             ) {
                  item {
-                    DashboardCombinedHeader(
-                        currentGlucose = currentGlucose,
-                        currentRate = currentRate,
-                        viewMode = viewMode,
-                        latestPoint = latestPoint,
-                        sensorName = sensorName,
-                        daysRemaining = daysRemaining,
-                        activeSensors = activeSensorList,
-                        sensorStatus = sensorStatus,
-                        sensorProgress = sensorProgress,
-                        sensorHoursRemaining = sensorHoursRemaining,
-                        currentDay = currentDay,
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        DashboardCombinedHeader(
+                            currentGlucose = currentGlucose,
+                            currentRate = currentRate,
+                            viewMode = viewMode,
+                            latestPoint = latestPoint,
+                            sensorName = sensorName,
+                            daysRemaining = daysRemaining,
+                            activeSensors = activeSensorList,
+                            sensorStatus = sensorStatus,
+                            sensorProgress = sensorProgress,
+                            sensorHoursRemaining = sensorHoursRemaining,
+                            currentDay = currentDay,
                             history = glucoseHistory, // Advanced Trend
                             calibratedValue = calibratedValue,
                             isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onHeroClick = {
-                            val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
-                            val rawVal = latestPoint?.rawValue ?: autoVal
-                            onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
-                        }
-                    )
+                                val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                                val rawVal = latestPoint?.rawValue ?: autoVal
+                                onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
+                            }
+                        )
+                    }
                 }
 
                 item {
                     // Portrait Chart: Flexible height
-                    DashboardChartSection(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 560.dp),
-                        glucoseHistory = glucoseHistory,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
-                        unit = unit,
-                        calibrations = calibrations,
-                        viewMode = viewMode,
-                        onTimeRangeSelected = { timeRange = it },
-                        selectedTimeRange = timeRange,
-                        onPointClick = { point -> 
-                            onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
-                        },
-                        onCalibrationClick = { cal ->
-                            onTriggerCalibration(CalibrationSheetState.Edit(cal))
-                        }
+                    val chartHeightCapTarget = (
+                        portraitExpandedChartHeight.value +
+                            (portraitChartMaxHeight.value - portraitExpandedChartHeight.value) * collapseFraction
+                        ).dp
+                    val expandedMinHeight = if (isCompactScreen) 272.dp else 296.dp
+                    val chartMinHeightTarget = (
+                        expandedMinHeight.value +
+                            (200.dp.value - expandedMinHeight.value) * collapseFraction
+                        ).dp
+                    val chartHorizontalPaddingTarget = (16f * collapseFraction).dp
+                    val chartUnderlayTopTarget = 0.dp
+                    val chartUnderlayBottomTarget = ((if (isCompactScreen) 120f else 168f) * expandedProgress).dp
+                    val animatedChartHeightCap by animateDpAsState(
+                        targetValue = chartHeightCapTarget,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "DashboardChartHeightCap"
                     )
+                    val animatedChartMinHeight by animateDpAsState(
+                        targetValue = chartMinHeightTarget,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "DashboardChartMinHeight"
+                    )
+                    val animatedChartHorizontalPadding by animateDpAsState(
+                        targetValue = chartHorizontalPaddingTarget,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "DashboardChartHorizontalPadding"
+                    )
+                    val animatedChartUnderlayTop by animateDpAsState(
+                        targetValue = chartUnderlayTopTarget,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "DashboardChartUnderlayTop"
+                    )
+                    val animatedChartUnderlayBottom by animateDpAsState(
+                        targetValue = chartUnderlayBottomTarget,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "DashboardChartUnderlayBottom"
+                    )
+                    val chartUnderlayTopPx = with(LocalDensity.current) { animatedChartUnderlayTop.roundToPx() }
+                    val chartUnderlayBottomPx = with(LocalDensity.current) { animatedChartUnderlayBottom.roundToPx() }
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = animatedChartHorizontalPadding.coerceAtLeast(0.dp))
+                    ) {
+                        DashboardChartSection(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(
+                                    min = animatedChartMinHeight + animatedChartUnderlayTop + animatedChartUnderlayBottom,
+                                    max = animatedChartHeightCap + animatedChartUnderlayTop + animatedChartUnderlayBottom
+                                )
+                                .then(
+                                    if (chartUnderlayTopPx > 0 || chartUnderlayBottomPx > 0) {
+                                        Modifier.layout { measurable, constraints ->
+                                            val placeable = measurable.measure(constraints)
+                                            val consumedHeight = (placeable.height - chartUnderlayTopPx - chartUnderlayBottomPx).coerceAtLeast(0)
+                                            layout(placeable.width, consumedHeight) {
+                                                placeable.placeRelative(0, -chartUnderlayTopPx)
+                                            }
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .padding(bottom = 0.dp),
+
+                            glucoseHistory = glucoseHistory,
+                            targetLow = targetLow,
+                            targetHigh = targetHigh,
+                            unit = unit,
+                            calibrations = calibrations,
+                            viewMode = viewMode,
+                            onTimeRangeSelected = { timeRange = it },
+                            selectedTimeRange = timeRange,
+                            isExpanded = isChartExpanded,
+                            expandedProgress = expandedProgress,
+                            onToggleExpanded = null,
+                            onPointClick = { point ->
+                                onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
+                            },
+                            onCalibrationClick = { cal ->
+                                onTriggerCalibration(CalibrationSheetState.Edit(cal))
+                            }
+                        )
+                    }
                 }
 
 
                 item {
-                    RecentReadingsCard(
-                        recentReadings = recentReadings,
-                        unit = unit,
-                        viewMode = viewMode
-                    ) { index, item ->
-                        ReadingRow(
-                            point = item,
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        RecentReadingsCard(
+                            recentReadings = recentReadings,
                             unit = unit,
                             viewMode = viewMode,
-                            index = index,
-                            totalCount = recentReadings.size,
-                            history = recentReadings,
-                            calibrations = calibrations,
-                            modifier = Modifier
-                                .animateItem()
-                                .clickable { 
-                                    onTriggerCalibration(CalibrationSheetState.New(item.value, item.rawValue, item.timestamp)) 
-                                }
-                        )
+                            onViewHistory = onNavigateToHistory
+                        ) { index, item ->
+                            ReadingRow(
+                                point = item,
+                                unit = unit,
+                                viewMode = viewMode,
+                                index = index,
+                                totalCount = recentReadings.size,
+                                history = recentReadings,
+                                calibrations = calibrations,
+                                modifier = Modifier
+                                    .animateItem()
+                                    .clickable {
+                                        onTriggerCalibration(CalibrationSheetState.New(item.value, item.rawValue, item.timestamp))
+                                    }
+                            )
+                        }
                     }
                 }
 
                 // Calibrations Card
                 item {
-                    CalibrationsCard(
-                        viewMode = viewMode,
-                        isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
-                        onAddCalibration = {
-                            val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
-                            val rawVal = latestPoint?.rawValue ?: autoVal
-                            onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
-                        },
-                        onEditCalibration = { cal ->
-                            onTriggerCalibration(CalibrationSheetState.Edit(cal))
-                        },
-                        onViewHistory = onNavigateToCalibrations,
-                        snackbarHostState = snackbarHostState
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        CalibrationsCard(
+                            viewMode = viewMode,
+                            isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
+                            onAddCalibration = {
+                                val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                                val rawVal = latestPoint?.rawValue ?: autoVal
+                                onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
+                            },
+                            onEditCalibration = { cal ->
+                                onTriggerCalibration(CalibrationSheetState.Edit(cal))
+                            },
+                            onViewHistory = onNavigateToCalibrations,
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
                 }
             }
         }
@@ -1096,1492 +1420,6 @@ fun DashboardScreen(
 }
 
 // --- EXTRACTED COMPONENTS (Performance Optimization) ---
-
-
-
-@Composable
-fun DashboardChartSection(
-    modifier: Modifier,
-    glucoseHistory: List<GlucosePoint>,
-    targetLow: Float,
-    targetHigh: Float,
-    unit: String,
-    viewMode: Int,
-    onTimeRangeSelected: (TimeRange) -> Unit,
-    selectedTimeRange: TimeRange,
-    calibrations: List<tk.glucodata.data.calibration.CalibrationEntity> = emptyList(),
-    onPointClick: ((GlucosePoint) -> Unit)? = null,
-    onCalibrationClick: ((tk.glucodata.data.calibration.CalibrationEntity) -> Unit)? = null
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        )
-    ) {
-        Column(modifier = Modifier.padding(bottom = 0.dp)) {
-             Box(modifier = Modifier.weight(1f)) {
-                if (glucoseHistory.isNotEmpty()) {
-                    InteractiveGlucoseChart(
-                        fullData = glucoseHistory,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
-                        unit = unit,
-                        viewMode = viewMode,
-                        calibrations = calibrations,
-                        selectedTimeRange = selectedTimeRange,
-                        onPointClick = onPointClick,
-                        onCalibrationClick = onCalibrationClick
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.no_data_available)) }
-                }
-                }
-    }
-}
-}
-
-@SuppressLint("UnusedBoxWithConstraintsScope")
-@Composable
-fun InteractiveGlucoseChart(
-    fullData: List<GlucosePoint>,
-    targetLow: Float,
-    targetHigh: Float,
-    unit: String,
-    viewMode: Int = 0,
-    calibrations: List<tk.glucodata.data.calibration.CalibrationEntity> = emptyList(),
-    onDateSelected: (Long) -> Unit = {},
-    selectedTimeRange: TimeRange? = null,
-    onPointClick: ((GlucosePoint) -> Unit)? = null,
-    onCalibrationClick: ((tk.glucodata.data.calibration.CalibrationEntity) -> Unit)? = null
-) {
-    // --- THEME & PAINTS ---
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-    val tertiaryColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f) // Lighter shade for 3rd line
-    val pointColor = MaterialTheme.colorScheme.onSurface
-    val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-    // 1. Select the correct Material Green shade (300 for Dark, 700 for Light)
-    val isDark = isSystemInDarkTheme()
-    val materialGreen = if (isDark) Color(0xFF81C784) else Color(0xFF388E3C)
-    // 2. Apply "Container" level opacity (0.12f is standard for M3 highlights)
-    val targetBandColor = materialGreen.copy(alpha = 0.12f)
-//    val targetBandColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-    val hoverLineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-    val minMaxLineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-
-    val context = LocalContext.current
-    val density = context.resources.displayMetrics.density
-    
-    val graphFont = remember(context) {
-        ResourcesCompat.getFont(context, R.font.ibm_plex_sans_var)
-    }
-    val graphFontBold = remember(graphFont) {
-        if (graphFont != null) android.graphics.Typeface.create(graphFont, android.graphics.Typeface.BOLD) else android.graphics.Typeface.DEFAULT_BOLD
-    }
-
-    // Paints
-    val axisTextPaint = remember(graphFont) {
-        android.graphics.Paint().apply {
-            color = android.graphics.Color.GRAY
-            textSize = 10f * density
-            textAlign = android.graphics.Paint.Align.LEFT
-            typeface = graphFont
-        }
-    }
-    val xTextPaint = remember(graphFont) {
-        android.graphics.Paint().apply {
-            color = android.graphics.Color.GRAY
-            textSize = 10f * density
-            textAlign = android.graphics.Paint.Align.CENTER
-            typeface = graphFont
-        }
-    }
-
-
-    // --- ONE-TIME INIT ---
-    // Ensure Fast Random Access for the drawing loop (critical for performance)
-    val safeData = remember(fullData) {
-        if (fullData is java.util.RandomAccess) fullData else ArrayList(fullData)
-    }
-
-    // --- FORMATTERS & TOOLS (Hoisted for Performance) ---
-    val cal = remember { java.util.Calendar.getInstance() }
-    val formatTime = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
-    val formatDate = remember { java.text.SimpleDateFormat("EEE dd", java.util.Locale.getDefault()) }
-
-    // Reusable objects to avoid allocation on every frame
-    val reusablePath = remember { Path() }
-    val reusableDate = remember { java.util.Date() }
-
-    // Hoist intervals array to avoid allocation in Canvas loop
-    val gridIntervals = remember {
-        longArrayOf(
-            15 * 60 * 1000L,     // 15m
-            30 * 60 * 1000L,     // 30m
-            60 * 60 * 1000L,     // 1h
-            2 * 60 * 60 * 1000L, // 2h
-            4 * 60 * 60 * 1000L, // 4h
-            6 * 60 * 60 * 1000L, // 6h
-            12 * 60 * 60 * 1000L,// 12h
-            24 * 60 * 60 * 1000L // 24h
-        )
-    }
-
-    // Hoisted PathEffect for dashed lines (Zero-Allocation)
-    val dashEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f) }
-
-    // Label Cache to avoid SimpleDateFormat overhead during scroll
-    // Maps Timestamp -> Formatted String
-    val labelCache = remember { mutableMapOf<Long, String>() }
-
-    // --- VIEWPORT STATE ---
-    // ... (rest of viewport state)
-
-
-    // --- VIEWPORT STATE ---
-    val now = System.currentTimeMillis()
-    val latestDataTimestamp = safeData.lastOrNull()?.timestamp ?: 0L
-    val earliestDataTimestamp = safeData.firstOrNull()?.timestamp ?: 0L
-
-    var lastAutoScrolledTimestamp by rememberSaveable { mutableLongStateOf(0L) }
-    // Jitter fix: Track the auto-scroll job to cancel it on user interaction
-    var autoScrollJob by remember { mutableStateOf<Job?>(null) }
-    var visibleDuration by rememberSaveable { mutableLongStateOf(3L * 60 * 60 * 1000) }
-    var preZoomDuration by rememberSaveable { mutableLongStateOf(0L) } // For toggle zoom
-    var centerTime by rememberSaveable { mutableLongStateOf(now - visibleDuration / 2) }
-
-    // Date picker state
-    var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = centerTime,
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                // Only allow selecting dates we have data for
-                return utcTimeMillis >= earliestDataTimestamp && utcTimeMillis <= now
-            }
-        }
-    )
-
-    // Auto-scroll logic: Only jump if we are already "near" the end (monitor mode)
-    // or if this is the first load.
-    // Auto-scroll logic: Only jump if we are explicitly RESUMED (Active)
-
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var isResumed by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
-
-    // Flag to detect immediate Resume/Startup so we can FORCE snap to latest
-    // (ignoring the 1h check initially) as per User Request.
-    var justResumed by remember { mutableStateOf(true) }
-
-    // TRACKING INACTIVITY FOR GRAPH RESET
-    // Fix: If app is backgrounded for a long time (e.g. overnight), the saved graph state
-    // (centerTime, visibleDuration) becomes stale and "borked".
-    // We implement a 10-minute timeout: if resumed after >10 mins, reset graph state.
-    var lastActiveTime by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                isResumed = true
-                justResumed = true
-
-                val currentTime = System.currentTimeMillis()
-                // Check for 10-minute timeout (10 * 60 * 1000 = 600000 ms)
-                if (currentTime - lastActiveTime > 600000) {
-                    // TIMEOUT EXCEEDED: Reset Graph State
-                    // Only reset if we have valid data to snap to, otherwise wait for data load
-                    if (latestDataTimestamp > 0) {
-                        visibleDuration = 3L * 60 * 60 * 1000 // Default 3h
-                        lastAutoScrolledTimestamp = 0L // Reset auto-scroll memory
-                        centerTime = latestDataTimestamp - visibleDuration / 2 // Snap to live
-                    }
-                }
-            }
-            else if (event == Lifecycle.Event.ON_PAUSE) {
-                isResumed = false
-                lastActiveTime = System.currentTimeMillis() // Save time on pause
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    // React to Time Range Selection (User Request)
-    // If external time range changes, we snap visibleDuration to it and center on latest.
-    LaunchedEffect(selectedTimeRange) {
-        selectedTimeRange?.let { range ->
-            val newDuration = range.hours * 60 * 60 * 1000L
-            if (visibleDuration != newDuration) {
-                visibleDuration = newDuration
-                // Snap to latest data when changing range for immediate feedback
-                if (latestDataTimestamp > 0) {
-                     centerTime = latestDataTimestamp - visibleDuration / 2
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(latestDataTimestamp, isResumed) {
-        if (isResumed && latestDataTimestamp > lastAutoScrolledTimestamp) {
-            val currentEnd = centerTime + visibleDuration / 2
-
-            // Robust Logic:
-            // 1. If we JUST Resumed (or started), we force snap (User: "exited via Home... regardless of 1h").
-            // 2. If we are Active/Monitoring (last update was recent), we snap.
-            // 3. If we are Active but viewing History (dist > 1h), we STAY PUT.
-
-            val dist = kotlin.math.abs(lastAutoScrolledTimestamp - currentEnd)
-            val isMonitoring = lastAutoScrolledTimestamp == 0L || dist < 60 * 60 * 1000
-
-            if (justResumed || isMonitoring) {
-                centerTime = latestDataTimestamp - visibleDuration / 2
-            }
-            lastAutoScrolledTimestamp = latestDataTimestamp
-
-            // Clear flag after processing the "Resume" frame
-            justResumed = false
-        }
-    }
-
-    // --- Y-AXIS STATE (Manual Scaling) ---
-    // Adaptive Scaling Logic (User Request)
-    // Defaults: mmol/L: 1.5 - 14.0 | mg/dL: 27 - 250
-    // "Robust" Expansion: Only expand if > 3 points exceed the range (ignores single spikes).
-    // DYNAMIC SCALING: Y-axis adapts to visible data with smooth animations.
-
-    val isMmol = if (unit.isNotEmpty()) tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit) else tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
-    val defaultMin = if (isMmol) 1.5f else 27f
-    val defaultMax = if (isMmol) 14f else 250f
-
-    // --- Y-AXIS SCALING ---
-    // Simple, stable approach: rememberSaveable so it survives recomposition
-    // User can manually adjust via gestures, values persist
-    var yMin by rememberSaveable { mutableFloatStateOf(defaultMin) }
-    var yMax by rememberSaveable { mutableFloatStateOf(defaultMax) }
-
-    // --- INTERACTION STATE ---
-    var selectedPoint by remember { mutableStateOf<GlucosePoint?>(null) }
-    var isScrubbing by remember { mutableStateOf(false) } // Touching the line?
-
-    // Auto-dismiss selection if off-screen (User Request)
-    LaunchedEffect(centerTime, visibleDuration, selectedPoint) {
-        selectedPoint?.let { p ->
-            val start = centerTime - visibleDuration / 2
-            val end = centerTime + visibleDuration / 2
-            // Allow a small buffer so it doesn't flicker on edge
-            if (p.timestamp < start || p.timestamp > end) {
-                selectedPoint = null
-            }
-        }
-    }
-
-    // Physics / Animation
-    val coroutineScope = rememberCoroutineScope()
-    val velocityTracker = remember { VelocityTracker() }
-    val inertiaAnim = remember { Animatable(0f) }
-
-    // Limits
-    val minDuration = 10L * 60 * 1000
-    val maxDuration = 72L * 60 * 60 * 1000
-    val maxAllowedTime = System.currentTimeMillis() + (2 * 60 * 60 * 1000)
-
-    // --- DATA CAPTURE FOR GESTURES ---
-    // Use rememberUpdatedState to ensure the running gesture coroutine always sees the latest data
-    val currentSafeData by rememberUpdatedState(safeData)
-    val currentViewMode by rememberUpdatedState(viewMode)
-    val curYMin by rememberUpdatedState(yMin)
-    val curYMax by rememberUpdatedState(yMax)
-    val currentCenterTime by rememberUpdatedState(centerTime)
-    val currentVisibleDuration by rememberUpdatedState(visibleDuration)
-
-    // --- DATA HELPER (Fixed Interpolation) ---
-    fun getPointAt(timeAtTapRaw: Double): GlucosePoint? {
-        val data = currentSafeData // Always use fresh data
-        val minuteInMillis = 60000.0
-        val snappedTime = (kotlin.math.round(timeAtTapRaw / minuteInMillis) * minuteInMillis).toLong()
-
-        // Manual Binary Search (Zero-Allocation)
-        var low = 0
-        var high = data.size - 1
-        var idx = -1
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val midVal = data[mid].timestamp
-            if (midVal < snappedTime) low = mid + 1
-            else if (midVal > snappedTime) high = mid - 1
-            else { idx = mid; break }
-        }
-        // If exact match not found, we use 'low' as insertion point (-idx - 1 logic)
-        // binarySearch returns: index of the search key, if it is contained in the list; otherwise, (-(insertion point) - 1).
-        // Since we did manual, if not found, 'idx' is -1. The standard equivalent would be... we just need nearest.
-
-        if (idx >= 0) return data[idx]
-
-        // Find closest neighbor
-        // 'low' should be the insertion point
-        val insPoint = low
-
-        if (insPoint >= data.size) return data.lastOrNull()
-        if (insPoint <= 0) return data.firstOrNull()
-
-        val p1 = data[insPoint - 1]
-        val p2 = data[insPoint]
-        return if (kotlin.math.abs(p1.timestamp - snappedTime) < kotlin.math.abs(p2.timestamp - snappedTime)) p1 else p2
-    }
-
-
-
-
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .pointerInput(Unit) {
-                    // Manual Gesture Handler for:
-                    // 1. Pan / Inertia
-                    // 2. Pinch Zoom
-                    // 3. One-Finger Zoom (Double-Tap + Drag)
-                    // 4. Tap to Select
-
-                    var lastGestureWasTap = false
-                    var lastTapTime = 0L
-                    var lastTapPos = Offset.Zero
-
-                    awaitEachGesture {
-                        // Cancel any active auto-scroll (e.g. "Back to Now") immediately on touch
-                        // This prevents the animation from fighting with manual scroll (jitter fix)
-                        val down = awaitFirstDown(requireUnconsumed = true)
-                        autoScrollJob?.cancel()
-                        autoScrollJob = null
-
-                        // STRICT DOUBLE TAP DETECTION
-                        // Only trigger if:
-                        // 1. Previous gesture was a tap (not a scroll)
-                        // 2. Short duration since then (<300ms)
-                        // 3. Close spatial proximity (<100px)
-                        val now = System.currentTimeMillis()
-                        val isDoubleTapStart = lastGestureWasTap &&
-                                (now - lastTapTime < 300) &&
-                                (down.position - lastTapPos).getDistance() < 100.dp.toPx()
-
-                        var isOneFingerZoom = isDoubleTapStart
-
-                        // Kill inertia
-                        coroutineScope.launch { inertiaAnim.snapTo(0f) }
-                        velocityTracker.resetTracking()
-
-                        // --- HIT TEST (Hit Logic reused) ---
-                        val width = size.width.toFloat()
-                        val height = size.height.toFloat()
-                        val chartHeight = height - 30.dp.toPx()
-                        val viewportStart = currentCenterTime - currentVisibleDuration / 2
-                        val timeAtTouch = viewportStart + ((down.position.x / width).toDouble() * currentVisibleDuration)
-                        val pointAtTouch = getPointAt(timeAtTouch)
-                        var touchThreshold = 35.dp.toPx()
-
-                        // Only allow scrubbing if purely single tap start (not double tap sequence)
-                        isScrubbing = if (pointAtTouch != null && !isOneFingerZoom) {
-                            val timeDiff = timeAtTouch - pointAtTouch.timestamp
-                            if (timeDiff > 15 * 60 * 1000) false else {
-                                // When calibration is on and is primary, use calibrated value for touch target
-                                val isRawMode = currentViewMode == 1 || currentViewMode == 3
-                                val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawMode)
-                                val v = if (hasCalibration) {
-                                    val baseV = if (isRawMode) pointAtTouch.rawValue else pointAtTouch.value
-                                    tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseV, pointAtTouch.timestamp, isRawMode)
-                                } else if (isRawMode) {
-                                    pointAtTouch.rawValue
-                                } else {
-                                    pointAtTouch.value
-                                }
-                                val dataY = chartHeight - ((v - curYMin) / (curYMax - curYMin)) * chartHeight
-                                abs(down.position.y - dataY) < touchThreshold
-                            }
-                        } else {
-                            false
-                        }
-
-                        if (isScrubbing) {
-                            selectedPoint = pointAtTouch
-                        }
-
-                        var change = down
-                        var totalDragDistance = 0f
-
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val newChange = event.changes.firstOrNull() ?: break
-                            if (newChange.changedToUp()) break
-
-                            velocityTracker.addPointerInputChange(newChange)
-
-                            val pointerCount = event.changes.size
-
-                            if (isOneFingerZoom) {
-                                // ONE FINGER ZOOM MODE (Double-Tap-Drag)
-                                val panY = newChange.position.y - change.position.y
-
-                                // Only apply zoom if there's meaningful vertical movement
-                                if (abs(panY) > 2f) {
-                                    // EXPONENTIAL ZOOM (Smoother feel)
-                                    // panY > 0 (Down) -> Zoom IN (Duration shrinks)
-                                    // Form: newDur = oldDur * exp(-panY * sensitivity)
-                                    val zoomSensitivity = 3f / height // Adjust constant for speed
-                                    val zoomFactor = kotlin.math.exp(-panY * zoomSensitivity)
-
-                                    val newDuration = (visibleDuration * zoomFactor).toLong()
-                                    visibleDuration = newDuration.coerceIn(minDuration, maxDuration)
-                                    totalDragDistance += abs(panY) // Mark as dragged, not tap
-                                }
-                                newChange.consume()
-
-                            } else if (pointerCount > 1) {
-                                // 2-FINGER ZOOM
-                                val zoomChange = event.calculateZoom()
-                                if (zoomChange != 1f) {
-                                    val effectiveZoom = 1f + (zoomChange - 1f) * 2.0f
-                                    val newDuration = (visibleDuration / effectiveZoom).toLong()
-                                    visibleDuration = newDuration.coerceIn(minDuration, maxDuration)
-                                }
-                                event.changes.forEach { it.consume() }
-                            } else {
-                                // 1-FINGER PAN / SCRUB
-                                if (isScrubbing) {
-                                    val currentFrac = (newChange.position.x / width).toDouble()
-                                    val currentTime = viewportStart + (currentFrac * visibleDuration)
-                                    selectedPoint = getPointAt(currentTime)
-                                } else {
-                                    val panX = newChange.position.x - change.position.x
-                                    val panY = newChange.position.y - change.position.y
-                                    val dragDist = kotlin.math.sqrt(panX * panX + panY * panY)
-                                    totalDragDistance += dragDist
-
-                                    if (abs(panX) > abs(panY)) {
-                                        // Horizontal pan
-                                        val timePerPixel = visibleDuration.toFloat() / width
-                                        val timeDelta = -(panX * timePerPixel).toLong()
-                                        centerTime = (centerTime + timeDelta).coerceAtMost(maxAllowedTime)
-                                    } else if (totalDragDistance > 30f) {
-                                        // Vertical scale
-                                        val scaleFactor = panY * (curYMax - curYMin) / height * 2f
-                                        if (change.position.y < height / 2) {
-                                            yMax = (curYMax + scaleFactor).coerceAtLeast(curYMin + 10f)
-                                        } else {
-                                            yMin = (curYMin + scaleFactor).coerceAtLeast(0f)
-                                        }
-                                    }
-                                }
-                                newChange.consume()
-                            }
-                            change = newChange
-                        }
-
-                        // ON UP
-                        val wasTap = totalDragDistance < viewConfiguration.touchSlop
-                        lastGestureWasTap = wasTap && !isOneFingerZoom && !isScrubbing
-
-                        if (wasTap) {
-                            lastTapTime = System.currentTimeMillis()
-                            lastTapPos = change.position
-                        }
-
-                        if (!isScrubbing) {
-                            if (wasTap) {
-                                // TAP DETECTED
-                                if (isOneFingerZoom) {
-                                    // DOUBLE TAP TOGGLE ZOOM
-                                    if (preZoomDuration > 0) {
-                                        visibleDuration = preZoomDuration
-                                        preZoomDuration = 0L
-                                    } else {
-                                        preZoomDuration = visibleDuration
-                                        visibleDuration = (visibleDuration / 2f).toLong().coerceIn(minDuration, maxDuration)
-                                    }
-                                } else {
-                                    // SINGLE TAP (Selection)
-                                    val isFutureTap = pointAtTouch != null &&
-                                            pointAtTouch.timestamp == currentSafeData.lastOrNull()?.timestamp &&
-                                            timeAtTouch > pointAtTouch.timestamp
-
-                                    if (isFutureTap) selectedPoint = pointAtTouch else selectedPoint = null
-                                }
-                            } else if (!isOneFingerZoom) {
-                                // FLING - simple defaults
-                                val velocity = velocityTracker.calculateVelocity()
-                                val vx = velocity.x
-                                if (abs(vx) > 1000f) { // High threshold - ignore small movements
-                                    // Velocity-dependent boost: fast swipes get more acceleration
-                                    val boost = if (abs(vx) > 3000f) 2f else if (abs(vx) > 2000f) 1.5f else 1f
-                                    coroutineScope.launch {
-                                        var lastVal = 0f
-                                        inertiaAnim.snapTo(0f)
-                                        inertiaAnim.animateDecay(
-                                            initialVelocity = -vx * boost,
-                                            animationSpec = exponentialDecay(frictionMultiplier = 2.0f) // Higher friction = stops faster
-                                        ) {
-                                            val delta = this.value - lastVal
-                                            val tPerPix = visibleDuration.toFloat() / size.width.toFloat()
-                                            centerTime = (centerTime + (delta * tPerPix).toLong()).coerceAtMost(maxAllowedTime)
-                                            lastVal = this.value
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-        ) {
-            // Smooth zoom animation
-            val animatedVisibleDuration by animateFloatAsState(
-                targetValue = visibleDuration.toFloat(),
-                animationSpec = spring<Float>(stiffness = Spring.StiffnessMedium),
-                label = "ChartZoomAnimation"
-            )
-
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val width = size.width
-                val height = size.height
-                val bottomAxisHeight = 30.dp.toPx()
-                val chartHeight = height - bottomAxisHeight
-
-                // Viewport Logic (STABLE)
-                // Use animated duration for smooth zoom, but ensure logic matches
-                val animDur = animatedVisibleDuration.coerceAtLeast(minDuration.toFloat())
-                val currentDur = animDur.toLong()
-                
-                // Calculate Viewport
-                val viewportStart = centerTime - currentDur / 2
-                val viewportEnd = centerTime + currentDur / 2
-                
-                // Data Access (Strict Guards)
-                if (safeData.isEmpty()) return@Canvas
-
-                // 2. SEARCH RANGE (With ample padding to prevent popping)
-                val padding = currentDur / 2 // 50% padding on each side
-                val searchStart = viewportStart - padding
-                val searchEnd = viewportEnd + padding
-
-                // 3. BINARY SEARCH (Standard Library)
-                // binarySearchBy returns: index if found, or -(insertion point) - 1
-                // Calculate visible range indices with padding for connecting lines
-                // startIdx: Include point just BEFORE viewport start
-                val startIdx = safeData.binarySearchBy(searchStart) { it.timestamp }
-                    .let { if (it < 0) -it - 2 else it } // if not found, insertion point - 1
-                    .coerceIn(0, safeData.size)
-                
-                // endIdx: Include point just AFTER viewport end (for exclusive loop)
-                val endIdx = safeData.binarySearchBy(searchEnd) { it.timestamp }
-                    .let { if (it < 0) -it else it + 1 } // if not found, insertion point + 1
-                    .coerceIn(startIdx, safeData.size)
-
-                // 4. COORDINATE MAPPING (Inline for performance)
-                // Maps timestamp to X relative to CURRENT viewport
-                fun timeToX(t: Long): Float {
-                    return ((t - viewportStart).toFloat() / animDur) * width
-                }
-
-                // Maps Value to Y (Inverted: High value = Low Y)
-                // Hoist state reads for performance loop
-                val cYMin = yMin
-                val cYRange = yMax - cYMin
-                
-                fun valToY(v: Float): Float {
-                    if (cYRange < 0.001f) return chartHeight / 2 // Prevent div/0
-                    return chartHeight - ((v - cYMin) / cYRange) * chartHeight
-                }
-
-                // --- 1. DRAW Y-AXIS GRID ---
-                val yStep = if (cYRange < 25) 2f else 50f
-                var yVal = (kotlin.math.ceil(yMin / yStep) * yStep).toInt() // integer steps
-                
-                while (yVal < yMax) {
-                    val y = valToY(yVal.toFloat())
-                    if (y in 0f..chartHeight) {
-                        drawLine(gridColor, Offset(0f, y), Offset(width, y), 1f)
-                        // Text - Vertically centered with grid line, 4dp left padding
-                        val labelText = yVal.toString()
-                        val textBounds = android.graphics.Rect()
-                        axisTextPaint.getTextBounds(labelText, 0, labelText.length, textBounds)
-                        val centeredY = y + (textBounds.height() / 2f)
-                        val labelPadding = 16f * density
-                        drawContext.canvas.nativeCanvas.drawText(
-                            labelText, labelPadding, centeredY, axisTextPaint
-                        )
-                    }
-                    yVal += yStep.toInt()
-                }
-
-                // --- 2. DRAW X-AXIS GRID ---
-                // Intervals: 5m, 15m, 30m, 1h, 2h, 4h, 8h, 12h, 24h
-                val intervals = listOf(
-                    5 * 60000L, 15 * 60000L, 30 * 60000L,
-                    60 * 60000L, 120 * 60000L, 240 * 60000L, 
-                    480 * 60000L, 720 * 60000L, 1440 * 60000L
-                )
-                
-                // Pick interval keeping labels ~120px apart
-                val pxPerMs = width / animDur
-                val minMs = 120f / pxPerMs
-                val gridInterval = intervals.firstOrNull { it >= minMs } ?: intervals.last()
-
-                // Align t to timezone day boundary
-                val tzOffset = java.util.TimeZone.getDefault().getOffset(viewportStart).toLong()
-                
-                // Start drawing from just before viewport to cover edge
-                var tGrid = ((viewportStart + tzOffset) / gridInterval) * gridInterval - tzOffset
-                if (tGrid < viewportStart) tGrid += gridInterval
-
-                // Limit loop to prevent freeze if interval is tiny (sanity check)
-                val loopLimit = viewportEnd + gridInterval
-                
-                // Safety: Don't draw if interval is dangerously small 
-                 if (gridInterval > 1000L) {
-                    while (tGrid <= loopLimit) {
-                        val x = timeToX(tGrid)
-                        if (x > -50f && x < width + 50f) {
-                            cal.timeInMillis = tGrid
-                            val h = cal.get(java.util.Calendar.HOUR_OF_DAY)
-                            val m = cal.get(java.util.Calendar.MINUTE)
-                            val isMidnight = h == 0 && m == 0
-                            
-                            if (isMidnight) {
-                                // Date Line
-                                drawLine(gridColor.copy(alpha=0.8f), Offset(x, 0f), Offset(x, chartHeight), 3f)
-                                val dateLabel = labelCache.getOrPut(tGrid) {
-                                    reusableDate.time = tGrid
-                                    formatDate.format(reusableDate)
-                                }
-                                drawContext.canvas.nativeCanvas.drawText(
-                                    dateLabel, x, height - 25f, 
-                                    xTextPaint.apply { typeface = graphFontBold }
-                                )
-                                xTextPaint.typeface = graphFont
-                            } else {
-                                // Time Line
-                                drawLine(gridColor, Offset(x, 0f), Offset(x, chartHeight), 1f)
-                                val timeLabel = labelCache.getOrPut(tGrid) {
-                                    reusableDate.time = tGrid
-                                    formatTime.format(reusableDate)
-                                }
-                                drawContext.canvas.nativeCanvas.drawText(timeLabel, x, height - 28f, xTextPaint)
-                            }
-                        }
-                        tGrid += gridInterval
-                    }
-                }
-
-
-                // --- 3. DATA LINES (Optimized with Decimation) ---
-                if (endIdx > startIdx) {
-                    val gapThreshold = 900000L // 15 mins
-
-                    // Helper to draw a line series (Inlined Logic)
-                    fun drawOptimized(isRaw: Boolean, color: androidx.compose.ui.graphics.Color, strokeWidth: Float) {
-                        reusablePath.rewind()
-                        
-                        var first = true
-                        var lastX = -10000f // Far off screen
-                        var lastTimestamp = 0L
-
-                        for (i in startIdx until endIdx) {
-                            val p = safeData[i]
-                            val v = if (isRaw) p.rawValue else p.value
-                            
-                            // 1. Data Validity
-                            if (v.isNaN() || v < 0.1f) {
-                                first = true
-                                continue
-                            }
-
-                            // 2. Coordinate Mapping
-                            // Use inlined logic or local funcs (local funcs are fast enough if no alloc)
-                            val px = timeToX(p.timestamp)
-                            
-                            // PERFORMANCE: Decimation
-                            // If x is within 0.5px of last drawn point, SKIP drawing (unless gap)
-                            // This reduces 50,000 points to ~2000 points (screen width)
-                            if (!first && kotlin.math.abs(px - lastX) < 0.7f) {
-                                // We skip this point. 
-                                // Ideally we should min/max here for accuracy but for 1px it's negligible for smooth lines.
-                                continue 
-                            }
-
-                            val py = valToY(v)
-
-                            // 3. Coordinate Safety
-                            if (!px.isFinite() || !py.isFinite()) {
-                                first = true
-                                continue
-                            }
-
-                            // 4. Gap Check
-                            if (!first && (p.timestamp - lastTimestamp) > gapThreshold) {
-                                first = true
-                            }
-                            
-                            if (first) { 
-                                reusablePath.moveTo(px, py) 
-                                first = false 
-                            } else { 
-                                reusablePath.lineTo(px, py) 
-                            }
-                            
-                            lastX = px
-                            lastTimestamp = p.timestamp
-                        }
-                        
-                        drawPath(reusablePath, color, style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-                    }
-
-                    // --- DRAW BASED ON VIEW MODE ---
-                    // ViewMode logic simplified
-                    // ViewMode only uses 0-3. Broadcast-only is a separate connection option in AiDexSensor.
-                    val drawRaw = viewMode == 1 || viewMode == 2 || viewMode == 3
-                    val drawAuto = viewMode == 0 || viewMode == 2 || viewMode == 3
-                    val isRawModeChart = viewMode == 1 || viewMode == 3
-                    val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawModeChart)
-                    
-                    if (drawRaw) {
-                         // Raw line: Demote based on mode and calibration
-                         // In mode 2 (Auto+Raw) with calibration: Raw is tertiary (3rd)
-                         val color = when {
-                             hasCalibration && viewMode == 2 -> tertiaryColor  // 3rd line (raw is least important)
-                             hasCalibration || viewMode == 2 -> secondaryColor
-                             else -> primaryColor
-                         }
-                         val width = if (hasCalibration || viewMode == 2) 2.dp.toPx() else 3.dp.toPx()
-                         drawOptimized(true, color, width)
-                    }
-                    
-                    if (drawAuto) {
-                        // Auto line: Demote based on mode and calibration 
-                        // In mode 3 (Raw+Auto) with calibration: Auto is tertiary (3rd)
-                        val color = when {
-                            hasCalibration && viewMode == 3 -> tertiaryColor  // 3rd line (auto is least important)
-                            hasCalibration || viewMode == 3 -> secondaryColor
-                            else -> primaryColor
-                        }
-                        val width = if (hasCalibration || viewMode == 3) 2.dp.toPx() else 3.dp.toPx()
-                        drawOptimized(false, color, width)
-                    }
-                    
-                    // Draw calibrated line ON TOP (primary when active)
-                    if (hasCalibration) {
-                        reusablePath.rewind()
-                        var first = true
-                        var lastX = -10000f
-                        var lastTimestamp = 0L
-                        
-                        for (i in startIdx until endIdx) {
-                            val p = safeData[i]
-                            val baseValue = if (viewMode == 1 || viewMode == 3) p.rawValue else p.value
-                            val calibratedV = tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseValue, p.timestamp, isRawModeChart)
-                            
-                            if (calibratedV.isNaN() || calibratedV < 0.1f) {
-                                first = true
-                                continue
-                            }
-                            
-                            val px = timeToX(p.timestamp)
-                            if (!first && kotlin.math.abs(px - lastX) < 0.7f) continue
-                            
-                            val py = valToY(calibratedV)
-                            if (!px.isFinite() || !py.isFinite()) {
-                                first = true
-                                continue
-                            }
-                            
-                            if (!first && (p.timestamp - lastTimestamp) > gapThreshold) {
-                                first = true
-                            }
-                            
-                            if (first) { 
-                                reusablePath.moveTo(px, py)
-                                first = false
-                            } else {
-                                reusablePath.lineTo(px, py)
-                            }
-                            
-                            lastX = px
-                            lastTimestamp = p.timestamp
-                        }
-                        
-                        drawPath(reusablePath, primaryColor, style = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-                    }
-                }
-
-                // --- 4. MIN/MAX INDICATORS (Restored & Optimized) ---
-                if (endIdx > startIdx) {
-                    var minPoint = safeData[startIdx]
-                    var maxPoint = safeData[startIdx]
-                    var minVal = Float.MAX_VALUE
-                    var maxVal = Float.MIN_VALUE
-
-                    // Single fast pass for min/max
-                    for (i in startIdx until endIdx) {
-                        val p = safeData[i]
-                        // Determine value based on mode commonality
-                        // If showing Raw (Mode 1) or Raw-Primary (Mode 3), prioritize Raw
-                        val useRaw = viewMode == 1 || viewMode == 3
-                        val v = if (useRaw) p.rawValue else p.value
-
-                        if (v.isNaN() || v < 0.1f) continue
-
-                        if (v < minVal) { minVal = v; minPoint = p }
-                        if (v > maxVal) { maxVal = v; maxPoint = p }
-                    }
-
-                    // Helper to draw
-                    fun drawIndicator(point: GlucosePoint, valToDraw: Float) {
-                        val y = valToY(valToDraw)
-                        val x = timeToX(point.timestamp)
-
-                        if (y.isFinite() && x.isFinite() && y in 0f..chartHeight && x in 0f..width) {
-                            val label = tk.glucodata.ui.util.GlucoseFormatter.format(valToDraw, isMmol)
-                            
-                            // Text - Vertically centered with guide line, 4dp left padding
-                            val indicatorBounds = android.graphics.Rect()
-                            axisTextPaint.getTextBounds(label, 0, label.length, indicatorBounds)
-                            val centeredY = y + (indicatorBounds.height() / 2f)
-                            val indicatorPadding = 16f * density
-                            val textWidth = axisTextPaint.measureText(label)
-                            
-                            drawContext.canvas.nativeCanvas.drawText(
-                                label, indicatorPadding, centeredY, 
-                                axisTextPaint.apply { color = android.graphics.Color.DKGRAY } // Dark Gray for visibility
-                            )
-                            // Guide line - starts after text
-                            val lineStartX = indicatorPadding + textWidth + 8f * density
-                            drawLine(
-                                color = minMaxLineColor,
-                                start = Offset(lineStartX, y),
-                                end = Offset(x, y),
-                                strokeWidth = 1f,
-                                pathEffect = dashEffect
-                            )
-                            // Restore paint color (axisTextPaint is shared)
-                            axisTextPaint.color = android.graphics.Color.GRAY 
-                        }
-                    }
-
-                    if (maxVal > Float.MIN_VALUE) drawIndicator(maxPoint, maxVal)
-                    if (minVal < Float.MAX_VALUE && minVal != maxVal) drawIndicator(minPoint, minVal)
-                }
-
-                // --- 5. TARGET RANGE ---
-                val yHigh = valToY(targetHigh)
-                val yLow = valToY(targetLow)
-                // Only draw if valid
-                if (yHigh.isFinite() && yLow.isFinite()) {
-                    drawRect(targetBandColor, topLeft = Offset(0f, yHigh), size = Size(width, yLow - yHigh))
-                }
-
-                // --- 6. CALIBRATION MARKERS ---
-                // Draw permanent vertical lines for calibration points in visible range (respects mode)
-                val isRawModeMarkers = viewMode == 1 || viewMode == 3
-                val calibrations = tk.glucodata.data.calibration.CalibrationManager.getVisibleCalibrations(isRawModeMarkers)
-                val visibleCalibrations = calibrations.filter { it.timestamp in viewportStart..viewportEnd }
-                
-                visibleCalibrations.forEach { cal ->
-                    val calX = timeToX(cal.timestamp)
-                    if (calX in 0f..width) {
-                        // Draw vertical line with opacity
-                        drawLine(
-                            color = primaryColor.copy(alpha = 0.4f),
-                            start = Offset(calX, 0f),
-                            end = Offset(calX, chartHeight),
-                            strokeWidth = 1.5.dp.toPx()
-                        )
-                    }
-                }
-
-                // --- 7. CURSOR ---
-                val cursorX = selectedPoint?.let { timeToX(it.timestamp) }
-                if (cursorX != null && cursorX in 0f..width) {
-                    drawLine(hoverLineColor, Offset(cursorX, 0f), Offset(cursorX, chartHeight), 2.dp.toPx())
-
-                    selectedPoint?.let { p ->
-                        val dotRadius = 5.dp.toPx()
-                        val isRawModeDot = viewMode == 1 || viewMode == 3
-                        val hasCalibrationDot = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawModeDot)
-                        
-                        // Draw dots for active lines (demoted when calibration active)
-                         if (viewMode == 1 || viewMode == 2 || viewMode == 3) {
-                             val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 1 || viewMode == 3) primaryColor else secondaryColor
-                             val py = valToY(p.rawValue)
-                             if (py.isFinite()) drawCircle(color, dotRadius, Offset(cursorX, py))
-                         }
-                         if (viewMode == 0 || viewMode == 2 || viewMode == 3) {
-                             val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 0 || viewMode == 2) primaryColor else secondaryColor
-                             val py = valToY(p.value)
-                             if (py.isFinite()) drawCircle(color, dotRadius, Offset(cursorX, py))
-                         }
-                         
-                         // Draw calibrated dot on top (primary when active)
-                         if (hasCalibrationDot) {
-                             val baseValue = if (viewMode == 1 || viewMode == 3) p.rawValue else p.value
-                             val calibratedV = tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseValue, p.timestamp, isRawModeDot)
-                             val py = valToY(calibratedV)
-                             if (py.isFinite()) drawCircle(primaryColor, dotRadius, Offset(cursorX, py))
-                         }
-                    }
-                }
-            }
-
-            // --- INFO CARD ---
-            selectedPoint?.let { point ->
-                // Calculate X position to follow cursor
-                val viewportStart = centerTime - visibleDuration / 2
-                val xFraction = (point.timestamp - viewportStart).toFloat() / visibleDuration.toFloat()
-                // Clamp horizontal position to keep card on screen (assuming approx card width ~120dp)
-                // We use specific offsets in standard DP
-                val cardXOffset = (constraints.maxWidth * xFraction).coerceIn(0f, constraints.maxWidth.toFloat())
-
-                // Resolve Colors matching Graph Lines
-
-                // --- COLORS & STYLING ---
-                // MATCH GRAPH COLORS EXACTLY
-                val textPrimaryColor = MaterialTheme.colorScheme.primary
-                val textSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
-
-                // Capture Theme Colors outside non-composable builder
-                val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
-
-                // User Feedback: "same color as graph bg" -> Use distinct colors.
-                // Info Card: Standard SurfaceContainer (Distinct from base Surface)
-                // --- COLORS & STYLING ---
-                // MATCH "Current Status Card" (Top Card, lines 500-503) EXACTLY
-                // Top Card uses: colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                // Default Card Shape is usually Medium (12.dp) in M3.
-
-                val statusCardColor = MaterialTheme.colorScheme.primaryContainer
-                val statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                val cardShape = RoundedCornerShape(12.dp) // M3 standard card corner radius
-
-                // AXIS TEXT MATCHING
-                val axisFontSize = 12.sp
-
-                // Compute calibrated value for tooltip
-                val isRawModeTT = viewMode == 1 || viewMode == 3
-                val hasCalibrationTT = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawModeTT)
-                val calibratedValueTT = if (hasCalibrationTT) {
-                    val baseValue = if (isRawModeTT) point.rawValue else point.value
-                    tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseValue, point.timestamp, isRawModeTT)
-                } else null
-                val dvs = getDisplayValues(point, viewMode, unit, calibratedValueTT)
-
-                // --- 1. INFO CARD (Top) ---
-                // "Current Status Card styling" -> primaryContainer
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .zIndex(2f) // Above calibration tooltips
-                        // 1. Move to Cursor X, Fixed Y
-                        .offset {
-                            androidx.compose.ui.unit.IntOffset(
-                                x = cardXOffset.toInt(),
-                                y = 48.dp.roundToPx()
-                            )
-                        }
-                        // 2. Center
-                        .graphicsLayer { translationX = -size.width / 2f }
-                        .widthIn(min = 48.dp)
-                        .clip(cardShape) // Clip ripple to match rounded corners
-                        .clickable { onPointClick?.invoke(point) },
-                    shape = cardShape,
-                    color = statusCardColor.copy(alpha = 1f),
-                    contentColor = statusContentColor.copy(alpha = 1f),
-                    shadowElevation = 0.dp,
-                    tonalElevation = 0.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Colored Text Logic (Keep matching graph lines for values)
-                        val styledText = androidx.compose.ui.text.buildAnnotatedString {
-                            // Primary Value
-                            withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append(dvs.primaryStr)
-                            }
-
-                            // Separator & Secondary
-                            dvs.secondaryStr?.let { sec ->
-                                withStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                    append(" · ")
-                                }
-                                withStyle(androidx.compose.ui.text.SpanStyle(color = LocalContentColor.current.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)) {
-                                    append(sec)
-                                }
-                            }
-                            
-                            // Tertiary (when 3 values exist)
-                            dvs.tertiaryStr?.let { ter ->
-                                withStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                    append(" · ")
-                                }
-                                withStyle(androidx.compose.ui.text.SpanStyle(color = LocalContentColor.current.copy(alpha = 0.4f))) {
-                                    append(ter)
-                                }
-                            }
-                        }
-
-                        Text(
-                            text = styledText,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-
-                // --- 2. TIME CHIP (Bottom) - Text centered on same line as X-axis labels ---
-                // Height: 32dp, Corner: 8dp, Padding: horizontal 8dp
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .zIndex(2f) // Above calibration tooltips
-                        .offset {
-                            androidx.compose.ui.unit.IntOffset(
-                                x = cardXOffset.toInt(),
-                                y = (2).dp.roundToPx() // Center text on same line as X-axis labels
-                            )
-                        }
-                        .graphicsLayer { translationX = -size.width / 2f }
-                        .height(32.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainerHigh,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = point.time,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            // Brace removed here to keep subsequent elements inside BoxWithConstraints
-
-            // --- CALIBRATION TOOLTIPS ---
-            // Show permanent tooltips for calibration points in visible range (respects mode)
-            val isRawModeTooltip = viewMode == 1 || viewMode == 3
-            val calibrationsTooltip = tk.glucodata.data.calibration.CalibrationManager.getVisibleCalibrations(isRawModeTooltip)
-            val viewportStartTooltip = centerTime - visibleDuration / 2
-            val viewportEndTooltip = centerTime + visibleDuration / 2
-            val visibleCalibrationsTooltip = calibrationsTooltip.filter { it.timestamp in viewportStartTooltip..viewportEndTooltip }
-            
-            visibleCalibrationsTooltip.forEach { cal ->
-                val calXFraction = (cal.timestamp - viewportStartTooltip).toFloat() / visibleDuration.toFloat()
-                val calXOffset = (constraints.maxWidth * calXFraction).coerceIn(0f, constraints.maxWidth.toFloat())
-                val calTimeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-                val calTimeStr = calTimeFormat.format(java.util.Date(cal.timestamp))
-                
-                // Top: Value chip with waterdrop icon (clickable to edit)
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .zIndex(1f) // Below scrubbing tooltip
-                        .offset {
-                            androidx.compose.ui.unit.IntOffset(
-                                x = calXOffset.toInt(),
-                                y = 8.dp.roundToPx()
-                            )
-                        }
-                        .graphicsLayer { translationX = -size.width / 2f }
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { 
-                            // Open CalibrationBottomSheet to edit this calibration
-                            onCalibrationClick?.invoke(cal)
-                        },
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    shadowElevation = 0.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.WaterDrop,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = String.format(java.util.Locale.getDefault(), if (unit.contains("mmol", true)) "%.1f" else "%.0f", cal.userValue),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                
-                // Bottom: Time chip
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .zIndex(1f) // Below scrubbing tooltip
-                        .offset {
-                            androidx.compose.ui.unit.IntOffset(
-                                x = calXOffset.toInt(),
-                                y = 2.dp.roundToPx()
-                            )
-                        }
-                        .graphicsLayer { translationX = -size.width / 2f }
-                        .height(24.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
-                            RoundedCornerShape(6.dp)
-                        )
-                        .padding(horizontal = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = calTimeStr,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-
-            // --- DATE HEADER OVERLAY ---
-            // Show only if NOT today AND not "recent" (to avoid showing date when day just started)
-            val now = System.currentTimeMillis()
-            val dayCheckFormat = java.text.SimpleDateFormat("yyyyDDD", java.util.Locale.getDefault())
-            val isToday = dayCheckFormat.format(java.util.Date(now)) == dayCheckFormat.format(java.util.Date(centerTime))
-            val isRecent = abs(now - centerTime) < 4 * 60 * 60 * 1000L // 4 Hour buffer for "just started" days
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !isToday && !isRecent,
-                enter = androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            ) {
-                val headerDate = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault()).format(java.util.Date(centerTime))
-
-                // Same style as bottom Time Chip
-                Box(
-                    modifier = Modifier
-                        .height(32.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainerHigh,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = headerDate,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            /*
-            // --- BACK TO NOW BUTTON ---
-            // Show if centerTime is more than 5 minutes away from "real now"
-            val isFarFromNow = abs(centerTime - (System.currentTimeMillis() - visibleDuration / 2)) > 60 * 60 * 1000
-            
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isFarFromNow,
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-            ) {
-                // M3 Expressive: FilledTonalIconButton is lighter than FAB ("less like an action button")
-                // Icon: LastPage (>|) implies "Go to End/Now"
-                FilledTonalIconButton(
-                    onClick = {
-                        val realNow = System.currentTimeMillis()
-                        val targetTime = realNow - visibleDuration / 2
-                        val diff = targetTime - centerTime
-                        
-                        coroutineScope.launch {
-                            // "Smart Scroll": Avoid crazy jumps
-                            val maxScroll = 12 * 60 * 60 * 1000L // 12 Hours
-                            var startScroll = centerTime
-                            
-                            // If distance is huge, snap closer first
-                            if (abs(diff) > maxScroll) {
-                                startScroll = targetTime - (if (diff > 0) maxScroll else -maxScroll)
-                                centerTime = startScroll
-                            }
-
-                            // Animate the remaining distance
-                            androidx.compose.animation.core.Animatable(startScroll.toFloat()).animateTo(
-                                targetValue = targetTime.toFloat(),
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            ) {
-                                centerTime = value.toLong()
-                            }
-                        }
-                    },
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.size(48.dp) // Slightly larger than standard 40dp for touch target
-                ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.LastPage,
-                        contentDescription = "Jump to Now"
-                    )
-                }
-            }
-            */
-        }
-
-        // --- ZOOM BUTTONS (Expressive Connected Group) ---
-        // --- ZOOM BUTTONS (M3 Expressive: Text + Pill Selection) ---
-        // Refined based on user feedback:
-        // 1. Alignment: Centered Horizontally (Arrangement) and Vertically.
-        // 2. Spacing: Top 16dp, Bottom reduced to 4dp (tighter).
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-//                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = 12.dp, horizontal = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(0.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val items = TimeRange.values()
-            val configuration = LocalConfiguration.current
-            // Graceful collapse: on narrow screens (<380dp), collapse "Back to Now" width
-            val isCompact = configuration.screenWidthDp < 380
-
-            // Date Picker Button (Left side, always visible)
-            FilledTonalIconButton(
-                onClick = { showDatePicker = true },
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
-
-                modifier = Modifier.size(width = if (isCompact) 32.dp else 40.dp, height = 32.dp) // Collapse to square on small screens
-            ) {
-                Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Filled.DateRange,
-                    contentDescription = "Jump to Date",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(Modifier.width(width = if (isCompact) 4.dp else 8.dp))
-
-            items.forEach { range ->
-                val rangeDur = range.hours * 60 * 60 * 1000L
-                val isSel = abs(visibleDuration - rangeDur) < 1000
-
-                // M3 Expressive Animation specs - bouncy springs
-                val bouncySpec = spring<Float>(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-                val colorSpec = spring<Color>(stiffness = Spring.StiffnessMediumLow)
-
-                val containerColor by animateColorAsState(
-                    // Fix: Interpolate alpha of the SAME color to avoid "dark/gray" ghosting during transition
-                    targetValue = if (isSel) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
-                    animationSpec = colorSpec,
-                    label = "ButtonContainerColor"
-                )
-                val contentColor by animateColorAsState(
-                    targetValue = if (isSel) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                    animationSpec = colorSpec,
-                    label = "ButtonContentColor"
-                )
-
-                // M3 Expressive: Scale pop on selection
-                val scale by animateFloatAsState(
-                    targetValue = if (isSel) 1f else 1f,
-                    animationSpec = bouncySpec,
-                    label = "ButtonScale"
-                )
-
-                // M3 Expressive: Icon rotation (fun subtle touch)
-                val iconRotation by animateFloatAsState(
-                    targetValue = if (isSel) 360f else 0f,
-                    animationSpec = spring<Float>(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    ),
-                    label = "IconRotation"
-                )
-
-                Surface(
-                    onClick = {
-                        val now = System.currentTimeMillis()
-                        // Cancel any active scroll when interacting with tabs
-                        autoScrollJob?.cancel()
-
-                        if (isSel) {
-                            // "Back to Now" logic with Smart Scroll animation
-                            autoScrollJob = coroutineScope.launch {
-                                val targetTime = now - visibleDuration / 2
-                                val diff = targetTime - centerTime
-
-                                // "Smart Scroll": Avoid crazy jumps
-                                val maxScroll = 12 * 60 * 60 * 1000L // 12 Hours
-                                var startScroll = centerTime
-
-                                // If distance is huge, snap closer first
-                                if (abs(diff) > maxScroll) {
-                                    startScroll = targetTime - (if (diff > 0) maxScroll else -maxScroll)
-                                    centerTime = startScroll
-                                }
-
-                                // Animate the remaining distance
-                                androidx.compose.animation.core.Animatable(startScroll.toFloat()).animateTo(
-                                    targetValue = targetTime.toFloat(),
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                ) {
-                                    centerTime = value.toLong()
-                                }
-                            }
-                        } else {
-                            visibleDuration = rangeDur
-                            val maxCenter = now - visibleDuration / 2
-                            if (centerTime > maxCenter) {
-                                centerTime = maxCenter
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(28.dp),
-                    color = containerColor,
-                    contentColor = contentColor,
-                    modifier = Modifier
-                        .height(32.dp)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        if (isSel) {
-                            Icon(
-                                imageVector = Icons.Default.AccessTime,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .size(16.dp)
-                                    .graphicsLayer { rotationZ = iconRotation }
-                            )
-                        }
-
-                        Text(
-                            text = range.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(width = if (isCompact) 4.dp else 8.dp))
-
-
-            // "Back to Now" Button (Expressive: End of Row)
-            val now = System.currentTimeMillis()
-            val targetTime = now - visibleDuration / 2
-            val isAtNow = abs(centerTime - targetTime) < 60 * 60 * 1000 // 1 hour threshold (Old behavior)
-
-            AnimatedVisibility(
-                visible = !isAtNow,
-                enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start) + scaleIn(),
-                exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start) + scaleOut()
-            ) {
-
-                Surface(
-                    onClick = {
-                        // Cancel previous if any
-                        autoScrollJob?.cancel()
-
-                        autoScrollJob = coroutineScope.launch {
-                            val maxScroll = 12 * 60 * 60 * 1000L
-                            val diff = targetTime - centerTime
-                            var startScroll = centerTime
-                            if (abs(diff) > maxScroll) {
-                                startScroll = targetTime - (if (diff > 0) maxScroll else -maxScroll)
-                                centerTime = startScroll
-                            }
-                            androidx.compose.animation.core.Animatable(startScroll.toFloat()).animateTo(
-                                targetValue = targetTime.toFloat(),
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            ) {
-                                centerTime = value.toLong()
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(28.dp),
-                    // Subtle surface color for visibility
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier
-//                            .padding(start = 4.dp)
-                        .size(width = if (isCompact) 32.dp else 40.dp, height = 32.dp) // Collapse to square on small screens
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.LastPage,
-                            contentDescription = "Back to Now",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    // Date Picker Dialog
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { selectedDate ->
-                            // Jump to selected date
-                            autoScrollJob?.cancel()
-                            centerTime = selectedDate + (12 * 60 * 60 * 1000) // Center on noon of selected day
-                        }
-                        showDatePicker = false
-                    }
-                ) {
-                    Text(stringResource(R.string.go))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-}
-
-
-
 
 fun buildGlucoseString(
     dvs: DisplayValues,
@@ -3160,6 +1998,15 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
             modifier = Modifier.clickable { navController.navigate("settings/nightscout") }
         )
 
+        // Edit 67b: Only show LibreView settings when enabled or an account ID exists
+        if (Natives.getuselibreview() || Natives.getlibreAccountIDnumber() > 0L) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.libreview_config)) },
+                supportingContent = { Text(stringResource(R.string.libreview_desc)) },
+                modifier = Modifier.clickable { navController.navigate("settings/libreview") }
+            )
+        }
+
 
 
         // M3 Grid: 24dp between major sections
@@ -3346,7 +2193,11 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                         tk.glucodata.data.HistoryExporter.exportToReadable(context, uri, data, unitStr)
                     }
 
-                    Toast.makeText(context, if (success) "Export successful" else "Export failed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        if (success) context.getString(R.string.export_successful) else context.getString(R.string.export_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -3359,10 +2210,18 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 coroutineScope.launch {
                     val result = tk.glucodata.data.HistoryExporter.importFromCsv(context, uri)
                     if (result.success) {
-                        Toast.makeText(context, "Imported ${result.successCount} readings", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.imported_readings_count, result.successCount),
+                            Toast.LENGTH_LONG
+                        ).show()
                         viewModel.refreshData()
                     } else {
-                        Toast.makeText(context, "Import failed: ${result.errorMessage}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.import_failed_with_error, result.errorMessage ?: ""),
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
@@ -3372,7 +2231,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         if (showExportDialog) {
             AlertDialog(
                 onDismissRequest = { showExportDialog = false },
-                title = { Text("Select Export Format") },
+                title = { Text(stringResource(R.string.select_export_format)) },
                 text = {
                     Column {
                         Row(
@@ -3460,7 +2319,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Dangerous Actions",
+            text = stringResource(R.string.danger_zone),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 16.dp),
             color = MaterialTheme.colorScheme.error
@@ -3493,7 +2352,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    "Remove all glucose readings from database",
+                    stringResource(R.string.clear_history_desc_short),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -3504,7 +2363,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     if (isClearing) CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                    else Text("Clear History")
+                    else Text(stringResource(R.string.clear_history))
                 }
             }
         }
@@ -3532,7 +2391,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    "Remove history and cache, keep settings",
+                    stringResource(R.string.clear_app_data_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -3547,7 +2406,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     if (isClearing) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onError)
-                    else Text("Clear Data")
+                    else Text(stringResource(R.string.clear_app_data))
                 }
             }
         }
@@ -3575,7 +2434,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    "Remove everything - app returns to first-run state",
+                    stringResource(R.string.factory_reset_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -3590,7 +2449,7 @@ fun SettingsScreen(navController: androidx.navigation.NavController, themeMode: 
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     if (isClearing) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onError)
-                    else Text("Factory Reset")
+                    else Text(stringResource(R.string.factory_reset))
                 }
             }
         }
@@ -3865,6 +2724,12 @@ private fun String.capitalize(): String {
 fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewModel()) {
     val context = LocalContext.current
     val sensors by viewModel.sensors.collectAsState()
+    val configuration = LocalConfiguration.current
+    val isCompactScreen = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val panelPadding = 16.dp
+    val titleInset = 16.dp
+    val panelTopGap = if (isCompactScreen) 10.dp else 16.dp
+    val panelBottomPadding = if (isCompactScreen) 88.dp else 100.dp
     
     // Start/stop real-time polling based on screen visibility
     DisposableEffect(Unit) {
@@ -3879,6 +2744,8 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
     var showSibionicsWizard by remember { mutableStateOf(false) }
     var showLibreWizard by remember { mutableStateOf(false) }
     var showDexcomWizard by remember { mutableStateOf(false) }
+    var showAccuChekWizard by remember { mutableStateOf(false) }
+    var showCareSensAirWizard by remember { mutableStateOf(false) }
     var showAiDexWizard by remember { mutableStateOf(false) }
     
     // Sensor Type Picker Bottom Sheet
@@ -3890,6 +2757,8 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
                     tk.glucodata.ui.components.SensorType.SIBIONICS -> showSibionicsWizard = true
                     tk.glucodata.ui.components.SensorType.LIBRE -> showLibreWizard = true
                     tk.glucodata.ui.components.SensorType.DEXCOM -> showDexcomWizard = true
+                    tk.glucodata.ui.components.SensorType.ACCUCHEK -> showAccuChekWizard = true
+                    tk.glucodata.ui.components.SensorType.CARESENS_AIR -> showCareSensAirWizard = true
                     tk.glucodata.ui.components.SensorType.AIDEX -> showAiDexWizard = true
                 }
             }
@@ -3934,46 +2803,96 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
         return
     }
 
+    // Accu-Chek Setup Wizard
+    if (showAccuChekWizard) {
+        tk.glucodata.ui.setup.AccuChekSetupWizard(
+            onDismiss = { showAccuChekWizard = false },
+            onScan = {
+                tk.glucodata.MainActivity.launchQrScan()
+                showAccuChekWizard = false
+            }
+        )
+        return
+    }
+
+    // CareSens Air Setup Wizard
+    if (showCareSensAirWizard) {
+        tk.glucodata.ui.setup.CareSensAirSetupWizard(
+            onDismiss = { showCareSensAirWizard = false },
+            onScan = {
+                tk.glucodata.MainActivity.launchQrScan()
+                showCareSensAirWizard = false
+            }
+        )
+        return
+    }
+    
+    // AiDex Setup Wizard (Edit 48e: was missing — selecting AiDex from SensorTypePicker did nothing)
+    if (showAiDexWizard) {
+        tk.glucodata.ui.setup.AiDexSetupWizard(
+            onDismiss = { showAiDexWizard = false },
+            onComplete = {
+                showAiDexWizard = false
+                viewModel.refreshSensors()
+            }
+        )
+        return
+    }
+
     // Use Box instead of Scaffold to avoid double padding from parent nav
     Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         if (sensors.isEmpty()) {
             // Show sensor selection cards for empty state
-            Column(modifier = Modifier.fillMaxSize()) {
-                Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = panelPadding)
+                    .padding(bottom = panelBottomPadding)
+            ) {
+                Spacer(modifier = Modifier.height(panelTopGap))
                 Text(
                     text = stringResource(R.string.sensors_title),
-                    style = MaterialTheme.typography.displaySmall,
-                    modifier = Modifier.padding(start = 28.dp, end = 16.dp)
+                    style = if (isCompactScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
+                    modifier = Modifier.padding(start = titleInset, end = titleInset)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(panelTopGap))
                 tk.glucodata.ui.components.SensorsEmptyState(
                     onSensorSelected = { type ->
                         when (type) {
                             tk.glucodata.ui.components.SensorType.SIBIONICS -> showSibionicsWizard = true
                             tk.glucodata.ui.components.SensorType.LIBRE -> showLibreWizard = true
                             tk.glucodata.ui.components.SensorType.DEXCOM -> showDexcomWizard = true
+                            tk.glucodata.ui.components.SensorType.ACCUCHEK -> showAccuChekWizard = true
+                            tk.glucodata.ui.components.SensorType.CARESENS_AIR -> showCareSensAirWizard = true
                             tk.glucodata.ui.components.SensorType.AIDEX -> showAiDexWizard = true
                         }
                     }
                 )
+                Spacer(modifier = Modifier.height(panelPadding))
             }
         } else {
             // LazyColumn with header that scrolls
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp)
+                contentPadding = PaddingValues(
+                    start = panelPadding,
+                    end = panelPadding,
+                    top = panelPadding,
+                    bottom = panelBottomPadding
+                )
             ) {
                 // Scrollable header
                 item {
                     Text(
                         text = stringResource(R.string.sensors_title),
-                    style = MaterialTheme.typography.displaySmall,
-                    modifier = Modifier.padding(start = 16.dp, bottom = 24.dp)
+                    style = if (isCompactScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
+                    modifier = Modifier.padding(start = titleInset, bottom = if (isCompactScreen) 16.dp else 24.dp)
                     )
                 }
                 items(sensors) { sensor ->
-                    SensorCard(sensor, viewModel)
+                    SensorCard(sensor, viewModel, sensorCount = sensors.size)
                 }
             }
         }
@@ -3986,11 +2905,11 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp)
+                    .padding(if (isCompactScreen) 12.dp else 16.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Add Sensor",
+                    contentDescription = null,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -4003,26 +2922,203 @@ fun TabIcon(
     isSelected: Boolean,
     selectedIcon: ImageVector,
     unselectedIcon: ImageVector,
-    description: String
+    description: String,
+    isDashboard: Boolean = false,
+    isStatistics: Boolean = false
 ) {
+    val dashboardTilt = remember { Animatable(0f) }
+    val dashboardLift = remember { Animatable(0f) }
+    val dashboardScale = remember { Animatable(1f) }
+    val statsTilt = remember { Animatable(0f) }
+    val statsLift = remember { Animatable(0f) }
+    val statsAlpha by animateFloatAsState(
+        targetValue = if (isSelected) 0.96f else 0.84f,
+        animationSpec = tween(220),
+        label = "StatsIconAlpha"
+    )
+
+    LaunchedEffect(isDashboard, isSelected) {
+        if (!isDashboard) {
+            dashboardTilt.snapTo(0f)
+            dashboardLift.snapTo(0f)
+            dashboardScale.snapTo(1f)
+            return@LaunchedEffect
+        }
+
+        if (isSelected) {
+            dashboardTilt.snapTo(-22f)
+            dashboardLift.snapTo(13f)
+            dashboardScale.snapTo(1.12f)
+            launch {
+                dashboardTilt.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = 0.34f,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            }
+            launch {
+                dashboardLift.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            }
+            launch {
+                dashboardScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = 0.56f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+            }
+        } else {
+            dashboardTilt.animateTo(0f, animationSpec = tween(120))
+            dashboardLift.animateTo(0f, animationSpec = tween(120))
+            dashboardScale.animateTo(1f, animationSpec = tween(140))
+        }
+    }
+
+    LaunchedEffect(isStatistics, isSelected) {
+        if (!isStatistics) {
+            statsTilt.snapTo(0f)
+            statsLift.snapTo(0f)
+            return@LaunchedEffect
+        }
+
+        if (isSelected) {
+            statsTilt.snapTo(-8f)
+            statsLift.snapTo(4f)
+            launch {
+                statsTilt.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = 0.72f,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            }
+            launch {
+                statsLift.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+            }
+        } else {
+            statsTilt.animateTo(0f, animationSpec = tween(130))
+            statsLift.animateTo(0f, animationSpec = tween(130))
+        }
+    }
+
     AnimatedContent(
         targetState = isSelected,
         transitionSpec = {
             if (targetState) {
-                // Selected: Filled icon "pops" in (Scale + Fade)
-                (scaleIn(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
-                    .togetherWith(fadeOut(animationSpec = tween(200)))
+                if (isDashboard) {
+                    // Dashboard: stronger, playful motion without icon scale expansion.
+                    (slideInVertically(
+                        initialOffsetY = { it + (it / 3) },
+                        animationSpec = spring(
+                            dampingRatio = 0.58f,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + scaleIn(
+                        initialScale = 0.82f,
+                        animationSpec = tween(230)
+                    ) + fadeIn(animationSpec = tween(190)))
+                        .togetherWith(
+                            slideOutVertically(
+                                targetOffsetY = { -it / 2 },
+                                animationSpec = tween(160)
+                            ) + scaleOut(
+                                targetScale = 1.08f,
+                                animationSpec = tween(160)
+                            ) + fadeOut(animationSpec = tween(130))
+                        )
+                } else {
+                    if (isStatistics) {
+                        // Statistics: slightly livelier but still calmer than Dashboard.
+                        (slideInVertically(
+                            initialOffsetY = { it / 3 },
+                            animationSpec = spring(
+                                dampingRatio = 0.8f,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ) + fadeIn(animationSpec = tween(190)))
+                            .togetherWith(
+                                slideOutVertically(
+                                    targetOffsetY = { -it / 6 },
+                                    animationSpec = tween(140)
+                                ) + fadeOut(animationSpec = tween(130))
+                            )
+                    } else {
+                        // Selected: Filled icon "pops" in (Scale + Fade)
+                        (scaleIn(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
+                            .togetherWith(fadeOut(animationSpec = tween(200)))
+                    }
+                }
             } else {
-                // Deselected: Outline icon fades back in normal
-                fadeIn(animationSpec = tween(200))
-                    .togetherWith(scaleOut(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200)))
+                if (isDashboard) {
+                    (slideInVertically(
+                        initialOffsetY = { -it / 4 },
+                        animationSpec = tween(170)
+                    ) + fadeIn(animationSpec = tween(180)))
+                        .togetherWith(
+                            slideOutVertically(
+                                targetOffsetY = { it / 3 },
+                                animationSpec = tween(160)
+                            ) + fadeOut(animationSpec = tween(150))
+                        )
+                } else {
+                    if (isStatistics) {
+                        (slideInVertically(
+                            initialOffsetY = { -it / 5 },
+                            animationSpec = tween(170)
+                        ) + fadeIn(animationSpec = tween(180)))
+                            .togetherWith(
+                                slideOutVertically(
+                                    targetOffsetY = { it / 4 },
+                                    animationSpec = tween(150)
+                                ) + fadeOut(animationSpec = tween(140))
+                            )
+                    } else {
+                        // Deselected: Outline icon fades back in normal
+                        fadeIn(animationSpec = tween(200))
+                            .togetherWith(scaleOut(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200)))
+                    }
+                }
             }
         },
         label = "TabIconAnimation"
     ) { selected ->
         Icon(
             imageVector = if (selected) selectedIcon else unselectedIcon,
-            contentDescription = description
+            contentDescription = description,
+            modifier = if (isDashboard) {
+                Modifier.graphicsLayer {
+                    rotationZ = dashboardTilt.value
+                    translationY = -dashboardLift.value
+                    scaleX = dashboardScale.value
+                    scaleY = dashboardScale.value
+                }.size(24.dp)
+            } else if (isStatistics) {
+                Modifier
+                    .graphicsLayer {
+                        rotationZ = statsTilt.value
+                        translationY = -statsLift.value
+                    }
+                    .size(24.dp)
+                    .alpha(statsAlpha)
+            } else {
+                Modifier
+            }
         )
     }
 }
@@ -4052,11 +3148,11 @@ fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.glucodata.ui.viewmodel.SensorViewModel) {
+fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.glucodata.ui.viewmodel.SensorViewModel, sensorCount: Int = 1) {
     var showTerminateDialog by remember { mutableStateOf(false) }
     var showForgetDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
-    var showClearDialog by remember { mutableStateOf(false) }
+    // Edit 79: showClearDialog removed — restart algorithm now in Sibionics Calibration bottom sheet
     var showClearAllDialog by remember { mutableStateOf(false) }
     var showUnifiedResetDialog by remember { mutableStateOf(false) }
     var keepAutoCalChecked by remember { mutableStateOf(false) }
@@ -4065,50 +3161,79 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     var wipeDataChecked by remember { mutableStateOf(false) }
     var keepDataChecked by remember { mutableStateOf(false) }
 
+    // Sibionics Calibration Bottom Sheet
+    var showSibionicsCalSheet by remember { mutableStateOf(false) }
+
     // AiDex Maintenance Dialogs
     var showAiDexClearDialog by remember { mutableStateOf(false) }
     var showAiDexCalibrateDialog by remember { mutableStateOf(false) }
     var showAiDexUnpairDialog by remember { mutableStateOf(false) }
     var calibrationInputText by remember { mutableStateOf("") }
-    // Edit 59c: Initialization bias compensation checkbox state
-    var resetBiasChecked by remember { mutableStateOf(true) }  // Default ON — most users want this after reset
+    // Edit 78: resetBiasChecked removed — bias toggle now lives in the bottom sheet as an independent switch
 
     val scope = rememberCoroutineScope() // Fix: Add missing scope
+    // Edit 74: Removed LocalContext.current that was added in Edit 73 for Toasts (rejected by user).
+    // Status feedback now goes through getDetailedBleStatus() via vendorActionStatus field.
 
+    // Edit 68b: AiDex disconnect button now uses terminateSensor (destructive) instead of
+    // disconnectSensor (soft). The old soft-disconnect left zombie "is finished" entries —
+    // bond/keys preserved, prefs not cleaned, sensor reappeared. terminateSensor calls
+    // forgetVendor() + removeAiDexFromPrefs() + finishSensor() + sensorEnded() = full cleanup.
     if (showTerminateDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showTerminateDialog = false
-                keepDataChecked = false
-            },
-            title = { Text(stringResource(R.string.disconnect_sensor_title)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.disconnect_sensor_desc))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = keepDataChecked,
-                            onCheckedChange = { keepDataChecked = it }
-                        )
-                        Text(stringResource(R.string.keep_data))
+        if (sensor.isAidex) {
+            // AiDex: full teardown — removes bond, keys, prefs, and sensor entry
+            AlertDialog(
+                onDismissRequest = { showTerminateDialog = false },
+                title = { Text(stringResource(R.string.disconnect_sensor_title)) },
+                text = { Text(stringResource(R.string.disconnect_sensor_aidex_desc)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.terminateSensor(sensor.serial)
+                        showTerminateDialog = false
+                    }) { Text(stringResource(R.string.disconnect)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTerminateDialog = false }) {
+                        Text(stringResource(R.string.cancel))
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.terminateSensor(sensor.serial, !keepDataChecked)
+            )
+        } else {
+            // Legacy sensors: destructive terminate
+            AlertDialog(
+                onDismissRequest = {
                     showTerminateDialog = false
                     keepDataChecked = false
-                }) { Text(stringResource(R.string.disconnect)) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showTerminateDialog = false
-                    keepDataChecked = false
-                }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
+                },
+                title = { Text(stringResource(R.string.disconnect_sensor_title)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.disconnect_sensor_desc))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = keepDataChecked,
+                                onCheckedChange = { keepDataChecked = it }
+                            )
+                            Text(stringResource(R.string.keep_data))
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.terminateSensor(sensor.serial, !keepDataChecked)
+                        showTerminateDialog = false
+                        keepDataChecked = false
+                    }) { Text(stringResource(R.string.disconnect)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showTerminateDialog = false
+                        keepDataChecked = false
+                    }) { Text(stringResource(R.string.cancel)) }
+                }
+            )
+        }
     }
 
     if (showReconnectDialog) {
@@ -4147,21 +3272,40 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
         )
     }
 
+    // Edit 62d: Forget/Disconnect dialog — for AiDex, this is the destructive "Disconnect" path
+    // that wipes vendor keys, disconnects, and removes from list.
     if (showForgetDialog) {
-        AlertDialog(
-            onDismissRequest = { showForgetDialog = false },
-            title = { Text(stringResource(R.string.forget_sensor_title)) },
-            text = { Text(stringResource(R.string.forget_sensor_desc)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.forgetSensor(sensor.serial)
-                    showForgetDialog = false
-                }) { Text(stringResource(R.string.forget)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showForgetDialog = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
+        if (sensor.isAidex) {
+            AlertDialog(
+                onDismissRequest = { showForgetDialog = false },
+                title = { Text(stringResource(R.string.disconnect_sensor_title)) },
+                text = { Text(stringResource(R.string.remove_sensor_desc)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.forgetSensor(sensor.serial)
+                        showForgetDialog = false
+                    }) { Text(stringResource(R.string.disconnect)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showForgetDialog = false }) { Text(stringResource(R.string.cancel)) }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { showForgetDialog = false },
+                title = { Text(stringResource(R.string.forget_sensor_title)) },
+                text = { Text(stringResource(R.string.forget_sensor_desc)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.forgetSensor(sensor.serial)
+                        showForgetDialog = false
+                    }) { Text(stringResource(R.string.forget)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showForgetDialog = false }) { Text(stringResource(R.string.cancel)) }
+                }
+            )
+        }
     }
 
     if (showResetDialog) {
@@ -4181,25 +3325,8 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
         )
     }
 
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text(stringResource(R.string.restart_autocal_title)) },
-            text = { Text(stringResource(R.string.restart_autocal_desc)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    // Launch coroutine to handle sequence
-                    viewModel.clearCalibration(sensor.serial)
-                    // Reconnect handles its own async disconnect/delay logic now
-                    viewModel.reconnectSensor(sensor.serial, false)
-                    showClearDialog = false
-                }) { Text(stringResource(R.string.restart)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
-    }
+    // Edit 79: showClearDialog AlertDialog removed — restart algorithm now lives
+    // inside the Sibionics Calibration bottom sheet as a destructive action card.
 
     if (showUnifiedResetDialog) {
         AlertDialog(
@@ -4247,8 +3374,8 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     if (showWipeDialog) {
         AlertDialog(
             onDismissRequest = { showWipeDialog = false },
-            title = { Text("Wipe sensor data?") },
-            text = { Text("This will clear all data for this sensor from the app. The connection will remain active.") },
+            title = { Text(stringResource(R.string.wipe_sensor_data_title)) },
+            text = { Text(stringResource(R.string.wipe_sensor_data_desc)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -4257,7 +3384,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Wipe Data")
+                    Text(stringResource(R.string.wipe_data))
                 }
             },
             dismissButton = {
@@ -4266,69 +3393,387 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
         )
     }
 
-    // Edit 59c: Upgraded AiDex Reset Dialog — combines hardware reset + clear storage + bias compensation
+    // Edit 78: AiDex Reset & Bias Correction bottom sheet — replaces old AlertDialog.
+    // Matches the destructive-action-sheet pattern from DashboardClearOptionsBottomSheet.
     if (showAiDexClearDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showAiDexClearDialog = false
-                resetBiasChecked = true
-            },
-            title = { Text("Reset Sensor") },
-            text = {
-                Column {
-                    Text("This performs a hardware reset on the AiDex sensor. The sensor will clear its internal storage and restart its session counter.")
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "After reset, readings may be low for up to 48 hours due to the sensor's initialization calibration.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+        @OptIn(ExperimentalMaterial3Api::class)
+        ModalBottomSheet(
+            onDismissRequest = { showAiDexClearDialog = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    stringResource(R.string.reset_correction_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.reset_correction_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // --- Bias Correction toggle ---
+                Surface(
+                    onClick = {
+                        if (sensor.resetCompensationActive) {
+                            viewModel.disableAiDexBiasCompensation(sensor.serial)
+                        } else {
+                            viewModel.enableAiDexBiasCompensation(sensor.serial)
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { resetBiasChecked = !resetBiasChecked }
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = resetBiasChecked,
-                            onCheckedChange = { resetBiasChecked = it }
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary
                         )
-                        Column {
-                            Text("Apply initialization bias correction")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Compensates for low readings during the first 48h after reset",
+                                stringResource(R.string.bias_correction),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (sensor.resetCompensationActive && sensor.resetCompensationStatus.isNotEmpty())
+                                    sensor.resetCompensationStatus
+                                else
+                                    stringResource(R.string.bias_correction_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (sensor.resetCompensationActive)
+                                    MaterialTheme.colorScheme.tertiary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        StyledSwitch(
+                            checked = sensor.resetCompensationActive,
+                            onCheckedChange = {
+                                if (sensor.resetCompensationActive) {
+                                    viewModel.disableAiDexBiasCompensation(sensor.serial)
+                                } else {
+                                    viewModel.enableAiDexBiasCompensation(sensor.serial)
+                                }
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // --- Hardware Reset action ---
+                Surface(
+                    onClick = {
+                        viewModel.resetAiDexSensor(sensor.serial, enableBiasCompensation = true)
+                        showAiDexClearDialog = false
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.RestartAlt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.hardware_reset),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                stringResource(R.string.hardware_reset_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    // Show current compensation status if already active
-                    if (sensor.resetCompensationActive && sensor.resetCompensationStatus.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Current: ${sensor.resetCompensationStatus}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.tertiary
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    onClick = { showAiDexClearDialog = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.cancel)) }
+            }
+        }
+    }
+
+    // Auto-Calibration Settings bottom sheet — redesigned with master switch
+    // Master switch guards advanced controls (slider + daily restart).
+    // Restart button available in both modes (native restart in OFF, windowed in ON).
+    if (showSibionicsCalSheet && sensor.isSibionics && sensor.viewMode != 1) {
+        @OptIn(ExperimentalMaterial3Api::class)
+        ModalBottomSheet(
+            onDismissRequest = { showSibionicsCalSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    stringResource(R.string.auto_calibration_mode),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- Master switch: Advanced auto-calibration (prominent card) ---
+                var advancedEnabled by remember(sensor.customCalEnabled) { mutableStateOf(sensor.customCalEnabled) }
+                // Track whether settings were changed but not yet applied (dirty state)
+                var settingsDirty by remember { mutableStateOf(false) }
+                val windowLabels = remember { listOf("12H", "1D", "2D", "3D", "5D", "7D", "10D", "14D", "18D", "MAX") }
+                val maxSliderPos = windowLabels.lastIndex
+                var sliderPos by remember(sensor.customCalEnabled, sensor.customCalIndex) {
+                    mutableStateOf(
+                        if (sensor.customCalEnabled) {
+                            sensor.customCalIndex.coerceIn(0, maxSliderPos).toFloat()
+                        } else {
+                            maxSliderPos.toFloat()
+                        }
+                    )
+                }
+                var customAutoReset by remember(sensor.customCalEnabled, sensor.customCalAutoReset) {
+                    mutableStateOf(if (sensor.customCalEnabled) sensor.customCalAutoReset else true)
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (advancedEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.surfaceContainerHighest,
+                    border = if (advancedEnabled)
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                    else null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val newState = !advancedEnabled
+                                advancedEnabled = newState
+                                if (!newState) {
+                                    viewModel.disableCustomCalAndReplay(sensor.serial)
+                                    settingsDirty = false
+                                } else {
+                                    val defaultPos = sliderPos.toInt().coerceIn(0, maxSliderPos)
+                                    viewModel.updateCustomCalibration(sensor.serial, true, defaultPos, customAutoReset)
+                                    settingsDirty = true
+                                }
+                            }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = if (advancedEnabled) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Advanced auto-calibration",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if (advancedEnabled) "Custom calibration window active"
+                                else "Standard Juggluco algorithm",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        StyledSwitch(
+                            checked = advancedEnabled,
+                            onCheckedChange = { checked ->
+                                advancedEnabled = checked
+                                if (!checked) {
+                                    viewModel.disableCustomCalAndReplay(sensor.serial)
+                                    settingsDirty = false
+                                } else {
+                                    val defaultPos = sliderPos.toInt().coerceIn(0, maxSliderPos)
+                                    viewModel.updateCustomCalibration(sensor.serial, true, defaultPos, customAutoReset)
+                                    settingsDirty = true
+                                }
+                            }
                         )
                     }
                 }
-            },
-            confirmButton = {
-                Button(
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- Advanced controls (slider + daily restart) — visible when master switch ON ---
+                AnimatedVisibility(visible = advancedEnabled) {
+                    Column {
+                        val currentPos = sliderPos.toInt().coerceIn(0, maxSliderPos)
+                        val currentLabel = windowLabels[currentPos]
+
+                        // Current mode label
+                        Text(
+                            currentLabel,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (currentLabel == "MAX") MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            if (currentLabel == "MAX") "Use all available sensor data"
+                            else "$currentLabel calibration window",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+
+                        Slider(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                            value = sliderPos,
+                            onValueChange = { sliderPos = it },
+                            valueRange = 0f..maxSliderPos.toFloat(),
+                            steps = maxSliderPos - 1,
+                            onValueChangeFinished = {
+                                val pos = sliderPos.toInt().coerceIn(0, maxSliderPos)
+                                viewModel.updateCustomCalibration(sensor.serial, true, pos, customAutoReset)
+                                settingsDirty = true
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // --- Restart daily toggle (full-row touch target) ---
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    val newVal = !customAutoReset
+                                    customAutoReset = newVal
+                                    val pos = sliderPos.toInt().coerceIn(0, maxSliderPos)
+                                    viewModel.updateCustomCalibration(sensor.serial, true, pos, newVal)
+                                }
+                                .padding(horizontal = 4.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Restart daily",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    "Automatically restart algorithm once per day",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            StyledSwitch(
+                                checked = customAutoReset,
+                                onCheckedChange = { checked ->
+                                    customAutoReset = checked
+                                    val pos = sliderPos.toInt().coerceIn(0, maxSliderPos)
+                                    viewModel.updateCustomCalibration(sensor.serial, true, pos, checked)
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+
+                // --- Restart algorithm button (always visible) ---
+                // Visual: RED when dirty (unapplied changes), subtle otherwise
+                val restartButtonColor = if (settingsDirty)
+                    MaterialTheme.colorScheme.errorContainer
+                else
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                val restartIconColor = MaterialTheme.colorScheme.error
+                val restartTextColor = MaterialTheme.colorScheme.error
+
+                Surface(
                     onClick = {
-                        viewModel.resetAiDexSensor(sensor.serial, enableBiasCompensation = resetBiasChecked)
-                        showAiDexClearDialog = false
-                        resetBiasChecked = true
+                        if (advancedEnabled) {
+                            viewModel.localReplay(sensor.serial)
+                        } else {
+                            viewModel.disableCustomCalAndReplay(sensor.serial)
+                        }
+                        settingsDirty = false
+                        showSibionicsCalSheet = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Reset") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showAiDexClearDialog = false
-                    resetBiasChecked = true
-                }) { Text(stringResource(R.string.cancel)) }
+                    shape = RoundedCornerShape(12.dp),
+                    color = restartButtonColor,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.RestartAlt,
+                            contentDescription = null,
+                            tint = restartIconColor
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (settingsDirty) stringResource(R.string.restart_algorithm_to_apply)
+                                else stringResource(R.string.restart_algorithm),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = restartTextColor
+                            )
+                            Text(
+                                if (settingsDirty) stringResource(R.string.settings_changed_press_to_apply)
+                                else if (advancedEnabled) stringResource(R.string.restart_with_current_window)
+                                else stringResource(R.string.restart_with_standard_algorithm),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    onClick = { showSibionicsCalSheet = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.cancel)) }
             }
-        )
+        }
     }
 
     if (showAiDexCalibrateDialog) {
@@ -4337,12 +3782,12 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                 showAiDexCalibrateDialog = false
                 calibrationInputText = ""
             },
-            title = { Text("Calibrate Sensor") },
+            title = { Text(stringResource(R.string.calibrate_sensor_title)) },
             text = {
                 val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
                 val unitLabel = if (isMmol) "mmol/L" else "mg/dL"
                 Column {
-                    Text("Enter your blood glucose meter reading in $unitLabel to calibrate the sensor.")
+                    Text(stringResource(R.string.calibrate_sensor_desc, unitLabel))
                     Spacer(modifier = Modifier.height(12.dp))
                     androidx.compose.material3.OutlinedTextField(
                         value = calibrationInputText,
@@ -4359,7 +3804,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                 newVal.filter { c -> c.isDigit() }
                             }
                         },
-                        label = { Text("Glucose ($unitLabel)") },
+                        label = { Text(stringResource(R.string.glucose_with_unit, unitLabel)) },
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = if (isMmol)
                                 androidx.compose.ui.text.input.KeyboardType.Decimal
@@ -4388,7 +3833,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                         }
                     },
                     enabled = isValid
-                ) { Text("Calibrate") }
+                ) { Text(stringResource(R.string.calibrate_action)) }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -4402,8 +3847,8 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     if (showAiDexUnpairDialog) {
         AlertDialog(
             onDismissRequest = { showAiDexUnpairDialog = false },
-            title = { Text("Unpair Sensor?") },
-            text = { Text("Delete the pairing bond on the sensor and clear saved keys. The sensor will be free to pair with another device. The sensor entry will remain in the app but will no longer connect.") },
+            title = { Text(stringResource(R.string.unpair_sensor_title)) },
+            text = { Text(stringResource(R.string.unpair_sensor_desc)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -4411,7 +3856,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                         showAiDexUnpairDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Unpair") }
+                ) { Text(stringResource(R.string.unpair)) }
             },
             dismissButton = {
                 TextButton(onClick = { showAiDexUnpairDialog = false }) { Text(stringResource(R.string.cancel)) }
@@ -4497,28 +3942,43 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                 val badgeBg = if(isMain) sensor.color.copy(alpha = 0.15f) else Color.Transparent
                                 val badgeBorder = if(isMain) null else androidx.compose.foundation.BorderStroke(1.dp, sensor.color.copy(alpha=0.3f))
 
-                                // Touch Target Wrapper (48dp minimum)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .clickable { if(!isMain) viewModel.setMain(sensor.serial) }
-                                        .defaultMinSize(minWidth = 26.dp, minHeight = 26.dp), // Check imports
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Surface(
-                                        color = badgeBg,
-                                        shape = androidx.compose.foundation.shape.CircleShape,
-                                        border = badgeBorder
+                                if (sensorCount > 1) {
+                                    // Multi-sensor: interactive badge with Surface background
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .then(
+                                                if (!isMain) Modifier.clickable { viewModel.setMain(sensor.serial) }
+                                                else Modifier
+                                            )
+                                            .defaultMinSize(minWidth = 26.dp, minHeight = 26.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(
-                                            imageVector = if (isMain) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-                                            contentDescription = if (isMain) "Active" else "Set Main",
-                                            tint = badgeColor,
-                                            modifier = Modifier
-                                                .padding(horizontal = 8.dp, vertical = 8.dp)
-                                                .size(18.dp)
-                                        )
+                                        Surface(
+                                            color = badgeBg,
+                                            shape = androidx.compose.foundation.shape.CircleShape,
+                                            border = badgeBorder
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isMain) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                                                contentDescription = if (isMain) "Active" else "Set Main",
+                                                tint = badgeColor,
+                                                modifier = Modifier
+                                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                                                    .size(18.dp)
+                                            )
+                                        }
                                     }
+                                } else {
+                                    // Single sensor: slim inline checkmark, no touch target
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle,
+                                        contentDescription = "Active",
+                                        tint = badgeColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                                 Text(
                                     text = "${statusText}",
@@ -4623,19 +4083,19 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 
                     // AiDex: Battery voltage (from AUTO_UPDATE_BATTERY_VOLTAGE)
                     if (sensor.isAidex && sensor.batteryMillivolts > 0) {
-                        DataRow("Battery", String.format(java.util.Locale.getDefault(), "%.3f V", sensor.batteryMillivolts / 1000.0))
+                        DataRow(stringResource(R.string.sensor_battery_voltage), String.format(java.util.Locale.getDefault(), "%.3f V", sensor.batteryMillivolts / 1000.0))
                     }
 
                     // Edit 58b: AiDex sensor remaining life
                     if (sensor.isAidex && sensor.sensorRemainingHours >= 0) {
                         val remainText = when {
-                            sensor.isSensorExpired -> "Expired"
-                            sensor.sensorRemainingHours <= 0 -> "Expired"
-                            sensor.sensorRemainingHours <= 24 -> "${sensor.sensorRemainingHours}h remaining"
+                            sensor.isSensorExpired -> stringResource(R.string.expired)
+                            sensor.sensorRemainingHours <= 0 -> stringResource(R.string.expired)
+                            sensor.sensorRemainingHours <= 24 -> stringResource(R.string.hours_remaining, sensor.sensorRemainingHours)
                             else -> {
                                 val days = sensor.sensorRemainingHours / 24
                                 val hours = sensor.sensorRemainingHours % 24
-                                "${days}d ${hours}h remaining"
+                                stringResource(R.string.days_hours_remaining, days, hours)
                             }
                         }
                         val remainColor = when {
@@ -4648,7 +4108,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Sensor Life", style = labelStyle)
+                            Text(stringResource(R.string.sensor_life), style = labelStyle)
                             Text(
                                 remainText,
                                 style = valueStyle.copy(color = remainColor),
@@ -4661,42 +4121,15 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     if (sensor.isAidex && sensor.sensorAgeHours >= 0) {
                         val ageText = if (sensor.sensorAgeHours < 24) "${sensor.sensorAgeHours}h"
                                       else "${sensor.sensorAgeHours / 24}d ${sensor.sensorAgeHours % 24}h"
-                        DataRow("Sensor Age", ageText)
+                        DataRow(stringResource(R.string.sensor_age), ageText)
                     }
 
                     // Edit 58c: AiDex device metadata (firmware, hardware, model)
                     if (sensor.isAidex && sensor.vendorModel.isNotEmpty()) {
-                        DataRow("Model", sensor.vendorModel)
+                        DataRow(stringResource(R.string.model), sensor.vendorModel)
                     }
                     if (sensor.isAidex && sensor.vendorFirmware.isNotEmpty()) {
-                        DataRow("Firmware", "v${sensor.vendorFirmware}")
-                    }
-
-                    // Edit 59c: Initialization bias compensation status indicator
-                    if (sensor.isAidex && sensor.resetCompensationActive && sensor.resetCompensationStatus.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Bias Correction", style = labelStyle)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    sensor.resetCompensationStatus,
-                                    style = valueStyle.copy(color = MaterialTheme.colorScheme.tertiary),
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                // Small disable button
-                                TextButton(
-                                    onClick = { viewModel.disableAiDexBiasCompensation(sensor.serial) },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(24.dp)
-                                ) {
-                                    Text("Off", style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                        }
+                        DataRow(stringResource(R.string.firmware), "v${sensor.vendorFirmware}")
                     }
 
                     // AiDex: Sensor expired warning
@@ -4705,9 +4138,9 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Status", style = labelStyle)
+                            Text(stringResource(R.string.status), style = labelStyle)
                             Text(
-                                "Sensor Expired",
+                                stringResource(R.string.sensor_expired_text),
                                 style = valueStyle.copy(color = MaterialTheme.colorScheme.error),
                                 fontWeight = FontWeight.Bold
                             )
@@ -4746,432 +4179,158 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 //            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 //            Spacer(modifier = Modifier.height(16.dp))
 
-            // Calibration Mode (Sibionics only) - M3 Expressive Connected Button Group
-            if (sensor.isSibionics) {
-
-                Row(
+            // Edit 79 rev: Sensor Data Mode — ConnectedButtonGroup
+            if (sensor.isSibionics || sensor.isAidex) {
+                Text(
+                    stringResource(R.string.data_mode),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                val modeLabels = listOf(
+                    stringResource(R.string.auto),
+                    stringResource(R.string.raw),
+                    stringResource(R.string.auto_raw),
+                    stringResource(R.string.raw_auto)
+                )
+                ConnectedButtonGroup(
+                    options = modeLabels.indices.toList(),
+                    selectedOption = sensor.viewMode,
+                    onOptionSelected = { viewModel.setCalibrationMode(sensor.serial, it) },
+                    label = { Text(modeLabels[it]) },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        stringResource(R.string.calibration_algorithm),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedContentColor = MaterialTheme.colorScheme.onPrimary,
+                    unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(20.dp))
 
-                    // M3 Expressive Trailing Action (Compact)
-                    if (sensor.isSibionics && sensor.viewMode != 1) {
-                        FilledTonalButton(
-                        onClick = { showClearDialog = true },
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-
-//                        Spacer(Modifier.width(4.dp))
-//                        Text(stringResource(R.string.restart), style = MaterialTheme.typography.labelLarge)
-                    }
-                        Spacer(modifier = Modifier.height(48.dp))
-
+                // Auto-calibration entry — Sibionics only, hidden when Raw mode selected (viewMode == 1)
+                if (sensor.isSibionics && sensor.viewMode != 1) {
+                    val calSubtitle = if (sensor.customCalEnabled) {
+                        val calLabels = listOf("12H", "1D", "2D", "3D", "5D", "7D", "10D", "14D", "18D", "MAX")
+                        val label = calLabels.getOrElse(sensor.customCalIndex) { "12H" }
+                        "$label ${stringResource(R.string.window_label)}"
                     } else {
-                        Spacer(modifier = Modifier.height(48.dp))
+                        stringResource(R.string.juggluco_native)
                     }
+                    Surface(
+                        onClick = { showSibionicsCalSheet = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.auto_calibration_mode),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    calSubtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (sensor.customCalEnabled) MaterialTheme.colorScheme.tertiary
+                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp) // Add vertical spacing for wrapped rows
-                ) {
-
-                    val autoStr = stringResource(R.string.auto)
-                    val rawStr = stringResource(R.string.raw)
-                    val autoRawStr = stringResource(R.string.auto_raw)
-                    val rawAutoStr = stringResource(R.string.raw_auto)
-                    // Note: Broadcast Only is a separate connection option (checkbox), not a viewMode
-
-                    val modes = listOf(autoStr, rawStr, autoRawStr, rawAutoStr)
-                    modes.forEachIndexed { index, title ->
-                        FilterChip(
-                            selected = sensor.viewMode == index,
-                            onClick = { viewModel.setCalibrationMode(sensor.serial, index) },
-                            label = { Text(title) }
-                        )
-                    }
+//                    Spacer(modifier = Modifier.height(8.dp))
                 }
-
-//                BUTTONS ALT
-
-//                Text(
-//                    stringResource(R.string.calibration_algorithm),
-//                    style = MaterialTheme.typography.labelLarge,
-//                    color = MaterialTheme.colorScheme.primary
-//                )
-//                Spacer(modifier = Modifier.height(16.dp))
-//
-//                val autoStr = stringResource(R.string.auto)
-//                val rawStr = stringResource(R.string.raw)
-//                val autoRawStr = stringResource(R.string.auto_raw)
-//                val rawAutoStr = stringResource(R.string.raw_auto)
-//                val modes = listOf(autoStr, rawStr, autoRawStr, rawAutoStr)
-//
-//                // M3 Connected Button Group - single container, flush buttons
-//                Surface(
-//                    shape = RoundedCornerShape(90), // Full pill/capsule
-//                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-//                    modifier = Modifier.fillMaxWidth()
-//                ) {
-//                    Row(
-//                        modifier = Modifier.padding(0.dp)
-//                    ) {
-//                        modes.forEachIndexed { index, title ->
-//                            val isSelected = sensor.viewMode == index
-//
-//                            // Selected state with animated background
-//                            val backgroundColor by animateColorAsState(
-//                                targetValue = if (isSelected)
-//                                    MaterialTheme.colorScheme.secondaryContainer
-//                                else
-//                                    Color.Transparent,
-//                                animationSpec = tween(200),
-//                                label = "bgColor$index"
-//                            )
-//
-//                            Surface(
-//                                onClick = { viewModel.setCalibrationMode(sensor.serial, index) },
-//                                shape = RoundedCornerShape(90), // Each button is also pill-shaped
-//                                color = backgroundColor,
-//                                modifier = Modifier.weight(1f)
-//                            ) {
-//                                Row(
-//                                    horizontalArrangement = Arrangement.Center,
-//                                    verticalAlignment = Alignment.CenterVertically,
-//                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
-//                                ) {
-//                                    // Star icon for selected state (like the reference)
-//                                    if (isSelected) {
-//
-//                                        Spacer(modifier = Modifier.width(4.dp))
-//                                    }
-//                                    Text(
-//                                        text = title,
-//                                        style = MaterialTheme.typography.labelMedium,
-//                                        color = if (isSelected)
-//                                            MaterialTheme.colorScheme.onSecondaryContainer
-//                                        else
-//                                            MaterialTheme.colorScheme.onSurfaceVariant,
-//                                        maxLines = 1
-//                                    )
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (sensor.isAidex) {
-                // Broadcast-Only Connection Option
+                // Broadcast only mode — compact row with subtitle
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = sensor.broadcastOnlyConnection,
-                        onCheckedChange = { viewModel.setBroadcastOnlyConnection(sensor.serial, it) }
-                    )
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            stringResource(R.string.broadcast_only),
+                            stringResource(R.string.broadcast_only_mode_title),
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                            "Use BLE advertisements only (no GATT connection)",
+                            stringResource(R.string.broadcast_only_mode_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-
-
-            if (sensor.isSibionics && sensor.viewMode != 1) {
-
-                // Button moved to Calibration Algorithm header
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                var customEnabled by remember(sensor.customCalEnabled) { mutableStateOf(sensor.customCalEnabled) }
-                var customIndex by remember(sensor.customCalIndex) { mutableStateOf(sensor.customCalIndex.toFloat()) }
-                var customAutoReset by remember(sensor.customCalAutoReset) { mutableStateOf(sensor.customCalAutoReset) }
-
-                // Helper for slider labels
-                val labels = listOf("12 hours", "24 hours", "2 days", "3 days", "7 days", "14 days", "20 days")
-
-                // Calculate max allowed index based on sensor age
-                val sensorAge = System.currentTimeMillis() - sensor.startMs
-                val maxAllowedIndex = if (sensor.startMs > 0) {
-                    when {
-                        sensorAge >= 20L * 24 * 3600 * 1000 -> 6
-                        sensorAge >= 14L * 24 * 3600 * 1000 -> 5
-                        sensorAge >= 7L * 24 * 3600 * 1000 -> 4
-                        sensorAge >= 3L * 24 * 3600 * 1000 -> 3
-                        sensorAge >= 2L * 24 * 3600 * 1000 -> 2
-                        sensorAge >= 24L * 3600 * 1000 -> 1
-                        else -> 0
-                    }
-                } else {
-                    6 // Fallback if start time unknown
-                }
-
-                // Coerce current index to valid range
-                // Note: We don't auto-update the backend here to avoid side effects, but we visually clamp the slider
-                val safeIndex = customIndex.coerceIn(0f, maxAllowedIndex.toFloat())
-                val currentLabel = labels.getOrElse(safeIndex.toInt()) { "12 hours" }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(stringResource(R.string.auto_calibration_mode), style = MaterialTheme.typography.titleMedium)
-//                             if (!customEnabled) {
-//                                 Text("Juggluco native", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-//                             }
-                        if (customEnabled) {
-                            Text(
-                                text = "$currentLabel ${stringResource(R.string.window_label)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.juggluco_native),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.width(12.dp))
                     StyledSwitch(
-                        checked = customEnabled,
-                        onCheckedChange = { enabled ->
-                            customEnabled = enabled
-                            viewModel.updateCustomCalibration(sensor.serial, enabled, safeIndex.toInt(), customAutoReset)
-                        }
+                        checked = sensor.broadcastOnlyConnection,
+                        onCheckedChange = { viewModel.setBroadcastOnlyConnection(sensor.serial, it) }
                     )
                 }
-
-                AnimatedVisibility(visible = customEnabled) {
-                    Column {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (maxAllowedIndex < 6) {
-//                             Text(
-//                                text = "Limited by sensor age (${(sensorAge / (3600 * 1000 * 24))} days)",
-//                                style = MaterialTheme.typography.labelSmall,
-//                                color = MaterialTheme.colorScheme.secondary,
-//                                modifier = Modifier.padding(horizontal = 8.dp)
-//                            )
-                        }
-                        Slider(
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            value = safeIndex,
-                            onValueChange = { customIndex = it },
-                            valueRange = 0f..maxAllowedIndex.toFloat(),
-                            steps = if (maxAllowedIndex > 0) maxAllowedIndex - 1 else 0,
-                            onValueChangeFinished = {
-                                viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt().coerceAtMost(maxAllowedIndex), customAutoReset)
-                            }
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                val newVal = !customAutoReset
-                                customAutoReset = newVal
-                                viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), newVal)
-                            },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = customAutoReset,
-                                onCheckedChange = { checked ->
-                                    customAutoReset = checked
-                                    viewModel.updateCustomCalibration(sensor.serial, true, customIndex.toInt(), checked)
-                                }
-                            )
-                            Text(stringResource(R.string.auto_restart_algorithm), style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
+//                Spacer(modifier = Modifier.height(8.dp))
             }
-            if (sensor.isSibionics2) {
 
 
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // Auto reset
-                // LOGIC:
-                // < 25 means Enabled (Standard range is 1-22).
-                // >= 25 (e.g. 300) means Disabled/Never.
-                val isAutoResetEnabled = sensor.autoResetDays < 25
-
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Use Int for stepper value
-                    var daysValue by remember(sensor.autoResetDays) {
-                        mutableStateOf(if (isAutoResetEnabled) sensor.autoResetDays else 20)
-                    }
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left: Title only
-                        Text(
-                            stringResource(R.string.auto_reset_title), 
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        
-                        // Right: Integrated Floating Stepper + Switch
-                        // Peak 2026: Capsule containment, Ghost state, Spring animation
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp) // Extra spacing before switch
-                        ) {
-                            // Animate stepper scale and alpha with spring
-                            val stepperScale by animateFloatAsState(
-                                targetValue = if (isAutoResetEnabled) 1f else 0.95f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                ),
-                                label = "stepperScale"
-                            )
-                            val stepperAlpha by animateFloatAsState(
-                                targetValue = if (isAutoResetEnabled) 1f else 0.38f,
-                                animationSpec = tween(250),
-                                label = "stepperAlpha"
-                            )
-                            
-                            // M3 Peak 2026: Capsule Container wraps the entire stepper
-                            Surface(
-                                shape = MaterialTheme.shapes.large, // Pill-like capsule
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier
-                                    .graphicsLayer {
-                                        scaleX = stepperScale
-                                        scaleY = stepperScale
-                                        alpha = stepperAlpha
-                                    }
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(0.dp),
-                                    modifier = Modifier.padding(4.dp)
-                                ) {
-                                    // Minus button - 40dp touch target, 16dp visible icon
-                                    IconButton(
-                                        onClick = {
-                                            if (isAutoResetEnabled && daysValue > 1) {
-                                                daysValue--
-                                                viewModel.setAutoResetDays(sensor.serial, daysValue)
-                                            }
-                                        },
-                                        enabled = isAutoResetEnabled && daysValue > 1,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Remove,
-                                            contentDescription = "Decrease",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (isAutoResetEnabled && daysValue > 1)
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            else
-                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                        )
-                                    }
-                                    
-                                    // Value display - the single source of truth
-                                    Surface(
-                                        shape = MaterialTheme.shapes.medium,
-                                        color = if (isAutoResetEnabled) 
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        else
-                                            MaterialTheme.colorScheme.surfaceContainerHighest
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.auto_reset_days, daysValue),
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (isAutoResetEnabled)
-                                                MaterialTheme.colorScheme.onPrimaryContainer
-                                            else
-                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                        )
-                                    }
-                                    
-                                    // Plus button - 40dp touch target, 16dp visible icon
-                                    IconButton(
-                                        onClick = {
-                                            if (isAutoResetEnabled && daysValue < 22) {
-                                                daysValue++
-                                                viewModel.setAutoResetDays(sensor.serial, daysValue)
-                                            }
-                                        },
-                                        enabled = isAutoResetEnabled && daysValue < 22,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = "Increase",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (isAutoResetEnabled && daysValue < 22)
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            else
-                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            StyledSwitch(
-                                checked = isAutoResetEnabled,
-                                onCheckedChange = { enabled ->
-                                    val newValue = if (enabled) daysValue else 300
-                                    viewModel.setAutoResetDays(sensor.serial, newValue)
-                                }
-                            )
-                        }
-                    }
-                }
-            } // End isSibionics2 block
+            // Edit 79: Auto-calibration and auto-reset controls moved to Sibionics Calibration bottom sheet.
 
             // --- ACTION BUTTONS (Always Visible) ---
             Spacer(modifier = Modifier.height(24.dp))
 
             // AiDex: Calibration history list, then Calibrate button, then Reset | Pair/Unpair row
             if (sensor.isAidex) {
+
+                // Full-width Calibrate button — disabled when vendor BLE is not connected
+                val canCalibrate = sensor.isVendorConnected && !sensor.broadcastOnlyConnection
+                FilledTonalButton(
+                    onClick = { showAiDexCalibrateDialog = true },
+                    enabled = canCalibrate,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bloodtype,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (canCalibrate) stringResource(R.string.calibrate_action) else stringResource(R.string.calibrate_connect_first),
+                        maxLines = 1
+                    )
+                }
                 // Calibration history — show previous calibrations from the sensor
                 if (sensor.vendorCalibrations.isNotEmpty()) {
                     val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
                     val unitLabel = if (isMmol) "mmol/L" else "mg/dL"
                     val calDateFormat = java.text.SimpleDateFormat("dd MMM HH:mm", java.util.Locale.getDefault())
 
-                    Text(
-                        text = "Previous Calibrations",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
+//                    Text(
+//                        text = "Previous Calibrations",
+//                        style = MaterialTheme.typography.titleSmall,
+//                        color = MaterialTheme.colorScheme.onSurface,
+//                        modifier = Modifier.padding(bottom = 8.dp)
+//                    )
                     Surface(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                         shape = RoundedCornerShape(12.dp),
@@ -5220,45 +4379,36 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     }
                 }
 
-                // Full-width Calibrate button — disabled when vendor BLE is not connected
-                val canCalibrate = sensor.isVendorConnected && !sensor.broadcastOnlyConnection
-                FilledTonalButton(
-                    onClick = { showAiDexCalibrateDialog = true },
-                    enabled = canCalibrate,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Bloodtype,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (canCalibrate) "Calibrate" else "Calibrate (connect first)",
-                        maxLines = 1
-                    )
-                }
+                // Edit 78: Bias correction toggle moved to the Reset & Correction bottom sheet.
+                // No inline toggle here — it was clipped by the card container and had
+                // touch target issues. Users access it via the Reset button now.
 
-                // Reset | Pair/Unpair row
+
+                // Edit 74: Reset (left, smaller, no weight) | Unpair/Pair (right, larger, weight 1f)
+                // Unpair/Pair is more important — it's the primary action for AiDex sensor management.
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Reset (clear storage) — left
+                    // Edit 78: Reset button — opens bottom sheet. Shows tertiary tint when
+                    // bias correction is active so the user knows something is going on.
                     FilledTonalButton(
                         onClick = { showAiDexClearDialog = true },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(
+                            topStart = 12.dp,
+                            bottomStart = 12.dp,
+                            topEnd = 4.dp,
+                            bottomEnd = 4.dp
+                        ),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            containerColor = if (sensor.resetCompensationActive)
+                                MaterialTheme.colorScheme.tertiaryContainer
+                            else
+                                MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (sensor.resetCompensationActive)
+                                MaterialTheme.colorScheme.onTertiaryContainer
+                            else
+                                MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     ) {
                         Icon(
@@ -5267,14 +4417,22 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Reset", maxLines = 1)
+                        Text(
+                            if (sensor.resetCompensationActive) stringResource(R.string.correcting) else stringResource(R.string.resettitle),
+                            maxLines = 1
+                        )
                     }
-                    // Pair / Unpair toggle — right, moderate warning tone (not destructive)
+                    // Pair / Unpair toggle — right (weight 1f = fills remaining space, prominent)
                     if (sensor.isVendorPaired) {
                         FilledTonalButton(
                             onClick = { showAiDexUnpairDialog = true },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(
+                                topStart = 4.dp,
+                                bottomStart = 4.dp,
+                                topEnd = 12.dp,
+                                bottomEnd = 12.dp
+                            ),
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -5286,13 +4444,20 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Unpair", maxLines = 1)
+                            Text(stringResource(R.string.unpair), maxLines = 1)
                         }
                     } else {
                         FilledTonalButton(
-                            onClick = { viewModel.rePairAiDexSensor(sensor.serial) },
+                            onClick = {
+                                viewModel.rePairAiDexSensor(sensor.serial)
+                            },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(
+                                topStart = 4.dp,
+                                bottomStart = 4.dp,
+                                topEnd = 12.dp,
+                                bottomEnd = 12.dp
+                            ),
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -5304,7 +4469,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Pair", maxLines = 1)
+                            Text(stringResource(R.string.pair), maxLines = 1)
                         }
                     }
                 }
@@ -5329,17 +4494,107 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.reset_sensor))
                 }
+
+                // Auto-reset days stepper (hardware reset scheduling, not algorithm-related)
+                val isAutoResetEnabled = sensor.autoResetDays < 25
+                var daysValue by remember(sensor.autoResetDays) {
+                    mutableStateOf(if (isAutoResetEnabled) sensor.autoResetDays else 20)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(R.string.auto_reset_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AnimatedVisibility(visible = isAutoResetEnabled) {
+                        Surface(
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(4.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        if (daysValue > 1) {
+                                            daysValue--
+                                            viewModel.setAutoResetDays(sensor.serial, daysValue)
+                                        }
+                                    },
+                                    enabled = daysValue > 1,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Remove,
+                                        contentDescription = "Decrease",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (daysValue > 1) MaterialTheme.colorScheme.onSurfaceVariant
+                                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                    )
+                                }
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.auto_reset_days, daysValue),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        if (daysValue < 22) {
+                                            daysValue++
+                                            viewModel.setAutoResetDays(sensor.serial, daysValue)
+                                        }
+                                    },
+                                    enabled = daysValue < 22,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Increase",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (daysValue < 22) MaterialTheme.colorScheme.onSurfaceVariant
+                                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    StyledSwitch(
+                        checked = isAutoResetEnabled,
+                        onCheckedChange = { enabled ->
+                            val newValue = if (enabled) daysValue else 300
+                            viewModel.setAutoResetDays(sensor.serial, newValue)
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Row 2: Reconnect | Disconnect
+            // Edit 63b: All sensors get the same 2-button row: Reconnect | Disconnect.
+            // AiDex-specific behavior is handled in the dialogs (terminate dialog routes
+            // AiDex through disconnectSensor instead of terminateSensor).
+            // Edit 65b: Reconnect (left, no modifier = wraps content, small) | Disconnect (right, weight 1f = large).
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)  // No gap for connected look
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Reconnect - Left side
+                // Reconnect - Left side (no modifier = wraps content, stays small)
                 FilledTonalButton(
                     onClick = { showReconnectDialog = true },
-//                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(
                         topStart = 12.dp,
                         bottomStart = 12.dp,
@@ -5359,10 +4614,8 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.reconnect), maxLines = 1)
                 }
-                
-//                Spacer(modifier = Modifier.width(4.dp))
 
-                // Disconnect - Right side (error container)
+                // Disconnect - Right side (weight 1f = fills remaining space, large)
                 FilledTonalButton(
                     onClick = { showTerminateDialog = true },
                     modifier = Modifier.weight(1f),
@@ -5392,9 +4645,203 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
 }
 }
 
+// Edit 48f: LibreView Settings Screen — bridges to legacy Libreview.java via Natives JNI
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
+    val context = LocalContext.current
 
+    // Load initial values from Natives
+    var email by remember { mutableStateOf(Natives.getlibreemail() ?: "") }
+    var password by remember { mutableStateOf(Natives.getlibrepass() ?: "") }
+    var isActive by remember { mutableStateOf(Natives.getuselibreview()) }
+    var isRussia by remember { mutableStateOf(Natives.getLibreCountry() == 4) }
+    var libreCurrent by remember { mutableStateOf(Natives.getLibreCurrent()) }
+    var libreIsViewed by remember { mutableStateOf(Natives.getLibreIsViewed()) }
+    var sendNumbers by remember { mutableStateOf(Natives.getSendNumbers()) }
+    var showPassword by remember { mutableStateOf(false) }
+    var statusText by remember { mutableStateOf(tk.glucodata.Libreview.getStatus()) }
 
+    val accountId = remember { Natives.getlibreAccountIDnumber() }
 
+    Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.libreview_settings_title)) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        // Auto-save on exit
+        DisposableEffect(Unit) {
+            onDispose {
+                Natives.setlibreemail(email)
+                Natives.setlibrepass(password)
+                Natives.setuselibreview(isActive)
+                Natives.setLibreCountry(if (isRussia) 4 else 0)
+                Natives.setLibreCurrent(libreCurrent)
+                Natives.setLibreIsViewed(libreIsViewed)
+                Natives.setSendNumbers(sendNumbers)
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Active Toggle
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.libreview_active)) },
+                supportingContent = { Text(stringResource(R.string.libreview_active_desc)) },
+                trailingContent = {
+                    StyledSwitch(checked = isActive, onCheckedChange = { isActive = it })
+                }
+            )
+
+            HorizontalDivider()
+
+            // Email
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text(stringResource(R.string.libreview_email)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Email
+                )
+            )
+
+            // Password
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text(stringResource(R.string.libreview_password)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                trailingIcon = {
+                    val image = if (showPassword) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(imageVector = image, contentDescription = if (showPassword) "Hide password" else "Show password")
+                    }
+                }
+            )
+
+            HorizontalDivider()
+
+            // Russia region toggle
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.libreview_russia)) },
+                trailingContent = {
+                    StyledSwitch(checked = isRussia, onCheckedChange = { isRussia = it })
+                }
+            )
+
+            // Libre Current
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.libreview_current)) },
+                trailingContent = {
+                    StyledSwitch(checked = libreCurrent, onCheckedChange = { libreCurrent = it })
+                }
+            )
+
+            // Libre Is Viewed
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.libreview_is_viewed)) },
+                trailingContent = {
+                    StyledSwitch(checked = libreIsViewed, onCheckedChange = { libreIsViewed = it })
+                }
+            )
+
+            // Send Numbers (insulin/carbs)
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.libreview_send_numbers)) },
+                trailingContent = {
+                    StyledSwitch(checked = sendNumbers, onCheckedChange = { sendNumbers = it })
+                }
+            )
+
+            HorizontalDivider()
+
+            // Account ID display
+            if (accountId > 0L) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.libreview_account_id)) },
+                    supportingContent = { Text(accountId.toString()) }
+                )
+            }
+
+            // Status display
+            if (statusText.isNotEmpty()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.libreview_status)) },
+                    supportingContent = { Text(statusText) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Send Now button
+            Button(
+                onClick = {
+                    // Save current settings first
+                    Natives.setlibreemail(email)
+                    Natives.setlibrepass(password)
+                    Natives.setuselibreview(isActive)
+                    Natives.setLibreCountry(if (isRussia) 4 else 0)
+                    Natives.wakelibreview(0)
+                    android.widget.Toast.makeText(context, context.getString(R.string.sending_now), android.widget.Toast.LENGTH_SHORT).show()
+                    // Refresh status after a short delay
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        statusText = tk.glucodata.Libreview.getStatus()
+                    }, 3000)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.libreview_send_now))
+            }
+
+            // Get Account ID button
+            OutlinedButton(
+                onClick = {
+                    // Save credentials first
+                    Natives.setlibreemail(email)
+                    Natives.setlibrepass(password)
+                    Natives.setLibreCountry(if (isRussia) 4 else 0)
+                    Natives.askServerforAccountID()
+                    android.widget.Toast.makeText(context, context.getString(R.string.requesting_account_id), android.widget.Toast.LENGTH_SHORT).show()
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        statusText = tk.glucodata.Libreview.getStatus()
+                    }, 5000)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.libreview_get_account_id))
+            }
+
+            // Resend data button
+            OutlinedButton(
+                onClick = {
+                    Natives.clearlibreFromMSec(0L)
+                    android.widget.Toast.makeText(context, context.getString(R.string.resend_triggered), android.widget.Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.libreview_resend))
+            }
+        }
+    }
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -5419,7 +4866,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Nightscout Settings") },
+                title = { Text(stringResource(R.string.nightscout_settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -5448,8 +4895,8 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
 
             // Active Switch
             ListItem(
-                headlineContent = { Text("Active") },
-                supportingContent = { Text("Enable Nightscout Upload") },
+                headlineContent = { Text(stringResource(R.string.active)) },
+                supportingContent = { Text(stringResource(R.string.nightscout_enable_upload)) },
                 trailingContent = {
                     StyledSwitch(checked = isActive, onCheckedChange = { isActive = it })
                 }
@@ -5461,17 +4908,17 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
             OutlinedTextField(
                 value = url,
                 onValueChange = { url = it },
-                label = { Text("Nightscout URL") },
+                label = { Text(stringResource(R.string.nightscout_url_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("https://my-nightscout.herokuapp.com") }
+                placeholder = { Text(stringResource(R.string.nightscout_url_placeholder)) }
             )
 
             // Secret
             OutlinedTextField(
                 value = secret,
                 onValueChange = { secret = it },
-                label = { Text("API Secret") },
+                label = { Text(stringResource(R.string.api_secret_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = if (showSecret) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
@@ -5482,7 +4929,7 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
                         Icons.Filled.VisibilityOff
 
                     IconButton(onClick = { showSecret = !showSecret }) {
-                        Icon(imageVector = image, contentDescription = if (showSecret) "Hide password" else "Show password")
+                        Icon(imageVector = image, contentDescription = if (showSecret) stringResource(R.string.hide_password) else stringResource(R.string.show_password))
                     }
                 }
             )
@@ -5491,8 +4938,8 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
 
             // Send Treatments
             ListItem(
-                headlineContent = { Text("Send Amounts") },
-                supportingContent = { Text("Upload Insulin/Carbs (Treatments)") },
+                headlineContent = { Text(stringResource(R.string.sendamounts)) },
+                supportingContent = { Text(stringResource(R.string.nightscout_send_amounts_desc)) },
                 trailingContent = {
                     StyledSwitch(checked = sendTreatments, onCheckedChange = { sendTreatments = it })
                 }
@@ -5500,8 +4947,8 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
 
             // Mobile only V3 check
             ListItem(
-                headlineContent = { Text("Use V3 API") },
-                supportingContent = { Text("Experimental") },
+                headlineContent = { Text(stringResource(R.string.nightscout_use_v3_api)) },
+                supportingContent = { Text(stringResource(R.string.experimental)) },
                 trailingContent = {
                     StyledSwitch(checked = isV3, onCheckedChange = { isV3 = it })
                 }
@@ -5513,21 +4960,21 @@ fun NightscoutSettingsScreen(navController: androidx.navigation.NavController) {
             Button(
                 onClick = {
                     Natives.wakeuploader()
-                    android.widget.Toast.makeText(context, "Sending now...", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.sending_now), android.widget.Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Send Now")
+                Text(stringResource(R.string.sendnow))
             }
 
             OutlinedButton(
                 onClick = {
                     Natives.resetuploader()
-                    android.widget.Toast.makeText(context, "Resend triggered", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.resend_triggered), android.widget.Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Resend Data (Reset)")
+                Text(stringResource(R.string.resend_data_reset))
             }
 
         }

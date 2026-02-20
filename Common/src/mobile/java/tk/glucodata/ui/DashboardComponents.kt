@@ -40,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.key
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,7 +53,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.LinearEasing
@@ -70,6 +73,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -81,6 +85,51 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.lerp
+import kotlin.math.cos
+import kotlin.math.sin
+import tk.glucodata.R
+import tk.glucodata.Applic
+import tk.glucodata.logic.TrendEngine
+
+private data class TrendCornerWeights(
+    val topStart: Float,
+    val topEnd: Float,
+    val bottomEnd: Float,
+    val bottomStart: Float
+)
+
+private fun lerpFloat(start: Float, end: Float, fraction: Float): Float =
+    start + (end - start) * fraction.coerceIn(0f, 1f)
+
+private fun trendCornerWeightsFromVelocity(velocity: Float): TrendCornerWeights {
+    val angleDeg = (-velocity * 25f).coerceIn(-90f, 90f)
+    val angleRad = Math.toRadians(angleDeg.toDouble())
+    val dirX = cos(angleRad).toFloat()
+    val dirY = sin(angleRad).toFloat()
+
+    fun cornerRoundWeight(cornerX: Float, cornerY: Float): Float {
+        val dot = ((dirX * cornerX + dirY * cornerY) * 0.70710677f).coerceIn(-1f, 1f)
+        return if (dot >= 0f) {
+            // Toward direction: sharper as dot increases.
+            lerpFloat(0.88f, 0.08f, dot)
+        } else {
+            // Opposite side: extra rounded.
+            lerpFloat(0.88f, 1f, -dot)
+        }
+    }
+
+    return TrendCornerWeights(
+        topStart = cornerRoundWeight(-1f, -1f),
+        topEnd = cornerRoundWeight(1f, -1f),
+        bottomEnd = cornerRoundWeight(1f, 1f),
+        bottomStart = cornerRoundWeight(-1f, 1f)
+    )
+}
+
+private fun directionalRadius(weight: Float, min: Dp, max: Dp): Dp = lerp(min, max, weight.coerceIn(0f, 1f))
 
 @Composable
 fun DashboardCombinedHeader(
@@ -129,6 +178,57 @@ fun DashboardCombinedHeader(
             tk.glucodata.logic.TrendEngine.TrendResult(tk.glucodata.logic.TrendEngine.TrendState.Unknown, 0f, 0f, 0f, 0f)
         }
     }
+    val configuration = LocalConfiguration.current
+    val isCompactWidth = configuration.screenWidthDp < 390
+    val startPadding = if (isCompactWidth) 20.dp else 28.dp
+    val trendIconSize = if (isCompactWidth) 34.dp else 40.dp
+    val cornerWeights = remember(trendResult.velocity) { trendCornerWeightsFromVelocity(trendResult.velocity) }
+    val cornerAnimSpec = spring<Dp>(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessLow
+    )
+
+    val heroTopStart by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.topStart, 22.dp, 52.dp),
+        animationSpec = cornerAnimSpec,
+        label = "HeroTopStartRadius"
+    )
+    val heroTopEnd by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.topEnd, 8.dp, 24.dp),
+        animationSpec = cornerAnimSpec,
+        label = "HeroTopEndRadius"
+    )
+    val heroBottomEnd by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.bottomEnd, 8.dp, 24.dp),
+        animationSpec = cornerAnimSpec,
+        label = "HeroBottomEndRadius"
+    )
+    val heroBottomStart by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.bottomStart, 22.dp, 46.dp),
+        animationSpec = cornerAnimSpec,
+        label = "HeroBottomStartRadius"
+    )
+
+    val sensorTopStart by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.topStart, 8.dp, 24.dp),
+        animationSpec = cornerAnimSpec,
+        label = "SensorTopStartRadius"
+    )
+    val sensorTopEnd by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.topEnd, 20.dp, 46.dp),
+        animationSpec = cornerAnimSpec,
+        label = "SensorTopEndRadius"
+    )
+    val sensorBottomEnd by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.bottomEnd, 22.dp, 52.dp),
+        animationSpec = cornerAnimSpec,
+        label = "SensorBottomEndRadius"
+    )
+    val sensorBottomStart by animateDpAsState(
+        targetValue = directionalRadius(cornerWeights.bottomStart, 8.dp, 24.dp),
+        animationSpec = cornerAnimSpec,
+        label = "SensorBottomStartRadius"
+    )
 
     Row(
         modifier = Modifier
@@ -151,9 +251,46 @@ fun DashboardCombinedHeader(
         val primaryText = dvs?.primaryStr ?: currentGlucose
         val secondaryText = dvs?.secondaryStr
         val tertiaryText = dvs?.tertiaryStr
-
-        // 3. Adaptive Layout Params
-        val startPadding = 28.dp
+        val hasSecondary = secondaryText != null
+        val hasTertiary = tertiaryText != null
+        val hasThreeValues = hasSecondary && hasTertiary
+        val primaryValueStyle = if (isCompactWidth) {
+            MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.SemiBold)
+        } else {
+            MaterialTheme.typography.displayLargeExpressive
+        }
+        val secondaryInlineStyle = if (isCompactWidth) {
+            MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium)
+        } else {
+            MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium)
+        }
+        val slashStyle = if (isCompactWidth) {
+            MaterialTheme.typography.headlineMedium
+        } else {
+            MaterialTheme.typography.headlineLarge
+        }
+        val secondaryThreeValueStyle = if (isCompactWidth) {
+            MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.18.sp
+            )
+        } else {
+            MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.12.sp
+            )
+        }
+        val tertiaryThreeValueStyle = if (isCompactWidth) {
+            MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.22.sp
+            )
+        } else {
+            MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.18.sp
+            )
+        }
 
         Card(
             onClick = onHeroClick,
@@ -164,7 +301,12 @@ fun DashboardCombinedHeader(
                 containerColor = glucoseContainerColor,
                 contentColor = glucoseContentColor
             ),
-            shape = RoundedCornerShape(topStart = 48.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+            shape = RoundedCornerShape(
+                topStart = heroTopStart,
+                topEnd = heroTopEnd,
+                bottomEnd = heroBottomEnd,
+                bottomStart = heroBottomStart
+            )
         ) {
             Row(
                 modifier = Modifier
@@ -173,52 +315,91 @@ fun DashboardCombinedHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
-                // Primary Value
-                AnimatedContent(
-                    targetState = primaryText,
-                    transitionSpec = {
-                        (slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { -it / 2 } + fadeIn(tween(200)))
-                            .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it / 2 } + fadeOut(tween(100)))
-                    },
-                    label = "GlucoseHeroAnimation"
-                ) { glucoseValue ->
-                    Text(
-                        text = glucoseValue,
-                        style = MaterialTheme.typography.displayLargeExpressive,
-                        color = glucoseContentColor
-                    )
-                }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AnimatedContent(
+                        targetState = primaryText,
+                        transitionSpec = {
+                            (slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { -it / 2 } + fadeIn(tween(200)))
+                                .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it / 2 } + fadeOut(tween(100)))
+                        },
+                        label = "GlucoseHeroAnimation"
+                    ) {
+                        Text(
+                            text = primaryText,
+                            style = primaryValueStyle,
+                            color = glucoseContentColor,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
 
-                // Secondary Value (inline)
-                if (secondaryText != null) {
-                    Text(
-                        text = " / ",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = glucoseContentColor.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                    Text(
-                        text = secondaryText,
-                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
-                        color = glucoseContentColor.copy(alpha = 0.7f)
-                    )
+                    if (hasThreeValues) {
+                        Row(
+                            modifier = Modifier.padding(start = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "/",
+                                style = slashStyle,
+                                color = glucoseContentColor.copy(alpha = 0.70f),
+                                softWrap = false,
+                                maxLines = 1,
+                                modifier = Modifier.offset(y = (-2).dp)
+                            )
+                            Text(
+                                text = secondaryText ?: "",
+                                style = secondaryThreeValueStyle,
+                                color = glucoseContentColor.copy(alpha = 0.90f),
+                                softWrap = false,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .padding(start = 4.dp)
+                                    .offset(y = 1.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 6.dp)
+                                    .width(1.dp)
+                                    .height(if (isCompactWidth) 14.dp else 16.dp)
+                                    .background(glucoseContentColor.copy(alpha = 0.30f), RoundedCornerShape(1.dp))
+                            )
+                            Text(
+                                text = tertiaryText ?: "",
+                                style = tertiaryThreeValueStyle,
+                                color = glucoseContentColor.copy(alpha = 0.66f),
+                                softWrap = false,
+                                maxLines = 1,
+                                modifier = Modifier.offset(y = (-2).dp)
+                            )
+                        }
+                    } else if (hasSecondary) {
+                        Text(
+                            text = "/ ${secondaryText ?: ""}",
+                            style = secondaryInlineStyle,
+                            color = glucoseContentColor.copy(alpha = 0.80f),
+                            softWrap = false,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    } else if (hasTertiary) {
+                        Text(
+                            text = "/ ${tertiaryText ?: ""}",
+                            style = tertiaryThreeValueStyle,
+                            color = glucoseContentColor.copy(alpha = 0.60f),
+                            softWrap = false,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
                 }
-
-                // Tertiary Value (smaller, appended)
-                if (tertiaryText != null) {
-                    Text(
-                        text = " · $tertiaryText",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = glucoseContentColor.copy(alpha = 0.5f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
 
                 // Trend Icon
                 tk.glucodata.ui.components.TrendIndicator(
                     trendResult = trendResult,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(trendIconSize),
                     color = glucoseContentColor
                 )
             }
@@ -233,7 +414,12 @@ fun DashboardCombinedHeader(
                 containerColor = sensorContainerColor,
                 contentColor = sensorContentColor
             ),
-            shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 28.dp, bottomEnd = 48.dp)
+            shape = RoundedCornerShape(
+                topStart = sensorTopStart,
+                topEnd = sensorTopEnd,
+                bottomEnd = sensorBottomEnd,
+                bottomStart = sensorBottomStart
+            )
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Dynamic Fill Layer
@@ -491,9 +677,21 @@ fun RecentReadingsCard(
     recentReadings: List<GlucosePoint>,
     unit: String,
     viewMode: Int,
+    onViewHistory: (() -> Unit)? = null,
     content: @Composable (Int, GlucosePoint) -> Unit // Rendering the row with Index
 ) {
     if (recentReadings.isNotEmpty()) {
+        // Do not animate rows on initial dashboard open.
+        // Only animate truly new readings that arrive afterward.
+        val seenTimestamps = remember { mutableSetOf<Long>() }
+        var initialized by remember { mutableStateOf(false) }
+
+        if (!initialized) {
+            seenTimestamps.clear()
+            seenTimestamps.addAll(recentReadings.map { it.timestamp })
+            initialized = true
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -505,13 +703,45 @@ fun RecentReadingsCard(
         ) {
             Column {
                 recentReadings.forEachIndexed { index, item ->
-                    key(item) {
-                        AnimatedVisibility(
-                            visibleState = remember { MutableTransitionState(false).apply { targetState = true } },
-                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn()
-                        ) {
+                    key(item.timestamp) {
+                        val isNewReading = !seenTimestamps.contains(item.timestamp)
+                        if (isNewReading) {
+                            seenTimestamps.add(item.timestamp)
+                            AnimatedVisibility(
+                                visibleState = remember { MutableTransitionState(false).apply { targetState = true } },
+                                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn()
+                            ) {
+                                content(index, item)
+                            }
+                        } else {
                             content(index, item)
                         }
+                    }
+                }
+                if (onViewHistory != null) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onViewHistory() }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreHoriz,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.historyname),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -619,7 +849,10 @@ fun CalibrationsCard(
     // Collect calibrations and enable state
     val allCalibrations by tk.glucodata.data.calibration.CalibrationManager.getCalibrationsFlow()?.collectAsState(initial = tk.glucodata.data.calibration.CalibrationManager.getCachedCalibrations())
         ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(tk.glucodata.data.calibration.CalibrationManager.getCachedCalibrations()) }
-    val calibrations = allCalibrations.filter { it.isRawMode == isRawMode }
+    val currentSensor = tk.glucodata.Natives.lastsensorname() ?: ""
+    val calibrations = allCalibrations.filter {
+        it.isRawMode == isRawMode && (it.sensorId == currentSensor || it.sensorId.isEmpty())
+    }
     
     val isEnabledForRaw by tk.glucodata.data.calibration.CalibrationManager.isEnabledForRaw.collectAsState()
     val isEnabledForAuto by tk.glucodata.data.calibration.CalibrationManager.isEnabledForAuto.collectAsState()
@@ -654,7 +887,7 @@ fun CalibrationsCard(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Calibrate",
+                text = stringResource(R.string.calibrate_action),
                 style = MaterialTheme.typography.titleMedium
             )
         }
@@ -699,7 +932,7 @@ fun CalibrationsCard(
                     ) {
                         Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Clear")
+                        Text(stringResource(R.string.clear))
                     }
                  } else {
 //                     Spacer(modifier = Modifier.weight(8.dp))
@@ -728,7 +961,7 @@ fun CalibrationsCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Calibrate",
+                        text = stringResource(R.string.calibrate_action),
                         style = MaterialTheme.typography.labelLarge
                     )
                 }
@@ -749,12 +982,12 @@ fun CalibrationsCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Enable Calibration",
+                        stringResource(R.string.enable_calibration),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "Adjust sensor readings",
+                        stringResource(R.string.adjust_sensor_readings),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -820,8 +1053,8 @@ fun CalibrationsCard(
                                          
                                          // Show Undo Snackbar
                                          val result = snackbarHostState?.showSnackbar(
-                                             message = "Calibration deleted",
-                                             actionLabel = "Undo",
+                                             message = Applic.app.getString(R.string.calibration_deleted),
+                                             actionLabel = Applic.app.getString(R.string.undo),
                                              duration = androidx.compose.material3.SnackbarDuration.Short
                                          )
                                          
@@ -840,7 +1073,7 @@ fun CalibrationsCard(
                                 },
                                 isDisabled = isRowDisabled,
                                 onClick = { onEditCalibration(cal) }
-                            ) {
+                        ) {
                                 // Row content with disabled visual state
                                 Row(
                                     modifier = Modifier
@@ -905,7 +1138,7 @@ fun CalibrationsCard(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Previous calibrations")
+                        Text(stringResource(R.string.previous_calibrations))
                     }
                 }
             }
@@ -920,7 +1153,7 @@ fun CalibrationsCard(
                     val disabled = calibrations.filter { !it.isEnabled }
                     disabled.forEach { tk.glucodata.data.calibration.CalibrationManager.deleteCalibration(it) }
                     snackbarHostState?.showSnackbar(
-                        message = "${disabled.size} disabled calibrations cleared",
+                        message = Applic.app.getString(R.string.disabled_calibrations_cleared, disabled.size),
                         duration = androidx.compose.material3.SnackbarDuration.Short
                     )
                 }
@@ -932,8 +1165,8 @@ fun CalibrationsCard(
                     tk.glucodata.data.calibration.CalibrationManager.clearAll()
                     
                     val result = snackbarHostState?.showSnackbar(
-                        message = "All calibrations cleared",
-                        actionLabel = "Undo",
+                        message = Applic.app.getString(R.string.all_calibrations_cleared),
+                        actionLabel = Applic.app.getString(R.string.undo),
                         duration = androidx.compose.material3.SnackbarDuration.Short
                     )
                     
@@ -1003,7 +1236,7 @@ fun SignalQualityIndicator(
         // Animated Icon
         Icon(
             imageVector = Icons.Filled.GraphicEq,
-            contentDescription = "Noise: $noiseLevel",
+            contentDescription = null,
             tint = color,
             modifier = Modifier
                 .size(14.dp)
@@ -1049,9 +1282,9 @@ private fun DashboardClearOptionsBottomSheet(
                 .padding(bottom = 32.dp) // Extra padding for nav bar
                 .padding(bottom = 24.dp)
         ) {
-            Text("Clear Calibrations", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.clear_calibrations_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Choose what to clear:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.choose_what_to_clear), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(24.dp))
             
             if (disabledCount > 0) {
@@ -1060,8 +1293,8 @@ private fun DashboardClearOptionsBottomSheet(
                         Icon(Icons.Filled.Close, null, tint = MaterialTheme.colorScheme.secondary)
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Clear disabled only", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                            Text("$disabledCount disabled", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.clear_disabled_only), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                            Text(stringResource(R.string.disabled_count, disabledCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -1073,17 +1306,14 @@ private fun DashboardClearOptionsBottomSheet(
                     Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Clear", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
-                        Text("$totalCount calibrations", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.clear), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.calibrations_count, totalCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
-            androidx.compose.material3.TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+            androidx.compose.material3.TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
         }
     }
 }
-
-
-

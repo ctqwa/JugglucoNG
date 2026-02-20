@@ -119,8 +119,10 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
   for (int off = 0; off < maxoff; off += 14) {
     const uint16_t *one = reinterpret_cast<uint16_t *>(start + off);
     const int index = std::byteswap(one[0]);
-    const double temp = std::byteswap(one[1]) / 10.0;
+    const uint16_t rawTemp = std::byteswap(one[1]);
+    const double temp = rawTemp / 10.0;
     const double value = std::byteswap(one[3]) / 10.0;
+    const int rawCurrent = std::byteswap(one[3]); // raw sensor integer (0.1 mmol/L units)
     const int numOfUnreceived = std::byteswap(one[5]);
 
     const int maxid = sens->getSiIndex();
@@ -173,17 +175,40 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
     }
 
     // Sanity check with streak counter - only reset after consecutive bad
-    // values
-    static int badValueStreak = 0;
+    // values (per-sensor via SiContext::badValueStreak member)
     constexpr int MAX_BAD_STREAK = 5;
+    constexpr int RESET_COOLDOWN_SECS = 300; // 5 min cooldown between resets
     if (newvalue > 50.0) {
       badValueStreak++;
       LOGGER("SIprocess: newvalue=%f is out of range. Streak=%d\n", newvalue,
              badValueStreak);
       if (badValueStreak >= MAX_BAD_STREAK) {
-        LOGGER("SIprocess: %d consecutive bad values, resetting algorithm\n",
-               badValueStreak);
-        this->reset(sens);
+        // Edit 85: Skip reset if already in reset mode (replaying history).
+        // During replay, the algorithm processes old data with a fresh context
+        // and regularly produces out-of-range values — this is expected and
+        // should NOT trigger another reset (which would loop).
+        if (sens->isInResetMode()) {
+          LOGGER("SIprocess: in reset mode, ignoring bad streak (%d)\n",
+                 badValueStreak);
+        } else {
+          // Edit 79: Cooldown guard — prevent reset loop after fresh algorithm start
+          uint32_t lastReset = sens->getinfo()->lastCalResetTime;
+          uint32_t now = (uint32_t)time(nullptr);
+          if (lastReset > 0 && (now - lastReset) < RESET_COOLDOWN_SECS) {
+            LOGGER("SIprocess: reset cooldown active (%d sec since last reset), skipping\n",
+                   (int)(now - lastReset));
+          } else {
+            LOGGER("SIprocess: %d consecutive bad values, resetting algorithm\n",
+                   badValueStreak);
+            // Only reset when custom calibration is active — in native mode
+            // (Auto), bad streaks are transient and the algorithm self-corrects.
+            if (sens->getinfo()->useCustomCalibration) {
+              this->reset(sens);
+            } else {
+              LOGSTRING("SIprocess: custom cal not enabled, skipping reset\n");
+            }
+          }
+        }
         badValueStreak = 0;
       }
       // Fallback to raw sensor value
@@ -209,11 +234,17 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
     //             if(infuture) sens->setSiIndex(index+1);
     // Valid range check aligned with sanity check thresholds (0.5-40)
     if (newvalue > 1 && newvalue < 30) {
-      sens->savestream(eventTime, index, mgdL, abbotttrend, change);
+      sens->savestream(eventTime, index, mgdL, abbotttrend, change, rawCurrent, rawTemp);
       sens->setSiIndex(index + 1);
       sens->retried = 0;
       saveSi3(sens, index, eventTime, !infuture, value, temp, !numOfUnreceived);
       if (!numOfUnreceived) {
+        // Current-time data (not replay). If we were in reset mode,
+        // replay is done — exit reset mode so normal operation resumes.
+        if (sens->isInResetMode()) {
+          LOGGER("SIprocess: replay reached current data (eventTime=%ld), exiting reset mode\n", (long)eventTime);
+          sens->exitResetMode();
+        }
         sens->sensorerror = false;
         if (sensor->finished) {
           sensor->finished = 0;

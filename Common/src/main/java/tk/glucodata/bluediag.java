@@ -81,6 +81,7 @@ public class bluediag {
     Button clearAllButton;
     Spinner calibSpinner;
     View calibRow;
+    AdapterView.OnItemSelectedListener calibSpinnerListener;
     private static DateFormat fname;
 
     public static void mktimeformat() {
@@ -211,7 +212,12 @@ public class bluediag {
                 final boolean showViewMode = resetvis || gatt instanceof tk.glucodata.drivers.aidex.AiDexSensor;
                 calibRow.setVisibility(showViewMode ? VISIBLE : GONE);
                 if (showViewMode && calibSpinner != null) {
-                    calibSpinner.setSelection(Natives.getViewMode(gatt.dataptr));
+                    final int nativeMode = Natives.getViewMode(gatt.dataptr);
+                    if (calibSpinner.getSelectedItemPosition() != nativeMode) {
+                        calibSpinner.setOnItemSelectedListener(null);
+                        calibSpinner.setSelection(nativeMode);
+                        calibSpinner.setOnItemSelectedListener(calibSpinnerListener);
+                    }
                 }
             }
         }
@@ -744,20 +750,24 @@ public class bluediag {
             calibRow = row;
             calibRow.setVisibility(GONE);
 
-            calibSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            calibSpinnerListener = new AdapterView.OnItemSelectedListener() {
                 public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (gatts != null && gatts.size() > gattselected) {
                         final SuperGattCallback gatt = gatts.get(gattselected);
                         if (gatt.sensorgen == 0x10 || gatt instanceof tk.glucodata.drivers.aidex.AiDexSensor) {
-                            Natives.setViewMode(gatt.dataptr, pos);
-                            act.requestRender();
+                            final int currentMode = Natives.getViewMode(gatt.dataptr);
+                            if (currentMode != pos) {
+                                Natives.setViewMode(gatt.dataptr, pos);
+                                act.requestRender();
+                            }
                         }
                     }
                 }
 
                 public void onNothingSelected(AdapterView<?> p) {
                 }
-            });
+            };
+            calibSpinner.setOnItemSelectedListener(calibSpinnerListener);
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

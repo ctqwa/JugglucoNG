@@ -8,9 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import tk.glucodata.R
 import tk.glucodata.alerts.CustomAlertConfig
 import tk.glucodata.alerts.CustomAlertType
 import java.util.UUID
@@ -46,14 +48,14 @@ fun CustomAlertDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = if (initialConfig == null) "New Custom Alert" else "Edit Alert") },
+        title = { Text(text = if (initialConfig == null) stringResource(R.string.new_custom_alert) else stringResource(R.string.edit_alert)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Alert Name") },
-                    placeholder = { Text("e.g. Dawn Phenomenon") },
+                    label = { Text(stringResource(R.string.alert_name)) },
+                    placeholder = { Text(stringResource(R.string.alert_name_example)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -61,13 +63,13 @@ fun CustomAlertDialog(
                 OutlinedTextField(
                     value = thresholdStr,
                     onValueChange = { thresholdStr = it },
-                    label = { Text("Threshold (mg/dL)") },
+                    label = { Text(stringResource(R.string.threshold_mgdl)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("Active Time Range", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.active_time_range), style = MaterialTheme.typography.labelLarge)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -76,13 +78,13 @@ fun CustomAlertDialog(
                     OutlinedButton(
                         onClick = { showTimePicker(startTimeMinutes) { startTimeMinutes = it } }
                     ) {
-                        Text("Start: ${formatTime(startTimeMinutes)}")
+                        Text(stringResource(R.string.start_time_with_value, formatTime(startTimeMinutes)))
                     }
-                    Text("-")
+                    Text(stringResource(R.string.dash))
                     OutlinedButton(
                         onClick = { showTimePicker(endTimeMinutes) { endTimeMinutes = it } }
                     ) {
-                        Text("End: ${formatTime(endTimeMinutes)}")
+                        Text(stringResource(R.string.end_time_with_value, formatTime(endTimeMinutes)))
                     }
                 }
             }
@@ -112,12 +114,12 @@ fun CustomAlertDialog(
                 },
                 enabled = name.isNotBlank() && thresholdStr.toFloatOrNull() != null
             ) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

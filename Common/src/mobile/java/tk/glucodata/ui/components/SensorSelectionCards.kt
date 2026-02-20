@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -17,11 +19,31 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import tk.glucodata.R
+
+@OptIn(ExperimentalTextApi::class)
+private fun jugglucoBrandFamily(weight: Int, width: Float): FontFamily {
+    return FontFamily(
+        Font(
+            R.font.ibm_plex_sans_var,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(weight),
+                FontVariation.width(width)
+            )
+        )
+    )
+}
 
 /**
  * Material 3 Expressive sensor selection cards for empty state screens.
@@ -32,6 +54,10 @@ fun SensorSelectionCards(
     onSensorSelected: (SensorType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val horizontalPadding = 0.dp
+    val cardGap = if (compact) 8.dp else 10.dp
     var visible by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
@@ -45,8 +71,8 @@ fun SensorSelectionCards(
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Generous spacing (M3 Expressive)
+                .padding(horizontal = horizontalPadding),
+            verticalArrangement = Arrangement.spacedBy(cardGap) // Generous spacing (M3 Expressive)
         ) {
             // Sibionics
             SensorCard(
@@ -55,7 +81,8 @@ fun SensorSelectionCards(
                 subtitle = stringResource(R.string.sibionics_sensor_desc),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                onClick = { onSensorSelected(SensorType.SIBIONICS) }
+                onClick = { onSensorSelected(SensorType.SIBIONICS) },
+                compact = compact
             )
             
             // Libre 2/3
@@ -65,7 +92,8 @@ fun SensorSelectionCards(
                 subtitle = stringResource(R.string.libre_sensor_desc),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = { onSensorSelected(SensorType.LIBRE) }
+                onClick = { onSensorSelected(SensorType.LIBRE) },
+                compact = compact
             )
             
             // Dexcom
@@ -75,17 +103,41 @@ fun SensorSelectionCards(
                 subtitle = stringResource(R.string.dexcom_sensor_desc),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = { onSensorSelected(SensorType.DEXCOM) }
+                onClick = { onSensorSelected(SensorType.DEXCOM) },
+                compact = compact
+            )
+
+            // Accu-Chek SmartGuide
+            SensorCard(
+                icon = Icons.Default.QrCodeScanner,
+                title = stringResource(R.string.accuchek_sensor),
+                subtitle = stringResource(R.string.accuchek_sensor_desc),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = { onSensorSelected(SensorType.ACCUCHEK) },
+                compact = compact
+            )
+
+            // CareSens Air
+            SensorCard(
+                icon = Icons.Default.Bluetooth,
+                title = stringResource(R.string.caresens_air_sensor),
+                subtitle = stringResource(R.string.caresens_air_sensor_desc),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = { onSensorSelected(SensorType.CARESENS_AIR) },
+                compact = compact
             )
             
             // AiDex / LinX
             SensorCard(
                 icon = Icons.Default.Bluetooth,
-                title = "AiDex / LinX",
-                subtitle = "Connect AiDex or LinX CGM",
+                title = stringResource(R.string.aidex_sensor),
+                subtitle = stringResource(R.string.aidex_sensor_desc),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = { onSensorSelected(SensorType.AIDEX) }
+                onClick = { onSensorSelected(SensorType.AIDEX) },
+                compact = compact
             )
         }
     }
@@ -102,8 +154,14 @@ private fun SensorCard(
     subtitle: String,
     containerColor: androidx.compose.ui.graphics.Color,
     contentColor: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    compact: Boolean
 ) {
+    val iconContainerSize = if (compact) 44.dp else 50.dp
+    val iconInnerPadding = if (compact) 11.dp else 13.dp
+    val rowPadding = if (compact) 12.dp else 15.dp
+    val arrowContainer = if (compact) 32.dp else 36.dp
+    val arrowPadding = if (compact) 8.dp else 9.dp
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -114,14 +172,14 @@ private fun SensorCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp), // More generous padding
+                .padding(rowPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon container with larger, rounder shape
             Surface(
                 shape = MaterialTheme.shapes.large, // Larger corner radius
                 color = containerColor,
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(iconContainerSize)
             ) {
                 Icon(
                     imageVector = icon,
@@ -129,11 +187,11 @@ private fun SensorCard(
                     tint = contentColor,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(14.dp)
+                        .padding(iconInnerPadding)
                 )
             }
             
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(if (compact) 10.dp else 12.dp))
             
             // Text content
             Column(modifier = Modifier.weight(1f)) {
@@ -142,21 +200,23 @@ private fun SensorCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(if (compact) 6.dp else 8.dp))
             
             // Filled tonal arrow indicator (M3 Expressive)
             Surface(
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(arrowContainer)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
@@ -164,7 +224,7 @@ private fun SensorCard(
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(10.dp)
+                        .padding(arrowPadding)
                 )
             }
         }
@@ -231,56 +291,60 @@ fun DashboardEmptyState(
     onImportHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val sidePadding = 16.dp
+    val scrollState = rememberScrollState()
+    val brandWeight = if (compact) 450 else 470
+    val brandWidth = if (compact) 94f else 90f
+    val brandFontFamily = remember(brandWeight, brandWidth) {
+        jugglucoBrandFamily(weight = brandWeight, width = brandWidth)
+    }
+    val brandStyle = if (compact) {
+        MaterialTheme.typography.displaySmall.copy(
+            fontFamily = brandFontFamily,
+            fontWeight = FontWeight(brandWeight),
+            letterSpacing = (-0.55).sp
+        )
+    } else {
+        MaterialTheme.typography.displayMedium.copy(
+            fontFamily = brandFontFamily,
+            fontWeight = FontWeight(brandWeight),
+            letterSpacing = (-0.75).sp
+        )
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .verticalScroll(scrollState)
+            .padding(horizontal = sidePadding)
+            .padding(top = if (compact) 10.dp else 16.dp)
+            .padding(bottom = if (compact) 104.dp else 120.dp),
+        horizontalAlignment = Alignment.Start
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        
-            // Welcome header
+        // Welcome header
         Text(
             text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.displayMedium,
-//            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Left
-        )
-        
-//        Spacer(modifier = Modifier.height(8.dp))
-//
-//        Text(
-//            text = stringResource(R.string.get_started_desc),
-//            style = MaterialTheme.typography.displaySmall,
-//            color = MaterialTheme.colorScheme.onSurfaceVariant,
-//            textAlign = TextAlign.Center
-//        )
-//
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // Sensor selection cards
-        Text(
-            text = stringResource(R.string.select_sensor),
-            style = MaterialTheme.typography.titleLarge,
-//            fontWeight = FontWeight.SemiBold,
+            style = brandStyle,
+            textAlign = TextAlign.Start,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         )
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
+
+        Spacer(modifier = Modifier.height(if (compact) 16.dp else 20.dp))
+
         SensorSelectionCards(
             onSensorSelected = onSensorSelected
         )
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(if (compact) 12.dp else 16.dp))
         
         // Divider with "or"
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = if (compact) 4.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             HorizontalDivider(modifier = Modifier.weight(1f))
@@ -292,15 +356,15 @@ fun DashboardEmptyState(
             HorizontalDivider(modifier = Modifier.weight(1f))
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
         
         // Import History card
         ImportHistoryCard(
             onClick = onImportHistory,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = if (compact) 4.dp else 8.dp)
         )
-        
-        Spacer(modifier = Modifier.weight(1f))
+
+        Spacer(modifier = Modifier.height(if (compact) 10.dp else 12.dp))
     }
 }
 
@@ -312,17 +376,19 @@ fun SensorsEmptyState(
     onSensorSelected: (SensorType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp),
+            .padding(vertical = if (compact) 10.dp else 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = stringResource(R.string.no_sensors_connected),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = if (compact) 10.dp else 16.dp)
         )
         
         SensorSelectionCards(

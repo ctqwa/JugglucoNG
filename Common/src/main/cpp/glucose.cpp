@@ -645,77 +645,77 @@ std::string_view getdeltaname(float rate) {
 
 */
 void SensorGlucoseData::resetSiIndex() {
+  // Edit 84: Guard against cascading resets. If already in reset mode, skip.
+  // This prevents the cascade observed in algofail.txt where:
+  //   SiContext::reset() → initAlgorithm → resetSiIndex() → enterResetMode()
+  //   ...fires again from another thread mid-replay.
+  if (isInResetMode()) {
+    LOGGER("resetSiIndex: already in reset mode, skipping (siIndex=%d)\n",
+           getSiIndex());
+    return;
+  }
+
+  // Edit 84: Set lastCalResetTime so the 5-minute cooldown guards in
+  // process.cpp and eu.cpp also protect against resets triggered via this path.
+  // Previously only SiContext::reset() set this, so resetSiIndex() could
+  // bypass the cooldown entirely.
+  getinfo()->lastCalResetTime = (uint32_t)time(nullptr);
+
   enterResetMode();
 
   int currentIndex = getSiIndex();
 
-  // If useCustomCalibration is enabled, use rolling window
+  // Custom calibration: rewind siIndex by the rolling window size so
+  // the algorithm replays enough history to recalibrate.
+  // viewMode is independent of useCustomCalibration — viewMode controls
+  // which value (auto/raw/custom) is DISPLAYED, not whether the
+  // calibration algorithm runs.
   if (getinfo()->useCustomCalibration) {
     int hoursWindow = getCustomCalHours(getinfo()->customCalIndex);
 
-    // Attempt to calculate interval based on history
-    // Fallback to 60s (1 min) if calculation fails, as it's safer to
-    // overestimate history needs (go back further) than underestimate (cover
-    // less time).
-    float interval =
-        getinfo()->pollinterval > 0 ? getinfo()->pollinterval : 0.0f;
-
-    if (interval == 0.0f && currentIndex > 6) {
-      // Try to calculate from recent history points (average over ~5 intervals)
-      uint32_t tNow = timeatpos(currentIndex - 1);
-      uint32_t tPrev = timeatpos(currentIndex - 6);
-      if (tNow > tPrev && tPrev > 0) {
-        interval = (float)(tNow - tPrev) / 5.0f;
-      }
-    }
-
-    // Final fallback if still 0 or invalid (e.g. < 50s or > 310s sanity check)
-    if (interval < 50.0f || interval > 320.0f) {
-      // If we can't determine, default to 60s (Libre 3/Sibionics are often 1
-      // min). 60s means windowSize = hours * 60. On a 5min sensor, this means
-      // 60 samples = 5 hours (so we go back 5x too far?) Wait, if sensor is
-      // 5min: windowSize=Samples. If we specify windowSize based on 60s
-      // assumption: windowSize = Hours * 60. Real duration = WindowSize * 5min
-      // = Hours * 60 * 5 = Hours * 300 min = Hours * 5 hours. Wait... Target:
-      // Go back N hours. Samples needed = N * 3600 / Interval. If Interval=300
-      // (5min), Samples = N * 12. If Interval=60 (1min), Samples = N * 60.
-
-      // If we use Default=60s -> Samples = N * 60.
-      // Case A (1min sensor): Rewind = N * 60 * 1min = N hours. (Correct)
-      // Case B (5min sensor): Rewind = N * 60 * 5min = 5N hours. (Goes back 5x
-      // too far).
-
-      // Is going back 5x too far explicitely bad?
-      // It means replaying 5 days for a 1 day request. Slow, but safe.
-      // Going back 1/5th (Current 300s bug) is bad (missing data).
-      // So 60s is the Safer Default.
-      interval = 60.0f;
-    }
-
-    // Calculate how many samples are in the time window
-    int windowSize = (int)((hoursWindow * 3600.0f) / interval);
-
-    // Idempotent Reset: Calculate from TIME, not current index (Duplicate of
-    // fix in start.cpp) This prevents repeated resets from drifting infinitely
-    // backward.
-    time_t now = time(NULL);
-    uint32_t starttime = getinfo()->starttime;
-
     int newIndex;
-    if (starttime > 0 && now > starttime) {
-      float calcInterval = interval > 0.1f ? interval : 60.0f;
-      int maxIndex = (int)((now - starttime) / calcInterval);
-      newIndex = maxIndex > windowSize ? (maxIndex - windowSize) : 1;
-
-      LOGGER("resetSiIndex (Custom/TimeBased): now=%ld start=%d elapsed=%d "
-             "maxIndex=%d windowSize=%d newIndex=%d\n",
-             now, starttime, (int)(now - starttime), maxIndex, windowSize,
-             newIndex);
+    if (hoursWindow <= 0) {
+      // MAX mode: replay all history from beginning
+      newIndex = 1;
+      LOGSTRING("resetSiIndex (Custom/MAX): resetting to index 1\n");
     } else {
-      LOGGER("resetSiIndex (Custom/Fallback): Invalid time (now=%ld start=%d), "
-             "using relative\n",
-             now, starttime);
-      newIndex = currentIndex > windowSize ? (currentIndex - windowSize) : 1;
+      // Attempt to calculate interval based on history
+      float interval =
+          getinfo()->pollinterval > 0 ? getinfo()->pollinterval : 0.0f;
+
+      if (interval == 0.0f && currentIndex > 6) {
+        uint32_t tNow = timeatpos(currentIndex - 1);
+        uint32_t tPrev = timeatpos(currentIndex - 6);
+        if (tNow > tPrev && tPrev > 0) {
+          interval = (float)(tNow - tPrev) / 5.0f;
+        }
+      }
+
+      if (interval < 50.0f || interval > 320.0f) {
+        interval = 60.0f;
+      }
+
+      int windowSize = (int)((hoursWindow * 3600.0f) / interval);
+
+      time_t now = time(NULL);
+      uint32_t starttime = getinfo()->starttime;
+
+      if (starttime > 0 && now > starttime) {
+        float calcInterval = interval > 0.1f ? interval : 60.0f;
+        int maxIndex = (int)((now - starttime) / calcInterval);
+        newIndex = maxIndex > windowSize ? (maxIndex - windowSize) : 1;
+
+        LOGGER("resetSiIndex (Custom/TimeBased): now=%ld start=%d elapsed=%d "
+               "maxIndex=%d windowSize=%d newIndex=%d\n",
+               now, starttime, (int)(now - starttime), maxIndex, windowSize,
+               newIndex);
+      } else {
+        LOGGER(
+            "resetSiIndex (Custom/Fallback): Invalid time (now=%ld start=%d), "
+            "using relative\n",
+            now, starttime);
+        newIndex = currentIndex > windowSize ? (currentIndex - windowSize) : 1;
+      }
     }
 
     setSiIndex(newIndex);
