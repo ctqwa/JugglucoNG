@@ -438,6 +438,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private val VENDOR_SLOW_POLL_INTERVAL_MS = 62_000L  // Edit 45b: slightly over sensor's 60s cycle to avoid phase drift
     private val VENDOR_MAX_POLL_COUNT = 30  // 30 polls × 2s = 60s max for initial fast polling
     private val CCCD_WRITE_TIMEOUT_MS = 8_000L
+    private val CCCD_SUPPLEMENTARY_TIMEOUT_MS = 1_500L
     private val CCCD_WRITE_RETRY_DELAY_MS = 120L
     private val CCCD_WRITE_MAX_RETRIES = 30
     private val HISTORY_PAGE_TIMEOUT_MS = 25_000L
@@ -4361,6 +4362,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
         // Build the CCCD write queue
         pendingCccdWrites.clear()
+        var mainPrivQueued = false
+        var mainCharQueued = false
 
         // 1. Supplementary: F001 if not already in main chain
         if (privUuid != 0xF001 && charUuid != 0xF001) {
@@ -4388,6 +4391,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         if (cPriv != null) {
             gatt.setCharacteristicNotification(cPriv, true)
             pendingCccdWrites.addLast(privUuid)
+            mainPrivQueued = true
             Log.i(TAG, "Edit 72: Queued main chain private CCCD 0x${Integer.toHexString(privUuid)}")
         }
 
@@ -4397,8 +4401,31 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             if (cChar != null) {
                 gatt.setCharacteristicNotification(cChar, true)
                 pendingCccdWrites.addLast(charUuid)
+                mainCharQueued = true
                 Log.i(TAG, "Edit 72: Queued main chain characteristic CCCD 0x${Integer.toHexString(charUuid)}")
             }
+        } else {
+            mainCharQueued = mainPrivQueued
+        }
+
+        // Main chain is mandatory: without it vendorGattNotified can never become true.
+        if (!mainPrivQueued || !mainCharQueued) {
+            Log.e(
+                TAG,
+                "enableVendorNotifications: missing main-chain CCCD(s). " +
+                        "privQueued=$mainPrivQueued charQueued=$mainCharQueued " +
+                        "priv=0x${Integer.toHexString(privUuid)} char=0x${Integer.toHexString(charUuid)} — reconnecting"
+            )
+            pendingCccdWrites.clear()
+            synchronized(cccdChainLock) {
+                if (cccdChainGattToken == gattToken) cccdChainRunning = false
+            }
+            try {
+                gatt.disconnect()
+            } catch (t: Throwable) {
+                Log.e(TAG, "enableVendorNotifications: disconnect after missing main-chain CCCD failed: ${t.message}")
+            }
+            return
         }
 
         Log.i(TAG, "Edit 72: CCCD queue built: ${pendingCccdWrites.map { "0x${Integer.toHexString(it)}" }} (${pendingCccdWrites.size} writes)")
@@ -4414,6 +4441,12 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // Start the first write — subsequent writes are triggered by onDescriptorWrite callbacks
         writeNextCccd(gatt)
     }
+
+    private fun isMainChainCccd(shortUuid: Int): Boolean =
+        shortUuid == cccdMainPrivUuid || shortUuid == cccdMainCharUuid
+
+    private fun isSupplementaryCccd(shortUuid: Int): Boolean =
+        !isMainChainCccd(shortUuid) && (shortUuid == 0xF001 || shortUuid == 0xF003)
 
     /**
      * Edit 72: Writes the next CCCD from the pendingCccdWrites queue.
@@ -4446,7 +4479,25 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
         val characteristic = sF000.getCharacteristic(shortToFullUuid(nextShort))
         if (characteristic == null) {
-            Log.w(TAG, "writeNextCccd: characteristic 0x${Integer.toHexString(nextShort)} not found, skipping to next")
+            if (isMainChainCccd(nextShort)) {
+                cancelCccdWriteTimeout()
+                cccdWriteRetryCount = 0
+                Log.e(
+                    TAG,
+                    "writeNextCccd: required main-chain characteristic 0x${Integer.toHexString(nextShort)} not found — reconnecting"
+                )
+                pendingCccdWrites.clear()
+                synchronized(cccdChainLock) {
+                    if (cccdChainGattToken == System.identityHashCode(gatt)) cccdChainRunning = false
+                }
+                try {
+                    gatt.disconnect()
+                } catch (t: Throwable) {
+                    Log.e(TAG, "writeNextCccd: disconnect after missing main-chain characteristic failed: ${t.message}")
+                }
+                return
+            }
+            Log.w(TAG, "writeNextCccd: supplementary characteristic 0x${Integer.toHexString(nextShort)} not found, skipping to next")
             // Skip this one and try the next
             writeNextCccd(gatt)
             return
@@ -4454,7 +4505,25 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
         val descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG)
         if (descriptor == null) {
-            Log.w(TAG, "writeNextCccd: CCCD descriptor not found for 0x${Integer.toHexString(nextShort)}, skipping")
+            if (isMainChainCccd(nextShort)) {
+                cancelCccdWriteTimeout()
+                cccdWriteRetryCount = 0
+                Log.e(
+                    TAG,
+                    "writeNextCccd: required main-chain CCCD descriptor missing for 0x${Integer.toHexString(nextShort)} — reconnecting"
+                )
+                pendingCccdWrites.clear()
+                synchronized(cccdChainLock) {
+                    if (cccdChainGattToken == System.identityHashCode(gatt)) cccdChainRunning = false
+                }
+                try {
+                    gatt.disconnect()
+                } catch (t: Throwable) {
+                    Log.e(TAG, "writeNextCccd: disconnect after missing main-chain CCCD descriptor failed: ${t.message}")
+                }
+                return
+            }
+            Log.w(TAG, "writeNextCccd: supplementary CCCD descriptor not found for 0x${Integer.toHexString(nextShort)}, skipping")
             writeNextCccd(gatt)
             return
         }
@@ -4476,6 +4545,16 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             cancelCccdWriteTimeout()
             cccdWriteRetryCount++
             if (cccdWriteRetryCount > CCCD_WRITE_MAX_RETRIES) {
+                if (isSupplementaryCccd(nextShort)) {
+                    Log.w(
+                        TAG,
+                        "writeNextCccd: supplementary CCCD 0x${Integer.toHexString(nextShort)} " +
+                                "writeDescriptor retry exhaustion (${cccdWriteRetryCount}/$CCCD_WRITE_MAX_RETRIES) — skipping"
+                    )
+                    cccdWriteRetryCount = 0
+                    writeNextCccd(gatt)
+                    return
+                }
                 Log.e(
                     TAG,
                     "writeNextCccd: gatt.writeDescriptor returned false for 0x${Integer.toHexString(nextShort)} " +
@@ -4520,13 +4599,23 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private fun scheduleCccdWriteTimeout(gatt: BluetoothGatt, shortUuid: Int) {
         cancelCccdWriteTimeout()
         val gattToken = System.identityHashCode(gatt)
+        val timeoutMs = if (isSupplementaryCccd(shortUuid)) CCCD_SUPPLEMENTARY_TIMEOUT_MS else CCCD_WRITE_TIMEOUT_MS
         cccdWriteTimeoutGattToken = gattToken
         cccdWriteTimeoutShortUuid = shortUuid
         val timeoutRunnable = Runnable {
             if (cccdWriteTimeoutGattToken != gattToken || cccdWriteTimeoutShortUuid != shortUuid) return@Runnable
             if (mBluetoothGatt !== gatt) return@Runnable
             if (!cccdChainRunning || vendorGattNotified) return@Runnable
-            Log.e(TAG, "CCCD watchdog: timeout on 0x${Integer.toHexString(shortUuid)} after ${CCCD_WRITE_TIMEOUT_MS}ms, reconnecting")
+            if (isSupplementaryCccd(shortUuid)) {
+                Log.w(
+                    TAG,
+                    "CCCD watchdog: supplementary 0x${Integer.toHexString(shortUuid)} timed out after ${timeoutMs}ms — skipping and continuing chain"
+                )
+                cancelCccdWriteTimeout()
+                writeNextCccd(gatt)
+                return@Runnable
+            }
+            Log.e(TAG, "CCCD watchdog: timeout on 0x${Integer.toHexString(shortUuid)} after ${timeoutMs}ms, reconnecting")
             cancelCccdWriteTimeout()
             pendingCccdWrites.clear()
             synchronized(cccdChainLock) {
@@ -4539,7 +4628,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             }
         }
         cccdWriteTimeoutRunnable = timeoutRunnable
-        vendorWorkHandler.postDelayed(timeoutRunnable, CCCD_WRITE_TIMEOUT_MS)
+        vendorWorkHandler.postDelayed(timeoutRunnable, timeoutMs)
     }
 
     /** Convert short UUID (e.g. 0xF001) to full 128-bit UUID */
@@ -7026,7 +7115,20 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             Log.w(TAG, "onDescriptorWrite: stale callback ignored for ${descriptor.characteristic.uuid}")
             return
         }
-        cancelCccdWriteTimeout()
+        val descriptorCharShort = uuidToShort(descriptor.characteristic.uuid)
+        val gattToken = System.identityHashCode(gatt)
+        val waitingForCccd = cccdWriteTimeoutGattToken == gattToken && cccdWriteTimeoutShortUuid != 0
+        if (vendorBleEnabled && cccdChainRunning && waitingForCccd && descriptorCharShort != cccdWriteTimeoutShortUuid) {
+            Log.w(
+                TAG,
+                "onDescriptorWrite: out-of-order CCCD callback 0x${Integer.toHexString(descriptorCharShort)} " +
+                        "while waiting for 0x${Integer.toHexString(cccdWriteTimeoutShortUuid)} — ignoring"
+            )
+            return
+        }
+        if (!waitingForCccd || descriptorCharShort == cccdWriteTimeoutShortUuid) {
+            cancelCccdWriteTimeout()
+        }
         // Edit 26: Handle GATT_INSUFFICIENT_AUTHENTICATION (0x05) — means no bond yet, SMP starting.
         // When the CCCD retry succeeds after auth fail, bonding is definitely complete.
         if (status != BluetoothGatt.GATT_SUCCESS) {
@@ -7041,6 +7143,19 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             } else if (status == 0x08 && vendorBleEnabled) {  // GATT_INSUF_AUTHORIZATION
                 cccdNeedsRetryAfterBond = true
                 Log.i(TAG, "Edit 62a: onDescriptorWrite: CCCD ${descriptor.characteristic.uuid} insuf_authorization (status=0x08) — will retry after BOND_BONDED")
+            } else if (vendorBleEnabled && isSupplementaryCccd(descriptorCharShort)) {
+                Log.w(
+                    TAG,
+                    "onDescriptorWrite: supplementary CCCD 0x${Integer.toHexString(descriptorCharShort)} failed status=$status — skipping and continuing chain"
+                )
+                if (pendingCccdWrites.isNotEmpty()) {
+                    writeNextCccd(gatt)
+                } else {
+                    synchronized(cccdChainLock) {
+                        if (cccdChainGattToken == System.identityHashCode(gatt)) cccdChainRunning = false
+                    }
+                }
+                return
             } else {
                 Log.w(TAG, "onDescriptorWrite: CCCD ${descriptor.characteristic.uuid} failed status=$status")
             }
@@ -7069,8 +7184,6 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // After any successful CCCD write, check if the queue has more entries.
         // If yes, write the next. If queue is empty and this was a main-chain CCCD,
         // set vendorGattNotified and fire onConnectSuccess.
-        val descriptorCharShort = uuidToShort(descriptor.characteristic.uuid)
-
         if (vendorBleEnabled && cccdMainCharUuid != 0) {
             if (pendingCccdWrites.isNotEmpty()) {
                 // More CCCDs in queue — write the next one
