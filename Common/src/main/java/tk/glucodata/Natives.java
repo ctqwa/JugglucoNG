@@ -720,6 +720,8 @@ public class Natives {
 
         public static native void addGlucoseStream(long time, float glucose, String sensorId);
 
+        public static native void addRawGlucoseStream(long time, float rawGlucose, String sensorId);
+
         public static native byte[] bytesettings();
 
         public static native boolean ontbytesettings(byte[] ar);

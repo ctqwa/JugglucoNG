@@ -310,8 +310,13 @@ fun getDisplayValues(
     calibratedValue: Float? = null
 ): DisplayValues {
     val isMmol = if (unit.isNotEmpty()) tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit) else tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
-    
-    val rawStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.rawValue, isMmol)
+
+    val rawDisplayValue = if (point.rawValue.isFinite() && point.rawValue > 0f) point.rawValue else Float.NaN
+    val rawStr = if (rawDisplayValue.isFinite()) {
+        tk.glucodata.ui.util.GlucoseFormatter.format(rawDisplayValue, isMmol)
+    } else {
+        "--"
+    }
     val valStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.value, isMmol)
     val calStr = calibratedValue?.let { tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol) }
     val hideInitialWhenCalibrated = calibratedValue != null &&
@@ -323,7 +328,7 @@ fun getDisplayValues(
             return when (viewMode) {
                 2 -> DisplayValues( // Auto + Raw → Calibrated primary, Raw secondary
                     primaryValue = calibratedValue,
-                    secondaryValue = point.rawValue,
+                    secondaryValue = rawDisplayValue,
                     primaryStr = calStr,
                     secondaryStr = rawStr,
                     fullFormatted = "$calStr · $rawStr $unit"
@@ -345,7 +350,7 @@ fun getDisplayValues(
         return when (viewMode) {
             1 -> DisplayValues( // Raw → Calibrated primary, Raw secondary
                 primaryValue = calibratedValue,
-                secondaryValue = point.rawValue,
+                secondaryValue = rawDisplayValue,
                 primaryStr = calStr,
                 secondaryStr = rawStr,
                 fullFormatted = "$calStr · $rawStr $unit"
@@ -353,7 +358,7 @@ fun getDisplayValues(
             2 -> DisplayValues( // Auto + Raw → Calibrated primary, Auto secondary, Raw tertiary
                 primaryValue = calibratedValue,
                 secondaryValue = point.value,
-                tertiaryValue = point.rawValue,
+                tertiaryValue = rawDisplayValue,
                 primaryStr = calStr,
                 secondaryStr = valStr,
                 tertiaryStr = rawStr,
@@ -361,7 +366,7 @@ fun getDisplayValues(
             )
             3 -> DisplayValues( // Raw + Auto → Calibrated primary, Raw secondary, Auto tertiary
                 primaryValue = calibratedValue,
-                secondaryValue = point.rawValue,
+                secondaryValue = rawDisplayValue,
                 tertiaryValue = point.value,
                 primaryStr = calStr,
                 secondaryStr = rawStr,
@@ -381,19 +386,19 @@ fun getDisplayValues(
     // No calibration - original logic
     return when (viewMode) {
         1 -> DisplayValues( // Raw
-            primaryValue = point.rawValue,
+            primaryValue = rawDisplayValue,
             primaryStr = rawStr,
             fullFormatted = "$rawStr $unit"
         )
         2 -> DisplayValues( // Auto + Raw
             primaryValue = point.value,
-            secondaryValue = point.rawValue,
+            secondaryValue = rawDisplayValue,
             primaryStr = valStr,
             secondaryStr = rawStr,
             fullFormatted = "$valStr · $rawStr $unit"
         )
         3 -> DisplayValues( // Raw + Auto
-            primaryValue = point.rawValue,
+            primaryValue = rawDisplayValue,
             secondaryValue = point.value,
             primaryStr = rawStr,
             secondaryStr = valStr,
@@ -680,10 +685,8 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
                     composable("settings/libreview") { LibreViewSettingsScreen(navController) }
                     composable("settings/mirror") { MirrorSettingsScreen(navController) }
-                    composable("settings/mirror/edit/{pos}") { backStackEntry ->
-                        val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
-                        MirrorEditScreen(navController, pos)
-                    }
+
+                    composable("settings/turnserver") { tk.glucodata.ui.TurnServerSettingsScreen(navController) }
                     composable("settings/debug") { DebugSettingsScreen(navController) }
                     composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                     composable("settings/calibrations") {
@@ -794,10 +797,8 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("settings/nightscout") { NightscoutSettingsScreen(navController) }
                 composable("settings/libreview") { LibreViewSettingsScreen(navController) }
                 composable("settings/mirror") { MirrorSettingsScreen(navController) }
-                composable("settings/mirror/edit/{pos}") { backStackEntry ->
-                    val pos = backStackEntry.arguments?.getString("pos")?.toIntOrNull() ?: -1
-                    MirrorEditScreen(navController, pos)
-                }
+
+                composable("settings/turnserver") { tk.glucodata.ui.TurnServerSettingsScreen(navController) }
                 composable("settings/debug") { DebugSettingsScreen(navController) }
                 composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                 composable("settings/calibrations") {

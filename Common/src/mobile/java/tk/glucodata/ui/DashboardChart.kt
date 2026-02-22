@@ -1492,11 +1492,11 @@ fun InteractiveGlucoseChart(
                         val hideAutoDot = hideInitialWhenCalibrated && !isRawModeDot
 
                         // Draw dots for active lines (demoted when calibration active)
-                         if (!hideRawDot && (viewMode == 1 || viewMode == 2 || viewMode == 3)) {
-                             val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 1 || viewMode == 3) primaryColor else secondaryColor
-                             val py = valToY(p.rawValue)
-                             if (py.isFinite()) drawCircle(color, dotRadius, Offset(cursorX, py))
-                         }
+                         if (!hideRawDot && (viewMode == 1 || viewMode == 2 || viewMode == 3) && p.rawValue > 0.1f) {
+                              val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 1 || viewMode == 3) primaryColor else secondaryColor
+                              val py = valToY(p.rawValue)
+                              if (py.isFinite()) drawCircle(color, dotRadius, Offset(cursorX, py))
+                          }
                          if (!hideAutoDot && (viewMode == 0 || viewMode == 2 || viewMode == 3)) {
                              val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 0 || viewMode == 2) primaryColor else secondaryColor
                              val py = valToY(p.value)
@@ -1554,8 +1554,12 @@ fun InteractiveGlucoseChart(
                 val isRawModeTT = viewMode == 1 || viewMode == 3
                 val hasCalibrationTT = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawModeTT)
                 val calibratedValueTT = if (hasCalibrationTT) {
-                    val baseValue = if (isRawModeTT) point.rawValue else point.value
-                    tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseValue, point.timestamp, isRawModeTT)
+                    val baseValue = if (isRawModeTT && point.rawValue > 0.1f) point.rawValue else point.value
+                    if (baseValue > 0.1f) {
+                        tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseValue, point.timestamp, isRawModeTT)
+                    } else {
+                        null
+                    }
                 } else null
                 val dvs = getDisplayValues(point, viewMode, unit, calibratedValueTT)
 

@@ -1,8 +1,18 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package tk.glucodata.ui
 
+import android.content.Context
 import android.text.Html
-import android.text.format.DateFormat
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,20 +21,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.QrCode
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -34,651 +41,646 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
-import tk.glucodata.R
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import org.json.JSONObject
 import tk.glucodata.Natives
-import tk.glucodata.QRmake
-import tk.glucodata.TurnServer
-import java.util.Date
-import java.util.Calendar
-import com.journeyapps.barcodescanner.BarcodeEncoder
-import com.google.zxing.BarcodeFormat
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
+import tk.glucodata.R
+import tk.glucodata.ui.components.*
+import tk.glucodata.ui.util.ConnectedButtonGroup
+import tk.glucodata.util.DiscoveredMirror
+import tk.glucodata.util.MDnsManager
+
+// ── QR Code ──────────────────────────────────────────────────────────────────
 
 @Composable
 fun QRCodeImage(content: String, size: Int = 500) {
     if (content.isEmpty()) return
     val bitmap = remember(content) {
-        try {
-            com.journeyapps.barcodescanner.BarcodeEncoder().encodeBitmap(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
-        } catch (e: Exception) {
-            null
-        }
+        try { com.journeyapps.barcodescanner.BarcodeEncoder().encodeBitmap(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size) }
+        catch (_: Exception) { null }
     }
     bitmap?.let {
-        androidx.compose.foundation.Image(
-            bitmap = it.asImageBitmap(),
-            contentDescription = null,
-            modifier = Modifier.size(250.dp)
-        )
+        androidx.compose.foundation.Image(bitmap = it.asImageBitmap(), contentDescription = "QR Code", modifier = Modifier.size(240.dp))
     }
 }
 
-@Composable
-fun AutoQRDialog(onDismiss: () -> Unit, act: tk.glucodata.MainActivity) {
-    var qrContent by remember { mutableStateOf<String?>(null) }
-    var qrTitle by remember { mutableStateOf("") }
-
-    if (qrContent != null) {
-        AlertDialog(
-            onDismissRequest = { qrContent = null },
-            title = { Text(qrTitle) },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    QRCodeImage(qrContent!!)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { qrContent = null }) { Text(stringResource(R.string.close)) }
-            }
+fun injectMirrorJson(jsonstr: String, context: Context): Boolean {
+    try {
+        val jsonClean = if (jsonstr.endsWith(" MirrorJuggluco")) jsonstr.dropLast(15) else jsonstr
+        val json = JSONObject(jsonClean)
+        val namesArray = json.getJSONArray("names")
+        val names = Array(namesArray.length()) { i -> namesArray.getString(i) }
+        val pos = Natives.changebackuphost(
+            -1, names, json.getInt("nr"),
+            json.optBoolean("detect", false), json.getString("port"),
+            json.optBoolean("nums", false), json.optBoolean("stream", false),
+            json.optBoolean("scans", false), false, json.optBoolean("receive", false),
+            json.optBoolean("activeonly", false), json.optBoolean("passiveonly", false),
+            if (json.isNull("pass")) null else json.getString("pass"), 0L,
+            if (json.isNull("label")) null else json.getString("label"),
+            json.optBoolean("testip", false), json.optBoolean("hasname", false),
+            null, false
         )
-    } else {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.auto_qr)) },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.sendto), style = MaterialTheme.typography.titleSmall)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        Button(onClick = { 
-                            try {
-                                val idx = Natives.makeHomeSender()
-                                if (idx >= 0) {
-                                    qrContent = Natives.getbackJson(idx)
-                                    qrTitle = act.getString(R.string.home_net_sender)
-                                } else {
-                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }) { Text(stringResource(R.string.homenet)) }
-                        
-                        Button(onClick = { 
-                            try {
-                                val idx = Natives.makeICESender()
-                                if (idx >= 0) {
-                                    qrContent = Natives.getbackJson(idx)
-                                    qrTitle = act.getString(R.string.internet_sender)
-                                } else {
-                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                             } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }) { Text(stringResource(R.string.internet)) }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.receivefrom), style = MaterialTheme.typography.titleSmall)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        Button(onClick = { 
-                            try {
-                                val idx = Natives.makeHomeReceiver()
-                                if (idx >= 0) {
-                                    qrContent = Natives.getbackJson(idx)
-                                    qrTitle = act.getString(R.string.home_net_receiver)
-                                } else {
-                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                             } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }) { Text(stringResource(R.string.homenet)) }
-                        
-                        Button(onClick = { 
-                            try {
-                                val idx = Natives.makeICEReceiver()
-                                if (idx >= 0) {
-                                    qrContent = Natives.getbackJson(idx)
-                                    qrTitle = act.getString(R.string.internet_receiver)
-                                } else {
-                                     android.widget.Toast.makeText(act, act.getString(R.string.mirror_error_with_code, idx), android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                             } catch (e: UnsatisfiedLinkError) {
-                                android.widget.Toast.makeText(act, act.getString(R.string.not_implemented_natively), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }) { Text(stringResource(R.string.internet)) }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { /* Help action */ }) { Text(stringResource(R.string.help)) }
-            }
-        )
+        if (pos < 0) { Toast.makeText(context, "Failed to save", Toast.LENGTH_SHORT).show(); return false }
+        Toast.makeText(context, context.getString(R.string.mirrorscansucces), Toast.LENGTH_SHORT).show()
+        tk.glucodata.Applic.wakemirrors()
+        return true
+    } catch (_: Exception) {
+        Toast.makeText(context, "Invalid QR data", Toast.LENGTH_SHORT).show()
+        return false
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ── Main Screen ──────────────────────────────────────────────────────────────
+
 @Composable
 fun MirrorSettingsScreen(navController: NavController) {
     val context = LocalContext.current
-    var triggerRefresh by remember { mutableStateOf(0) }
+    var triggerRefresh by remember { mutableIntStateOf(0) }
     var mirrors by remember { mutableStateOf(emptyList<MirrorItemData>()) }
-    var showAutoQR by remember { mutableStateOf(false) }
+    var showMyQR by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(triggerRefresh) {
-        mirrors = getMirrorsList()
+    // mDNS
+    val mdnsManager = remember { MDnsManager(context) }
+    var isBroadcasting by remember { mutableStateOf(false) }
+    var broadcastSenderIdx by remember { mutableIntStateOf(-1) } // index of the sender entry on master
+    var discoveredMirrors by remember { mutableStateOf(emptyList<DiscoveredMirror>()) }
+
+    // Pending states
+    var scannedQrPayload by remember { mutableStateOf<String?>(null) }
+    var pendingNearby by remember { mutableStateOf<DiscoveredMirror?>(null) }
+
+    // Edit sheet state
+    var editSheetPos by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(triggerRefresh) { mirrors = getMirrorsList() }
+
+    DisposableEffect(Unit) {
+        mdnsManager.discoverServices { mirror ->
+            if (discoveredMirrors.none { it.ip == mirror.ip }) {
+                discoveredMirrors = discoveredMirrors + mirror
+            }
+        }
+        onDispose {
+            mdnsManager.stopDiscovery()
+            if (isBroadcasting) mdnsManager.unregisterService()
+        }
     }
 
-    if (showAutoQR) {
-        (context as? tk.glucodata.MainActivity)?.let { AutoQRDialog(onDismiss = { showAutoQR = false }, act = it) }
+    // ZXing fallback
+    val zxingLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let { raw ->
+            if (raw.contains("MirrorJuggluco") || raw.contains("\"port\"")) scannedQrPayload = raw
+            else Toast.makeText(context, "Invalid QR Code", Toast.LENGTH_SHORT).show()
+        }
     }
+    val launchScanner: () -> Unit = {
+        try {
+            GmsBarcodeScanning.getClient(context).startScan()
+                .addOnSuccessListener { barcode ->
+                    barcode.rawValue?.let { raw ->
+                        if (raw.contains("MirrorJuggluco") || raw.contains("\"port\"")) scannedQrPayload = raw
+                        else Toast.makeText(context, "Invalid QR Code", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .addOnFailureListener {
+                    zxingLauncher.launch(ScanOptions().apply { setPrompt("Scan Juggluco Mirror QR"); setBeepEnabled(false) })
+                }
+        } catch (_: Exception) {
+            zxingLauncher.launch(ScanOptions().apply { setPrompt("Scan Juggluco Mirror QR"); setBeepEnabled(false) })
+        }
+    }
+
+    // ── Dialogs ──────────────────────────────────────────────────────────
+
+    if (scannedQrPayload != null) {
+        AlertDialog(
+            onDismissRequest = { scannedQrPayload = null },
+            icon = { Icon(Icons.Filled.Link, contentDescription = null) },
+            title = { Text("Connect to this device?") },
+            text = { Text("A Juggluco Mirror QR code was scanned. This will sync glucose data with the remote device.") },
+            confirmButton = {
+                Button(onClick = {
+                    if (injectMirrorJson(scannedQrPayload!!, context)) triggerRefresh++
+                    scannedQrPayload = null
+                }) { Text("Connect") }
+            },
+            dismissButton = { OutlinedButton(onClick = { scannedQrPayload = null }) { Text(stringResource(R.string.cancel)) } }
+        )
+    }
+
+    if (pendingNearby != null) {
+        val device = pendingNearby!!
+        AlertDialog(
+            onDismissRequest = { pendingNearby = null },
+            icon = { Icon(Icons.Filled.Wifi, contentDescription = null) },
+            title = { Text("Connect to ${device.name}?") },
+            text = { Text("Found at ${device.ip}:${device.port}.\nThis will receive glucose data from \"${device.name}\".") },
+            confirmButton = {
+                Button(onClick = {
+                    Natives.changebackuphost(
+                        -1, arrayOf(device.ip), 1, false, device.port.toString(),
+                        false, false, false, false, true,
+                        false, true, "", System.currentTimeMillis(), device.name,
+                        false, true, null, false
+                    )
+                    Toast.makeText(context, "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
+                    tk.glucodata.Applic.wakemirrors()
+                    triggerRefresh++
+                    pendingNearby = null
+                }) { Text("Connect") }
+            },
+            dismissButton = { OutlinedButton(onClick = { pendingNearby = null }) { Text(stringResource(R.string.cancel)) } }
+        )
+    }
+
+    if (showMyQR != null) {
+        AlertDialog(
+            onDismissRequest = { showMyQR = null },
+            title = { Text(stringResource(R.string.auto_qr)) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.scan_with_follower), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(16.dp))
+                    QRCodeImage(showMyQR!!)
+                }
+            },
+            confirmButton = { Button(onClick = { showMyQR = null }) { Text(stringResource(R.string.close)) } }
+        )
+    }
+
+    // ── Content ──────────────────────────────────────────────────────────
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.mirror_settings_title)) },
+                title = { Text(stringResource(R.string.sync)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 actions = {
-                    TextButton(onClick = {
-                         (context as? tk.glucodata.MainActivity)?.let { TurnServer.show(it, it.findViewById(android.R.id.content)) }
-                     }) {
-                         Text(stringResource(R.string.turnserver))
-                     }
+                    IconButton(onClick = {
+                        Natives.resetnetwork()
+                        tk.glucodata.Applic.wakemirrors()
+                        Toast.makeText(context, context.getString(R.string.reinit_progress), Toast.LENGTH_SHORT).show()
+                        triggerRefresh++
+                    }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Reconnect All")
+                    }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = {
-                navController.navigate("settings/mirror/edit/-1")
-            }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_connection))
-            }
-        },
-        bottomBar = {
-             BottomAppBar {
-                 IconButton(onClick = { 
-                      tk.glucodata.help.help(context.getString(R.string.mirror_settings_help_text), context as android.app.Activity) 
-                  }) {
-                     Icon(Icons.Filled.Help, contentDescription = stringResource(R.string.help))
-                  }
-                  Spacer(Modifier.weight(1f))
-                  TextButton(onClick = { tk.glucodata.Applic.wakemirrors(); android.widget.Toast.makeText(context, context.getString(R.string.syncing), android.widget.Toast.LENGTH_SHORT).show() }) {
-                      Icon(Icons.Filled.Sync, contentDescription = null)
-                      Spacer(Modifier.width(4.dp))
-                      Text(stringResource(R.string.sync))
-                  }
-                  TextButton(onClick = { Natives.resetnetwork(); tk.glucodata.Applic.wakemirrors(); android.widget.Toast.makeText(context, context.getString(R.string.reinit_progress), android.widget.Toast.LENGTH_SHORT).show() }) {
-                      Icon(Icons.Filled.Refresh, contentDescription = null)
-                      Spacer(Modifier.width(4.dp))
-                      Text(stringResource(R.string.reinit))
-                  }
-                  TextButton(onClick = { showAutoQR = true }) {
-                      // AutoQR Icon? Using generic Code/QrCode or just text
-                      Text(stringResource(R.string.auto_qr))
-                  }
-              }
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            items(mirrors) { mirror ->
-                MirrorItemRow(mirror, navController) {
-                    triggerRefresh++
+            // ── QR Row ───────────────────────────────────────────────
+            item(key = "qr_section") {
+                SectionLabel("Quick Pair", topPadding = 8.dp)
+            }
+            item(key = "qr_share") {
+                SettingsItem(
+                    title = "Share My QR",
+                    subtitle = "Let another device scan to connect",
+                    icon = Icons.Outlined.QrCode,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    position = CardPosition.TOP,
+                    onClick = {
+                        val idx = Natives.makeHomeSender()
+                        if (idx >= 0) {
+                            showMyQR = Natives.getbackJson(idx)
+                            triggerRefresh++
+                        } else {
+                            Toast.makeText(context, context.getString(R.string.mirror_error_with_code, idx), Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            }
+            item(key = "qr_scan") {
+                SettingsItem(
+                    title = "Scan QR Code",
+                    subtitle = "Scan another device's QR to connect",
+                    icon = Icons.Outlined.QrCodeScanner,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    position = CardPosition.BOTTOM,
+                    onClick = { launchScanner() }
+                )
+            }
+
+            // ── Local Network ────────────────────────────────────────
+            item(key = "network_section") {
+                SectionLabel("Local Network")
+            }
+            item(key = "broadcast") {
+                SettingsSwitchItem(
+                    title = "Broadcast on Network",
+                    subtitle = "Let nearby devices discover this device",
+                    icon = Icons.Filled.CellTower,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    checked = isBroadcasting,
+                    position = CardPosition.SINGLE,
+                    onCheckedChange = { checked ->
+                        isBroadcasting = checked
+                        if (checked) {
+                            // Create a sender entry so master actually listens for connections
+                            val idx = Natives.makeHomeSender()
+                            if (idx >= 0) {
+                                broadcastSenderIdx = idx
+                                triggerRefresh++
+                            }
+                            mdnsManager.registerService(android.os.Build.MODEL ?: "Device")
+                        } else {
+                            mdnsManager.unregisterService()
+                        }
+                    }
+                )
+            }
+            if (discoveredMirrors.isNotEmpty()) {
+                items(discoveredMirrors, key = { it.ip }) { device ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { pendingNearby = device },
+                        shape = cardShape(CardPosition.SINGLE),
+                        color = MaterialTheme.colorScheme.tertiaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(device.name, style = MaterialTheme.typography.titleSmall)
+                                Text("${device.ip}:${device.port}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f))
+                            }
+                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+            }
+
+            // ── Relay ────────────────────────────────────────────────
+            item(key = "relay_section") {
+                SectionLabel("Relay")
+            }
+            item(key = "turn") {
+                SettingsItem(
+                    title = stringResource(R.string.turnserver),
+                    subtitle = "TURN relay for remote connections",
+                    icon = Icons.Filled.Cloud,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    showArrow = true,
+                    position = CardPosition.SINGLE,
+                    onClick = { navController.navigate("settings/turnserver") }
+                )
+            }
+
+            // ── Connections ──────────────────────────────────────────
+            item(key = "connections_section") {
+                Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp, start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Connections", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { editSheetPos = -1 }) {
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_connection), tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+
+            if (mirrors.isEmpty()) {
+                item(key = "empty_msg") {
+                    Surface(Modifier.fillMaxWidth(), shape = cardShape(CardPosition.SINGLE), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        Text("No connections. Use Quick Pair or tap + to add.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
+                    }
+                }
+            } else {
+                items(mirrors, key = { it.index }) { mirror ->
+                    MirrorConnectionCard(
+                        mirror = mirror,
+                        onEdit = { editSheetPos = mirror.index },
+                        onToggle = {
+                            Natives.setHostDeactivated(mirror.index, !mirror.isDeactivated)
+                            triggerRefresh++
+                        },
+                        onShowQR = { mirror.index },
+                        onDelete = {
+                            Natives.deletebackuphost(mirror.index)
+                            triggerRefresh++
+                        }
+                    )
                 }
             }
         }
     }
+
+    // ── Edit Bottom Sheet ────────────────────────────────────────────────
+
+    if (editSheetPos != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        MirrorEditSheet(
+            pos = editSheetPos!!,
+            sheetState = sheetState,
+            onDismiss = { editSheetPos = null; triggerRefresh++ }
+        )
+    }
 }
 
-data class MirrorItemData(
-    val index: Int,
-    val label: String?,
-    val names: Array<String>?,
-    val port: String?,
-    val isDeactivated: Boolean,
-    val status: String
-)
+// ── Connection Card (expandable) ─────────────────────────────────────────────
 
 @Composable
-fun MirrorItemRow(mirror: MirrorItemData, navController: NavController, onRefresh: () -> Unit) {
+fun MirrorConnectionCard(
+    mirror: MirrorItemData,
+    onEdit: () -> Unit,
+    onToggle: () -> Unit,
+    onShowQR: () -> Unit,
+    onDelete: () -> Unit
+) {
     val context = LocalContext.current
-    var showStatusDialog by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var qrContent by remember { mutableStateOf<String?>(null) }
+    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
     if (qrContent != null) {
         AlertDialog(
             onDismissRequest = { qrContent = null },
-             title = { Text(if (!mirror.label.isNullOrEmpty()) mirror.label else stringResource(R.string.connection_number, mirror.index)) },
+            title = { Text(mirror.label ?: context.getString(R.string.connection_number, mirror.index)) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     QRCodeImage(qrContent!!)
                 }
             },
+            confirmButton = { Button(onClick = { qrContent = null }) { Text(stringResource(R.string.close)) } }
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Delete connection?") },
+            text = { Text("\"${mirror.label ?: mirror.names?.firstOrNull() ?: "Connection"}\" will be removed permanently.") },
             confirmButton = {
-                TextButton(onClick = { qrContent = null }) { Text(stringResource(R.string.close)) }
-            }
+                Button(
+                    onClick = { onDelete(); showDeleteConfirm = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = { OutlinedButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { showStatusDialog = true },
-        colors = CardDefaults.cardColors(
-            containerColor = if (mirror.isDeactivated) MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.6f) else MaterialTheme.colorScheme.surfaceVariant
-        )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = cardShape(CardPosition.SINGLE),
+        color = if (mirror.isDeactivated) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (!mirror.label.isNullOrEmpty()) mirror.label else mirror.names?.firstOrNull() ?: context.getString(R.string.connection_number, mirror.index),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (mirror.isDeactivated) Color.Gray else Color.Unspecified
-                )
-                Spacer(Modifier.weight(1f))
-                if (!mirror.port.isNullOrEmpty()) {
-                    Text(mirror.port, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        mirror.label?.takeIf { it.isNotEmpty() } ?: mirror.names?.firstOrNull() ?: context.getString(R.string.connection_number, mirror.index),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (mirror.isDeactivated) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else Color.Unspecified
+                    )
+                    val sub = if (mirror.isDeactivated) stringResource(R.string.deactivated)
+                    else if (!mirror.port.isNullOrEmpty()) ":${mirror.port}" else null
+                    if (sub != null) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                Icon(Icons.Filled.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.graphicsLayer { rotationZ = chevronRotation })
             }
-            if (!mirror.isDeactivated) {
-                 AndroidView<TextView>(factory = { ctx ->
-                     TextView(ctx).apply {
-                         textSize = 12f
-                         setTextColor(android.graphics.Color.WHITE)
-                     }
-                 }, update = {
-                      it.text = Html.fromHtml(mirror.status, Html.FROM_HTML_MODE_LEGACY)
-                 })
-            } else {
-                Text(stringResource(R.string.deactivated), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
 
-    if (showStatusDialog) {
-        MirrorStatusDialog(
-            mirror = mirror,
-            onDismiss = { showStatusDialog = false },
-            onModify = {
-                showStatusDialog = false
-                navController.navigate("settings/mirror/edit/${mirror.index}")
-            },
-            onToggleOff = {
-                 Natives.setHostDeactivated(mirror.index, !mirror.isDeactivated)
-                 onRefresh()
-            },
-            onQR = {
-                 val json = Natives.getbackJson(mirror.index)
-                 qrContent = json
-                 showStatusDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-fun MirrorStatusDialog(
-    mirror: MirrorItemData,
-    onDismiss: () -> Unit,
-    onModify: () -> Unit,
-    onToggleOff: () -> Unit,
-    onQR: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.connection_number, mirror.index)) },
-        text = {
-            Column {
-                 AndroidView<TextView>(factory = { ctx ->
-                     TextView(ctx).apply {
-                         textSize = 14f
-                         setTextColor(android.graphics.Color.DKGRAY) 
-                     }
-                 }, update = {
-                      it.text = Html.fromHtml(mirror.status, Html.FROM_HTML_MODE_LEGACY)
-                 })
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onModify) { Text(stringResource(R.string.edit)) }
-                TextButton(onClick = onQR) { Text(stringResource(R.string.qr)) }
-                TextButton(onClick = onToggleOff) { 
-                    Text(if (mirror.isDeactivated) stringResource(R.string.enable) else stringResource(R.string.disable)) 
+            AnimatedVisibility(visible = expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    if (!mirror.isDeactivated) {
+                        AndroidView<TextView>(
+                            factory = { ctx -> TextView(ctx).apply { textSize = 13f } },
+                            update = { it.text = Html.fromHtml(mirror.status, Html.FROM_HTML_MODE_LEGACY) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showDeleteConfirm = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                            Text(stringResource(R.string.delete))
+                        }
+                        TextButton(onClick = onToggle) {
+                            Text(if (mirror.isDeactivated) stringResource(R.string.enable) else stringResource(R.string.disable))
+                        }
+                        TextButton(onClick = { qrContent = Natives.getbackJson(mirror.index) }) {
+                            Text(stringResource(R.string.qr))
+                        }
+                        TextButton(onClick = onEdit) {
+                            Text(stringResource(R.string.edit))
+                        }
+                    }
                 }
             }
         }
-    )
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ── Edit Sheet ───────────────────────────────────────────────────────────────
+
+enum class ConnectionType { LOCAL, ICE, DIRECT }
+
 @Composable
-fun MirrorEditScreen(navController: NavController, pos: Int) {
+fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val isNew = pos == -1
-    
-    // --- STATE INITIALIZATION ---
-    var isICE by remember { mutableStateOf(if (!isNew) Natives.getICEside(pos) else true) } 
-    
-    // Header
+
+    var connectionType by remember { mutableStateOf(
+        if (isNew) ConnectionType.LOCAL
+        else if (Natives.getICEside(pos)) ConnectionType.ICE
+        else if (Natives.getbackupHasHostname(pos)) ConnectionType.DIRECT
+        else ConnectionType.LOCAL
+    )}
     var port by remember { mutableStateOf(if (!isNew) Natives.getbackuphostport(pos) ?: "8795" else "8795") }
-    var hasHostname by remember { mutableStateOf(if (!isNew) Natives.getbackupHasHostname(pos) else false) } 
-    var detect by remember { mutableStateOf(if (!isNew) Natives.detectIP(pos) else false) }
-
-    // ICE Specific
-    var iceLabel by remember { mutableStateOf(if (!isNew) Natives.getbackuplabel(pos) ?: "" else "") }
-    var iceSide by remember { mutableIntStateOf(if (!isNew && Natives.getICEside(pos)) 1 else 0) } 
-
-    // Host Row
-    var hostname by remember { mutableStateOf(if (!isNew) Natives.getbackupIPs(pos)?.firstOrNull() ?: "" else "") }
-
-    // Test Row
-    var testIP by remember { mutableStateOf(if (!isNew) Natives.getbackuptestip(pos) else false) }
-    var testLabel by remember { mutableStateOf(if (!isNew) Natives.getbackupTestLabel(pos) else false) }
-
-    // Mode
-    var mode by remember { mutableIntStateOf(
-        if (isNew) 2 else {
-            val p = Natives.getbackuphostpassive(pos)
-            val a = Natives.getbackupActiveOnly(pos)
-            if (p) 0 else if (a) 1 else 2
-        }
-    ) }
-
-    // Send/Receive
-    var sendAmounts by remember { mutableStateOf(if (!isNew) Natives.getbackuphostnums(pos) else false) }
-    var sendScans by remember { mutableStateOf(if (!isNew) Natives.getbackuphostscans(pos) else false) }
-    var sendStream by remember { mutableStateOf(if (!isNew) Natives.getbackuphoststream(pos) else false) }
-    var receiveFrom by remember { mutableStateOf(if (!isNew) (Natives.getbackuphostreceive(pos) and 2) != 0 else false) } 
-
-    // Time
-    var startMode by remember { mutableIntStateOf(0) }
-    var customDate by remember { mutableLongStateOf(Natives.getstarttime()) } 
-
     var password by remember { mutableStateOf(if (!isNew) Natives.getbackuppassword(pos) ?: "" else "") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var iceLabel by remember { mutableStateOf(if (!isNew) Natives.getbackuplabel(pos) ?: "" else "") }
+    var hostname by remember { mutableStateOf(if (!isNew) Natives.getbackupIPs(pos)?.firstOrNull() ?: "" else "") }
+    var isSending by remember { mutableStateOf(if (!isNew) Natives.getbackuphostnums(pos) else false) }
+    var isReceiving by remember { mutableStateOf(if (!isNew) (Natives.getbackuphostreceive(pos) and 2) != 0 else true) }
 
-    var isDeleted by remember { mutableStateOf(false) }
+    fun save() {
+        val isICE = connectionType == ConnectionType.ICE
+        val isDirect = connectionType == ConnectionType.DIRECT
+        val isLocal = connectionType == ConnectionType.LOCAL
+        val finalNames = if ((isDirect || isLocal) && hostname.isNotEmpty()) arrayOf(hostname) else arrayOf("")
+        val finalPort = port.ifEmpty { "8795" }
+        val finalIceLabel = if (isICE) iceLabel else ""
 
-    // Auto-save logic
-    DisposableEffect(Unit) {
-        onDispose {
-            if (!isDeleted) {
-                // Natives.changebackuphost expects a non-empty array if hashostname is true
-                // and blindly accesses index 0. We must safeguard against empty arrays.
-                val names = if (hostname.isNotEmpty()) arrayOf(hostname) else arrayOf("")
-                val activeOnly = mode == 1
-                val passiveOnly = mode == 0
-                val sideBool = iceSide == 1
-                
-                val finalStartTime = when(startMode) {
-                    0 -> Natives.getstarttime() 
-                    1 -> System.currentTimeMillis()
-                    else -> customDate
-                }
-
-                Natives.changebackuphost(
-                    if (isNew) -1 else pos,
-                    names,
-                    names.size,
-                    detect,
-                    port,
-                    sendAmounts,
-                    sendStream,
-                    sendScans,
-                    false, 
-                    receiveFrom,
-                    activeOnly,
-                    passiveOnly,
-                    password,
-                    finalStartTime,
-                    iceLabel,
-                    testIP,
-                    hasHostname, 
-                    iceLabel.takeIf { isICE },
-                    sideBool
-                )
-            }
-        }
+        Natives.changebackuphost(
+            if (isNew) -1 else pos, finalNames, finalNames.size,
+            isLocal, finalPort,
+            isSending, isSending, isSending, false, isReceiving,
+            false, false, password, System.currentTimeMillis(), finalIceLabel,
+            isLocal && hostname.isEmpty(), isDirect || (!isICE && hostname.isNotEmpty()),
+            finalIceLabel.takeIf { isICE }, isReceiving
+        )
+        tk.glucodata.Applic.wakemirrors()
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isNew) stringResource(R.string.add_connection) else stringResource(R.string.edit_connection)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    // Help
-                    IconButton(onClick = {
-                         tk.glucodata.help.help(context.getString(R.string.mirror_connection_settings_help_text), context as android.app.Activity) 
-                    }) {
-                        Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.help))
-                    }
-                    
-                    // Delete (only if not new, or maybe allow deleting new? new hasn't been saved yet so deleting it just means popping)
-                    // Actually if it's new, "Delete" is effectively "Cancel". But usually Delete is for existing items.
-                    // If it is new, we can just pop without saving by setting isDeleted=true.
-                    IconButton(onClick = {
-                        if (!isNew) {
-                            Natives.deletebackuphost(pos) 
-                        }
-                        isDeleted = true
-                        navController.popBackStack()
-                    }) {
-                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- ROW 1: Port | Hostname Check | Detect ---
-            if (!isICE) { // Only show if ICE is OFF? Screen shots logic
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = port,
-                        onValueChange = { port = it },
-                        label = { Text(stringResource(R.string.port)) },
-                        modifier = Modifier.width(100.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = hasHostname, onCheckedChange = { hasHostname = it })
-                        Text(stringResource(R.string.hostname))
+            Text(
+                if (isNew) stringResource(R.string.add_connection) else stringResource(R.string.edit_connection),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+            )
+
+            // Connection Type
+            SectionLabel("Connection Type", topPadding = 0.dp, modifier = Modifier.padding(horizontal = 24.dp))
+            ConnectedButtonGroup(
+                options = ConnectionType.entries.toList(),
+                selectedOption = connectionType,
+                onOptionSelected = { connectionType = it },
+                label = { option ->
+                    Text(when (option) {
+                        ConnectionType.LOCAL -> "Local"
+                        ConnectionType.ICE -> "ICE"
+                        ConnectionType.DIRECT -> "Direct IP"
+                    })
+                },
+                itemHeight = 40.dp,
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+            )
+
+            // Type hint
+            val typeHint = when (connectionType) {
+                ConnectionType.LOCAL -> "Same Wi-Fi. IP auto-detected."
+                ConnectionType.ICE -> "Across networks via STUN/TURN."
+                ConnectionType.DIRECT -> "Specific IP/hostname."
+            }
+            Text(typeHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+
+            // Fields
+            SectionLabel("Details", modifier = Modifier.padding(horizontal = 24.dp))
+            Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                when (connectionType) {
+                    ConnectionType.LOCAL -> {
+                        OutlinedTextField(
+                            value = hostname, onValueChange = { hostname = it },
+                            label = { Text("IP Address (optional)") },
+                            supportingText = { Text("Leave blank to auto-detect") },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
                     }
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = detect, onCheckedChange = { detect = it })
-                        Text(stringResource(R.string.detect))
+                    ConnectionType.ICE -> {
+                        OutlinedTextField(
+                            value = iceLabel, onValueChange = { iceLabel = it },
+                            label = { Text("ICE Label") },
+                            supportingText = { Text("Must match on both devices") },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
+                    }
+                    ConnectionType.DIRECT -> {
+                        OutlinedTextField(
+                            value = hostname, onValueChange = { hostname = it },
+                            label = { Text("Hostname / IP Address") },
+                            supportingText = { Text("e.g. 192.168.1.100 or myserver.com") },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
                     }
                 }
-            }
-
-            // --- ROW 2: ICE Checkbox ---
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = isICE, onCheckedChange = { isICE = it })
-                Text(stringResource(R.string.ICE))
-                if (isICE) {
-                    Spacer(Modifier.width(16.dp))
-                    OutlinedTextField(
-                        value = iceLabel,
-                        onValueChange = { iceLabel = it },
-                        label = { Text(stringResource(R.string.icelabel)) },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    RadioButton(selected = iceSide == 0, onClick = { iceSide = 0 })
-                    Text(stringResource(R.string.zero))
-                    RadioButton(selected = iceSide == 1, onClick = { iceSide = 1 })
-                    Text(stringResource(R.string.one))
-                }
-            }
-
-            // --- ROW 3: Hostname/IP Field ---
-            if (!isICE && hasHostname) { // Show Hostname only if Checkbox checked? Or always for Host?
-                // Screenshot 2 (Hostname ON) shows Hostname field.
-                // Screenshot 1 (Hostname OFF) shows Test IP (no host field in middle).
                 OutlinedTextField(
-                    value = hostname,
-                    onValueChange = { hostname = it },
-                    label = { Text(stringResource(R.string.hostname_ip)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    value = port, onValueChange = { port = it },
+                    label = { Text(stringResource(R.string.port)) },
+                    supportingText = { Text("Default: 8795") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
 
-            // --- ROW 4: Test IP | Test Label ---
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                 if (!isICE && !hasHostname) { // Test IP only when Hostname OFF?
-                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = testIP, onCheckedChange = { testIP = it })
-                        Text(stringResource(R.string.testip))
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = testLabel, onCheckedChange = { testLabel = it })
-                    Text(stringResource(R.string.testlabel))
-                }
-                
-                // Master Label (User) ?
-                if (!isICE && hasHostname) {
-                    OutlinedTextField(
-                        value = iceLabel, // Reusing icelabel for master/user?
-                        onValueChange = { iceLabel = it },
-                        label = { Text(stringResource(R.string.master)) },
-                        modifier = Modifier.width(120.dp),
-                         singleLine = true
-                    )
-                }
-            }
-            // --- ROW 5: Mode ---
-            if (!isICE) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = mode == 0, onClick = { mode = 0 })
-                        Text(stringResource(R.string.passiveonly))
-                    } 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = mode == 1, onClick = { mode = 1 })
-                        Text(stringResource(R.string.activeonly))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = mode == 2, onClick = { mode = 2 })
-                        Text(stringResource(R.string.both))
-                    }
-                }
+            // Role
+            SectionLabel("Role", modifier = Modifier.padding(horizontal = 24.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(horizontal = 24.dp)) {
+                SettingsSwitchItem(
+                    title = "Receive Data", subtitle = "This device is a Follower",
+                    checked = isReceiving, onCheckedChange = { isReceiving = it },
+                    icon = Icons.Filled.Download, iconTint = MaterialTheme.colorScheme.tertiary,
+                    position = CardPosition.TOP
+                )
+                SettingsSwitchItem(
+                    title = "Send Data", subtitle = "This device is a Master",
+                    checked = isSending, onCheckedChange = { isSending = it },
+                    icon = Icons.Filled.Upload, iconTint = MaterialTheme.colorScheme.tertiary,
+                    position = CardPosition.BOTTOM
+                )
             }
 
-            // --- ROW 6: Send/Receive ---
-            Text(stringResource(R.string.send_receive), style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = receiveFrom, onCheckedChange = { receiveFrom = it })
-                        Text(stringResource(R.string.receivefrom))
-                    }
-                    Text(stringResource(R.string.send_to_colon), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start=12.dp, top=4.dp))
-                }
-                Column {
-                   Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = sendAmounts, onCheckedChange = { sendAmounts = it })
-                        Text(stringResource(R.string.amountsname))
-                   } 
-                   Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = sendScans, onCheckedChange = { sendScans = it })
-                        Text(stringResource(R.string.scansname))
-                   }
-                   Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = sendStream, onCheckedChange = { sendStream = it })
-                        Text(stringResource(R.string.streamname))
-                   }
-                }
-            }
-            
-            HorizontalDivider()
-
-            // --- ROW 7: Time ---
-            if (!isICE && hasHostname) {
-                Text(stringResource(R.string.data_present_until), style = MaterialTheme.typography.labelLarge)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = startMode == 0, onClick = { startMode = 0 })
-                        Text(stringResource(R.string.start))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = startMode == 1, onClick = { startMode = 1 })
-                        Text(stringResource(R.string.now))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = startMode == 2, onClick = { startMode = 2 })
-                        val dateStr = if (startMode == 2) DateFormat.format("yyyy-MM-dd", customDate).toString() else context.getString(R.string.date)
-                        Text(dateStr)
-                    }
-                }
-            }
-
-            // --- ROW 8: Password ---
+            // Password
+            SectionLabel("Security", modifier = Modifier.padding(horizontal = 24.dp))
             OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
+                value = password, onValueChange = { password = it },
                 label = { Text(stringResource(R.string.password)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                supportingText = { Text("Must match on both devices") },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(imageVector = image, contentDescription = if (passwordVisible) stringResource(R.string.hide_password) else stringResource(R.string.show_password))
+                        Icon(if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, contentDescription = null)
                     }
                 }
             )
 
+            // Save
+            Spacer(Modifier.height(24.dp))
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!isNew) {
+                    OutlinedButton(
+                        onClick = { Natives.deletebackuphost(pos); onDismiss() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text(stringResource(R.string.delete)) }
+                }
+                Button(onClick = { save(); onDismiss() }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.save))
+                }
+            }
         }
     }
 }
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+
+data class MirrorItemData(
+    val index: Int, val label: String?, val names: Array<String>?,
+    val port: String?, val isDeactivated: Boolean, val status: String
+)
 
 fun getMirrorsList(): List<MirrorItemData> {
     val mirrors = mutableListOf<MirrorItemData>()
     for (i in 0 until 64) {
         val names = Natives.getbackupIPs(i)
         if (names != null) {
-            val label = Natives.getbackuplabel(i)
-            val port = Natives.getbackuphostport(i)
-            val deactivated = Natives.getHostDeactivated(i)
-            val status = Natives.mirrorStatus(i) ?: ""
-            mirrors.add(MirrorItemData(i, label, names, port, deactivated, status))
+            mirrors.add(MirrorItemData(i, Natives.getbackuplabel(i), names, Natives.getbackuphostport(i), Natives.getHostDeactivated(i), Natives.mirrorStatus(i) ?: ""))
         }
     }
     return mirrors

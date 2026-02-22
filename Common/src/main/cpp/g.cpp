@@ -1155,12 +1155,92 @@ extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
 
         uint16_t mgVal = (uint16_t)(glucose * 10.0f);
 
-        // Use savepollallIDs to update the stream data (index = lifeCount)
+        // Use savepollallIDs to update the stream data (index = lifeCount).
+        // Preserve existing raw/temperature channels when overwriting auto value
+        // so calibrated stream rewrites don't zero out raw data.
         if (lifeCount >= 0 && lifeCount < hist->maxstreampos()) {
-          hist->savepollallIDs<60>(timestamp, lifeCount, mgVal, 0, 0.0f);
+          int preservedRaw = 0;
+          uint16_t preservedTemp = 0;
+          if (hist->hasStreamID(lifeCount)) {
+            const RawData *rawbuf = hist->getRawPollsData();
+            if (rawbuf) {
+              preservedRaw = rawbuf[lifeCount].raw;
+            }
+            preservedTemp = hist->getTempForPoll(lifeCount);
+          }
+          hist->savepollallIDs<60>(timestamp, lifeCount, mgVal, 0, 0.0f,
+                                   preservedRaw, preservedTemp);
         }
 
         setstreaming(hist);
+      }
+    }
+  }
+  env->ReleaseStringUTFChars(sensorId, str);
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(addRawGlucoseStream)(
+    JNIEnv *env, jclass cl, jlong timestamp, jfloat rawGlucose,
+    jstring sensorId) {
+  if (!sensors || !sensorId)
+    return;
+  const char *str = env->GetStringUTFChars(sensorId, NULL);
+  if (!str)
+    return;
+
+  if (timestamp > 0) {
+    int ind = -1;
+    auto *list = sensors->sensorlist();
+    if (list) {
+      ind = sensors->sensorindexshort(str);
+      if (ind < 0) {
+        ind = sensors->addsensor(std::string_view(str));
+      }
+    }
+
+    if (ind >= 0) {
+      if (SensorGlucoseData *hist = sensors->getSensorData(ind)) {
+        if (hist->error()) {
+          env->ReleaseStringUTFChars(sensorId, str);
+          return;
+        }
+
+        auto *info = hist->getinfo();
+        if (!info) {
+          env->ReleaseStringUTFChars(sensorId, str);
+          return;
+        }
+
+        uint32_t start = info->starttime;
+        if (!start && timestamp > 3600) {
+          start = timestamp - 3600;
+          info->starttime = start;
+        }
+
+        int lifeCount = 0;
+        if (start > 0 && timestamp >= start) {
+          lifeCount = (timestamp - start) / 60;
+        }
+
+        if (lifeCount >= 0 && lifeCount < hist->maxstreampos() &&
+            hist->hasStreamID(lifeCount)) {
+          auto polls = hist->getPolldata();
+          int preservedAuto = polls[lifeCount].g;
+          uint16_t preservedTemp = hist->getTempForPoll(lifeCount);
+          int rawVal = 0;
+          if (rawGlucose > 0) {
+            constexpr float mgdlToMmol = 1.0f / 18.0182f;
+            rawVal = (int)roundf(rawGlucose * mgdlToMmol * 10.0f);
+          } else {
+            const RawData *rawbuf = hist->getRawPollsData();
+            if (rawbuf) {
+              rawVal = rawbuf[lifeCount].raw;
+            }
+          }
+          hist->savepollallIDs<60>(timestamp, lifeCount, preservedAuto, 0, 0.0f,
+                                   rawVal, preservedTemp);
+          setstreaming(hist);
+        }
       }
     }
   }

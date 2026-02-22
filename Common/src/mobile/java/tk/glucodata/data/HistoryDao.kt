@@ -76,6 +76,13 @@ interface HistoryDao {
     suspend fun updateValueAtTime(sensorSerial: String, timestamp: Long, value: Float): Int
 
     @Query("""
+        UPDATE history_readings
+        SET rawValue = :rawValue
+        WHERE sensorSerial = :sensorSerial AND timestamp = :timestamp
+    """)
+    suspend fun updateRawValueAtTime(sensorSerial: String, timestamp: Long, rawValue: Float): Int
+
+    @Query("""
         UPDATE history_readings SET sensorSerial = :newSerial 
         WHERE sensorSerial = :oldSerial
     """)

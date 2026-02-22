@@ -414,6 +414,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private val HISTORY_PAGE_TIMEOUT_MS = 25_000L
     private val HISTORY_PAGE_REQUEST_DELAY_MS = 80L
     private val HISTORY_PAGE_TIMEOUT_MAX_RETRIES = 1
+    private val RAW_HISTORY_PREFETCH_TARGET_RECORDS = 119
+    private val RAW_HISTORY_PREFETCH_MAX_PAGES = 4
     private var vendorGotGlucoseThisCycle = false  // true once we store a value this connection
     private var vendorSlowPollActive = false  // Edit 44b: tracks whether we've transitioned to slow polling
     // Edit 45c: AUTO_UPDATE watchdog — track when last AUTO_UPDATE push arrived
@@ -421,6 +423,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private var vendorAutoUpdateReady = false  // true after SET_AUTO_UPDATE_STATUS success for current session
     private var vendorBootstrapHistoryPending = false
     private var vendorBootstrapCalibrationPending = false
+    private var vendorRawHistoryHydrationPending = false
     private val VENDOR_AUTO_UPDATE_WATCHDOG_MS = 90_000L  // re-enable slow poll if no AUTO_UPDATE for 90s
     // Edit 52a: Snapshot of the last AUTO_UPDATE offset at disconnect time.
     // On reconnect, GET_HISTORY_RANGE uses this to roll back vendorHistoryNextIndex
@@ -529,6 +532,13 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             lastVendorRawCandidate = 0f
             lastF003RawCandidateMgDl = 0f
             lastF003RawCandidateTime = 0L
+            if (!isRawLaneMode(previous) && isRawLaneMode(value)) {
+                vendorRawHistoryHydrationPending = true
+                lastHistoryRequestTime = 0L
+                vendorWorkHandler.post {
+                    requestHistoryBackfill("raw-mode-enter")
+                }
+            }
             if (previous == 0 && value != 0) {
                 // Allow combined/raw modes to consume the most recent broadcast once.
                 lastBroadcastStoredOffsetMinutes = 0L
@@ -637,8 +647,16 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         connectionPart
                     }
                 }
-                // GATT connected but long-connect hasn't started yet
-                gattExists && vendorNativeReady -> "Connected (initializing)"
+                // GATT connected and vendor stack ready, but long-connect flag may lag on some reconnect paths.
+                gattExists && vendorNativeReady -> {
+                    val connectionPart = if (vendorPollActive) "Connected (polling)" else "Connected"
+                    val autoUpdateActive = vendorLastAutoUpdateTime > 0L && (now - vendorLastAutoUpdateTime) < VENDOR_AUTO_UPDATE_WATCHDOG_MS
+                    if (vendorLongConnectTriggered || autoUpdateActive || vendorGotGlucoseThisCycle) {
+                        connectionPart
+                    } else {
+                        "Connected (initializing)"
+                    }
+                }
                 // GATT connected, general state
                 gattExists -> "Connected"
                 // No GATT — show persistent state
@@ -763,6 +781,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
     private fun isAutoOnlyMode(): Boolean = viewModeInternal == 0
     private fun isRawOnlyMode(): Boolean = viewModeInternal == 1
+    private fun isRawLaneMode(mode: Int): Boolean = mode == 1 || mode == 2 || mode == 3
     private fun isBroadcastOnlyMode(): Boolean = broadcastOnlyConnection
     private fun wantsAuto(): Boolean = viewModeInternal == 0 || viewModeInternal == 2 || viewModeInternal == 3
     private fun wantsRaw(): Boolean = viewModeInternal == 1 || viewModeInternal == 2 || viewModeInternal == 3
@@ -774,14 +793,11 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         if (!broadcastEnabled) return false
         if (!(wantsAuto() || (wantsRaw() && rawBroadcastFallbackEnabled))) return false
 
-        // Edit 45a: Suppress broadcast scanning while vendor GATT is actively connected and
-        // past the initial handshake. The sensor stops BLE advertising when a GATT connection
-        // is active, so every scan times out — wasting battery and radio time.
-        // We still allow scanning during the initial connect phase (before executeConnect arrives)
-        // because the vendor lib needs scan record bytes to trigger executeConnect().
-        // Once the long-connect data flow is running (vendorLongConnectTriggered), scanning is pure waste.
-        if (vendorGattConnected && vendorLongConnectTriggered) {
-            Log.d(TAG, "wantsBroadcastScan: suppressed — vendor GATT active with long-connect running")
+        // Suppress scanning once vendor native stack is ready on an active GATT session.
+        // Some reconnect paths stream AUTO_UPDATE without flipping vendorLongConnectTriggered,
+        // and keeping scans active there causes repeated scan timeouts/reconnect churn.
+        if (vendorGattConnected && (vendorLongConnectTriggered || vendorNativeReady)) {
+            Log.d(TAG, "wantsBroadcastScan: suppressed — vendor GATT active and native ready")
             return false
         }
 
@@ -1426,24 +1442,42 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             return false
         }
 
-        // Wait for AES initialization (the vendor native lib needs to complete the F002 handshake)
+        // Wait for AES initialization (the vendor native lib needs to complete the F002 handshake).
+        // Some sessions keep command channel healthy while controller.isInitialized lags false,
+        // so also allow a "session-active" fallback based on recent vendor traffic.
+        val sessionReadyForCommand = {
+            if (!vendorNativeReady || !vendorGattConnected || !vendorGattNotified) {
+                false
+            } else {
+                val ageMs = System.currentTimeMillis() - vendorLastMessageTime
+                ageMs in 0..15_000L
+            }
+        }
         val aesBeforeCmd = try { controller.isInitialized } catch (_: Throwable) { false }
         if (!aesBeforeCmd) {
             Log.i(TAG, "$label: AES not yet initialized, waiting for F002 handshake...")
             var aesWait = 0
             val maxAesWait = 50 // 10 seconds (50 * 200ms)
             var aesReady = false
+            var readyByActiveSession = sessionReadyForCommand()
             while (aesWait < maxAesWait) {
+                if (readyByActiveSession) break
                 try { Thread.sleep(200) } catch (_: InterruptedException) {}
                 aesWait++
                 aesReady = try { controller.isInitialized } catch (_: Throwable) { false }
-                if (aesReady) break
+                readyByActiveSession = sessionReadyForCommand()
+                if (aesReady || readyByActiveSession) break
             }
-            if (!aesReady) {
+            if (!aesReady && !readyByActiveSession) {
                 Log.w(TAG, "$label failed: AES handshake did not complete after ${aesWait * 200}ms")
                 return false
             }
-            Log.i(TAG, "$label: AES initialized after ${aesWait * 200}ms")
+            if (aesReady) {
+                Log.i(TAG, "$label: AES initialized after ${aesWait * 200}ms")
+            } else {
+                val ageMs = (System.currentTimeMillis() - vendorLastMessageTime).coerceAtLeast(0L)
+                Log.w(TAG, "$label: proceeding with active vendor session while AES flag is false (last vendor msg ${ageMs}ms ago)")
+            }
         } else {
             Log.i(TAG, "$label: AES already initialized")
         }
@@ -2245,6 +2279,20 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         writeIntPref("vendorHistoryNextIndex", vendorHistoryNextIndex)
                         vendorLastAutoUpdateOffsetAtDisconnect = 0  // consumed
                     }
+                    if (vendorRawHistoryHydrationPending && hasRawLane() && rawStart > 0) {
+                        val hydrationStart = maxOf(briefStart, rawStart)
+                        if (vendorHistoryNextIndex > hydrationStart) {
+                            Log.i(
+                                TAG,
+                                "Edit 89a: raw-history hydration rewinding nextIndex $vendorHistoryNextIndex -> $hydrationStart (newest=$newest)"
+                            )
+                            vendorHistoryNextIndex = hydrationStart
+                            writeIntPref("vendorHistoryNextIndex", vendorHistoryNextIndex)
+                        }
+                        // One-shot rewind per raw-mode entry. Subsequent reconnect/backfill cycles
+                        // should continue from persisted nextIndex instead of restarting at rawStart.
+                        vendorRawHistoryHydrationPending = false
+                    }
                     // If there are records to fetch, start paginated download
                     if (vendorHistoryNextIndex < newest) {
                         val recordsAvailable = newest - vendorHistoryNextIndex
@@ -2272,15 +2320,17 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                             } catch (t: Throwable) {
                                 Log.e(TAG, "GET_HISTORY_RANGE: getHistories failed: ${t.message}")
                                 vendorHistoryDownloading = false
-                                vendorRawHistoryPendingIndex = -1
-                                vendorRawHistoryByOffset.clear()
+                                clearRawHistoryPageState()
                             }
                         }
                     } else {
                         Log.i(TAG, "GET_HISTORY_RANGE: no new history (nextIndex=$vendorHistoryNextIndex >= newest=$newest)")
                         vendorHistoryDownloading = false
-                        vendorRawHistoryPendingIndex = -1
-                        vendorRawHistoryByOffset.clear()
+                        if (vendorRawHistoryHydrationPending) {
+                            vendorRawHistoryHydrationPending = false
+                            Log.i(TAG, "Edit 89a: raw-history hydration already up-to-date")
+                        }
+                        clearRawHistoryPageState()
                         // Edit 60a: If gap flag was set but range says no records, clear it.
                         // This can happen if the sensor overwrote old records or the gap was tiny.
                         if (vendorHistoryGapDetected) {
@@ -2474,43 +2524,63 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 cancelHistoryPageTimeout()
                 val requestedIndex = if (vendorRawHistoryPendingIndex > 0) vendorRawHistoryPendingIndex else vendorHistoryNextIndex
                 vendorRawHistoryPendingIndex = -1
+                var parsedMaxOffset = 0
                 Log.i(
                     TAG,
                     "Edit 86a: Vendor GET_HISTORIES_RAW response: success=${message.isSuccess} (${data?.size ?: 0} bytes), requestedIndex=$requestedIndex"
                 )
                 if (message.isSuccess && data != null && data.isNotEmpty()) {
-                    try {
-                        val entities: List<com.microtechmd.blecomm.parser.AidexXRawHistoryEntity>? = AidexXParser.getRawHistory(data)
-                        if (!entities.isNullOrEmpty()) {
-                            var cached = 0
-                            var firstOffset = 0
-                            var lastOffset = 0
-                            for (entity in entities) {
-                                val offset = entity.timeOffset
-                                if (offset <= 0 || offset.toLong() > (AIDEX_MAX_OFFSET_DAYS * 24L * 60L)) continue
-                                vendorRawHistoryByOffset[offset] = VendorRawHistorySample(
-                                    i1 = entity.i1,
-                                    i2 = entity.i2,
-                                    vc = entity.vc,
-                                    isValid = entity.isValid
-                                )
-                                if (cached == 0) firstOffset = offset
-                                lastOffset = offset
-                                cached++
-                            }
-                            if (cached > 0) {
-                                Log.i(
-                                    TAG,
-                                    "Edit 86a: cached $cached raw history rows offsets=$firstOffset..$lastOffset (cacheSize=${vendorRawHistoryByOffset.size})"
-                                )
-                            } else {
-                                Log.i(TAG, "Edit 86a: GET_HISTORIES_RAW parsed but no valid rows")
-                            }
-                        } else {
-                            Log.i(TAG, "Edit 86a: GET_HISTORIES_RAW parser returned null/empty list")
+                    val liteRows = parseVendorRawHistoryPacked(data)
+                    if (!liteRows.isNullOrEmpty()) {
+                        var cached = 0
+                        var firstOffset = 0
+                        var lastOffset = 0
+                        for ((offset, sample) in liteRows) {
+                            vendorRawHistoryByOffset[offset] = sample
+                            if (cached == 0) firstOffset = offset
+                            lastOffset = offset
+                            if (offset > parsedMaxOffset) parsedMaxOffset = offset
+                            cached++
                         }
-                    } catch (t: Throwable) {
-                        Log.w(TAG, "Edit 86a: GET_HISTORIES_RAW parse failed: ${t.message}")
+                        Log.i(
+                            TAG,
+                            "Edit 86a: cached $cached raw history rows offsets=$firstOffset..$lastOffset (cacheSize=${vendorRawHistoryByOffset.size}, parser=lite)"
+                        )
+                    } else {
+                        try {
+                            val entities: List<com.microtechmd.blecomm.parser.AidexXRawHistoryEntity>? = AidexXParser.getRawHistory(data)
+                            if (!entities.isNullOrEmpty()) {
+                                var cached = 0
+                                var firstOffset = 0
+                                var lastOffset = 0
+                                for (entity in entities) {
+                                    val offset = entity.timeOffset
+                                    if (offset <= 0 || offset.toLong() > (AIDEX_MAX_OFFSET_DAYS * 24L * 60L)) continue
+                                    vendorRawHistoryByOffset[offset] = VendorRawHistorySample(
+                                        i1 = entity.i1,
+                                        i2 = entity.i2,
+                                        vc = entity.vc,
+                                        isValid = entity.isValid
+                                    )
+                                    if (cached == 0) firstOffset = offset
+                                    lastOffset = offset
+                                    if (offset > parsedMaxOffset) parsedMaxOffset = offset
+                                    cached++
+                                }
+                                if (cached > 0) {
+                                    Log.i(
+                                        TAG,
+                                        "Edit 86a: cached $cached raw history rows offsets=$firstOffset..$lastOffset (cacheSize=${vendorRawHistoryByOffset.size}, parser=vendor)"
+                                    )
+                                } else {
+                                    Log.i(TAG, "Edit 86a: GET_HISTORIES_RAW parsed but no valid rows")
+                                }
+                            } else {
+                                Log.i(TAG, "Edit 86a: GET_HISTORIES_RAW parser returned null/empty list")
+                            }
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Edit 86a: GET_HISTORIES_RAW parse failed: ${t.message}")
+                        }
                     }
                 }
                 if (vendorHistoryDownloading) {
@@ -2520,10 +2590,48 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                             if (!vendorGattConnected || !vendorNativeReady) {
                                 Log.w(TAG, "Edit 86a: GET_HISTORIES_RAW brief follow-up aborted — GATT disconnected")
                                 vendorHistoryDownloading = false
+                                clearRawHistoryPageState()
                                 return@execute
                             }
-                            val requested = if (requestedIndex > 0) requestedIndex else vendorHistoryNextIndex
-                            val startIndex = maxOf(requested, vendorHistoryNextIndex)
+                            val briefStart = if (vendorRawBriefFollowupIndex > 0) {
+                                vendorRawBriefFollowupIndex
+                            } else if (requestedIndex > 0) {
+                                requestedIndex
+                            } else {
+                                vendorHistoryNextIndex
+                            }
+                            val coverageTargetEnd = briefStart + RAW_HISTORY_PREFETCH_TARGET_RECORDS - 1
+                            val rawCoverageOffset = maxOf(parsedMaxOffset, vendorRawPrefetchLastOffset)
+                            if (
+                                hasRawLane() &&
+                                rawCoverageOffset > 0 &&
+                                rawCoverageOffset < coverageTargetEnd &&
+                                rawCoverageOffset < vendorHistoryNewestIndex &&
+                                vendorRawPrefetchPages < RAW_HISTORY_PREFETCH_MAX_PAGES
+                            ) {
+                                val nextRawIndex = rawCoverageOffset + 1
+                                vendorRawHistoryPendingIndex = nextRawIndex
+                                vendorRawPrefetchPages += 1
+                                vendorRawPrefetchLastOffset = rawCoverageOffset
+                                Log.i(
+                                    TAG,
+                                    "Edit 90a: raw prefetch ${vendorRawPrefetchPages}/${RAW_HISTORY_PREFETCH_MAX_PAGES} getRawHistories($nextRawIndex) for briefStart=$briefStart targetEnd=$coverageTargetEnd"
+                                )
+                                if (HISTORY_PAGE_REQUEST_DELAY_MS > 0L) Thread.sleep(HISTORY_PAGE_REQUEST_DELAY_MS)
+                                val rawResult = controller.getRawHistories(nextRawIndex)
+                                Log.i(TAG, "Edit 90a: raw prefetch getRawHistories($nextRawIndex) returned $rawResult")
+                                val rawDispatched = rawResult == 0 || rawResult == AidexXOperation.GET_HISTORIES_RAW
+                                if (rawDispatched) {
+                                    scheduleHistoryPageTimeout(nextRawIndex, "GET_HISTORIES_RAW prefetch")
+                                    return@execute
+                                }
+                                Log.w(TAG, "Edit 90a: raw prefetch dispatch failed (result=$rawResult), continuing with brief follow-up")
+                                vendorRawHistoryPendingIndex = -1
+                            }
+                            vendorRawBriefFollowupIndex = -1
+                            vendorRawPrefetchPages = 0
+                            vendorRawPrefetchLastOffset = -1
+                            val startIndex = maxOf(briefStart, vendorHistoryNextIndex)
                             Log.i(TAG, "Edit 86a: requesting getHistories($startIndex) after raw page")
                             if (HISTORY_PAGE_REQUEST_DELAY_MS > 0L) Thread.sleep(HISTORY_PAGE_REQUEST_DELAY_MS)
                             requestVendorHistoryPage(
@@ -2535,6 +2643,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         } catch (t: Throwable) {
                             Log.e(TAG, "Edit 86a: GET_HISTORIES_RAW follow-up getHistories failed: ${t.message}")
                             vendorHistoryDownloading = false
+                            clearRawHistoryPageState()
                         }
                     }
                 }
@@ -2631,8 +2740,11 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                                 // it completed before the history download finished.
                                 Log.i(TAG, "GET_HISTORIES: download complete — $vendorHistoryRecordsStored records stored total")
                                 vendorHistoryDownloading = false
-                                vendorRawHistoryPendingIndex = -1
-                                vendorRawHistoryByOffset.clear()
+                                if (vendorRawHistoryHydrationPending) {
+                                    vendorRawHistoryHydrationPending = false
+                                    Log.i(TAG, "Edit 89a: raw-history hydration complete")
+                                }
+                                clearRawHistoryPageState()
                                 if (vendorHistoryRecordsStored > 0) {
                                     // Small delay to ensure all native writes from aidexProcessData are flushed
                                     try { Thread.sleep(300) } catch (_: Throwable) {}
@@ -2646,14 +2758,15 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         } else {
                             Log.d(TAG, "GET_HISTORIES: parser returned null/empty list for ${data.size}-byte payload")
                             vendorHistoryDownloading = false
-                            vendorRawHistoryPendingIndex = -1
-                            vendorRawHistoryByOffset.clear()
+                            if (vendorRawHistoryHydrationPending) {
+                                vendorRawHistoryHydrationPending = false
+                            }
+                            clearRawHistoryPageState()
                         }
                     } catch (t: Throwable) {
                         Log.w(TAG, "GET_HISTORIES: parse failed: ${t.message}")
                         vendorHistoryDownloading = false
-                        vendorRawHistoryPendingIndex = -1
-                        vendorRawHistoryByOffset.clear()
+                        clearRawHistoryPageState()
                         if (vendorHistoryRecordsStored > 0) {
                             try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                         }
@@ -2662,8 +2775,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     // resCode=4 with empty data means no more records at this index
                     Log.i(TAG, "GET_HISTORIES: empty/failed response (resCode=${message.resCode}) — download complete ($vendorHistoryRecordsStored records stored)")
                     vendorHistoryDownloading = false
-                    vendorRawHistoryPendingIndex = -1
-                    vendorRawHistoryByOffset.clear()
+                    if (vendorRawHistoryHydrationPending) {
+                        vendorRawHistoryHydrationPending = false
+                    }
+                    clearRawHistoryPageState()
                     if (vendorHistoryRecordsStored > 0) {
                         try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                     }
@@ -3979,8 +4094,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             cancelBroadcastPoll()  // Edit 37a: stop polling on disconnect
             vendorHistoryRangePending = false
             vendorHistoryDownloading = false  // Edit 45d: abort any in-progress history download
-            vendorRawHistoryPendingIndex = -1
-            vendorRawHistoryByOffset.clear()
+            clearRawHistoryPageState()
             vendorHistoryGapDetected = false  // Edit 60a: reset gap flag on disconnect
             lastHistoryRequestTime = 0L  // Edit 48: reset cooldown so history resumes immediately after reconnect
             cancelReconnectStallTimeout()  // Edit 34: cancel stall timer on disconnect
@@ -5362,12 +5476,85 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         val rawMgDl: Float = 0f
     )
 
+    private data class VendorRawTuple(
+        val i1: Float,
+        val i2: Float,
+        val vc: Float,
+        val isValid: Int
+    )
+
+    private fun u16Le(bytes: ByteArray, offset: Int): Int {
+        if (offset + 1 >= bytes.size) return 0
+        return (bytes[offset].toInt() and 0xFF) or ((bytes[offset + 1].toInt() and 0xFF) shl 8)
+    }
+
+    private fun decodeVendorRawTuplePacked(bytes: ByteArray, offset: Int): VendorRawTuple? {
+        if (offset < 0 || offset + 4 >= bytes.size) return null
+        val i1Raw = u16Le(bytes, offset)
+        val i2Raw = u16Le(bytes, offset + 2)
+        val vcRaw = bytes[offset + 4].toInt() and 0xFF
+        val isValid = if (i1Raw == 0 && i2Raw == 0 && vcRaw == 0) 0 else 1
+        return VendorRawTuple(
+            i1 = i1Raw / 100f,
+            i2 = i2Raw / 100f,
+            vc = vcRaw / 100f,
+            isValid = isValid
+        )
+    }
+
+    private fun parseVendorRawHistoryPacked(payload: ByteArray): List<Pair<Int, VendorRawHistorySample>>? {
+        if (payload.size < 7) return null
+        val startOffset = u16Le(payload, 0)
+        if (startOffset <= 0) return null
+        val bodyBytes = payload.size - 2
+        if (bodyBytes <= 0 || bodyBytes % 5 != 0) return null
+        val rows = bodyBytes / 5
+        val parsed = ArrayList<Pair<Int, VendorRawHistorySample>>(rows)
+        for (idx in 0 until rows) {
+            val tuple = decodeVendorRawTuplePacked(payload, 2 + idx * 5) ?: return null
+            val offset = startOffset + idx
+            if (offset <= 0 || offset.toLong() > (AIDEX_MAX_OFFSET_DAYS * 24L * 60L)) continue
+            parsed.add(
+                offset to VendorRawHistorySample(
+                    i1 = tuple.i1,
+                    i2 = tuple.i2,
+                    vc = tuple.vc,
+                    isValid = tuple.isValid
+                )
+            )
+        }
+        return parsed
+    }
+
+    private fun parseVendorInstantPayloadLite(payload: ByteArray, now: Long): VendorDecodeResult? {
+        // Vendor AUTO_UPDATE_FULL_HISTORY callback currently arrives as 14-byte payload:
+        // [0]=status [1]=calTemp [2]=trend [3..4]=timeOffset [5]=glucose [7..8]=i1*100 [9..10]=i2*100 [11]=vc*100 [12]=calIndex.
+        if (payload.size != 14) return null
+        val offsetMinutes = u16Le(payload, 3)
+        if (offsetMinutes <= 0 || offsetMinutes.toLong() > (AIDEX_MAX_OFFSET_DAYS * 24L * 60L)) return null
+        val glucose = payload[5].toInt() and 0xFF
+        if (glucose !in MIN_VALID_GLUCOSE_MGDL_INT..MAX_VALID_GLUCOSE_MGDL_INT) return null
+        val trend = payload[2].toInt()
+        val tuple = decodeVendorRawTuplePacked(payload, 7)
+        val rawMgDl = if (tuple != null && tuple.isValid != 0) {
+            selectVendorRawLane(tuple.i1, tuple.i2, hasRawLane())
+        } else {
+            0f
+        }
+        updateStartTimeFromOffset(offsetMinutes.toLong(), now)
+        Log.i(
+            TAG,
+            "parseVendorInstantPayloadLite(14B): glucose=$glucose offset=$offsetMinutes trend=$trend rawTuple=${tuple?.i1}/${tuple?.i2}/${tuple?.vc}"
+        )
+        return VendorDecodeResult(glucose.toFloat(), offsetMinutes, trend, rawMgDl)
+    }
+
     private fun selectVendorRawLane(i1: Float, i2: Float, rawOnlyMode: Boolean): Float {
         val i2Candidate = i2.takeIf { it.isFinite() && it > 0f } ?: 0f
         if (rawOnlyMode) {
             val i1ScaledCandidate = i1
                 .takeIf { it.isFinite() && it > 0f }
-                ?.let { (it * 10f).coerceIn(MIN_VALID_GLUCOSE_MGDL, MAX_VALID_GLUCOSE_MGDL) }
+                ?.let { (it * 10f).coerceAtMost(MAX_VALID_GLUCOSE_MGDL) }
                 ?: 0f
             val i2LooksEngineering = i2Candidate in 25f..45f
             if (i2LooksEngineering && i1ScaledCandidate > 0f) {
@@ -5453,6 +5640,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private fun parseVendorInstantPayload(payload: ByteArray, now: Long): VendorDecodeResult? {
         if (payload.isEmpty()) return null
         if (!vendorLibAvailable) return null
+
+        parseVendorInstantPayloadLite(payload, now)?.let { return it }
 
         // Edit 43a: Accept both 14-byte (vendor message callback) and 17-byte (raw F003
         // notification) payloads. The vendor AUTO_UPDATE_FULL_HISTORY (op=65025) delivers
@@ -5630,10 +5819,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         val vendorRawCandidate = sanitizeVendorRawCandidate(
             rawCandidate = vendorRawMgDl.takeIf { it.isFinite() && it > 0f }
         )
-        val rawForStore = when (viewModeInternal) {
-            1, 3 -> f003RawSecondary ?: vendorRawCandidate ?: glucoseMgDl
-            2 -> f003RawSecondary ?: vendorRawCandidate ?: glucoseMgDl
-            else -> 0f
+        val rawForStore = resolveRawForStore(now, f003RawSecondary ?: vendorRawCandidate)
+        if ((viewModeInternal == 1 || viewModeInternal == 3) && rawForStore <= 0f) {
+            Log.i(TAG, "Raw-primary store skipped ($source): no raw candidate for offset=$offsetMinutes")
+            return false
         }
 
         // Edit 59b: Apply initialization bias compensation if enabled.
@@ -5695,6 +5884,15 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         vendorRawFlatlineStreak = 0
         lastVendorRawCandidate = rawCandidate
         return rawCandidate
+    }
+
+    private fun resolveRawForStore(now: Long, primaryRawCandidate: Float?): Float {
+        val primary = primaryRawCandidate?.takeIf { it.isFinite() && it > 0f }
+        val recent = recentRawSecondary(now).takeIf { it > 0f }
+        return when (viewModeInternal) {
+            1, 2, 3 -> primary ?: recent ?: 0f
+            else -> 0f
+        }
     }
 
     private fun recentRawSecondary(now: Long): Float {
@@ -6221,11 +6419,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                      Log.w(TAG, "AIDEX-F003: timeOffset ${vendorDirect.timeOffsetMinutes} too far from last known $lastVendorOffsetMinutes (delta > 60 min). Garbage decrypt — ignoring.")
                 } else {
                     markHandshakeComplete("vendor-f003-native")
-                    lastRawMgDl = vendorDirect.glucoseMgDl
-                    lastRawTime = now
-                    writeFloatPref("lastRawMgDl", lastRawMgDl)
-                    writeLongPref("lastRawTime", lastRawTime)
-    
+                    val rawCandidate = recentF003RawCandidate(now).takeIf { it > 0f }
+                        ?: vendorDirect.rawMgDl.takeIf { it.isFinite() && it > 0f }
                     val secondaryAuto = if (viewModeInternal == 3) {
                         recentVendorSecondary(now)
                     } else {
@@ -6233,12 +6428,19 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                     val autoForStore =
                         if (viewModeInternal == 3 && secondaryAuto > 0f) secondaryAuto else vendorDirect.glucoseMgDl
-                    val rawForStore = when (viewModeInternal) {
-                        1, 3 -> vendorDirect.glucoseMgDl
-                        2 -> recentRawSecondary(now).takeIf { it > 0f } ?: vendorDirect.glucoseMgDl
-                        else -> 0f
+                    val rawForStore = resolveRawForStore(now, rawCandidate)
+                    if ((viewModeInternal == 1 || viewModeInternal == 3) && rawForStore <= 0f) {
+                        Log.i(TAG, "AIDEX-F003: raw-primary store skipped — no raw candidate")
+                        checkAndRequestHistory()
+                        return
                     }
-                    Log.i(TAG, ">>> SUCCESS AIDEX (Native): Raw=${vendorDirect.glucoseMgDl} mg/dL")
+                    if (rawForStore > 0f) {
+                        lastRawMgDl = rawForStore
+                        lastRawTime = now
+                        writeFloatPref("lastRawMgDl", lastRawMgDl)
+                        writeLongPref("lastRawTime", lastRawTime)
+                    }
+                    Log.i(TAG, ">>> SUCCESS AIDEX (Native): Raw=$rawForStore mg/dL")
                     storeAidexReading(byteArrayOf(0), now, autoForStore, rawForStore)
     
                     if (wantsAuto()) {
@@ -6266,13 +6468,9 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             0f
         }
         val autoForStore = if (viewModeInternal == 3 && secondaryAuto > 0f) secondaryAuto else legacy.mgDl
-        val rawForStore = when (viewModeInternal) {
-            1, 3 -> legacy.mgDl
-            2 -> recentRawSecondary(now).takeIf { it > 0f } ?: legacy.mgDl
-            else -> 0f
-        }
+        val rawForStore = resolveRawForStore(now, legacy.mgDl)
 
-        Log.i(TAG, ">>> SUCCESS AIDEX (Legacy): Raw=${legacy.mgDl} mg/dL")
+        Log.i(TAG, ">>> SUCCESS AIDEX (Legacy): Raw=$rawForStore mg/dL")
         storeAidexReading(legacy.selectedBytes, now, autoForStore, rawForStore)
 
         if (wantsAuto()) {
@@ -6327,13 +6525,20 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         historyPageTimeoutRetryCount = 0
     }
 
+    private fun clearRawHistoryPageState() {
+        vendorRawHistoryPendingIndex = -1
+        vendorRawBriefFollowupIndex = -1
+        vendorRawPrefetchPages = 0
+        vendorRawPrefetchLastOffset = -1
+        vendorRawHistoryByOffset.clear()
+    }
+
     private fun recoverFromHistoryPageStall(reason: String, requestedIndex: Int) {
         Log.e(TAG, "History watchdog: recovering from stalled page index=$requestedIndex ($reason)")
         cancelHistoryPageTimeout()
         vendorHistoryDownloading = false
         vendorHistoryRangePending = false
-        vendorRawHistoryPendingIndex = -1
-        vendorRawHistoryByOffset.clear()
+        clearRawHistoryPageState()
         lastHistoryRequestTime = 0L
         vendorHistoryGapDetected = true
         vendorBootstrapHistoryPending = true
@@ -6412,6 +6617,9 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     ): Int {
         if (allowRaw && hasRawLane() && vendorHistoryRawStart > 0 && startIndex >= vendorHistoryRawStart) {
             vendorRawHistoryPendingIndex = startIndex
+            vendorRawBriefFollowupIndex = startIndex
+            vendorRawPrefetchPages = 0
+            vendorRawPrefetchLastOffset = startIndex - 1
             Log.i(TAG, "Edit 86a: $reason requesting getRawHistories($startIndex)")
             val rawResult = controller.getRawHistories(startIndex)
             Log.i(TAG, "Edit 86a: $reason getRawHistories($startIndex) returned $rawResult")
@@ -6421,8 +6629,14 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 return rawResult
             }
             vendorRawHistoryPendingIndex = -1
+            vendorRawBriefFollowupIndex = -1
+            vendorRawPrefetchPages = 0
+            vendorRawPrefetchLastOffset = -1
             Log.w(TAG, "Edit 86a: $reason raw request failed (result=$rawResult), falling back to getHistories($startIndex)")
         }
+        vendorRawBriefFollowupIndex = -1
+        vendorRawPrefetchPages = 0
+        vendorRawPrefetchLastOffset = -1
         val historyResult = controller.getHistories(startIndex)
         Log.i(TAG, "Edit 86a: $reason getHistories($startIndex) returned $historyResult")
         val historyDispatched = historyResult == 0 || historyResult == AidexXOperation.GET_HISTORIES
@@ -6451,17 +6665,21 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             return
         }
         val now = System.currentTimeMillis()
+        val forceRawHydration = vendorRawHistoryHydrationPending && hasRawLane()
+        if (forceRawHydration) {
+            Log.i(TAG, "requestHistoryBackfill($reason): forcing raw-history hydration run")
+        }
         // Edit 51a: Suppress history backfill when AUTO_UPDATE is actively delivering glucose.
         // AUTO_UPDATE stores every reading (~1/min). History backfill during active AUTO_UPDATE
         // creates duplicate data points and wastes 2-4 BLE transactions per cycle.
         // Only allow backfill when AUTO_UPDATE has been silent for >90s (e.g. after reconnection).
         // Edit 60b: BYPASS suppression when a gap is detected — filling gaps is critical.
         val timeSinceLastAutoUpdate = now - vendorLastAutoUpdateTime
-        if (!vendorHistoryGapDetected && vendorLastAutoUpdateTime > 0L && timeSinceLastAutoUpdate < VENDOR_AUTO_UPDATE_WATCHDOG_MS) {
+        if (!forceRawHydration && !vendorHistoryGapDetected && vendorLastAutoUpdateTime > 0L && timeSinceLastAutoUpdate < VENDOR_AUTO_UPDATE_WATCHDOG_MS) {
             Log.d(TAG, "requestHistoryBackfill($reason): suppressed — AUTO_UPDATE active (last ${timeSinceLastAutoUpdate / 1000}s ago)")
             return
         }
-        if (!vendorHistoryGapDetected && now - lastHistoryRequestTime < 60_000L) { // Edit 48: reduced from 300s to 60s — history is fast/lightweight now
+        if (!forceRawHydration && !vendorHistoryGapDetected && now - lastHistoryRequestTime < 60_000L) { // Edit 48: reduced from 300s to 60s — history is fast/lightweight now
             Log.d(TAG, "requestHistoryBackfill($reason): skipped, last request was ${(now - lastHistoryRequestTime) / 1000}s ago")
             return
         }
@@ -6801,6 +7019,9 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     )
     private val vendorRawHistoryByOffset = HashMap<Int, VendorRawHistorySample>()
     private var vendorRawHistoryPendingIndex: Int = -1
+    private var vendorRawBriefFollowupIndex: Int = -1
+    private var vendorRawPrefetchPages: Int = 0
+    private var vendorRawPrefetchLastOffset: Int = -1
     private var historyPageTimeoutRunnable: Runnable? = null
     private var historyPageTimeoutGattToken: Int = 0
     private var historyPageTimeoutIndex: Int = -1

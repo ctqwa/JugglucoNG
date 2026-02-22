@@ -209,16 +209,17 @@ class HistoryRepository(context: Context = Applic.app) {
         if (!CalibrationManager.shouldOverwriteSensorValues()) return value
 
         val viewMode = resolveSensorViewMode(sensorSerial)
-        val isRawMode = viewMode == 1 || viewMode == 3
-        if (!CalibrationManager.hasActiveCalibration(isRawMode, sensorSerial)) return value
+        if (viewMode == 1 || viewMode == 3) return value
+        if (viewMode != 0 && viewMode != 2) return value
+        if (!CalibrationManager.hasActiveCalibration(false, sensorSerial)) return value
 
-        val baseValue = if (isRawMode) rawValue else value
+        val baseValue = value
         if (!baseValue.isFinite() || baseValue <= 0f) return value
 
         val calibrated = CalibrationManager.getCalibratedValue(
             value = baseValue,
             timestamp = timestamp,
-            isRawMode = isRawMode,
+            isRawMode = false,
             sensorIdOverride = sensorSerial
         )
         return if (calibrated.isFinite() && calibrated > 0f) calibrated else value
@@ -594,6 +595,7 @@ class HistoryRepository(context: Context = Applic.app) {
             try {
                 val readings = dao.getReadingsSinceForSensor(sensorSerial, effectiveStartTimestamp)
                 var updated = 0
+                var mirrored = 0
                 readings.forEach { reading ->
                     val baseValue = if (isRawMode) reading.rawValue else reading.value
                     if (!baseValue.isFinite() || baseValue <= 0f) return@forEach
@@ -604,17 +606,42 @@ class HistoryRepository(context: Context = Applic.app) {
                         sensorIdOverride = sensorSerial
                     )
                     if (!calibrated.isFinite() || calibrated <= 0f) return@forEach
-                    if (kotlin.math.abs(calibrated - reading.value) < 0.01f) return@forEach
-                    updated += dao.updateValueAtTime(
-                        sensorSerial = sensorSerial,
-                        timestamp = reading.timestamp,
-                        value = calibrated
-                    )
+                    val currentStored = if (isRawMode) reading.rawValue else reading.value
+                    if (kotlin.math.abs(calibrated - currentStored) < 0.01f) return@forEach
+                    val changed = if (isRawMode) {
+                        dao.updateRawValueAtTime(
+                            sensorSerial = sensorSerial,
+                            timestamp = reading.timestamp,
+                            rawValue = calibrated
+                        )
+                    } else {
+                        dao.updateValueAtTime(
+                            sensorSerial = sensorSerial,
+                            timestamp = reading.timestamp,
+                            value = calibrated
+                        )
+                    }
+                    if (changed > 0) {
+                        updated += changed
+                        val pushed = runCatching {
+                            val tsSec = reading.timestamp / 1000L
+                            if (isRawMode) {
+                                Natives.addRawGlucoseStream(tsSec, calibrated, sensorSerial)
+                            } else {
+                                Natives.addGlucoseStream(tsSec, calibrated, sensorSerial)
+                            }
+                            true
+                        }.getOrDefault(false)
+                        if (pushed) mirrored += changed
+                    }
+                }
+                if (mirrored > 0) {
+                    runCatching { Natives.wakebackup() }
                 }
                 if (updated > 0) {
                     Log.d(
                         TAG,
-                        "Rewrote $updated readings with calibrated values for $sensorSerial (start=$effectiveStartTimestamp)"
+                        "Rewrote $updated readings with calibrated values for $sensorSerial (start=$effectiveStartTimestamp, mirrored=$mirrored)"
                     )
                 }
                 updated

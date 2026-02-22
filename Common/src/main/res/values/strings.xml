@@ -1309,4 +1309,5 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="calibration_overwrite_values_title">Write calibrated values</string>
     <string name="calibration_overwrite_values_subtitle">Write in DB for statistics, reports, and export.</string>
     <string name="calibration_visual_continuity_subtitle">Visual mode: continue calibrating from the value you currently see.</string>
+    <string name="scan_with_follower">Scan this QR Code on the Follower device</string>
 </resources>
