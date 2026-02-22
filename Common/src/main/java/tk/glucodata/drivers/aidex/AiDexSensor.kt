@@ -44,7 +44,7 @@ import tk.glucodata.data.HistoryRepository
 import com.microtechmd.blecomm.entity.AidexXDatetimeEntity
 import tk.glucodata.R
 
-private object AidexVendorOperation {
+private object AidexXOperation {
     const val DISCOVER = 1
     const val CONNECT = 2
     const val DISCONNECT = 3
@@ -1243,7 +1243,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             return false
         }
         Log.i(TAG, "calibrateSensor: sending glucose=$glucoseMgDl mg/dL, timeOffset=$offset")
-        return executeVendorCommand("calibration", AidexVendorOperation.SET_CALIBRATION) { ctrl ->
+        return executeVendorCommand("calibration", AidexXOperation.SET_CALIBRATION) { ctrl ->
             ctrl.calibrationWithLog(glucoseMgDl, offset)
         }
     }
@@ -1830,7 +1830,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         Log.i(TAG, "Vendor message: op=${message.operation} success=${message.isSuccess} resCode=${message.resCode} data=${data?.let { bytesToHex(it) } ?: "null"}")
         when (message.operation) {
             // Edit 33: Handle pairing flow operations — matches official app's PairUtil.observeMessage
-            AidexVendorOperation.DISCOVER -> {
+            AidexXOperation.DISCOVER -> {
                 // Edit 37e: Track consecutive DISCOVER without executeConnect.
                 // After a reset or disconnect, the native lib may spam DISCOVER without
                 // ever calling executeConnect — meaning its internal state is stuck.
@@ -1921,10 +1921,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.CONNECT -> {
+            AidexXOperation.CONNECT -> {
                 Log.i(TAG, "Vendor CONNECT: success=${message.isSuccess}")
             }
-            AidexVendorOperation.DISCONNECT -> {
+            AidexXOperation.DISCONNECT -> {
                 // Edit 38d + 39e + 40: Proper reconnection after vendor-initiated disconnect.
                 // The vendor lib disconnects after ~80s of polling (or on its own schedule).
                 // We need to: cancel polling, reset state for next cycle, and schedule a
@@ -1992,7 +1992,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 vendorDisconnectRestartRunnable = restartRunnable
                 vendorWorkHandler.postDelayed(restartRunnable, restartDelayMs)
             }
-            AidexVendorOperation.PAIR -> {
+            AidexXOperation.PAIR -> {
                 // PAIR success = AES key exchange completed, encryption keys are now available
                 Log.i(TAG, "Vendor PAIR: success=${message.isSuccess}")
                 if (message.isSuccess) {
@@ -2019,13 +2019,13 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     Log.e(TAG, "Vendor PAIR FAILED — pairing handshake did not complete")
                 }
             }
-            AidexVendorOperation.UNPAIR -> {
+            AidexXOperation.UNPAIR -> {
                 Log.i(TAG, "Vendor UNPAIR: success=${message.isSuccess}")
                 if (message.isSuccess) {
                     clearVendorPairingKeys()
                 }
             }
-            AidexVendorOperation.BOND -> {
+            AidexXOperation.BOND -> {
                 Log.i(TAG, "Vendor BOND: success=${message.isSuccess}")
                 if (message.isSuccess) {
                     clearVendorBondFailureLockout("vendor-bond-success")
@@ -2127,16 +2127,16 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.ENABLE_NOTIFY -> {
+            AidexXOperation.ENABLE_NOTIFY -> {
                 Log.i(TAG, "Vendor ENABLE_NOTIFY: success=${message.isSuccess}")
             }
-            AidexVendorOperation.DELETE_BOND -> {
+            AidexXOperation.DELETE_BOND -> {
                 Log.i(TAG, "Vendor DELETE_BOND: success=${message.isSuccess}")
                 if (message.isSuccess) {
                     clearVendorPairingKeys()
                 }
             }
-            AidexVendorOperation.GET_DEVICE_INFO -> {
+            AidexXOperation.GET_DEVICE_INFO -> {
                 Log.i(TAG, "Vendor GET_DEVICE_INFO: success=${message.isSuccess} data=${data?.let { bytesToHex(it) } ?: "null"}")
                 // Edit 58c: Parse device info response.
                 // Observed format (16 bytes): [status:2][fw_major][fw_minor][hw_major][hw_minor][sensor_type:2][model_ascii:8]
@@ -2166,7 +2166,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.GET_START_TIME -> {
+            AidexXOperation.GET_START_TIME -> {
                 // This is the final step in the official pairing flow.
                 // After GET_START_TIME, the official app calls savePair() → TransmitterManager.set() → register()
                 // and then starts the data subscription (setDynamicMode + setAutoUpdate + getBroadcastData).
@@ -2270,7 +2270,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.GET_HISTORY_RANGE -> {
+            AidexXOperation.GET_HISTORY_RANGE -> {
                 // Edit 45d: Parse 6-byte range response and trigger paginated history download.
                 // Official app pattern: getHistoryRange() → parse range → getHistories(nextEventIndex)
                 vendorHistoryRangePending = false
@@ -2367,7 +2367,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     Log.w(TAG, "GET_HISTORY_RANGE: unexpected data size ${data.size} (expected 6)")
                 }
             }
-            AidexVendorOperation.AUTO_UPDATE_FULL_HISTORY -> {
+            AidexXOperation.AUTO_UPDATE_FULL_HISTORY -> {
                 // Edit 43b: This is the primary real-time glucose push mechanism in long-connect
                 // mode. The sensor sends these continuously (~1/min) after SET_AUTO_UPDATE.
                 // The vendor lib decrypts the F003 notification and delivers parsed data here.
@@ -2437,7 +2437,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.GET_BROADCAST_DATA -> {
+            AidexXOperation.GET_BROADCAST_DATA -> {
                 // Edit 37a: Process the broadcast data and schedule the next poll.
                 // Edit 37b: Detect warmup state — the vendor parser returns null when
                 // isValid=0 or glucose is out of 30..500 range (e.g. 0xFF=255 during warmup).
@@ -2494,10 +2494,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     scheduleNextBroadcastPoll()
                 }
             }
-            AidexVendorOperation.RESET -> {
+            AidexXOperation.RESET -> {
                 Log.i(TAG, "Vendor RESET response: success=${message.isSuccess} resCode=${message.resCode}")
             }
-            AidexVendorOperation.SET_NEW_SENSOR -> {
+            AidexXOperation.SET_NEW_SENSOR -> {
                 Log.i(TAG, "Vendor NEW_SENSOR response: success=${message.isSuccess} resCode=${message.resCode}")
                 if (message.isSuccess) {
                     // Edit 75: Sensor activation succeeded. The sensor will now begin its warmup period (~60 min).
@@ -2542,10 +2542,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }, 1000L)
                 }
             }
-            AidexVendorOperation.CLEAR_STORAGE -> {
+            AidexXOperation.CLEAR_STORAGE -> {
                 Log.i(TAG, "Vendor CLEAR_STORAGE response: success=${message.isSuccess} resCode=${message.resCode}")
             }
-            AidexVendorOperation.GET_HISTORIES_RAW -> {
+            AidexXOperation.GET_HISTORIES_RAW -> {
                 cancelHistoryPageTimeout()
                 val requestedIndex = if (vendorRawHistoryPendingIndex > 0) vendorRawHistoryPendingIndex else vendorHistoryNextIndex
                 vendorRawHistoryPendingIndex = -1
@@ -2612,7 +2612,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                                 if (HISTORY_PAGE_REQUEST_DELAY_MS > 0L) Thread.sleep(HISTORY_PAGE_REQUEST_DELAY_MS)
                                 val rawResult = controller.getRawHistories(nextRawIndex)
                                 Log.i(TAG, "Edit 90a: raw prefetch getRawHistories($nextRawIndex) returned $rawResult")
-                                val rawDispatched = rawResult == 0 || rawResult == AidexVendorOperation.GET_HISTORIES_RAW
+                                val rawDispatched = rawResult == 0 || rawResult == AidexXOperation.GET_HISTORIES_RAW
                                 if (rawDispatched) {
                                     scheduleHistoryPageTimeout(nextRawIndex, "GET_HISTORIES_RAW prefetch")
                                     return@execute
@@ -2640,7 +2640,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.GET_HISTORIES -> {
+            AidexXOperation.GET_HISTORIES -> {
                 cancelHistoryPageTimeout()
                 // Edit 45d+46+46b: Batch history parsing + lightweight native-only store.
                 // Each record is stored via Natives.aidexProcessData ONLY — no notifications,
@@ -2776,7 +2776,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.AUTO_UPDATE_CALIBRATION -> {
+            AidexXOperation.AUTO_UPDATE_CALIBRATION -> {
                 // Sensor pushes a calibration update notification.
                 Log.i(TAG, "Vendor AUTO_UPDATE_CALIBRATION: success=${message.isSuccess} data=${data?.let { bytesToHex(it) } ?: "null"} (${data?.size ?: 0} bytes)")
                 if (data != null && message.isSuccess) {
@@ -2793,7 +2793,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.GET_CALIBRATION_RANGE -> {
+            AidexXOperation.GET_CALIBRATION_RANGE -> {
                 // Response to getCalibrationRange(): similar to GET_HISTORY_RANGE but for calibrations.
                 // Expected format: bytes with start index and newest index.
                 Log.i(TAG, "Vendor GET_CALIBRATION_RANGE: success=${message.isSuccess} data=${data?.let { bytesToHex(it) } ?: "null"} (${data?.size ?: 0} bytes)")
@@ -2827,7 +2827,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.GET_CALIBRATION -> {
+            AidexXOperation.GET_CALIBRATION -> {
                 // Response to getCalibration(index): individual calibration record.
                 Log.i(TAG, "Vendor GET_CALIBRATION: success=${message.isSuccess} data=${data?.let { bytesToHex(it) } ?: "null"} (${data?.size ?: 0} bytes)")
                 if (data != null && message.isSuccess) {
@@ -2845,7 +2845,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                 }
             }
-            AidexVendorOperation.SET_CALIBRATION -> {
+            AidexXOperation.SET_CALIBRATION -> {
                 // Response to our calibration command
                 Log.i(TAG, "Vendor SET_CALIBRATION: success=${message.isSuccess} resCode=${message.resCode}")
                 if (message.isSuccess) {
@@ -2853,7 +2853,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     requestCalibrationData("post-set-calibration")
                 }
             }
-            AidexVendorOperation.AUTO_UPDATE_SENSOR_EXPIRED -> {
+            AidexXOperation.AUTO_UPDATE_SENSOR_EXPIRED -> {
                 Log.i(TAG, "Vendor AUTO_UPDATE_SENSOR_EXPIRED: success=${message.isSuccess} data=${data?.let { bytesToHex(it) } ?: "null"}")
                 if (message.isSuccess) {
                     vendorSensorExpired = true
@@ -2861,7 +2861,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     Log.w(TAG, "Sensor has reported EXPIRED at ${vendorSensorExpiredTime}")
                 }
             }
-            AidexVendorOperation.AUTO_UPDATE_BATTERY_VOLTAGE -> {
+            AidexXOperation.AUTO_UPDATE_BATTERY_VOLTAGE -> {
                 Log.i(TAG, "Vendor AUTO_UPDATE_BATTERY_VOLTAGE: success=${message.isSuccess} data=${data?.let { bytesToHex(it) } ?: "null"} (${data?.size ?: 0} bytes)")
                 if (data != null && data.size >= 2 && message.isSuccess) {
                     val millivolts = (data[0].toInt() and 0xFF) or ((data[1].toInt() and 0xFF) shl 8)
@@ -2871,10 +2871,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 }
             }
             // Edit 37c: Handle long-connect setup responses properly
-            AidexVendorOperation.SET_DYNAMIC_ADV_MODE -> {
+            AidexXOperation.SET_DYNAMIC_ADV_MODE -> {
                 Log.i(TAG, "Vendor SET_DYNAMIC_ADV_MODE: success=${message.isSuccess}")
             }
-            AidexVendorOperation.SET_AUTO_UPDATE_STATUS -> {
+            AidexXOperation.SET_AUTO_UPDATE_STATUS -> {
                 Log.i(TAG, "Vendor SET_AUTO_UPDATE_STATUS: success=${message.isSuccess}")
                 if (message.isSuccess) {
                     vendorAutoUpdateReady = true
@@ -6514,7 +6514,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             Log.i(TAG, "Edit 86a: $reason requesting getRawHistories($startIndex)")
             val rawResult = controller.getRawHistories(startIndex)
             Log.i(TAG, "Edit 86a: $reason getRawHistories($startIndex) returned $rawResult")
-            val rawDispatched = rawResult == 0 || rawResult == AidexVendorOperation.GET_HISTORIES_RAW
+            val rawDispatched = rawResult == 0 || rawResult == AidexXOperation.GET_HISTORIES_RAW
             if (rawDispatched) {
                 scheduleHistoryPageTimeout(startIndex, "$reason/raw", timeoutRetryCount)
                 return rawResult
@@ -6530,7 +6530,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         vendorRawPrefetchLastOffset = -1
         val historyResult = controller.getHistories(startIndex)
         Log.i(TAG, "Edit 86a: $reason getHistories($startIndex) returned $historyResult")
-        val historyDispatched = historyResult == 0 || historyResult == AidexVendorOperation.GET_HISTORIES
+        val historyDispatched = historyResult == 0 || historyResult == AidexXOperation.GET_HISTORIES
         if (historyDispatched) {
             scheduleHistoryPageTimeout(startIndex, "$reason/brief", timeoutRetryCount)
         } else {
@@ -6614,7 +6614,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     return@execute
                 }
                 Log.i(TAG, "requestHistoryBackfill($reason): getHistoryRange() returned $result (0x${Integer.toHexString(result)})")
-                val dispatched = result == 0 || result == AidexVendorOperation.GET_HISTORY_RANGE
+                val dispatched = result == 0 || result == AidexXOperation.GET_HISTORY_RANGE
                 if (!dispatched) {
                     Log.w(TAG, "requestHistoryBackfill($reason): getHistoryRange dispatch failed (result=$result)")
                     vendorHistoryRangePending = false
@@ -8131,7 +8131,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // before executing the command, so we don't need to pre-check aesReady here.
         if (vendorBleEnabled && vendorController != null) {
             Log.i(TAG, "Reset Strategy 1: Vendor native lib")
-            val success = executeVendorCommand("reset-sensor", AidexVendorOperation.RESET) { ctrl ->
+            val success = executeVendorCommand("reset-sensor", AidexXOperation.RESET) { ctrl ->
                 ctrl.clearStorage()
                 ctrl.reset()
             }
@@ -8185,10 +8185,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             // Attempt 2a: Single-byte reset command (common BLE pattern)
             vendorWrite(ff32Id, byteArrayOf(0x0F.toByte(), 0x00.toByte())) // 0xF00 as little-endian 2 bytes
             Thread.sleep(300)
-            // Attempt 2b: Also try the full AidexVendorOperation.RESET value as big-endian
+            // Attempt 2b: Also try the full AidexXOperation.RESET value as big-endian
             vendorWrite(ff32Id, byteArrayOf(
-                ((AidexVendorOperation.RESET shr 8) and 0xFF).toByte(),
-                (AidexVendorOperation.RESET and 0xFF).toByte()
+                ((AidexXOperation.RESET shr 8) and 0xFF).toByte(),
+                (AidexXOperation.RESET and 0xFF).toByte()
             ))
             true
         } catch (t: Throwable) {
@@ -8266,7 +8266,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // executeVendorCommand now properly waits for GATT + AES initialization
         if (vendorBleEnabled && vendorController != null) {
             Log.i(TAG, "NewSensor Strategy 1: Vendor native lib")
-            val success = executeVendorCommand("new-sensor", AidexVendorOperation.SET_NEW_SENSOR) { ctrl ->
+            val success = executeVendorCommand("new-sensor", AidexXOperation.SET_NEW_SENSOR) { ctrl ->
                 val datetime = AidexXDatetimeEntity(Calendar.getInstance())
                 ctrl.newSensor(datetime)
             }
@@ -8291,8 +8291,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // --- Strategy 2: Direct FF32 Write ---
         Log.i(TAG, "NewSensor Strategy 2: Direct FF32 write with SET_NEW_SENSOR opcode")
         val opBytes = byteArrayOf(
-            ((AidexVendorOperation.SET_NEW_SENSOR shr 8) and 0xFF).toByte(),
-            (AidexVendorOperation.SET_NEW_SENSOR and 0xFF).toByte()
+            ((AidexXOperation.SET_NEW_SENSOR shr 8) and 0xFF).toByte(),
+            (AidexXOperation.SET_NEW_SENSOR and 0xFF).toByte()
         )
         // Append current datetime as payload (year_hi, year_lo, month, day, hour, minute, second)
         val cal = Calendar.getInstance()
