@@ -150,15 +150,20 @@ const val LabelSmall_Space  = 0.5
  * Note: 'opsz' removed as IBM Plex Sans relies on standard scaling.
  */
 private fun ibmPlexSans(weight: Int, width: Float): FontFamily {
-    return FontFamily(
-        Font(
-            MainFontFile,
-            variationSettings = FontVariation.Settings(
-                FontVariation.weight(weight),
-                FontVariation.width(width)
+    return try {
+        FontFamily(
+            Font(
+                MainFontFile,
+                variationSettings = FontVariation.Settings(
+                    FontVariation.weight(weight),
+                    FontVariation.width(width)
+                )
             )
         )
-    )
+    } catch (th: Throwable) {
+        android.util.Log.w("AppTypography", "Variable font fallback activated", th)
+        FontFamily(Font(MainFontFile))
+    }
 }
 
 // ============================================================================

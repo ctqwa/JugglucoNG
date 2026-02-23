@@ -372,6 +372,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     // Main-chain UUIDs remain mandatory and are never suppressed.
     @Volatile private var cccdSuppressSupplementaryF001 = false
     @Volatile private var cccdSuppressSupplementaryF003 = false
+    @Volatile private var cccdForceMainF003Fallback = false
+    private val cccdIgnoreLateCallbackShorts = HashSet<Int>()
     // Edit 50a: Bypass flag for proactive GATT connect on 2nd DISCOVER.
     // When true, connectDevice() allows GATT connect even without vendorExecuteConnectReceived.
     // Unlike Edit 49a, we do NOT set vendorExecuteConnectReceived — the GATT connects and waits
@@ -446,6 +448,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private val CCCD_SUPPLEMENTARY_TIMEOUT_MS = 1_500L
     private val CCCD_WRITE_RETRY_DELAY_MS = 120L
     private val CCCD_WRITE_MAX_RETRIES = 30
+    private val CCCD_MAIN_F003_FALLBACK_RETRY_THRESHOLD = 8
     private val HISTORY_PAGE_TIMEOUT_MS = 25_000L
     private val HISTORY_PAGE_REQUEST_DELAY_MS = 80L
     private val HISTORY_PAGE_TIMEOUT_MAX_RETRIES = 1
@@ -568,10 +571,18 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             lastF003RawCandidateMgDl = 0f
             lastF003RawCandidateTime = 0L
             if (!isRawLaneMode(previous) && isRawLaneMode(value)) {
-                vendorRawHistoryHydrationPending = true
-                lastHistoryRequestTime = 0L
-                vendorWorkHandler.post {
-                    requestHistoryBackfill("raw-mode-enter")
+                if (shouldHydrateRawHistoryOnModeEnter()) {
+                    vendorRawHistoryHydrationPending = true
+                    lastHistoryRequestTime = 0L
+                    vendorWorkHandler.post {
+                        requestHistoryBackfill("raw-mode-enter")
+                    }
+                } else {
+                    vendorRawHistoryHydrationPending = false
+                    Log.i(
+                        TAG,
+                        "Raw-mode enter: hydration skipped (rawHydratedUpTo=$vendorRawHistoryHydratedUpTo, nextIndex=$vendorHistoryNextIndex, lastOffset=$lastVendorOffsetMinutes)"
+                    )
                 }
             }
             if (previous == 0 && value != 0) {
@@ -910,6 +921,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         data class Read(val uuid: Int) : VendorGattOp()
     }
     private val VENDOR_GATT_OP_MAX_RETRIES = 10
+    private val VENDOR_NO_RESPONSE_ADVANCE_MS = 35L
 
     private fun ensureVendorStarted(reason: String) {
         if (!vendorBleEnabled) {
@@ -1025,6 +1037,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         }
         cccdSuppressSupplementaryF001 = false
         cccdSuppressSupplementaryF003 = false
+        cccdIgnoreLateCallbackShorts.clear()
         vendorHistoryRangePending = false
         cancelBroadcastPoll()  // Edit 37a: stop polling loop
         vendorConsecutiveDiscoverCount = 0  // Edit 37e: reset discover counter
@@ -1033,6 +1046,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // Note: vendorReconnectSpamRestarts is intentionally NOT reset in stopVendor() —
         // it must persist across stop/start cycles to count consecutive spam restarts.
         // It IS reset on executeConnect (success) and in forgetVendor().
+        // Keep cccdForceMainF003Fallback across stop/start too: some stacks repeatedly fail
+        // main-chain F003 CCCD writes, and clearing this flag would re-enter the same loop.
         cancelReconnectStallTimeout()  // Edit 34: cancel stall timer on vendor stop
         vendorLastAutoUpdateOffsetAtDisconnect = 0  // Edit 52a: clear disconnect snapshot on vendor stop
         // Edit 40: Cancel reconnect fallback timer on vendor stop
@@ -1043,6 +1058,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         vendorDisconnectRestartRunnable = null
         vendorDisconnectHandledForCycle = false
         cccdWriteRetryCount = 0
+        nudgeAttempts = 0
         unregisterAidexBondReceiver()
         Log.i(TAG, "Vendor stopped ($reason)")
 
@@ -1998,6 +2014,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         ensureVendorStarted("post-disconnect-reconnect")
                         // Also kick a broadcast scan so the native lib gets fresh advertisement data
                         scheduleBroadcastScan("post-disconnect-reconnect", forceImmediate = true)
+                    } else if (!vendorExecuteConnectReceived && mBluetoothGatt != null && !connectInProgress) {
+                        Log.w(TAG, "Vendor DISCONNECT: restart was about to be skipped but executeConnect is still missing. " +
+                                "Triggering recovery restart to break CCCD-ready deadlock.")
+                        recoverFromMissingExecuteConnect("post-disconnect-skip")
                     } else {
                         Log.i(TAG, "Vendor DISCONNECT: post-disconnect restart SKIPPED — " +
                                 "GATT already active/connecting (connected=$vendorGattConnected, " +
@@ -2320,18 +2340,32 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         vendorLastAutoUpdateOffsetAtDisconnect = 0  // consumed
                     }
                     if (vendorRawHistoryHydrationPending && hasRawLane() && rawStart > 0) {
-                        val hydrationStart = maxOf(briefStart, rawStart)
-                        if (vendorHistoryNextIndex > hydrationStart) {
+                        val hydrationTarget = newest - 1
+                        if (hydrationTarget > 0 && vendorRawHistoryHydratedUpTo >= hydrationTarget) {
                             Log.i(
                                 TAG,
-                                "Edit 89a: raw-history hydration rewinding nextIndex $vendorHistoryNextIndex -> $hydrationStart (newest=$newest)"
+                                "Edit 89a: raw-history hydration skipped — coverage already complete (hydratedUpTo=$vendorRawHistoryHydratedUpTo, target=$hydrationTarget)"
                             )
-                            vendorHistoryNextIndex = hydrationStart
-                            writeIntPref("vendorHistoryNextIndex", vendorHistoryNextIndex)
+                            vendorRawHistoryHydrationPending = false
+                        } else {
+                            val hydrationStart = maxOf(briefStart, rawStart, vendorRawHistoryHydratedUpTo + 1)
+                            if (vendorHistoryNextIndex > hydrationStart) {
+                                Log.i(
+                                    TAG,
+                                    "Edit 89a: raw-history hydration rewinding nextIndex $vendorHistoryNextIndex -> $hydrationStart (newest=$newest, hydratedUpTo=$vendorRawHistoryHydratedUpTo)"
+                                )
+                                vendorHistoryNextIndex = hydrationStart
+                                writeIntPref("vendorHistoryNextIndex", vendorHistoryNextIndex)
+                            } else {
+                                Log.i(
+                                    TAG,
+                                    "Edit 89a: raw-history hydration starts from nextIndex=$vendorHistoryNextIndex (targetStart=$hydrationStart, newest=$newest)"
+                                )
+                            }
+                            // One-shot rewind per raw-mode entry. Subsequent reconnect/backfill cycles
+                            // should continue from persisted nextIndex instead of restarting at rawStart.
+                            vendorRawHistoryHydrationPending = false
                         }
-                        // One-shot rewind per raw-mode entry. Subsequent reconnect/backfill cycles
-                        // should continue from persisted nextIndex instead of restarting at rawStart.
-                        vendorRawHistoryHydrationPending = false
                     }
                     // If there are records to fetch, start paginated download
                     if (vendorHistoryNextIndex < newest) {
@@ -2341,13 +2375,29 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         vendorHistoryRecordsStored = 0
                         vendorHistoryDownloadStartIndex = vendorHistoryNextIndex  // Edit 73: snapshot start for progress display
                         vendorHistoryLastProgressiveSyncAt = 0  // Edit 73: reset progressive sync counter
-                        // Edit 48: Snapshot current AUTO_UPDATE offset so storeHistoryRecord()
-                        // can skip records already covered by real-time data.
-                        // Edit 60a: Use lastVendorOffsetMinutes as the cutoff — this is the latest offset
-                        // that AUTO_UPDATE has stored. History records AT this offset are duplicates.
-                        // Records BEFORE this offset (the gap) are what we want.
-                        vendorHistoryAutoUpdateCutoff = lastVendorOffsetMinutes
-                        Log.i(TAG, "GET_HISTORY_RANGE: autoUpdateCutoff=$vendorHistoryAutoUpdateCutoff (records at or beyond this offset will be skipped)")
+                        // Edit 90a: Apply AUTO_UPDATE dedupe cutoff only when history replay starts
+                        // at/before the last real-time offset. If startIndex is already ahead
+                        // (common after reconnect), using a stale cutoff drops real missing rows.
+                        val realtimeCutoff = lastVendorOffsetMinutes
+                        vendorHistoryAutoUpdateCutoff =
+                            if (realtimeCutoff > 0 && vendorHistoryDownloadStartIndex <= realtimeCutoff) {
+                                realtimeCutoff
+                            } else {
+                                0
+                            }
+                        if (vendorHistoryAutoUpdateCutoff > 0) {
+                            Log.i(
+                                TAG,
+                                "GET_HISTORY_RANGE: autoUpdateCutoff=$vendorHistoryAutoUpdateCutoff " +
+                                        "(startIndex=$vendorHistoryDownloadStartIndex, records at or beyond cutoff will be skipped)"
+                            )
+                        } else if (realtimeCutoff > 0) {
+                            Log.i(
+                                TAG,
+                                "GET_HISTORY_RANGE: autoUpdateCutoff disabled (startIndex=$vendorHistoryDownloadStartIndex, " +
+                                        "realtimeOffset=$realtimeCutoff) — preserving reconnect gap backfill"
+                            )
+                        }
                         // Edit 60a: Clear gap flag — we're about to fill the gap via history download.
                         if (vendorHistoryGapDetected) {
                             Log.i(TAG, "Edit 60a: Clearing vendorHistoryGapDetected — history download starting to fill gap")
@@ -2536,6 +2586,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     vendorActionStatusSetAt = System.currentTimeMillis()
                     vendorHistoryNextIndex = 0
                     writeIntPref("vendorHistoryNextIndex", 0)
+                    vendorRawHistoryHydratedUpTo = 0
+                    writeIntPref("vendorRawHistoryHydratedUpTo", 0)
                     // Clear session state for fresh start
                     dynamicIV = null
                     ivLocked = false
@@ -3192,11 +3244,37 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      */
     private var nudgeAttempts = 0
     private val MAX_NUDGE_ATTEMPTS = 5
+    private var lastMissingExecuteConnectRecoveryMs = 0L
+    private val MISSING_EXEC_CONNECT_RECOVERY_COOLDOWN_MS = 12_000L
+
+    private fun recoverFromMissingExecuteConnect(reason: String) {
+        if (vendorExecuteConnectReceived) return
+        val now = System.currentTimeMillis()
+        if (now - lastMissingExecuteConnectRecoveryMs < MISSING_EXEC_CONNECT_RECOVERY_COOLDOWN_MS) {
+            Log.i(TAG, "recoverFromMissingExecuteConnect($reason): cooldown active, skipping duplicate recovery")
+            return
+        }
+        lastMissingExecuteConnectRecoveryMs = now
+        nudgeAttempts = 0
+        Log.w(TAG, "recoverFromMissingExecuteConnect($reason): executeConnect missing while GATT active. " +
+                "Forcing vendor restart with preserved keys.")
+        try {
+            mBluetoothGatt?.disconnect()
+        } catch (t: Throwable) {
+            Log.e(TAG, "recoverFromMissingExecuteConnect($reason): disconnect failed: ${t.message}")
+        }
+        stopVendor("missing-executeConnect-$reason")
+        ensureVendorStarted("missing-executeConnect-$reason")
+        scheduleBroadcastScan("missing-executeConnect-$reason", forceImmediate = true)
+    }
 
     private fun nudgeVendorExecuteConnect(reason: String) {
         if (vendorExecuteConnectReceived) return  // already received, no need to nudge
         if (nudgeAttempts >= MAX_NUDGE_ATTEMPTS) {
             Log.w(TAG, "nudgeVendorExecuteConnect($reason): giving up after $MAX_NUDGE_ATTEMPTS attempts")
+            if (!vendorExecuteConnectReceived && vendorGattNotified && mBluetoothGatt != null) {
+                recoverFromMissingExecuteConnect("nudge-giveup-$reason")
+            }
             return
         }
         nudgeAttempts++
@@ -3302,14 +3380,26 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     return
                 }
                 characteristic.value = next.data
-                characteristic.writeType = if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0) {
+                val writeType = if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0) {
                     BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                 } else {
                     BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                 }
+                characteristic.writeType = writeType
                 val ok = gatt.writeCharacteristic(characteristic)
                 Log.i(TAG, "Vendor write [0x${Integer.toHexString(next.uuid)}] data=${bytesToHex(next.data)} ok=$ok (queueRemaining=${vendorGattQueue.size} retry=${next.retryCount})")
-                vendorGattOpActive = ok
+                if (ok && writeType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
+                    // Some stacks never call onCharacteristicWrite() for NO_RESPONSE writes.
+                    // Advance the queue proactively to avoid a permanent stall.
+                    vendorGattOpActive = false
+                    vendorWorkHandler.postDelayed({
+                        if (!vendorGattOpActive) {
+                            drainVendorGattQueue()
+                        }
+                    }, VENDOR_NO_RESPONSE_ADVANCE_MS)
+                } else {
+                    vendorGattOpActive = ok
+                }
                 if (!ok) {
                     // Edit 41b: If bonding is in progress, pause the queue instead of burning retries.
                     // SMP bonding takes 3-6 seconds but the 200ms retry loop exhausts 10 retries in 2s.
@@ -3497,6 +3587,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             deviceStore.getDeviceMap()[str]?.let { mActiveBluetoothDevice = it }
             vendorConnectPending = true
             vendorExecuteConnectReceived = true  // Native lib has set up its internal connection state machine
+            nudgeAttempts = 0
+            lastMissingExecuteConnectRecoveryMs = 0L
             vendorConsecutiveDiscoverCount = 0  // Edit 37e: reset — native lib is progressing normally
             vendorReconnectSpamRestarts = 0  // Edit 41c: reset — executeConnect arrived, no more spam
             vendorReconnectFallbackAttempt = 0  // Edit 49c: reset — executeConnect arrived, no more fallback needed
@@ -3526,6 +3618,15 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                     mCharacteristicUuid = nativeCharUuid
                     mPrivateCharacteristicUuid = nativePrivUuid
+                    if (cccdForceMainF003Fallback &&
+                        !(nativePrivUuid == 0xF003 && nativeCharUuid == 0xF002)) {
+                        cccdForceMainF003Fallback = false
+                        Log.i(
+                            TAG,
+                            "CCCD fallback reset: native UUID mapping changed " +
+                                    "(priv=0x${Integer.toHexString(nativePrivUuid)}, char=0x${Integer.toHexString(nativeCharUuid)})"
+                        )
+                    }
                     // Verify both UUIDs exist in the char map (they should, thanks to Edit 36a mapping all)
                     if (characteristics[nativeCharUuid] == null) {
                         Log.e(TAG, "executeConnect: characteristic 0x${Integer.toHexString(nativeCharUuid)} NOT in char map! Re-scanning GATT service...")
@@ -3932,6 +4033,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             pendingCccdWrites.clear()
             cancelCccdWriteTimeout()
             cancelHistoryPageTimeout()
+            cccdIgnoreLateCallbackShorts.clear()
             cccdMainPrivUuid = 0
             cccdMainCharUuid = 0
             synchronized(cccdChainLock) {
@@ -3952,6 +4054,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             // Edit 29: Reset auth failure counter on successful connection
             consecutiveAuthFailures = 0
             nudgeAttempts = 0  // Edit 29: Reset nudge counter for fresh connection
+            lastMissingExecuteConnectRecoveryMs = 0L
             broadcastSeenInSession = lastBroadcastTime >= (sessionStartMs - BROADCAST_REFERENCE_MS)
             if (wantsBroadcastScan()) {
                 scheduleBroadcastScan("connect", forceImmediate = true)
@@ -4371,11 +4474,25 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             }
             return
         }
-        val privUuid = adapter.mPrivateCharacteristicUuid
-        val charUuid = adapter.mCharacteristicUuid
+        val nativePrivUuid = adapter.mPrivateCharacteristicUuid
+        val nativeCharUuid = adapter.mCharacteristicUuid
+        var privUuid = nativePrivUuid
+        var charUuid = nativeCharUuid
+        if (cccdForceMainF003Fallback && nativePrivUuid == 0xF003 && nativeCharUuid == 0xF002) {
+            markSupplementaryRuntimeSuppressed(0xF003, "main F003 fallback active")
+            privUuid = nativeCharUuid
+            Log.w(
+                TAG,
+                "enableVendorNotifications: applying runtime fallback — main private 0xF003 demoted to 0x${Integer.toHexString(privUuid)}"
+            )
+        }
         cccdMainPrivUuid = privUuid
         cccdMainCharUuid = charUuid
-        Log.i(TAG, "enableVendorNotifications: private=0x${Integer.toHexString(privUuid)}, characteristic=0x${Integer.toHexString(charUuid)}")
+        Log.i(
+            TAG,
+            "enableVendorNotifications: private=0x${Integer.toHexString(privUuid)}, characteristic=0x${Integer.toHexString(charUuid)} " +
+                    "(native private=0x${Integer.toHexString(nativePrivUuid)}, native characteristic=0x${Integer.toHexString(nativeCharUuid)})"
+        )
 
         val sF000 = gatt.getService(SERVICE_F000)
         if (sF000 == null) {
@@ -4482,6 +4599,9 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private fun isSupplementaryCccd(shortUuid: Int): Boolean =
         !isMainChainCccd(shortUuid) && (shortUuid == 0xF001 || shortUuid == 0xF003)
 
+    private fun isMainF003WithF002FallbackEligible(shortUuid: Int): Boolean =
+        shortUuid == 0xF003 && cccdMainPrivUuid == 0xF003 && cccdMainCharUuid == 0xF002
+
     private fun isSupplementaryRuntimeSuppressed(shortUuid: Int): Boolean = when (shortUuid) {
         0xF001 -> cccdSuppressSupplementaryF001
         0xF003 -> cccdSuppressSupplementaryF003
@@ -4503,6 +4623,28 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 }
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fallbackMainF003ToF002(gatt: BluetoothGatt, reason: String): Boolean {
+        if (!isMainF003WithF002FallbackEligible(0xF003)) return false
+        cccdForceMainF003Fallback = true
+        markSupplementaryRuntimeSuppressed(0xF003, reason)
+        while (pendingCccdWrites.remove(0xF003)) {
+        }
+        cccdMainPrivUuid = cccdMainCharUuid
+        if (!pendingCccdWrites.contains(cccdMainCharUuid)) {
+            pendingCccdWrites.addFirst(cccdMainCharUuid)
+        }
+        cccdWriteRetryCount = 0
+        Log.w(
+            TAG,
+            "CCCD fallback: demoted main 0xF003 to 0x${Integer.toHexString(cccdMainCharUuid)} ($reason)"
+        )
+        if (pendingCccdWrites.isNotEmpty()) {
+            writeNextCccd(gatt)
+        }
+        return true
     }
 
     /**
@@ -4601,6 +4743,17 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         if (!success) {
             cancelCccdWriteTimeout()
             cccdWriteRetryCount++
+            if (isMainF003WithF002FallbackEligible(nextShort) &&
+                cccdWriteRetryCount >= CCCD_MAIN_F003_FALLBACK_RETRY_THRESHOLD) {
+                Log.w(
+                    TAG,
+                    "writeNextCccd: main 0xF003 writeDescriptor returned false ${cccdWriteRetryCount} times — " +
+                            "switching to F002-only main chain"
+                )
+                if (fallbackMainF003ToF002(gatt, "main 0xF003 writeDescriptor false")) {
+                    return
+                }
+            }
             if (cccdWriteRetryCount > CCCD_WRITE_MAX_RETRIES) {
                 if (isSupplementaryCccd(nextShort)) {
                     markSupplementaryRuntimeSuppressed(nextShort, "writeDescriptor retry exhaustion")
@@ -4676,7 +4829,28 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 markSupplementaryRuntimeSuppressed(shortUuid, "watchdog timeout")
                 Log.w(
                     TAG,
-                    "CCCD watchdog: supplementary 0x${Integer.toHexString(shortUuid)} timed out after ${timeoutMs}ms — reconnecting and retrying without this supplementary CCCD"
+                    "CCCD watchdog: supplementary 0x${Integer.toHexString(shortUuid)} timed out after ${timeoutMs}ms — " +
+                            "skipping this supplementary CCCD and continuing main chain"
+                )
+                cancelCccdWriteTimeout()
+                cccdWriteRetryCount = 0
+                cccdIgnoreLateCallbackShorts.add(shortUuid)
+                if (pendingCccdWrites.isNotEmpty()) {
+                    writeNextCccd(gatt)
+                } else {
+                    synchronized(cccdChainLock) {
+                        if (cccdChainGattToken == gattToken) cccdChainRunning = false
+                    }
+                }
+                return@Runnable
+            }
+            if (isMainF003WithF002FallbackEligible(shortUuid)) {
+                cccdForceMainF003Fallback = true
+                markSupplementaryRuntimeSuppressed(0xF003, "main-chain watchdog timeout")
+                Log.w(
+                    TAG,
+                    "CCCD watchdog: main 0xF003 timed out after ${timeoutMs}ms — " +
+                            "forcing F002-only main chain on reconnect"
                 )
                 cancelCccdWriteTimeout()
                 pendingCccdWrites.clear()
@@ -4686,7 +4860,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                 try {
                     gatt.disconnect()
                 } catch (t: Throwable) {
-                    Log.e(TAG, "CCCD watchdog: disconnect after supplementary timeout failed: ${t.message}")
+                    Log.e(TAG, "CCCD watchdog: disconnect after main F003 timeout failed: ${t.message}")
                 }
                 return@Runnable
             }
@@ -5215,6 +5389,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         storeAidexReading(byteArrayOf(0), timeMs, glucoseMgDl, glucoseMgDl)
         lastRawMgDl = glucoseMgDl
         lastRawTime = timeMs
+        markRawCoverage(offsetMinutes.toInt(), "raw-broadcast")
         writeFloatPref("lastRawMgDl", lastRawMgDl)
         writeLongPref("lastRawTime", lastRawTime)
         lastRawBroadcastOffsetMinutes = offsetMinutes
@@ -5927,6 +6102,9 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         if (rawForStore > 0f) {
             lastRawMgDl = rawForStore
             lastRawTime = now
+            if (fromVendor) {
+                markRawCoverage(offsetMinutes, "auto:$source")
+            }
             writeFloatPref("lastRawMgDl", lastRawMgDl)
             writeLongPref("lastRawTime", lastRawTime)
         }
@@ -5965,6 +6143,11 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
     private fun resolveRawForStore(now: Long, primaryRawCandidate: Float?): Float {
         val primary = primaryRawCandidate?.takeIf { it.isFinite() && it > 0f }
+        if (viewModeInternal == 0) {
+            // Auto mode still persists fresh raw candidates so switching to raw mode does
+            // not require re-downloading the same history pages.
+            return primary ?: 0f
+        }
         val recent = recentRawSecondary(now).takeIf { it > 0f }
         return when (viewModeInternal) {
             1, 2, 3 -> primary ?: recent ?: 0f
@@ -6514,6 +6697,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     if (rawForStore > 0f) {
                         lastRawMgDl = rawForStore
                         lastRawTime = now
+                        markRawCoverage(vendorDirect.timeOffsetMinutes, "f003-native")
                         writeFloatPref("lastRawMgDl", lastRawMgDl)
                         writeLongPref("lastRawTime", lastRawTime)
                     }
@@ -6563,6 +6747,21 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
     private fun checkAndRequestHistory() {
         requestHistoryBackfill("auto")
+    }
+
+    private fun shouldHydrateRawHistoryOnModeEnter(): Boolean {
+        val targetCoverageOffset = maxOf(lastVendorOffsetMinutes, vendorHistoryNextIndex - 1)
+        if (targetCoverageOffset <= 0) return false
+        return vendorRawHistoryHydratedUpTo < targetCoverageOffset
+    }
+
+    private fun markRawCoverage(offsetMinutes: Int, source: String) {
+        if (offsetMinutes <= 0) return
+        if (offsetMinutes > (AIDEX_MAX_OFFSET_DAYS * 24L * 60L)) return
+        if (offsetMinutes <= vendorRawHistoryHydratedUpTo) return
+        vendorRawHistoryHydratedUpTo = offsetMinutes
+        writeIntPref("vendorRawHistoryHydratedUpTo", offsetMinutes)
+        Log.d(TAG, "Raw coverage advanced to offset=$offsetMinutes ($source)")
     }
 
     // Edit 78a: Detect offset jumps from broadcast/GATT paths and mark history gap.
@@ -7076,6 +7275,13 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private var vendorHistoryNextIndex: Int = readIntPref("vendorHistoryNextIndex", 0).also {
         Log.i(TAG, "Edit 47: Loaded vendorHistoryNextIndex=$it from SharedPreferences")
     }
+    // Highest offset where we have already persisted a raw lane in native storage.
+    // Used to prevent repeated raw-history rewinds on every Auto->Raw mode toggle.
+    private var vendorRawHistoryHydratedUpTo: Int = readIntPref("vendorRawHistoryHydratedUpTo", 0).also {
+        if (it > 0) {
+            Log.i(TAG, "Loaded vendorRawHistoryHydratedUpTo=$it from SharedPreferences")
+        }
+    }
     private var vendorHistoryRangePending: Boolean = false
     private var vendorHistoryDownloading: Boolean = false  // true while paginated download is in progress
     private var vendorHistoryRecordsStored: Int = 0 // count of records stored in current download session
@@ -7192,6 +7398,9 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         try {
             val rawForStore = if (rawMgDl.isFinite() && rawMgDl > 0f) rawMgDl else 0f
             Natives.aidexProcessData(dataptr, byteArrayOf(0), historicalTimeMs, glucoseMgDl, rawForStore, 1.0f)
+            if (rawForStore > 0f) {
+                markRawCoverage(offsetMinutes, "history")
+            }
             return true
         } catch (t: Throwable) {
             Log.e(TAG, "storeHistoryRecord: native store failed for offset=$offsetMinutes: ${t.message}")
@@ -7213,6 +7422,14 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             return
         }
         val descriptorCharShort = uuidToShort(descriptor.characteristic.uuid)
+        if (vendorBleEnabled && cccdIgnoreLateCallbackShorts.remove(descriptorCharShort)) {
+            Log.w(
+                TAG,
+                "onDescriptorWrite: late callback for previously timed-out supplementary CCCD " +
+                        "0x${Integer.toHexString(descriptorCharShort)} — ignoring"
+            )
+            return
+        }
         val gattToken = System.identityHashCode(gatt)
         val waitingForCccd = cccdWriteTimeoutGattToken == gattToken && cccdWriteTimeoutShortUuid != 0
         if (vendorBleEnabled && cccdChainRunning && waitingForCccd && descriptorCharShort != cccdWriteTimeoutShortUuid) {
@@ -7240,6 +7457,14 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             } else if (status == 0x08 && vendorBleEnabled) {  // GATT_INSUF_AUTHORIZATION
                 cccdNeedsRetryAfterBond = true
                 Log.i(TAG, "Edit 62a: onDescriptorWrite: CCCD ${descriptor.characteristic.uuid} insuf_authorization (status=0x08) — will retry after BOND_BONDED")
+            } else if (vendorBleEnabled && isMainF003WithF002FallbackEligible(descriptorCharShort)) {
+                Log.w(
+                    TAG,
+                    "onDescriptorWrite: main CCCD 0xF003 failed status=$status — switching to F002-only main chain"
+                )
+                if (fallbackMainF003ToF002(gatt, "main 0xF003 status=$status")) {
+                    return
+                }
             } else if (vendorBleEnabled && isSupplementaryCccd(descriptorCharShort)) {
                 Log.w(
                     TAG,
@@ -8335,6 +8560,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // Edit 47: Reset history position — new sensor means history starts from scratch
         vendorHistoryNextIndex = 0
         writeIntPref("vendorHistoryNextIndex", 0)
+        vendorRawHistoryHydratedUpTo = 0
+        writeIntPref("vendorRawHistoryHydratedUpTo", 0)
 
         // --- Strategy 1: Vendor Native Lib ---
         // executeVendorCommand now properly waits for GATT + AES initialization
@@ -8471,6 +8698,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         // Edit 47: Reset history position — new sensor means history starts from scratch
         vendorHistoryNextIndex = 0
         writeIntPref("vendorHistoryNextIndex", 0)
+        vendorRawHistoryHydratedUpTo = 0
+        writeIntPref("vendorRawHistoryHydratedUpTo", 0)
 
         // --- Strategy 1: Vendor Native Lib ---
         // executeVendorCommand now properly waits for GATT + AES initialization

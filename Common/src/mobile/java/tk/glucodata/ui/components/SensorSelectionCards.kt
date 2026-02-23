@@ -34,15 +34,20 @@ import tk.glucodata.R
 
 @OptIn(ExperimentalTextApi::class)
 private fun jugglucoBrandFamily(weight: Int, width: Float): FontFamily {
-    return FontFamily(
-        Font(
-            R.font.ibm_plex_sans_var,
-            variationSettings = FontVariation.Settings(
-                FontVariation.weight(weight),
-                FontVariation.width(width)
+    return try {
+        FontFamily(
+            Font(
+                R.font.ibm_plex_sans_var,
+                variationSettings = FontVariation.Settings(
+                    FontVariation.weight(weight),
+                    FontVariation.width(width)
+                )
             )
         )
-    )
+    } catch (th: Throwable) {
+        android.util.Log.w("SensorSelectionCards", "Variable font fallback activated", th)
+        FontFamily(Font(R.font.ibm_plex_sans_var))
+    }
 }
 
 /**

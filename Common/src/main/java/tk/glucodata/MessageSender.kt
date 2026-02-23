@@ -26,6 +26,7 @@ package tk.glucodata
 //import androidx.lifecycle.lifecycleScope
 import android.content.Context
 import androidx.annotation.Keep
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.CapabilityInfo
@@ -64,6 +65,10 @@ class MessageSender(val activity: Context):CapabilityClient.OnCapabilityChangedL
     }
 var nodesbusy=false
 suspend fun findWearDevicesWithApp() {
+    if (wearableApiUnavailable) {
+        Log.d(LOG_ID, "findWearDevicesWithApp skipped: Wearable.API unavailable")
+        return
+    }
     Log.i(LOG_ID,"start findWearDevicesWithApp nodesbusy=$nodesbusy")
     if(nodesbusy)        
         return;
@@ -76,9 +81,13 @@ suspend fun findWearDevicesWithApp() {
     } catch (cancellationException: CancellationException) {
         throw cancellationException
     } catch (th: Throwable) {
-        Thread.currentThread().setName("Devices$findIter")
-        ++findIter
-        Log.stack(LOG_ID, "findDev",th)
+        if (th is ApiException && th.statusCode == API_UNAVAILABLE_STATUS) {
+            markWearableApiUnavailable("findWearDevicesWithApp", th)
+        } else {
+            Thread.currentThread().setName("Devices$findIter")
+            ++findIter
+            Log.stack(LOG_ID, "findDev",th)
+        }
     }
     finally {
         Log.i(LOG_ID,"end findWearDevicesWithApp nodesbusy=false")
@@ -87,6 +96,10 @@ suspend fun findWearDevicesWithApp() {
     }
 
 public fun finddevices() {
+     if (wearableApiUnavailable) {
+         Log.w(LOG_ID, "finddevices skipped: Wearable.API unavailable")
+         return
+     }
      if (!GoogleServices.isPlayServicesAvailable(activity)) {
          Log.w(LOG_ID, "finddevices skipped: Google Play Services unavailable")
          return
@@ -98,7 +111,11 @@ public fun finddevices() {
      try {
          Wearable.getCapabilityClient(activity).addListener(sender, JUGGLUCOIDENT)
      } catch (th: Throwable) {
-         Log.stack(LOG_ID, "addCapabilityListener", th)
+         if (th is ApiException && th.statusCode == API_UNAVAILABLE_STATUS) {
+             markWearableApiUnavailable("addCapabilityListener", th)
+         } else {
+             Log.stack(LOG_ID, "addCapabilityListener", th)
+         }
      }
      }
 
@@ -261,6 +278,8 @@ private fun nodeSendmessage(node:Node,path:String,data:ByteArray) {
 companion object {
     private var findIter=0;
     private const val LOG_ID = "MessageSender"
+    private const val API_UNAVAILABLE_STATUS = 17
+    private const val WEAR_API_UNAVAILABLE_LOG_INTERVAL_MS = 60_000L
     const val WAKE_PATH = "/wake"
     const val WAKESTREAM_PATH = "/wakestream"
     const val NET_PATH = "/netinfo"
@@ -273,6 +292,23 @@ companion object {
     const val MESSAGES_PATH = "/messages"
     val scope = CoroutineScope(Dispatchers.IO+SupervisorJob()  )
     private var messagesender: MessageSender? = null
+    @Volatile private var wearableApiUnavailable = false
+    @Volatile private var wearableApiUnavailableLoggedAt = 0L
+
+    private fun markWearableApiUnavailable(where: String, th: Throwable?) {
+        wearableApiUnavailable = true
+        messagesender?.nodes = emptySet()
+        messagesender?.nexttimes = LongArray(0)
+        val now = System.currentTimeMillis()
+        if (now - wearableApiUnavailableLoggedAt >= WEAR_API_UNAVAILABLE_LOG_INTERVAL_MS) {
+            val detail = th?.message ?: "API_UNAVAILABLE"
+            Log.w(LOG_ID, "$where: Wearable.API unavailable ($detail). Wear transport disabled for this app run.")
+            wearableApiUnavailableLoggedAt = now
+        }
+    }
+
+    @JvmStatic
+    fun isWearTransportAvailable(): Boolean = !wearableApiUnavailable
     @JvmStatic
     public fun getMessageSender(): MessageSender? {
         return messagesender
@@ -403,6 +439,8 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
 
     @JvmStatic
     public fun initwearos(app: Context) {
+        wearableApiUnavailable = false
+        wearableApiUnavailableLoggedAt = 0L
         if (!GoogleServices.isPlayServicesAvailable(app)) {
             Log.w(LOG_ID, "initwearos skipped: Google Play Services unavailable")
             messagesender = null
@@ -421,6 +459,9 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
 
     @JvmStatic
     public fun cansend(): Boolean {
+        if (wearableApiUnavailable) {
+            return false
+        }
         val sender: MessageSender? = messagesender
         if (sender == null) {
             Log.e(LOG_ID, "messagesender==null");
@@ -438,6 +479,10 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
 
     private fun inargsendnetinfo(id: String) {
         if(doLog) {Log.i(LOG_ID,"sendnetinfo($id)");}
+        if (wearableApiUnavailable) {
+            Log.d(LOG_ID, "sendnetinfo($id) skipped: Wearable.API unavailable")
+            return
+        }
         if(!cansend()) {
             Log.i(LOG_ID, "!cansend()")
                 return
@@ -500,6 +545,10 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
         }
     private fun insendnetinfo() {
         Log.i(LOG_ID,"sendnetinfo()")
+        if (wearableApiUnavailable) {
+            Log.d(LOG_ID, "sendnetinfo skipped: Wearable.API unavailable")
+            return
+        }
 
             val nu = System.currentTimeMillis()
             if (!cansend()) {
@@ -550,6 +599,10 @@ public fun sendDatawithInt(ident: Int, data: ByteArray) {
 
      @JvmStatic     
      public fun reinit() {
+        if (wearableApiUnavailable) {
+            Log.i(LOG_ID, "reinit skipped: Wearable.API unavailable")
+            return
+        }
         Log.i(LOG_ID,"reinit")
         Natives.resetnetwork()
         getMessageSender()?.nulltimes()

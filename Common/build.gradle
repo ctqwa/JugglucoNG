@@ -696,8 +696,8 @@ mobileLibreOldSiDexImplementation {}
     mobileLibre3SiDexGoogleImplementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
     mobileLibre3SiDexNogoogleImplementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
 
-    mobileLibre3SiDexGoogleImplementation 'com.google.zxing:core:3.5.3'
-    mobileLibre3SiDexNogoogleImplementation 'com.google.zxing:core:3.5.3'
+    mobileLibre3SiDexGoogleImplementation 'com.google.zxing:core:3.5.4'
+    mobileLibre3SiDexNogoogleImplementation 'com.google.zxing:core:3.5.4'
 
 
     mobileLibre3SiDexGoogleImplementation 'com.journeyapps:zxing-android-embedded:4.3.0'

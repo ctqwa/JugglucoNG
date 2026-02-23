@@ -547,6 +547,30 @@ public class Applic extends Application implements androidx.work.Configuration.P
         return false;
     }
 
+    static private void updateWearMessageReceiverComponent() {
+        if (Applic.app == null) {
+            return;
+        }
+        if (isWearable) {
+            return;
+        }
+        try {
+            final boolean enable = GoogleServices.isPlayServicesAvailable(Applic.app);
+            final PackageManager pm = Applic.app.getPackageManager();
+            final ComponentName receiver = new ComponentName(Applic.app, "tk.glucodata.MessageReceiver");
+            final int current = pm.getComponentEnabledSetting(receiver);
+            final int target = enable
+                    ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+            if (current != target) {
+                pm.setComponentEnabledSetting(receiver, target, PackageManager.DONT_KILL_APP);
+                Log.i(LOG_ID, "MessageReceiver component set to " + (enable ? "ENABLED" : "DISABLED"));
+            }
+        } catch (Throwable th) {
+            Log.stack(LOG_ID, "updateWearMessageReceiverComponent", th);
+        }
+    }
+
     static public boolean useWearos() {
         if (!GoogleServices.isPlayServicesAvailable(Applic.app))
             return false;
@@ -572,10 +596,11 @@ public class Applic extends Application implements androidx.work.Configuration.P
                                 ;
                             }
                             ;
-                            if (useWearos() || hasip()) {
+                            final boolean wearos = useWearos();
+                            if (wearos || hasip()) {
                                 Natives.networkpresent();
-                                MessageSender.reinit();
-                                if (useWearos()) {
+                                if (wearos) {
+                                    MessageSender.reinit();
                                     MessageSender.sendnetinfo();
                                     Applic.scheduler.schedule(() -> {
                                         resetWearOS();
@@ -652,9 +677,12 @@ public class Applic extends Application implements androidx.work.Configuration.P
                             }
                             ;
                             Natives.networkabsent();
-                            MessageSender.reinit();
+                            final boolean wearos = useWearos();
+                            if (wearos) {
+                                MessageSender.reinit();
+                            }
                             // if(hasonAvailable)
-                            if (useWearos()) {
+                            if (wearos) {
                                 Applic.wakemirrors();
                                 Applic.scheduler.schedule(() -> {
                                     resetWearOS();
@@ -820,8 +848,9 @@ public class Applic extends Application implements androidx.work.Configuration.P
                     } else
                         MessageSender.sendaskforstart();
                 }, 4, 30, TimeUnit.SECONDS);
-            } else
+            } else if (useWearos()) {
                 MessageSender.sendnetinfo();
+            }
             Specific.start(this);
             if (isWearable) {
                 tk.glucodata.glucosecomplication.GlucoseValue.updateall();
@@ -860,6 +889,7 @@ public class Applic extends Application implements androidx.work.Configuration.P
     @Override
     public void onCreate() {
         super.onCreate();
+        updateWearMessageReceiverComponent();
         if (DiskSpace.check(this)) {
             initproc();
         } else {
@@ -1072,13 +1102,17 @@ public class Applic extends Application implements androidx.work.Configuration.P
             ;
         }
         ;
-        MessageSender.sendwake();
+        if (useWearos()) {
+            MessageSender.sendwake();
+        }
         Natives.wakebackup();
     }
 
     @Keep
     static public void resetWearOS() {
-        MessageSender.reinit();
+        if (useWearos()) {
+            MessageSender.reinit();
+        }
         wakemirrors();
     }
 

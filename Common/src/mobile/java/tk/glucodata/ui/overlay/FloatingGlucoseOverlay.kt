@@ -128,7 +128,17 @@ fun FloatingGlucoseOverlay(
     }
     
     val fontFamily = if (fontSource == "APP") {
-        FontFamily(Font(MainFontFile, variationSettings = FontVariation.Settings(FontVariation.weight(weightVal))))
+        try {
+            FontFamily(
+                Font(
+                    MainFontFile,
+                    variationSettings = FontVariation.Settings(FontVariation.weight(weightVal))
+                )
+            )
+        } catch (th: Throwable) {
+            android.util.Log.w("FloatingGlucoseOverlay", "Variable font fallback activated", th)
+            FontFamily(Font(MainFontFile))
+        }
     } else {
         remember(weightVal) {
              val familyName = if (weightVal >= 500) "google-sans-medium" else "google-sans"
