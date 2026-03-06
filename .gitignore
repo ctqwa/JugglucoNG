@@ -32,4 +32,20 @@ Common/src/mobileSi/jniLibs/
 
 .gemini/
 gha-creds-*.json
-customcal-logs/
+c-logs/
+*.md
+
+lint/intermediates/
+lint/generated/
+
+# Kotlin
+*.kotlin_module
+
+# Crash logs
+hs_err_pid*
+
+.kotlin/errors
+
+# --- Misc ---
+out/
+tmp/
