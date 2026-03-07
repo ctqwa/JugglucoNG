@@ -30,6 +30,9 @@
 
 -keep class androidx.wear.watchface.complications.rendering.ComplicationDrawable
 
+# Keep AiDex vendor bridge classes/fields/methods used by libblecomm-lib JNI.
+-keep class com.microtechmd.blecomm.** { *; }
+
 #-keep class tk.glucodata.watchface.WatchFaceService
 #-keep class tk.glucodata.watchface.WatchFaceService.editor.WatchFaceConfigActivity
 
@@ -40,4 +43,3 @@
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable
 -printmapping printmappingout.txt
-

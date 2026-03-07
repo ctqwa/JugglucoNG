@@ -33,7 +33,6 @@ Common/src/mobileSi/jniLibs/
 .gemini/
 gha-creds-*.json
 c-logs/
-*.md
 
 lint/intermediates/
 lint/generated/
