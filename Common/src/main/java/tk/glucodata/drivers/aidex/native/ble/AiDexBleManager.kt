@@ -300,8 +300,10 @@ class AiDexBleManager(
 
         val charUuid = descriptor.characteristic.uuid
 
-        if (status == 0x05) { // GATT_INSUFFICIENT_AUTHENTICATION — bonding in progress
-            Log.i(TAG, "onDescriptorWrite: CCCD $charUuid auth fail — SMP bonding in progress")
+        if (status == 0x05 || status == 0x03) {
+            // 0x05 = GATT_INSUFFICIENT_AUTHENTICATION — bonding in progress
+            // 0x03 = GATT_WRITE_NOT_PERMITTED — may also indicate bonding needed
+            Log.i(TAG, "onDescriptorWrite: CCCD $charUuid auth/perm fail (status=$status) — re-queuing for retry after bond")
             // Re-queue this characteristic for retry after bonding
             cccdQueue.addFirst(charUuid)
             cccdWriteInProgress = false
@@ -400,12 +402,10 @@ class AiDexBleManager(
         }
 
         cccdWriteInProgress = true
-        val isIndication = charUuid == CHAR_F001 // F001 uses indications
-        if (isIndication) {
-            enableIndication(gatt, characteristic)
-        } else {
-            enableNotification(gatt, characteristic)
-        }
+        // All AiDex characteristics (F001, F002, F003) use NOTIFY, not INDICATE.
+        // F001 props=0x18 (WRITE + NOTIFY), F002 props=WRITE+NOTIFY, F003 props=0x10 (NOTIFY).
+        // Writing indication (02 00) to a NOTIFY-only CCCD fails with status=3.
+        enableNotification(gatt, characteristic)
     }
 
     // =========================================================================
