@@ -144,7 +144,7 @@ class ExpressiveAppWidget : GlanceAppWidget() {
                 val gatt = gatts.find { it.SerialNumber == sName }
                 
                 if (gatt != null) {
-                    if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                    if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                         val remainingHours = try { gatt.getSensorRemainingHours() } catch(_: Throwable) { -1 }
                         val ageHours = try { gatt.getSensorAgeHours() } catch(_: Throwable) { -1 }
                         if (remainingHours >= 0 && ageHours >= 0) {

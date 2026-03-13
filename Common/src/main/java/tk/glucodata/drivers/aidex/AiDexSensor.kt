@@ -90,17 +90,17 @@ private data class VendorMessage(
  * 3. Decryption (AES-128 CFB with Dynamic IV).
  * 4. Official parser first, deterministic fallback when needed.
  */
-class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCallback(serial, dataptr, 0) {
+class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCallback(serial, dataptr, 0), AiDexDriver {
 
     companion object {
         private const val TAG = "AiDexSensor"
 
-        // Edit 62c: Dirty flag for UI device list sync. Set true when sensor state changes
-        // materially (connect/disconnect/add/remove). SensorViewModel polling loop checks
-        // this and does a full device sync only when dirty.
-        @Volatile
+        // Edit 62c: Dirty flag for UI device list sync. Delegates to AiDexDriver.deviceListDirty
+        // so both driver implementations share the same flag.
         @JvmStatic
-        var deviceListDirty = false
+        var deviceListDirty: Boolean
+            get() = AiDexDriver.deviceListDirty
+            set(value) { AiDexDriver.deviceListDirty = value }
 
         private val bridgeRouteLock = Any()
 
@@ -598,7 +598,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     // Edit 65a: Paused flag — set by softDisconnect(), cleared by connectDevice()/resumeSensor flow.
     // While true, prevents disconnect callback from scheduling broadcast scans and prevents
     // onVendorDiscovered from reconnecting. This stops the pause→disconnect→scan→reconnect loop.
-    @Volatile var isPaused = false
+    @Volatile override var isPaused = false
     @Volatile var isUnpaired = false  // Set by unpairSensor(), cleared by rePairSensor()
     // Edit 75: Auto-activation flag — prevents repeated SET_NEW_SENSOR attempts when
     // GET_START_TIME returns all zeros (sensor not yet started). Reset on disconnect/reconnect.
@@ -662,7 +662,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private var viewModeInternal: Int = 0
 
     // Connection option: use broadcast scanning instead of GATT (separate from viewMode)
-    var broadcastOnlyConnection: Boolean = false
+    override var broadcastOnlyConnection: Boolean = false
         private set
 
     // --- VENDOR (blecomm-lib) STATE ---
@@ -1424,7 +1424,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         Thread(r, "AiDex-VendorCmd").apply { isDaemon = true }
     }
 
-    var viewMode: Int
+    override var viewMode: Int
         get() = viewModeInternal
         set(value) {
             if (viewModeInternal == value) return
@@ -1458,7 +1458,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         }
 
     /** Enable/disable broadcast-only connection mode (no GATT, just BLE advertisements) */
-    fun setBroadcastOnlyConnection(enabled: Boolean) {
+    override fun setBroadcastOnlyConnection(enabled: Boolean) {
         if (broadcastOnlyConnection == enabled) return
         broadcastOnlyConnection = enabled
         writeBoolPref("broadcastOnlyConnection", enabled)
@@ -1474,7 +1474,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      *  Edit 48d: Enhanced to reflect vendor BLE pipeline states — pairing, bonding,
      *  history download progress, connected idle, etc.
      */
-    fun getDetailedBleStatus(): String {
+    override fun getDetailedBleStatus(): String {
         val now = System.currentTimeMillis()
 
         // Edit 74: Show transient action status (Unpairing.., Unpaired, Pairing.., Disconnecting..)
@@ -2232,7 +2232,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * Sends a maintenance command to the AiDex sensor via the vendor library.
      * @param opCode 1=Reset, 2=ShelfMode, 3=DeleteBond, 4=ClearStorage
      */
-    fun sendMaintenanceCommand(opCode: Int): Boolean {
+    override fun sendMaintenanceCommand(opCode: Int): Boolean {
         return executeVendorCommand("maintenance", opCode) { controller ->
             when (opCode) {
                 1 -> controller.reset()
@@ -2251,7 +2251,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * @param glucoseMgDl finger-stick glucose in mg/dL (integer)
      * @return true if the native call accepted the command
      */
-    fun calibrateSensor(glucoseMgDl: Int): Boolean {
+    override fun calibrateSensor(glucoseMgDl: Int): Boolean {
         val offset = lastVendorOffsetMinutes
         if (offset <= 0) {
             Log.w(TAG, "calibrateSensor: no recent AUTO_UPDATE offset to reference (lastVendorOffsetMinutes=$offset)")
@@ -2283,7 +2283,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      *   5. Clear local vendor pairing keys
      *   6. Block auto-reconnect
      */
-    fun unpairSensor(): Boolean {
+    override fun unpairSensor(): Boolean {
         Log.i(TAG, "=== UNPAIR SENSOR: Starting full unpair sequence ===")
         isPaused = true  // Block auto-reconnect during cleanup
         isUnpaired = true  // Persistent flag — shows "Unpaired" in status until re-pair
@@ -2379,7 +2379,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * Re-pair with the sensor: clear saved keys and restart the vendor stack so it
      * triggers a fresh pair() handshake on the next DISCOVER.
      */
-    fun rePairSensor() {
+    override fun rePairSensor() {
         Log.i(TAG, "rePairSensor: clearing keys and restarting vendor stack for fresh pairing")
         clearVendorBondFailureLockout("rePairSensor")
         isPaused = false  // Edit 66b: user wants reconnection — clear paused flag
@@ -2432,7 +2432,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * and pairing keys so that reconnect can work without re-pairing.
      * This is what the Pause button should call (non-destructive).
      */
-    fun softDisconnect() {
+    override fun softDisconnect() {
         Log.i(TAG, "softDisconnect: stopping vendor stack + GATT (preserving bond/keys)")
         isPaused = true  // Edit 65a: prevent disconnect callback from triggering scan/reconnect
         try {
@@ -2457,7 +2457,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * User-initiated reconnect fast path.
      * Bypasses deferred vendor-only waiting by granting a one-shot proactive GATT connect ticket.
      */
-    fun manualReconnectNow() {
+    override fun manualReconnectNow() {
         Log.i(TAG, "manualReconnectNow: user requested reconnect")
         val reconnectToken = nextReconnectAttemptToken("manual-reconnect")
         clearVendorBondFailureLockout("manual-reconnect")
@@ -8940,15 +8940,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     // Calibration records retrieved from the sensor via GET_CALIBRATION_RANGE + GET_CALIBRATION.
     // Each record contains: index, timeOffset (minutes), referenceGlucose (mg/dL), cf, offset, isValid.
     // Updated on connect (from startVendorLongConnect) and when AUTO_UPDATE_CALIBRATION is received.
-    data class CalibrationRecord(
-        val index: Int,
-        val timeOffsetMinutes: Int,
-        val referenceGlucoseMgDl: Int,
-        val cf: Float,
-        val offset: Float,
-        val isValid: Boolean,
-        val timestampMs: Long  // absolute time = sensorstartmsec + timeOffset*60000
-    )
+    // Calibration records — uses shared CalibrationRecord from AiDexDriver.kt.
+    // (Previously an inner data class; moved to package level for interface sharing.)
     @Volatile
     private var vendorCalibrationRecords: List<CalibrationRecord> = emptyList()
     private var vendorCalibrationRangeStart: Int = 0
@@ -8956,7 +8949,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private var vendorCalibrationDownloading: Boolean = false
 
     /** Public accessor for calibration records (newest first) */
-    fun getCalibrationRecords(): List<CalibrationRecord> = vendorCalibrationRecords.sortedByDescending { it.index }
+    override fun getCalibrationRecords(): List<CalibrationRecord> = vendorCalibrationRecords.sortedByDescending { it.index }
 
     // Battery voltage from AUTO_UPDATE_BATTERY_VOLTAGE (op 0xFE04).
     // Payload is 2-byte little-endian uint16 representing millivolts (typical range ~1530-1560 mV).
@@ -8968,7 +8961,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         private set
 
     /** Returns battery voltage in millivolts, or 0 if not yet received */
-    fun getBatteryMillivolts(): Int = vendorBatteryMillivolts
+    override fun getBatteryMillivolts(): Int = vendorBatteryMillivolts
 
     // Sensor expiry notification from AUTO_UPDATE_SENSOR_EXPIRED (op 0xFE03).
     @Volatile
@@ -8979,7 +8972,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         private set
 
     /** True if the sensor has reported itself as expired */
-    fun isSensorExpired(): Boolean = vendorSensorExpired
+    override fun isSensorExpired(): Boolean = vendorSensorExpired
 
     // Edit 59: Initialization bias compensation after sensor reset.
     // When a sensor is reset, the vendor lib applies initialization calibration factors
@@ -8987,7 +8980,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     // has already been running. This causes readings to be significantly low after reset.
     // When enabled, we divide incoming glucose by the phase factor to compensate.
     @Volatile
-    var resetCompensationEnabled: Boolean = readBoolPref("resetCompensationEnabled", false)
+    override var resetCompensationEnabled: Boolean = readBoolPref("resetCompensationEnabled", false)
         private set
     @Volatile
     var resetCompensationTimestamp: Long = readLongPref("resetCompensationTimestamp", 0L)
@@ -8997,7 +8990,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * Enable initialization bias compensation. Called when user resets with the checkbox checked.
      * Records the reset timestamp and persists both values.
      */
-    fun enableResetCompensation() {
+    override fun enableResetCompensation() {
         val now = System.currentTimeMillis()
         resetCompensationEnabled = true
         resetCompensationTimestamp = now
@@ -9010,7 +9003,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * Disable initialization bias compensation. Called when compensation period expires
      * or user manually disables it.
      */
-    fun disableResetCompensation() {
+    override fun disableResetCompensation() {
         resetCompensationEnabled = false
         resetCompensationTimestamp = 0L
         writeBoolPref("resetCompensationEnabled", false)
@@ -9053,7 +9046,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     }
 
     /** Returns a human-readable description of current compensation status */
-    fun getCompensationStatusText(): String {
+    override fun getCompensationStatusText(): String {
         if (!resetCompensationEnabled || resetCompensationTimestamp <= 0L) return ""
         val elapsed = System.currentTimeMillis() - resetCompensationTimestamp
         val remainingMs = PHASE2_DURATION_MS - elapsed
@@ -9080,7 +9073,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     private var vendorWearDays: Long = AIDEX_SENSOR_MAX_DAYS
 
     /** Returns remaining sensor life in hours, or -1 if start time unknown */
-    fun getSensorRemainingHours(): Int {
+    override fun getSensorRemainingHours(): Int {
         val expiry = vendorSensorExpiryMs
         if (expiry <= 0L) {
             // Fall back to inferred start time
@@ -9095,18 +9088,18 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
     }
 
     /** Returns sensor age in hours, or -1 if start time unknown */
-    fun getSensorAgeHours(): Int {
+    override fun getSensorAgeHours(): Int {
         val start = vendorSensorStartTimeMs.takeIf { it > 0 } ?: sensorstartmsec.takeIf { it > 0 } ?: return -1
         val age = System.currentTimeMillis() - start
         return if (age > 0) (age / 3600_000L).toInt() else 0
     }
 
     // Edit 58c: Device metadata from GET_DEVICE_INFO response
-    @Volatile var vendorFirmwareVersion: String = ""
+    @Volatile override var vendorFirmwareVersion: String = ""
         private set
-    @Volatile var vendorHardwareVersion: String = ""
+    @Volatile override var vendorHardwareVersion: String = ""
         private set
-    @Volatile var vendorModelName: String = ""
+    @Volatile override var vendorModelName: String = ""
         private set
 
     // Edit 45d: History range + pagination tracking.
@@ -10101,10 +10094,10 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
         return try { hexToBytes(hex) } catch (_: Exception) { null }
     }
 
-    fun isVendorPaired(): Boolean = readBoolPref("vendorPaired", false)
+    override fun isVendorPaired(): Boolean = readBoolPref("vendorPaired", false)
 
     /** True when the vendor BLE stack is actively connected and receiving data */
-    fun isVendorConnected(): Boolean = vendorBleEnabled && vendorGattConnected && vendorNativeReady
+    override fun isVendorConnected(): Boolean = vendorBleEnabled && vendorGattConnected && vendorNativeReady
 
     private fun clearVendorPairingKeys() {
         writeBoolPref("vendorPaired", false)
@@ -10124,7 +10117,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * Each step is independent with its own try/catch so a failure in one
      * (e.g. native lib already torn down) doesn't prevent the others from running.
      */
-    fun forgetVendor() {
+    override fun forgetVendor() {
         Log.i(TAG, "forgetVendor: full vendor cleanup for sensor removal")
         isPaused = true  // Edit 72: Block auto-reconnect so this sensor doesn't come back
         setActionStatus("Disconnecting...")  // Edit 74: Status text feedback
@@ -10434,7 +10427,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      * Each strategy is tried in order; any success short-circuits.
      * All attempts are logged for diagnostics.
      */
-    fun resetSensor(): Boolean {
+    override fun resetSensor(): Boolean {
         Log.i(TAG, "=== RESET SENSOR: Multi-Strategy Reset ===")
         clearVendorBondFailureLockout("resetSensor")
         // Edit 47: Reset history position — new sensor means history starts from scratch
@@ -10572,7 +10565,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
      *   Strategy 2: Direct FF32 write with SET_NEW_SENSOR opcode
      *   Strategy 3: Reset + reconnect (effectively starts fresh)
      */
-    fun startNewSensor(): Boolean {
+    override fun startNewSensor(): Boolean {
         Log.i(TAG, "=== START NEW SENSOR: Multi-Strategy ===")
         clearVendorBondFailureLockout("startNewSensor")
         // Edit 47: Reset history position — new sensor means history starts from scratch

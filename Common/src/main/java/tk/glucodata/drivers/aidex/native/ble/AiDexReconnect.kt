@@ -98,9 +98,9 @@ class AiDexReconnect {
     var bondLockoutUntilMs: Long = 0L
         private set
 
-    /** Whether we're in broadcast-only fallback mode (auth failures exhausted) */
+    /** Whether we're in broadcast-only fallback mode (auth failures exhausted or manually set) */
     var isBroadcastOnlyMode: Boolean = false
-        private set
+        internal set
 
     // -- Reconnect Delay Calculation --
 

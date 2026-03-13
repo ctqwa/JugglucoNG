@@ -22,9 +22,13 @@ import android.os.HandlerThread
 import android.os.Looper
 import tk.glucodata.Log
 import tk.glucodata.SuperGattCallback
+import tk.glucodata.drivers.aidex.AiDexDriver
+import tk.glucodata.drivers.aidex.CalibrationRecord as SharedCalibrationRecord
 import tk.glucodata.drivers.aidex.native.data.*
 import tk.glucodata.drivers.aidex.native.protocol.*
 import java.util.ArrayDeque
+import java.util.Calendar
+import java.util.TimeZone
 import java.util.UUID
 
 /**
@@ -50,7 +54,7 @@ class AiDexBleManager(
     serial: String,
     dataptr: Long,
     sensorGen: Int,
-) : SuperGattCallback(serial, dataptr, sensorGen), SensorBleController {
+) : SuperGattCallback(serial, dataptr, sensorGen), SensorBleController, AiDexDriver {
 
     companion object {
         private const val TAG = "AiDexBleManager"
@@ -129,6 +133,17 @@ class AiDexBleManager(
     // -- F003 Live Data --
     private var lastGlucoseTimeMs: Long = 0L
     private var lastOffsetMinutes: Int = 0
+
+    // -- AiDexDriver State --
+    @Volatile private var _batteryMillivolts: Int = 0
+    @Volatile private var _sensorExpired: Boolean = false
+    @Volatile private var _wearDays: Int = 14  // default 14-day sensor
+    @Volatile private var _firmwareVersion: String = ""
+    @Volatile private var _hardwareVersion: String = ""
+    @Volatile private var _modelName: String = ""
+    @Volatile private var _calibrationRecords: List<SharedCalibrationRecord> = emptyList()
+    @Volatile private var _viewModeInternal: Int = 0
+    @Volatile private var _resetCompensationEnabled: Boolean = false
 
     // -- Listeners --
     /** Called when a live glucose reading is parsed from F003. */
@@ -952,6 +967,212 @@ class AiDexBleManager(
     }
 
     // =========================================================================
+    // AiDexDriver Interface Implementation
+    // =========================================================================
+
+    override fun getDetailedBleStatus(): String = when (phase) {
+        Phase.IDLE -> "Disconnected"
+        Phase.GATT_CONNECTING -> "Connecting..."
+        Phase.DISCOVERING_SERVICES -> "Discovering services..."
+        Phase.CCCD_CHAIN -> "Configuring notifications..."
+        Phase.KEY_EXCHANGE -> "Key exchange..."
+        Phase.STREAMING -> if (reconnect.isBroadcastOnlyMode) "Broadcast Mode" else "Connected"
+    }
+
+    override val isPaused: Boolean get() = stop
+
+    override val broadcastOnlyConnection: Boolean get() = reconnect.isBroadcastOnlyMode
+
+    override fun isVendorPaired(): Boolean = keyExchange.isComplete
+
+    override fun isVendorConnected(): Boolean = phase == Phase.STREAMING && mBluetoothGatt != null
+
+    override fun getCalibrationRecords(): List<SharedCalibrationRecord> =
+        _calibrationRecords.sortedByDescending { it.index }
+
+    override fun getBatteryMillivolts(): Int = _batteryMillivolts
+
+    override fun isSensorExpired(): Boolean = _sensorExpired
+
+    override fun getSensorRemainingHours(): Int {
+        if (sensorstartmsec <= 0L) return -1
+        val elapsedMs = System.currentTimeMillis() - sensorstartmsec
+        val totalMs = _wearDays.toLong() * 24 * 60 * 60 * 1000
+        val remainingMs = totalMs - elapsedMs
+        return if (remainingMs <= 0) 0 else (remainingMs / (60 * 60 * 1000)).toInt()
+    }
+
+    override fun getSensorAgeHours(): Int {
+        if (sensorstartmsec <= 0L) return -1
+        val elapsedMs = System.currentTimeMillis() - sensorstartmsec
+        return (elapsedMs / (60 * 60 * 1000)).toInt()
+    }
+
+    override var vendorFirmwareVersion: String
+        get() = _firmwareVersion
+        set(value) { _firmwareVersion = value }
+
+    override var vendorHardwareVersion: String
+        get() = _hardwareVersion
+        set(value) { _hardwareVersion = value }
+
+    override var vendorModelName: String
+        get() = _modelName
+        set(value) { _modelName = value }
+
+    override fun forgetVendor() {
+        Log.i(TAG, "forgetVendor: tearing down native driver for $SerialNumber")
+        stop = true
+        keyExchange.reset()
+        // Disconnect GATT if connected
+        try { mBluetoothGatt?.disconnect() } catch (_: Throwable) {}
+        try { mBluetoothGatt?.close() } catch (_: Throwable) {}
+        mBluetoothGatt = null
+        // Remove BLE bond via reflection
+        try {
+            val device = mBluetoothGatt?.device
+            if (device?.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+                val removeBond = device.javaClass.getMethod("removeBond")
+                removeBond.invoke(device)
+                Log.i(TAG, "forgetVendor: BLE bond removed")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "forgetVendor: removeBond failed: ${t.message}")
+        }
+        setPhase(Phase.IDLE)
+        AiDexDriver.deviceListDirty = true
+    }
+
+    override fun softDisconnect() {
+        Log.i(TAG, "softDisconnect: non-destructive disconnect for $SerialNumber")
+        try { mBluetoothGatt?.disconnect() } catch (_: Throwable) {}
+        setPhase(Phase.IDLE)
+    }
+
+    override fun manualReconnectNow() {
+        Log.i(TAG, "manualReconnectNow: forcing reconnect for $SerialNumber")
+        reconnect.reset()
+        stop = false
+        connectDevice(0L)
+        AiDexDriver.deviceListDirty = true
+    }
+
+    override fun setBroadcastOnlyConnection(enabled: Boolean) {
+        Log.i(TAG, "setBroadcastOnlyConnection($enabled) for $SerialNumber")
+        reconnect.isBroadcastOnlyMode = enabled
+        if (enabled) {
+            // Disconnect GATT, rely on advertisements only
+            softDisconnect()
+        } else {
+            // Resume active GATT connection
+            manualReconnectNow()
+        }
+    }
+
+    override fun resetSensor(): Boolean {
+        Log.i(TAG, "resetSensor: sending reset (0xF0) for $SerialNumber")
+        val cmd = commandBuilder.resetSensor() ?: run {
+            Log.e(TAG, "resetSensor: session key not available")
+            return false
+        }
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+        return true
+    }
+
+    override fun startNewSensor(): Boolean {
+        Log.i(TAG, "startNewSensor: activating sensor $SerialNumber")
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        val tz = TimeZone.getDefault()
+        val tzOffsetMs = tz.getOffset(cal.timeInMillis)
+        val tzQuarters = (tzOffsetMs / (15 * 60 * 1000))
+        val dstMs = tz.getDSTSavings()
+        val dstQuarters = if (tz.inDaylightTime(cal.time)) (dstMs / (15 * 60 * 1000)) else 0
+
+        activateSensor(
+            year = cal.get(Calendar.YEAR),
+            month = cal.get(Calendar.MONTH) + 1,
+            day = cal.get(Calendar.DAY_OF_MONTH),
+            hour = cal.get(Calendar.HOUR_OF_DAY),
+            minute = cal.get(Calendar.MINUTE),
+            second = cal.get(Calendar.SECOND),
+            tzQuarters = tzQuarters,
+            dstQuarters = dstQuarters,
+        )
+        return true
+    }
+
+    override fun calibrateSensor(glucoseMgDl: Int): Boolean {
+        Log.i(TAG, "calibrateSensor($glucoseMgDl mg/dL) for $SerialNumber")
+        if (lastOffsetMinutes <= 0) {
+            Log.e(TAG, "calibrateSensor: no offset available yet")
+            return false
+        }
+        sendCalibration(lastOffsetMinutes, glucoseMgDl)
+        return true
+    }
+
+    override fun unpairSensor(): Boolean {
+        Log.i(TAG, "unpairSensor: sending deleteBond (0xF2) for $SerialNumber")
+        val cmd = commandBuilder.deleteBond() ?: run {
+            Log.e(TAG, "unpairSensor: session key not available")
+            return false
+        }
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+        // Also remove Android-level bond
+        try {
+            val device = mBluetoothGatt?.device
+            if (device?.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+                val removeBond = device.javaClass.getMethod("removeBond")
+                removeBond.invoke(device)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "unpairSensor: removeBond failed: ${t.message}")
+        }
+        keyExchange.reset()
+        return true
+    }
+
+    override fun rePairSensor() {
+        Log.i(TAG, "rePairSensor: resetting key exchange and reconnecting for $SerialNumber")
+        keyExchange.reset()
+        softDisconnect()
+        handler.postDelayed({
+            stop = false
+            connectDevice(500L)
+        }, 1000L)
+    }
+
+    override fun sendMaintenanceCommand(opCode: Int): Boolean {
+        Log.i(TAG, "sendMaintenanceCommand(0x${"%02X".format(opCode)}) for $SerialNumber")
+        val cmd = commandBuilder.buildEncrypted(opCode) ?: run {
+            Log.e(TAG, "sendMaintenanceCommand: session key not available")
+            return false
+        }
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+        return true
+    }
+
+    override val resetCompensationEnabled: Boolean get() = _resetCompensationEnabled
+
+    override fun enableResetCompensation() {
+        Log.i(TAG, "enableResetCompensation for $SerialNumber")
+        _resetCompensationEnabled = true
+    }
+
+    override fun disableResetCompensation() {
+        Log.i(TAG, "disableResetCompensation for $SerialNumber")
+        _resetCompensationEnabled = false
+    }
+
+    override fun getCompensationStatusText(): String {
+        return if (_resetCompensationEnabled) "Enabled (native driver)" else ""
+    }
+
+    override var viewMode: Int
+        get() = _viewModeInternal
+        set(value) { _viewModeInternal = value }
+
+    // =========================================================================
     // Cleanup
     // =========================================================================
 
@@ -966,11 +1187,7 @@ class AiDexBleManager(
         handlerThread.quitSafely()
     }
 
-    /**
-     * Whether this sensor is in broadcast-only fallback mode.
-     * Used by SensorBluetooth.scanStarter() via AiDexNativeFactory.
-     */
-    fun getBroadcastOnlyConnection(): Boolean = reconnect.isBroadcastOnlyMode
+    // broadcastOnlyConnection is implemented as a property (line ~984) via AiDexDriver interface
 
     // =========================================================================
     // Helpers

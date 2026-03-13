@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import tk.glucodata.Log
 import tk.glucodata.R
 import tk.glucodata.SensorBluetooth
+import tk.glucodata.drivers.aidex.AiDexNativeFactory
 import tk.glucodata.ui.util.BleDeviceScanner
 import tk.glucodata.ui.util.rememberBleScanner
 import java.util.UUID
@@ -55,7 +56,7 @@ fun AiDexSetupWizard(
     var selectedDeviceName by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var vendorLibAvailable by remember { mutableStateOf(BlecommLoader.isLibraryPresent(context)) }
+    var vendorLibAvailable by remember { mutableStateOf(BlecommLoader.isLibraryPresent(context) || AiDexNativeFactory.isNativeModeEnabled(context)) }
     val uploadLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -108,15 +109,19 @@ fun AiDexSetupWizard(
                     onUploadProprietary = launchUploadPickerSafely,
                     onDeviceSelected = { selectedName, address ->
                         try {
-                            if (!vendorLibAvailable) {
-                                Toast.makeText(context, context.getString(R.string.wronglibrary), Toast.LENGTH_LONG).show()
-                                return@AiDexScanStep
-                            }
-                            val libReady = BlecommLoader.ensureLoaded(context)
-                            vendorLibAvailable = libReady
-                            if (!libReady) {
-                                Toast.makeText(context, context.getString(R.string.wronglibrary), Toast.LENGTH_LONG).show()
-                                return@AiDexScanStep
+                            // Native Kotlin driver doesn't need the vendor library
+                            val nativeMode = AiDexNativeFactory.isNativeModeEnabled(context)
+                            if (!nativeMode) {
+                                if (!vendorLibAvailable) {
+                                    Toast.makeText(context, context.getString(R.string.wronglibrary), Toast.LENGTH_LONG).show()
+                                    return@AiDexScanStep
+                                }
+                                val libReady = BlecommLoader.ensureLoaded(context)
+                                vendorLibAvailable = libReady
+                                if (!libReady) {
+                                    Toast.makeText(context, context.getString(R.string.wronglibrary), Toast.LENGTH_LONG).show()
+                                    return@AiDexScanStep
+                                }
                             }
                             val name = selectedName.trim()
                             if (name.isEmpty()) {

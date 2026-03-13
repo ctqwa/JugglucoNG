@@ -627,13 +627,9 @@ public class SensorBluetooth {
         for (SuperGattCallback cb : gattcallbacks) {
             if (cb.mBluetoothGatt == null) {
                 // Skip AiDex sensors in broadcast mode - they manage their own status
-                if (cb instanceof tk.glucodata.drivers.aidex.AiDexSensor) {
-                    tk.glucodata.drivers.aidex.AiDexSensor aidex = (tk.glucodata.drivers.aidex.AiDexSensor) cb;
+                if (cb instanceof tk.glucodata.drivers.aidex.AiDexDriver) {
+                    tk.glucodata.drivers.aidex.AiDexDriver aidex = (tk.glucodata.drivers.aidex.AiDexDriver) cb;
                     if (aidex.getBroadcastOnlyConnection()) {
-                        continue;
-                    }
-                } else if (tk.glucodata.drivers.aidex.AiDexNativeFactory.isNativeAiDex(cb)) {
-                    if (tk.glucodata.drivers.aidex.AiDexNativeFactory.isBroadcastOnly(cb)) {
                         continue;
                     }
                 }

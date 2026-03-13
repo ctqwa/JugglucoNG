@@ -75,4 +75,7 @@ class AiDexCommandBuilder(private val keyExchange: AiDexKeyExchange) {
     fun deleteBond() = buildEncrypted(AiDexOpcodes.DELETE_BOND)
 
     fun reset() = buildEncrypted(AiDexOpcodes.RESET)
+
+    /** Alias for [reset] — used by AiDexBleManager.resetSensor(). */
+    fun resetSensor() = reset()
 }

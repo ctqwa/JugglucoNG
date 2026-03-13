@@ -20,11 +20,16 @@ import tk.glucodata.drivers.aidex.native.ble.AiDexBleManager
  * Factory bridge that SensorBluetooth.java can call without importing from
  * the `native` package (which Java cannot do).
  *
+ * Most UI code now uses `instanceof AiDexDriver` (the shared interface) to
+ * detect either driver implementation. These factory helpers remain for:
+ * - Creating native driver instances (createBleManager)
+ * - Checking native mode preference (isNativeModeEnabled)
+ * - Specifically identifying the native driver (isNativeAiDex)
+ *
  * Usage from Java:
  *   AiDexNativeFactory.INSTANCE.isNativeModeEnabled(context)
  *   AiDexNativeFactory.INSTANCE.createBleManager(serial, dataptr)
  *   AiDexNativeFactory.INSTANCE.isNativeAiDex(callback)
- *   AiDexNativeFactory.INSTANCE.isBroadcastOnly(callback)
  */
 object AiDexNativeFactory {
 
@@ -67,8 +72,8 @@ object AiDexNativeFactory {
     /**
      * Check whether a [SuperGattCallback] is an instance of our native [AiDexBleManager].
      *
-     * Used by SensorBluetooth.scanStarter() to avoid the `instanceof AiDexSensor` check
-     * (Java can't reference the `native` package for instanceof).
+     * Java code can use `instanceof AiDexDriver` to check for *any* AiDex driver,
+     * but this method specifically identifies the native Kotlin driver (vs vendor-lib).
      */
     @JvmStatic
     fun isNativeAiDex(callback: SuperGattCallback?): Boolean {
@@ -78,11 +83,14 @@ object AiDexNativeFactory {
     /**
      * Check whether a native AiDex callback is in broadcast-only mode.
      *
+     * Prefer using `(callback as? AiDexDriver)?.broadcastOnlyConnection` when possible.
+     * This method remains for Java code that needs a static helper.
+     *
      * Returns false if the callback is not an AiDexBleManager.
      */
     @JvmStatic
     fun isBroadcastOnly(callback: SuperGattCallback?): Boolean {
         val mgr = callback as? AiDexBleManager ?: return false
-        return mgr.getBroadcastOnlyConnection()
+        return mgr.broadcastOnlyConnection
     }
 }

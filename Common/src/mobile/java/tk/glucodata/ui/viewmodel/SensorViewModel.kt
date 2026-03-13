@@ -125,8 +125,8 @@ class SensorViewModel : ViewModel() {
         pollingJob = viewModelScope.launch {
             while (true) {
                 // Edit 62c: Only do expensive device sync when something actually changed
-                if (tk.glucodata.drivers.aidex.AiDexSensor.deviceListDirty) {
-                    tk.glucodata.drivers.aidex.AiDexSensor.deviceListDirty = false
+                if (tk.glucodata.drivers.aidex.AiDexDriver.deviceListDirty) {
+                    tk.glucodata.drivers.aidex.AiDexDriver.deviceListDirty = false
                     refreshSensorsWithDeviceSync()
                 } else {
                     refreshSensors()
@@ -230,13 +230,13 @@ class SensorViewModel : ViewModel() {
                     // Edit 56c: Skip finished legacy sensors (not in activeSensors list).
                     // AiDex sensors bypass this check since they're tracked in SharedPreferences.
                     val serial = gatt.SerialNumber ?: ""
-                    if (gatt !is tk.glucodata.drivers.aidex.AiDexSensor && serial.isNotEmpty() && !activeSet.contains(serial)) {
+                    if (gatt !is tk.glucodata.drivers.aidex.AiDexDriver && serial.isNotEmpty() && !activeSet.contains(serial)) {
                         android.util.Log.d("SensorVM", "Edit 56c: Filtering out finished sensor $serial from UI")
                         return@mapNotNull null
                     }
                     
                     // KOTLIN SENSOR SUPPORT (AiDex)
-                    if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                    if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                          // Map pure Kotlin fields to SensorInfo
                          val meaningfulStatus = gatt.getDetailedBleStatus()
                          val rawBleStatus = gatt.constatstatusstr ?: ""
@@ -551,7 +551,7 @@ class SensorViewModel : ViewModel() {
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
             try {
-                if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                     // AiDex: never call Sibionics wipe JNI here.
                     // If wipeData=true, forceDeleteSensorDirectory() below handles local AiDex files.
                     if (wipeData) {
@@ -612,7 +612,7 @@ class SensorViewModel : ViewModel() {
             // called from the UI thread while native lib is mid-operation.
             try {
                 // AiDex: stop vendor stack, remove BLE bond, wipe saved AES keys
-                if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                     gatt.forgetVendor()
                 }
             } catch (t: Throwable) {
@@ -628,7 +628,7 @@ class SensorViewModel : ViewModel() {
             } catch (t: Throwable) {
                 android.util.Log.e("SensorViewModel", "forgetSensor($serial) finishSensor crashed: ${t.message}", t)
             }
-            if (gatt !is tk.glucodata.drivers.aidex.AiDexSensor) {
+            if (gatt !is tk.glucodata.drivers.aidex.AiDexDriver) {
                 clearSibionicsTransmitterBinding(gatt, "forget")
             }
             try {
@@ -650,7 +650,7 @@ class SensorViewModel : ViewModel() {
          val gatts = SensorBluetooth.mygatts()
          val gatt = gatts.find { it.SerialNumber == serial }
          if (gatt != null) {
-             if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+             if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                  // Route AiDex to multi-strategy reset (runs on IO thread)
                  resetAiDexSensor(serial, enableBiasCompensation)
              } else {
@@ -724,7 +724,7 @@ class SensorViewModel : ViewModel() {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
-            if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+            if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                 gatt.viewMode = mode
             }
             Natives.setViewMode(gatt.dataptr, mode)
@@ -735,7 +735,7 @@ class SensorViewModel : ViewModel() {
     fun setBroadcastOnlyConnection(serial: String, enabled: Boolean) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             gatt.setBroadcastOnlyConnection(enabled)
             refreshSensors()
         }
@@ -816,7 +816,7 @@ class SensorViewModel : ViewModel() {
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
             viewModelScope.launch {
-                if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                     // AiDex reconnect must be non-destructive: keep pairing keys/local sensor state.
                     // Using forgetVendor() here wipes pairing + removes from prefs, which can leave
                     // the sensor dead until a full app reset/re-add.
@@ -863,7 +863,7 @@ class SensorViewModel : ViewModel() {
             // Edit 84: Only delete the sensor directory for AiDex sensors.
             // Legacy/Sibionics sensors don't use a per-sensor directory — their data
             // lives in the mmap'd native file, which siWipeDataOnly already handles.
-            if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+            if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                 forceDeleteSensorDirectory(serial)
             }
             refreshSensors()
@@ -884,7 +884,7 @@ class SensorViewModel : ViewModel() {
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+                if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                     // AiDex disconnect must stay non-destructive so Play can reconnect.
                     android.util.Log.d("SensorViewModel", "AiDex disconnect: soft-stopping vendor + GATT (non-destructive)")
                     try { gatt.softDisconnect() } catch (t: Throwable) {
@@ -913,7 +913,7 @@ class SensorViewModel : ViewModel() {
     fun sendAiDexMaintenanceCommand(serial: String, opCode: Int) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 val success = gatt.sendMaintenanceCommand(opCode)
                 if (success) {
@@ -930,7 +930,7 @@ class SensorViewModel : ViewModel() {
     fun resetAiDexSensor(serial: String, enableBiasCompensation: Boolean = false) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 // Edit 59d: Enable/disable bias compensation before reset
                 if (enableBiasCompensation) {
@@ -951,7 +951,7 @@ class SensorViewModel : ViewModel() {
     fun disableAiDexBiasCompensation(serial: String) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             gatt.disableResetCompensation()
             viewModelScope.launch { refreshSensors() }
         }
@@ -965,7 +965,7 @@ class SensorViewModel : ViewModel() {
     fun enableAiDexBiasCompensation(serial: String) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             gatt.enableResetCompensation()
             viewModelScope.launch { refreshSensors() }
         }
@@ -978,7 +978,7 @@ class SensorViewModel : ViewModel() {
     fun startNewAiDexSensor(serial: String) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 val success = gatt.startNewSensor()
                 android.util.Log.i("SensorVM", "AiDex startNewSensor result: $success")
@@ -994,7 +994,7 @@ class SensorViewModel : ViewModel() {
     fun calibrateAiDexSensor(serial: String, glucoseMgDl: Int) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 val success = gatt.calibrateSensor(glucoseMgDl)
                 android.util.Log.i("SensorVM", "AiDex calibrateSensor($glucoseMgDl mg/dL) result: $success")
@@ -1008,7 +1008,7 @@ class SensorViewModel : ViewModel() {
     fun unpairAiDexSensor(serial: String) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 val success = gatt.unpairSensor()
                 android.util.Log.i("SensorVM", "AiDex unpairSensor result: $success")
@@ -1023,7 +1023,7 @@ class SensorViewModel : ViewModel() {
     fun rePairAiDexSensor(serial: String) {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexSensor) {
+        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 gatt.rePairSensor()
                 android.util.Log.i("SensorVM", "AiDex rePairSensor initiated")
