@@ -199,6 +199,7 @@ class AiDexBleManager(
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
+            postCccdStreamingPending = false
             gattQueue.clear()
             gattOpActive = false
             queuePausedForBonding = false
@@ -230,6 +231,7 @@ class AiDexBleManager(
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
+            postCccdStreamingPending = false
             historyDownloading = false
 
             // Handle specific failure cases
@@ -330,8 +332,16 @@ class AiDexBleManager(
         if (cccdQueue.isNotEmpty()) {
             writeNextCccd(gatt)
         } else {
-            // All CCCDs done — check bond state before starting key exchange
             cccdChainComplete = true
+
+            // Post-key-exchange CCCD re-registration complete?
+            if (postCccdStreamingPending) {
+                Log.i(TAG, "Post-key-exchange CCCD re-registration complete. Entering streaming...")
+                enterStreamingPhase()
+                return
+            }
+
+            // Initial CCCD chain complete — check bond state before starting key exchange
             val bondState = gatt.device.bondState
             Log.i(TAG, "All CCCDs enabled. Bond state: $bondState")
 
@@ -363,15 +373,19 @@ class AiDexBleManager(
         val data = characteristic.value ?: return
         if (data.isEmpty()) return
 
+        Log.i(TAG, "onCharacteristicChanged: uuid=$uuid len=${data.size} hex=${AiDexParser.hexString(data.copyOfRange(0, minOf(data.size, 8)))}")
+
         when (uuid) {
             CHAR_F003 -> handleF003(data)
             CHAR_F001 -> handleF001Response(data, gatt)
             CHAR_F002 -> handleF002Response(data, gatt)
+            else -> Log.w(TAG, "onCharacteristicChanged: unexpected uuid=$uuid")
         }
     }
 
     override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
         super.onCharacteristicWrite(gatt, characteristic, status)
+        Log.d(TAG, "onCharacteristicWrite: uuid=${characteristic.uuid} status=$status")
         if (gattOpActive) {
             handler.post {
                 gattOpActive = false
@@ -558,12 +572,59 @@ class AiDexBleManager(
 
     /**
      * Called when key exchange is fully complete. Start receiving data.
+     *
+     * Re-registers F003 and F002 CCCDs before sending commands.
+     * On first connection, SMP bonding is triggered by the F001 CCCD write,
+     * but F003 and F002 CCCDs were written BEFORE bonding started. The sensor
+     * invalidates pre-bond CCCDs when the security level changes, so notifications
+     * never arrive. Re-writing CCCDs after key exchange (post-bond) fixes this.
+     * On reconnections where the device is already bonded, this is a harmless no-op.
      */
     private fun onKeyExchangeComplete() {
-        Log.i(TAG, "Key exchange complete — entering streaming phase")
+        Log.i(TAG, "Key exchange complete — re-registering CCCDs then entering streaming phase")
+
+        val gatt = mBluetoothGatt
+        if (gatt == null) {
+            Log.e(TAG, "onKeyExchangeComplete: no active GATT!")
+            return
+        }
+
+        val service = gatt.getService(SERVICE_F000)
+        if (service == null) {
+            Log.e(TAG, "onKeyExchangeComplete: SERVICE_F000 not found!")
+            return
+        }
+
+        // Re-register F003 (glucose data) and F002 (command responses) CCCDs.
+        // F001 was written during/after bonding so it's already valid.
+        // Use the CCCD chain mechanism for serialized writes.
+        cccdQueue.clear()
+        cccdQueue.add(CHAR_F003)
+        cccdQueue.add(CHAR_F002)
+        cccdWriteInProgress = false
+        cccdChainComplete = false
+
+        // After CCCDs are re-registered, enter streaming and send commands.
+        // We override the normal post-CCCD behavior by setting a flag.
+        postCccdStreamingPending = true
+
+        Log.i(TAG, "Re-registering F003 + F002 CCCDs...")
+        writeNextCccd(gatt)
+    }
+
+    /** Set when CCCDs are being re-registered after key exchange. */
+    @Volatile private var postCccdStreamingPending = false
+
+    /**
+     * Enter streaming phase and send initial commands.
+     * Called after post-key-exchange CCCD re-registration completes.
+     */
+    private fun enterStreamingPhase() {
+        postCccdStreamingPending = false
         setPhase(Phase.STREAMING)
         reconnect.onConnectionSuccess()
         constatstatusstr = "Streaming"
+        Log.i(TAG, "Streaming phase entered. Requesting device info + history...")
 
         // Request device info and history range
         requestDeviceInfo()
@@ -576,6 +637,7 @@ class AiDexBleManager(
 
     private fun handleF003(encryptedData: ByteArray) {
         val now = System.currentTimeMillis()
+        Log.i(TAG, "handleF003: len=${encryptedData.size}, raw=${AiDexParser.hexString(encryptedData.copyOfRange(0, minOf(encryptedData.size, 8)))}")
 
         // Status/keepalive frames (5 bytes) — ignore
         val frameType = AiDexParser.classifyFrame(encryptedData)
@@ -654,6 +716,7 @@ class AiDexBleManager(
 
     private fun handleF002Response(data: ByteArray, gatt: BluetoothGatt) {
         if (data.isEmpty()) return
+        Log.i(TAG, "handleF002Response: len=${data.size}, raw=${AiDexParser.hexString(data.copyOfRange(0, minOf(data.size, 16)))}")
 
         // Decrypt if session key is available
         val plaintext = if (keyExchange.isComplete) {
