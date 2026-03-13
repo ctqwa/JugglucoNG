@@ -120,10 +120,12 @@ class AiDexBleManager(
     private var servicesReady = false
     private var cccdQueue = ArrayDeque<UUID>() // Characteristics to enable notifications on
     private var cccdWriteInProgress = false
+    private var cccdChainComplete = false
 
     // -- Key Exchange State --
     private var challengeWritten = false
     private var bondDataRead = false
+    private var keyExchangePendingBond = false
 
     // -- History State --
     @Volatile private var historyDownloading = false
@@ -195,6 +197,8 @@ class AiDexBleManager(
             challengeWritten = false
             bondDataRead = false
             servicesReady = false
+            cccdChainComplete = false
+            keyExchangePendingBond = false
             gattQueue.clear()
             gattOpActive = false
             queuePausedForBonding = false
@@ -224,6 +228,8 @@ class AiDexBleManager(
             gattOpActive = false
             queuePausedForBonding = false
             servicesReady = false
+            cccdChainComplete = false
+            keyExchangePendingBond = false
             historyDownloading = false
 
             // Handle specific failure cases
@@ -324,9 +330,31 @@ class AiDexBleManager(
         if (cccdQueue.isNotEmpty()) {
             writeNextCccd(gatt)
         } else {
-            // All CCCDs done — start key exchange
-            Log.i(TAG, "All CCCDs enabled. Starting key exchange...")
-            startKeyExchange(gatt)
+            // All CCCDs done — check bond state before starting key exchange
+            cccdChainComplete = true
+            val bondState = gatt.device.bondState
+            Log.i(TAG, "All CCCDs enabled. Bond state: $bondState")
+
+            when (bondState) {
+                BluetoothDevice.BOND_BONDED -> {
+                    // Already bonded (reconnect case, or bonding finished during CCCD chain).
+                    // Small delay to let encryption fully settle.
+                    Log.i(TAG, "Already bonded. Starting key exchange after 500ms settle delay...")
+                    handler.postDelayed({ startKeyExchange(gatt) }, 500L)
+                }
+                BluetoothDevice.BOND_BONDING -> {
+                    // Bonding in progress — defer key exchange to bonded() callback.
+                    // The sensor ignores writes on an unencrypted link.
+                    Log.i(TAG, "Bonding in progress. Deferring key exchange until BOND_BONDED...")
+                    keyExchangePendingBond = true
+                }
+                else -> {
+                    // BOND_NONE — no bonding happened (unusual for AiDex).
+                    // Try key exchange anyway; the CCCD write itself may trigger bonding later.
+                    Log.w(TAG, "Bond state is BOND_NONE after CCCD chain — starting key exchange anyway")
+                    startKeyExchange(gatt)
+                }
+            }
         }
     }
 
@@ -371,17 +399,38 @@ class AiDexBleManager(
     }
 
     override fun bonded() {
-        Log.i(TAG, "Bond established — resuming CCCD chain if paused")
-        reconnect.onBondSuccess()
+        // Note: SensorBluetooth calls bonded() on EVERY bond state change
+        // (BONDING, BONDED, NONE, ERROR), not just BOND_BONDED.
+        val gatt = mBluetoothGatt ?: return
+        val bondState = gatt.device.bondState
+        Log.i(TAG, "bonded() callback: bondState=$bondState")
 
-        // Resume CCCD chain if it was interrupted by auth failure
-        if (queuePausedForBonding) {
-            queuePausedForBonding = false
-            handler.post { drainGattQueue() }
-        }
-        if (cccdQueue.isNotEmpty()) {
-            val gatt = mBluetoothGatt ?: return
-            handler.post { writeNextCccd(gatt) }
+        if (bondState == BluetoothDevice.BOND_BONDED) {
+            reconnect.onBondSuccess()
+
+            // Resume GATT queue if it was paused for bonding
+            if (queuePausedForBonding) {
+                queuePausedForBonding = false
+                handler.post { drainGattQueue() }
+            }
+
+            // Resume CCCD chain if it was interrupted by auth failure
+            if (cccdQueue.isNotEmpty()) {
+                handler.post { writeNextCccd(gatt) }
+            }
+
+            // Start deferred key exchange if CCCDs completed while bonding
+            if (keyExchangePendingBond && cccdChainComplete) {
+                keyExchangePendingBond = false
+                // 500ms delay to let encryption fully settle after bonding,
+                // matching vendor driver's approach (AiDexSensor.kt line 6013)
+                Log.i(TAG, "Bond complete. Starting deferred key exchange after 500ms settle delay...")
+                handler.postDelayed({ startKeyExchange(gatt) }, 500L)
+            }
+        } else if (bondState == BluetoothDevice.BOND_BONDING) {
+            Log.d(TAG, "bonded() callback: BOND_BONDING — waiting for BOND_BONDED")
+        } else {
+            Log.w(TAG, "bonded() callback: unexpected bond state $bondState")
         }
     }
 
