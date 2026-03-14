@@ -29,6 +29,7 @@ import tk.glucodata.R
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.strGlucose
+import tk.glucodata.logic.TrendEngine
 import java.util.Locale
 
 class AODOverlayService : AccessibilityService(), SensorEventListener {
@@ -377,24 +378,29 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
                 }
             }
         }
-        
+
         val isRawMode = (viewMode == 1 || viewMode == 3)
         val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawMode)
         val hideInitialWhenCalibrated = hasCalibration &&
             tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
+        val prefs = getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+        val showSecondary = prefs.getBoolean("aod_show_secondary", false)
+        val trendResult = if (chartPoints.isNotEmpty()) {
+            TrendEngine.calculateTrend(chartPoints, useRaw = isRawMode, isMmol = isMmol)
+        } else {
+            TrendEngine.TrendResult(TrendEngine.TrendState.Unknown, 0f, 0f, 0f, 0f)
+        }
 
         // Current Value
         val last: strGlucose? = Natives.lastglucose()
         var glvalue = 0f
         var valStr = "---"
-        var rate = 0f
         var time = 0L
 
         if (last != null && last.value != null) {
             try {
                 glvalue = last.value.toFloat()
             } catch (e: Exception) {}
-            rate = last.rate
             time = last.time
 
             // Build hero-card-style string with all values
@@ -481,12 +487,13 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             } catch (e: Exception) {}
         }
 
+        if (!showSecondary) {
+            valStr = valStr.substringBefore(" / ").substringBefore(" · ")
+        }
+
         val glucoseColor = NotificationChartDrawer.getGlucoseColor(this, glvalue, isMmol)
 
         // Draw Components
-        // Fetch Font Preferences
-        // Fetch Font Preferences
-        val prefs = getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
         val fontSource = prefs.getString("aod_font_source", "APP") ?: "APP"
         val fontWeight = prefs.getInt("aod_font_weight", 400)
         val textScale = prefs.getFloat("aod_text_scale", 1.5f)
@@ -495,7 +502,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         
         // Arrow Settings
         val showArrow = prefs.getBoolean("aod_show_arrow", true)
-        val arrowScale = prefs.getFloat("aod_arrow_scale", 1.0f)
+        val arrowScale = prefs.getFloat("aod_arrow_scale", 2.0f)
 
         // Use textScale here for high-res bitmap generation
         val textBitmap = NotificationChartDrawer.drawGlucoseText(this, valStr, glucoseColor, textScale, fontWeight, useSystemFont)
@@ -505,7 +512,13 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         // Pass combined scale to arrow
         val arrowImg = view.findViewById<ImageView>(R.id.notification_arrow)
         if (showArrow) {
-            val arrowBitmap = NotificationChartDrawer.drawArrow(this, rate, isMmol, glucoseColor, textScale * arrowScale)
+            val arrowBitmap = NotificationChartDrawer.drawArrow(
+                this,
+                trendResult.velocity,
+                isMmol,
+                glucoseColor,
+                textScale * arrowScale
+            )
             arrowImg?.setImageBitmap(arrowBitmap)
             arrowImg?.visibility = View.VISIBLE
         } else {
@@ -520,8 +533,8 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         if (showChart) {
             val dm = resources.displayMetrics
             val baseChartHeightPx = (200 * dm.density).toInt()
-            val renderWidth = (dm.widthPixels * 2.0f).toInt()
-            val renderHeight = (baseChartHeightPx * 2.0f).toInt()
+            val renderWidth = (dm.widthPixels * 1.5f).toInt()
+            val renderHeight = (baseChartHeightPx * 1.5f).toInt()
 
             val chartBitmap = NotificationChartDrawer.drawChart(
                 this,
@@ -548,9 +561,9 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         if (statusView != null) {
             // Apply Scaling
             statusView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14f * textScale)
-            
+
             if (statusText.isNotEmpty()) {
-                statusView.visibility = View.VISIBLE
+                statusView.visibility = View.GONE
                 statusView.text = statusText
             } else {
                 statusView.visibility = View.GONE

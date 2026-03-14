@@ -66,6 +66,7 @@ fun FloatingGlucoseOverlay(
     val isDynamicIsland by repository.isDynamicIslandEnabled.collectAsState(initial = false)
     val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = 0f)
     val manualGap by repository.islandGap.collectAsState(initial = 0f)
+    val useSubtleOutline by repository.useSubtleOutline.collectAsState(initial = false)
 
     // Metrics State (from Service WindowInsets)
     val cutoutData by cutoutDataFlow.collectAsState(initial = tk.glucodata.service.FloatingGlucoseService.CutoutData(0.dp, 0.dp))
@@ -112,6 +113,12 @@ fun FloatingGlucoseOverlay(
     val finalBgColor = if (isTransparent) Color.Transparent else Color.Black.copy(alpha = opacity)
     val finalShape = RoundedCornerShape(cornerRadius.dp)
     val finalTextColor = Color.White
+    val textOutlineColor = Color.Black.copy(alpha = if (isTransparent) 0.34f else 0.28f)
+    val textShadow = Shadow(
+        color = Color.Black.copy(alpha = if (isTransparent) 0.52f else 0.42f),
+        offset = Offset(0f, 1.5f),
+        blurRadius = 5f
+    )
     
     // Drag Modifier
     val dragModifier = if (isDynamicIsland) Modifier else Modifier.pointerInput(Unit) {
@@ -178,11 +185,11 @@ fun FloatingGlucoseOverlay(
                  verticalAlignment = Alignment.CenterVertically,
                  backgroundContent = {
                      Surface(
-                         color = finalBgColor,
-                         shape = finalShape,
-                         modifier = Modifier.fillMaxSize()
-                     ) {}
-                 }
+                           color = finalBgColor,
+                           shape = finalShape,
+                           modifier = Modifier.fillMaxSize()
+                       ) {}
+                   }
              ) {
                  // LEFT: Values
                  Box(modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp)) {
@@ -199,19 +206,47 @@ fun FloatingGlucoseOverlay(
                                      null
                                  }
                             } else null
-                            val dvs = getDisplayValues(point, viewMode, unit, calibratedValue)
-                            
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(dvs.primaryStr, color = finalTextColor, fontSize = fontSize.sp, fontFamily = fontFamily, fontWeight = fontWeight, textAlign = TextAlign.End)
-                                if (showSecondary && !dvs.secondaryStr.isNullOrEmpty()) {
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(dvs.secondaryStr!!, color = finalTextColor.copy(alpha=0.7f), fontSize = (fontSize*0.7f).sp, fontFamily = fontFamily, fontWeight = fontWeight)
-                                }
-                            }
-                     } else {
-                         Text("---", color = finalTextColor, fontSize = fontSize.sp)
-                     }
-                 }
+                             val dvs = getDisplayValues(point, viewMode, unit, calibratedValue)
+                              
+                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                 FloatingStyledText(
+                                     text = dvs.primaryStr,
+                                     fontSize = fontSize,
+                                     fontFamily = fontFamily,
+                                     fontWeight = fontWeight,
+                                     textColor = finalTextColor,
+                                     outlineColor = textOutlineColor,
+                                     shadow = textShadow,
+                                     useOutline = useSubtleOutline,
+                                     textAlign = TextAlign.End
+                                 )
+                                 if (showSecondary && !dvs.secondaryStr.isNullOrEmpty()) {
+                                     Spacer(Modifier.width(8.dp))
+                                     FloatingStyledText(
+                                         text = dvs.secondaryStr!!,
+                                         fontSize = fontSize * 0.7f,
+                                         fontFamily = fontFamily,
+                                         fontWeight = fontWeight,
+                                         textColor = finalTextColor.copy(alpha = 0.7f),
+                                         outlineColor = textOutlineColor,
+                                         shadow = textShadow,
+                                         useOutline = useSubtleOutline
+                                     )
+                                 }
+                             }
+                      } else {
+                          FloatingStyledText(
+                              text = "---",
+                              fontSize = fontSize,
+                              fontFamily = fontFamily,
+                              fontWeight = fontWeight,
+                              textColor = finalTextColor,
+                              outlineColor = textOutlineColor,
+                              shadow = textShadow,
+                              useOutline = useSubtleOutline
+                          )
+                      }
+                  }
                 
                 // RIGHT: Arrow
                 Box(modifier = Modifier.padding(end = 12.dp, top = 6.dp, bottom = 6.dp)) {
@@ -254,66 +289,101 @@ fun FloatingGlucoseOverlay(
                          } else {
                              null
                          }
-                    } else null
-                    val dvs = getDisplayValues(point, viewMode, unit, calibratedValue)
+                     } else null
+                     val dvs = getDisplayValues(point, viewMode, unit, calibratedValue)
 
-                    if (isTransparent) {
-                        OutlinedText(dvs.primaryStr, fontSize, fontFamily, fontWeight, finalTextColor, Color.Black.copy(alpha=0.5f))
-                    } else {
-                        Text(dvs.primaryStr, color = finalTextColor, fontSize = fontSize.sp, fontFamily = fontFamily, fontWeight = fontWeight)
-                    }
-                    
+                    FloatingStyledText(
+                        text = dvs.primaryStr,
+                        fontSize = fontSize,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight,
+                        textColor = finalTextColor,
+                        outlineColor = textOutlineColor,
+                        shadow = textShadow,
+                        useOutline = useSubtleOutline
+                    )
+                     
                     val secondaryText = if (showSecondary) dvs.secondaryStr else null
                     if (!secondaryText.isNullOrEmpty()) {
-                        if (isTransparent) {
-                            OutlinedText(secondaryText, fontSize*0.7f, fontFamily, fontWeight, finalTextColor.copy(alpha=0.7f), Color.Black.copy(alpha=0.5f))
-                        } else {
-                            Text(secondaryText, color = finalTextColor.copy(alpha=0.7f), fontSize = (fontSize*0.7f).sp, fontFamily = fontFamily, fontWeight = fontWeight)
-                        }
+                        FloatingStyledText(
+                            text = secondaryText,
+                            fontSize = fontSize * 0.7f,
+                            fontFamily = fontFamily,
+                            fontWeight = fontWeight,
+                            textColor = finalTextColor.copy(alpha = 0.7f),
+                            outlineColor = textOutlineColor,
+                            shadow = textShadow,
+                            useOutline = useSubtleOutline
+                        )
                     }
 
                     if (showArrow) {
                         TrendIndicator(trendResult, Modifier.size((fontSize * 0.85f).dp), finalTextColor)
                     }
                  } else {
-                     Text("---", color = finalTextColor, fontSize = fontSize.sp, fontFamily = fontFamily, fontWeight = fontWeight)
-                 }
-            }
+                     FloatingStyledText(
+                         text = "---",
+                         fontSize = fontSize,
+                         fontFamily = fontFamily,
+                         fontWeight = fontWeight,
+                         textColor = finalTextColor,
+                         outlineColor = textOutlineColor,
+                         shadow = textShadow,
+                         useOutline = useSubtleOutline
+                     )
+                  }
+             }
         }
     }
 }
 
 @Composable
-fun OutlinedText(
+private fun FloatingStyledText(
     text: String, 
     fontSize: Float, 
     fontFamily: FontFamily, 
     fontWeight: FontWeight, 
     textColor: Color, 
-    outlineColor: Color
+    outlineColor: Color,
+    shadow: Shadow,
+    useOutline: Boolean,
+    textAlign: TextAlign = TextAlign.Start
 ) {
-    Box {
-        // Outline (Stroke)
-        Text(
-            text = text,
-            color = outlineColor,
-            fontSize = fontSize.sp,
-            fontFamily = fontFamily,
-            fontWeight = fontWeight,
-            style = TextStyle.Default.copy(
-                drawStyle = Stroke(
-                    miter = 10f,
-                    width = 5f,
-                    join = StrokeJoin.Round
+    if (useOutline) {
+        Box {
+            Text(
+                text = text,
+                color = outlineColor,
+                fontSize = fontSize.sp,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                textAlign = textAlign,
+                style = TextStyle.Default.copy(
+                    drawStyle = Stroke(
+                        miter = 10f,
+                        width = 2.6f,
+                        join = StrokeJoin.Round
+                    )
                 )
             )
-        )
-        // Fill (Main Text)
+            Text(
+                text = text,
+                color = textColor,
+                fontSize = fontSize.sp,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                textAlign = textAlign
+            )
+        }
+    } else {
         Text(
             text = text,
             color = textColor,
             fontSize = fontSize.sp,
             fontFamily = fontFamily,
+            fontWeight = fontWeight,
+            textAlign = textAlign,
+            style = TextStyle(shadow = shadow)
         )
     }
 }

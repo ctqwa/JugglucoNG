@@ -232,6 +232,7 @@ fun FloatingGlucoseSettingsScreen(
     val isDynamicIsland by repository.isDynamicIslandEnabled.collectAsState(initial = false)
     val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = 0f)
     val manualGap by repository.islandGap.collectAsState(initial = 0f)
+    val useSubtleOutline by repository.useSubtleOutline.collectAsState(initial = false)
     var hasPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -312,6 +313,16 @@ fun FloatingGlucoseSettingsScreen(
                 steps = 18
             )
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsSwitchItem(
+            title = "Use subtle outline",
+            subtitle = if (useSubtleOutline) "Thin edge highlight" else "Soft shadow around overlay",
+            checked = useSubtleOutline,
+            onCheckedChange = { repository.setUseSubtleOutline(it) },
+            position = CardPosition.SINGLE,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
         SectionLabel(stringResource(R.string.position_layout), topPadding = 16.dp, modifier = Modifier.padding(horizontal = 24.dp))
@@ -444,6 +455,7 @@ fun AodSettingsScreen(navController: NavController) {
     var chartScale by rememberSaveable { mutableFloatStateOf(prefs.getFloat("aod_chart_scale", 1.5f)) }
     var showChart by rememberSaveable { mutableStateOf(prefs.getBoolean("aod_show_chart", true)) }
     var showArrow by rememberSaveable { mutableStateOf(prefs.getBoolean("aod_show_arrow", true)) }
+    var showSecondary by rememberSaveable { mutableStateOf(prefs.getBoolean("aod_show_secondary", false)) }
     var arrowScale by rememberSaveable { mutableFloatStateOf(prefs.getFloat("aod_arrow_scale", 1.0f)) }
     var positions by rememberSaveable { mutableStateOf(prefs.getStringSet("aod_positions", setOf("TOP")) ?: setOf("TOP")) }
     var alignment by rememberSaveable { mutableStateOf(prefs.getString("aod_alignment", "CENTER") ?: "CENTER") }
@@ -457,6 +469,7 @@ fun AodSettingsScreen(navController: NavController) {
             .putFloat("aod_chart_scale", chartScale)
             .putBoolean("aod_show_chart", showChart)
             .putBoolean("aod_show_arrow", showArrow)
+            .putBoolean("aod_show_secondary", showSecondary)
             .putFloat("aod_arrow_scale", arrowScale)
             .putStringSet("aod_positions", positions)
             .putString("aod_alignment", alignment)
@@ -595,17 +608,23 @@ fun AodSettingsScreen(navController: NavController) {
                 checked = showChart,
                 onCheckedChange = { showChart = it; save() },
                 icon = null,
-                position = if (showArrow) CardPosition.TOP else CardPosition.SINGLE
+                position = CardPosition.TOP
             )
-            if (showArrow || !showChart) {
-                SettingsSwitchItem(
-                    title = "Show Trend Arrow",
-                    checked = showArrow,
-                    onCheckedChange = { showArrow = it; save() },
-                    icon = null,
-                    position = if (showChart) CardPosition.BOTTOM else CardPosition.SINGLE
-                )
-            }
+            SettingsSwitchItem(
+                title = "Show Trend Arrow",
+                checked = showArrow,
+                onCheckedChange = { showArrow = it; save() },
+                icon = null,
+                position = CardPosition.MIDDLE
+            )
+            SettingsSwitchItem(
+                title = stringResource(R.string.display_secondary_values),
+                subtitle = stringResource(R.string.display_secondary_values_desc),
+                checked = showSecondary,
+                onCheckedChange = { showSecondary = it; save() },
+                icon = null,
+                position = CardPosition.BOTTOM
+            )
         }
 
         LegacySliderControl(
@@ -618,7 +637,7 @@ fun AodSettingsScreen(navController: NavController) {
             label = "Text Size: ${(textScale * 100).toInt()}%",
             value = textScale,
             onValueChange = { textScale = it; save() },
-            range = 0.5f..3.0f
+            range = 0.5f..6.0f
         )
         if (showChart) {
             LegacySliderControl(
