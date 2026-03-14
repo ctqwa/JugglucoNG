@@ -20,7 +20,6 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.Looper
 import tk.glucodata.Applic
 import tk.glucodata.Log
 import tk.glucodata.Natives
@@ -92,6 +91,8 @@ class AiDexBleManager(
         private const val HISTORY_PAGE_TIMEOUT_MS = 25_000L
         private const val HISTORY_REQUEST_DELAY_MS = 80L
         private const val KEY_EXCHANGE_TIMEOUT_MS = 35_000L
+        private const val GATT_OP_TIMEOUT_MS = 15_000L    // Watchdog for stuck GATT operations
+        private const val GATT_OP_WATCHDOG_RETRIES = 2  // Max retries on watchdog timeout before dropping op
 
         // -- History Storage --
         private const val MIN_VALID_GLUCOSE_MGDL = 20
@@ -124,7 +125,6 @@ class AiDexBleManager(
     // -- Handler --
     private val handlerThread = HandlerThread("AiDex-$serial").also { it.start() }
     private val handler = Handler(handlerThread.looper)
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     // -- GATT Queue --
     private sealed class GattOp {
@@ -136,6 +136,24 @@ class AiDexBleManager(
     private val gattQueue = ArrayDeque<GattOp>()
     @Volatile private var gattOpActive = false
     @Volatile private var queuePausedForBonding = false
+    private var currentGattOp: GattOp? = null  // Tracks active op for watchdog retry
+
+    /** Watchdog fires when a GATT operation callback never arrives within GATT_OP_TIMEOUT_MS. */
+    private val gattOpWatchdog = Runnable {
+        if (!gattOpActive) return@Runnable
+        val op = currentGattOp
+        Log.e(TAG, "GATT operation watchdog FIRED — no callback received in ${GATT_OP_TIMEOUT_MS}ms for $op")
+        gattOpActive = false
+        currentGattOp = null
+        if (op != null && op.retryCount < GATT_OP_WATCHDOG_RETRIES) {
+            op.retryCount++
+            Log.w(TAG, "GATT watchdog: retrying (attempt ${op.retryCount}/$GATT_OP_WATCHDOG_RETRIES)")
+            gattQueue.addFirst(op)
+        } else {
+            Log.e(TAG, "GATT watchdog: retries exhausted or no op — dropping")
+        }
+        drainGattQueue()
+    }
 
     // -- CCCD State --
     private var servicesReady = false
@@ -220,6 +238,19 @@ class AiDexBleManager(
         DOWNLOADING_RAW,         // 0x24 (ADC/raw data)
     }
 
+    /** Watchdog fires when a history page response never arrives. */
+    private val historyPageWatchdog = Runnable {
+        if (historyDownloading) {
+            Log.e(TAG, "History page watchdog FIRED — no response in ${HISTORY_PAGE_TIMEOUT_MS}ms (phase=$historyPhase)")
+            historyDownloading = false
+            historyPhase = HistoryPhase.IDLE
+            // Persist current offsets so next reconnect resumes where we stopped
+            writeIntPref("historyRawNextIndex", historyRawNextIndex)
+            writeIntPref("historyBriefNextIndex", historyBriefNextIndex)
+            Log.i(TAG, "History download aborted. Will resume on next connection from raw=$historyRawNextIndex, brief=$historyBriefNextIndex")
+        }
+    }
+
     // -- History Merge Cache --
     // 0x23 calibrated glucose values, keyed by offset minute.
     // Populated during 0x23 download, consumed during 0x24 download.
@@ -263,6 +294,12 @@ class AiDexBleManager(
     // flag set, the driver removes the stale BLE bond, clears key exchange,
     // waits for the sensor to reboot, and auto-reconnects.
     @Volatile private var pendingResetReconnect: Boolean = false
+
+    // -- Unpair Disconnect Flag --
+    // Set true by unpairSensor(). The DELETE_BOND command is sent first; when the
+    // response arrives (or disconnect occurs), this flag triggers bond removal +
+    // soft disconnect instead of normal reconnect.
+    @Volatile private var pendingUnpairDisconnect: Boolean = false
 
     // -- AiDexDriver State --
     @Volatile private var _batteryMillivolts: Int = 0
@@ -390,6 +427,7 @@ class AiDexBleManager(
             gattQueue.clear()
             gattOpActive = false
             queuePausedForBonding = false
+            currentGattOp = null
             cccdQueue.clear()
             cccdWriteInProgress = false
             cccdRetryCount = 0
@@ -400,7 +438,7 @@ class AiDexBleManager(
             gatt.requestMtu(512)
 
             // Schedule service discovery after MTU exchange
-            mainHandler.postDelayed({
+            handler.postDelayed({
                 if (mBluetoothGatt != null && !servicesReady) {
                     Log.i(TAG, "Discovering services...")
                     mBluetoothGatt?.discoverServices()
@@ -418,12 +456,12 @@ class AiDexBleManager(
             // Key exchange delays, CCCD retries, post-bond config, history timeouts, etc.
             // must not fire on a stale or new connection.
             handler.removeCallbacksAndMessages(null)
-            mainHandler.removeCallbacksAndMessages(null)
 
             // Clear GATT state
             gattQueue.clear()
             gattOpActive = false
             queuePausedForBonding = false
+            currentGattOp = null
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
@@ -431,6 +469,13 @@ class AiDexBleManager(
             historyDownloading = false
             cccdRetryCount = 0
             discoveryRetryAttempt = 0
+
+            // Clear per-connection caches and state (bugs #6, #7, #12, #13)
+            calibratedGlucoseCache.clear()
+            lastOffsetMinutes = 0
+            liveOffsetCutoff = 0
+            deviceInfoRetryCount = 0
+            deviceInfoComplete = false
 
             // Handle specific failure cases
             when (status) {
@@ -458,7 +503,23 @@ class AiDexBleManager(
             }
 
             // Schedule reconnect — but NOT if paused (stop=true) or broadcast-only
-            if (pendingResetReconnect) {
+            if (pendingUnpairDisconnect) {
+                // Unpair command was sent but sensor disconnected before (or right after)
+                // the response. Perform deferred cleanup now.
+                pendingUnpairDisconnect = false
+                Log.i(TAG, "Disconnect during unpair — performing deferred cleanup")
+                val device = mBluetoothGatt?.device
+                try {
+                    if (device?.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+                        val removeBond = device.javaClass.getMethod("removeBond")
+                        removeBond.invoke(device)
+                        Log.i(TAG, "unpairSensor: BLE bond removed (from disconnect handler)")
+                    }
+                } catch (_: Throwable) {}
+                keyExchange.reset()
+                close()
+                constatstatusstr = "Unpaired"
+            } else if (pendingResetReconnect) {
                 // Post-reset reconnect: sensor cleared its bond table + storage.
                 // We must: remove stale BLE bond, clear key exchange, wait for
                 // sensor reboot, then auto-reconnect fresh.
@@ -630,6 +691,8 @@ class AiDexBleManager(
         Log.d(TAG, "onCharacteristicWrite: uuid=${characteristic.uuid} status=$status")
         if (gattOpActive) {
             handler.post {
+                handler.removeCallbacks(gattOpWatchdog)
+                currentGattOp = null
                 gattOpActive = false
                 drainGattQueue()
             }
@@ -643,6 +706,8 @@ class AiDexBleManager(
 
         if (gattOpActive) {
             handler.post {
+                handler.removeCallbacks(gattOpWatchdog)
+                currentGattOp = null
                 gattOpActive = false
                 drainGattQueue()
             }
@@ -878,8 +943,14 @@ class AiDexBleManager(
         val challenge = keyExchange.getChallenge()
         Log.i(TAG, "Key exchange: writing challenge to F001 (${AiDexParser.hexString(challenge)})")
 
-        val service = gatt.getService(SERVICE_F000) ?: return
-        val f001 = service.getCharacteristic(CHAR_F001) ?: return
+        val service = gatt.getService(SERVICE_F000)
+        val f001 = service?.getCharacteristic(CHAR_F001)
+        if (service == null || f001 == null) {
+            Log.e(TAG, "startKeyExchange: SERVICE_F000 or F001 not found — cannot proceed. Triggering recovery.")
+            handler.removeCallbacks(keyExchangeWatchdog)
+            recoverFromServiceDiscoveryFailure()
+            return
+        }
 
         f001.value = challenge
         f001.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
@@ -1255,14 +1326,20 @@ class AiDexBleManager(
             return
         }
 
-        // Validate CRC-16 on decrypted response (log warning but don't reject —
-        // some response types may not have a CRC trailer)
-        if (plaintext.size >= 3 && !Crc16CcittFalse.validateResponse(plaintext)) {
-            Log.d(TAG, "F002: CRC-16 mismatch (len=${plaintext.size}, may not have CRC trailer)")
-        }
+        // Validate CRC-16 on decrypted response.
+        // Known data opcodes (0x21-0x24, 0x26-0x27) always have CRC trailers —
+        // reject on mismatch to prevent processing corrupt data.
+        // Control/ACK opcodes (0x20, 0x25, 0xF0, 0xF2, 0xF3, 0x11) may lack CRC.
+        val crcValid = plaintext.size < 3 || Crc16CcittFalse.validateResponse(plaintext)
 
         val opcode = plaintext[0].toInt() and 0xFF
-        Log.d(TAG, "F002 response: opcode=0x${"%02X".format(opcode)}, len=${plaintext.size}")
+        Log.d(TAG, "F002 response: opcode=0x${"%02X".format(opcode)}, len=${plaintext.size}, crc=$crcValid")
+
+        // For data-carrying opcodes, reject on CRC failure
+        if (!crcValid && opcode in intArrayOf(0x21, 0x22, 0x23, 0x24, 0x26, 0x27)) {
+            Log.e(TAG, "F002: CRC-16 FAILED for data opcode 0x${"%02X".format(opcode)} — rejecting corrupt response")
+            return
+        }
 
         when (opcode) {
             0x21 -> handleDeviceInfoResponse(plaintext)
@@ -1517,6 +1594,7 @@ class AiDexBleManager(
 
     private fun handleHistoryRawResponse(data: ByteArray) {
         if (data.size < 4) return
+        handler.removeCallbacks(historyPageWatchdog)  // Response arrived — cancel page timeout
         // data[1] = status, data[2..] = payload
         val payload = data.copyOfRange(2, data.size)
         val entries = AiDexParser.parseHistoryResponse(payload)
@@ -1580,6 +1658,7 @@ class AiDexBleManager(
 
     private fun handleHistoryBriefResponse(data: ByteArray) {
         if (data.size < 7) return
+        handler.removeCallbacks(historyPageWatchdog)  // Response arrived — cancel page timeout
         val payload = data.copyOfRange(2, data.size)
         val entries = AiDexParser.parseBriefHistoryResponse(payload)
         if (entries.isNotEmpty()) {
@@ -1783,10 +1862,29 @@ class AiDexBleManager(
 
     /**
      * Handle DELETE_BOND (0xF2) response.
+     * If pendingUnpairDisconnect is set, perform the deferred bond removal + disconnect.
      */
     private fun handleDeleteBondResponse(data: ByteArray) {
         val status = if (data.size >= 2) data[1].toInt() and 0xFF else 0xFF
         Log.i(TAG, "DELETE_BOND response: status=0x${"%02X".format(status)}")
+        if (pendingUnpairDisconnect) {
+            pendingUnpairDisconnect = false
+            Log.i(TAG, "DELETE_BOND delivered — performing deferred unpair cleanup")
+            // Remove Android-level bond
+            try {
+                val device = mBluetoothGatt?.device
+                if (device?.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+                    val removeBond = device.javaClass.getMethod("removeBond")
+                    removeBond.invoke(device)
+                    Log.i(TAG, "unpairSensor: BLE bond removed")
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "unpairSensor: removeBond failed: ${t.message}")
+            }
+            keyExchange.reset()
+            softDisconnect()
+            constatstatusstr = "Unpaired"
+        }
     }
 
     // =========================================================================
@@ -1812,6 +1910,9 @@ class AiDexBleManager(
         }
         if (cmd != null) {
             enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+            // Start page timeout — if no response arrives, abort history download
+            handler.removeCallbacks(historyPageWatchdog)
+            handler.postDelayed(historyPageWatchdog, HISTORY_PAGE_TIMEOUT_MS)
         }
     }
 
@@ -1906,6 +2007,10 @@ class AiDexBleManager(
         }
         if (gattQueue.isEmpty()) return
 
+        // Cancel any prior watchdog before starting a new op
+        handler.removeCallbacks(gattOpWatchdog)
+        currentGattOp = null
+
         val next = gattQueue.removeFirst()
         val gatt = mBluetoothGatt
         if (gatt == null) {
@@ -1941,6 +2046,10 @@ class AiDexBleManager(
                     }, NO_RESPONSE_ADVANCE_MS)
                 } else {
                     gattOpActive = ok
+                    if (ok) {
+                        currentGattOp = next
+                        handler.postDelayed(gattOpWatchdog, GATT_OP_TIMEOUT_MS)
+                    }
                 }
                 if (!ok) {
                     handleWriteFailure(next, gatt)
@@ -1957,6 +2066,10 @@ class AiDexBleManager(
                 val ok = gatt.readCharacteristic(characteristic)
                 Log.d(TAG, "GATT read [${next.charUuid}]: ok=$ok")
                 gattOpActive = ok
+                if (ok) {
+                    currentGattOp = next
+                    handler.postDelayed(gattOpWatchdog, GATT_OP_TIMEOUT_MS)
+                }
                 if (!ok) {
                     handleReadFailure(next, gatt)
                 }
@@ -2025,7 +2138,7 @@ class AiDexBleManager(
             recoverFromServiceDiscoveryFailure()
             return
         }
-        mainHandler.postDelayed({
+        handler.postDelayed({
             if (mBluetoothGatt != null && !servicesReady) {
                 Log.i(TAG, "Service discovery retry $discoveryRetryAttempt/$DISCOVERY_MAX_RETRIES")
                 mBluetoothGatt?.discoverServices()
@@ -2044,11 +2157,11 @@ class AiDexBleManager(
         Log.w(TAG, "recoverFromServiceDiscoveryFailure: closing GATT and scheduling reconnect")
         constatstatusstr = "Reconnecting"
         setPhase(Phase.IDLE)
-        // Cancel all pending retry/watchdog callbacks
-        mainHandler.removeCallbacksAndMessages(null)
+        // Cancel all pending retry/watchdog callbacks on worker handler
+        // (discovery retries, key exchange watchdog, etc. are all on handler)
         // Close the GATT cleanly
         close()
-        // Schedule reconnect on the worker handler (not mainHandler which we just cleared)
+        // Schedule reconnect on the worker handler
         val delay = reconnect.nextReconnectDelayMs()
         Log.i(TAG, "Scheduling reconnect after service discovery failure in ${delay}ms")
         handler.postDelayed({ connectDevice(0) }, delay)
@@ -2205,6 +2318,7 @@ class AiDexBleManager(
      * Called when all history pages (both raw and brief) have been downloaded.
      */
     private fun onHistoryDownloadComplete() {
+        handler.removeCallbacks(historyPageWatchdog)  // History done — cancel any pending page timeout
         historyDownloading = false
         historyPhase = HistoryPhase.IDLE
 
@@ -2373,6 +2487,8 @@ class AiDexBleManager(
         Log.i(TAG, "forgetVendor: tearing down native driver for $SerialNumber")
         stop = true
         keyExchange.reset()
+        // Notify C++ layer that this sensor is being removed — prevents zombie resurrection
+        try { finishSensor() } catch (_: Throwable) {}
         // Capture device reference BEFORE nullifying gatt
         val device = mBluetoothGatt?.device
         // Disconnect and close GATT
@@ -2398,8 +2514,7 @@ class AiDexBleManager(
         _isPaused = true  // Block external reconnection triggers (LossOfSensorAlarm, reconnectall)
         stop = true  // Prevent auto-reconnect from disconnect handler
         handler.removeCallbacksAndMessages(null)   // Cancel pending reconnects/timeouts
-        mainHandler.removeCallbacksAndMessages(null)
-        try { mBluetoothGatt?.disconnect() } catch (_: Throwable) {}
+        close()  // SuperGattCallback.close() does disconnect + close + nulls mBluetoothGatt
         setPhase(Phase.IDLE)
         // NOTE: callers set constatstatusstr after calling softDisconnect()
         // (e.g., "Paused", "Unpaired", "Broadcast Only", "Pairing cancelled")
@@ -2460,6 +2575,16 @@ class AiDexBleManager(
 
     override fun startNewSensor(): Boolean {
         Log.i(TAG, "startNewSensor: activating sensor $SerialNumber")
+
+        // Reset history indices — new sensor means history starts from scratch
+        historyRawNextIndex = 0
+        historyBriefNextIndex = 0
+        writeIntPref("historyRawNextIndex", 0)
+        writeIntPref("historyBriefNextIndex", 0)
+        liveOffsetCutoff = 0
+        calibratedGlucoseCache.clear()
+        Log.i(TAG, "startNewSensor: history indices and caches reset")
+
         val cal = Calendar.getInstance(TimeZone.getDefault())
         val tz = TimeZone.getDefault()
         val tzOffsetMs = tz.getOffset(cal.timeInMillis)
@@ -2539,21 +2664,11 @@ class AiDexBleManager(
             constatstatusstr = "Unpaired"
             return true
         }
+        // Set flag BEFORE sending — the response handler (or disconnect handler)
+        // will perform bond removal + disconnect after the command is delivered.
+        pendingUnpairDisconnect = true
         enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
-        // Also remove Android-level bond
-        try {
-            val device = mBluetoothGatt?.device
-            if (device?.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
-                val removeBond = device.javaClass.getMethod("removeBond")
-                removeBond.invoke(device)
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "unpairSensor: removeBond failed: ${t.message}")
-        }
-        keyExchange.reset()
-        // Disconnect GATT and prevent auto-reconnect
-        softDisconnect()
-        constatstatusstr = "Unpaired"
+        constatstatusstr = "Unpairing..."
         return true
     }
 
@@ -2611,7 +2726,6 @@ class AiDexBleManager(
         stop = true
         close()
         handler.removeCallbacksAndMessages(null)
-        mainHandler.removeCallbacksAndMessages(null)
         handlerThread.quitSafely()
     }
 
