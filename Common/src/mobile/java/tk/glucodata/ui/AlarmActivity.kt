@@ -13,13 +13,16 @@ import androidx.core.view.WindowCompat
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
+import tk.glucodata.GlucosePoint
 import tk.glucodata.Natives
 import tk.glucodata.Notify
+import tk.glucodata.SensorBluetooth
 import tk.glucodata.alerts.AlertRepository
 import tk.glucodata.alerts.AlertStateTracker
 import tk.glucodata.alerts.AlertType
 import tk.glucodata.alerts.SnoozeManager
 import tk.glucodata.logic.CustomAlertManager
+import tk.glucodata.logic.TrendEngine
 
 class AlarmActivity : ComponentActivity() {
 
@@ -65,7 +68,7 @@ class AlarmActivity : ComponentActivity() {
                 alarmLabel = model.alarmLabel,
                 supportingText = model.supportingText,
                 severity = model.severity,
-                rate = model.rate,
+                trendResult = model.trendResult,
                 timeText = model.timeText,
                 onSnooze = {
                     Notify.stopalarm()
@@ -107,10 +110,11 @@ class AlarmActivity : ComponentActivity() {
         } catch (_: Throwable) {
             null
         }
-        val rate = selectAlarmRate(
+        val fallbackRate = selectAlarmRate(
             intent.getFloatExtra(EXTRA_RATE, Float.NaN).takeIf { it.isFinite() },
             latestRate
         )
+        val trendResult = computeAlarmTrendResult(fallbackRate)
         val alertType = AlertType.fromId(intent.getIntExtra(EXTRA_ALERT_TYPE_ID, -1))
         val customAlertId = intent.getStringExtra(Notify.EXTRA_CUSTOM_ALERT_ID)
 
@@ -164,7 +168,7 @@ class AlarmActivity : ComponentActivity() {
             alarmLabel = alertLabel,
             supportingText = supportingText,
             severity = severity,
-            rate = rate,
+            trendResult = trendResult,
             timeText = timeText,
             alertType = alertType,
             snoozeMinutes = snoozeMinutes
@@ -217,6 +221,76 @@ class AlarmActivity : ComponentActivity() {
         return latest ?: intent ?: Float.NaN
     }
 
+    private fun computeAlarmTrendResult(fallbackRate: Float): TrendEngine.TrendResult {
+        val isMmol = tk.glucodata.Applic.unit == 1
+        return try {
+            val history = loadAlarmTrendHistory(isMmol)
+            if (history.size >= 2) {
+                val useRaw = resolveAlarmUseRawMode()
+                TrendEngine.calculateTrend(history, useRaw = useRaw, isMmol = isMmol)
+            } else {
+                fallbackAlarmTrendResult(fallbackRate)
+            }
+        } catch (_: Throwable) {
+            fallbackAlarmTrendResult(fallbackRate)
+        }
+    }
+
+    private fun loadAlarmTrendHistory(isMmol: Boolean): List<GlucosePoint> {
+        val recentStartSec = (System.currentTimeMillis() - 20 * 60 * 1000L) / 1000L
+        val historyRaw = Natives.getGlucoseHistory(recentStartSec) ?: return emptyList()
+        val nativePoints = ArrayList<GlucosePoint>(historyRaw.size / 3)
+        for (i in historyRaw.indices step 3) {
+            val timestampMs = historyRaw[i] * 1000L
+            var value = historyRaw[i + 1] / 10.0f
+            var rawValue = historyRaw[i + 2] / 10.0f
+            if (isMmol) {
+                value /= 18.0182f
+                rawValue /= 18.0182f
+            }
+            nativePoints.add(GlucosePoint(timestampMs, value, rawValue))
+        }
+        return nativePoints
+    }
+
+    private fun resolveAlarmUseRawMode(): Boolean {
+        val activeSensorSerial = try {
+            Natives.lastsensorname()
+        } catch (_: Throwable) {
+            null
+        } ?: return false
+
+        return try {
+            synchronized(SensorBluetooth.gattcallbacks) {
+                SensorBluetooth.gattcallbacks.firstOrNull { cb ->
+                    cb.SerialNumber != null && cb.SerialNumber == activeSensorSerial
+                }?.let { cb ->
+                    val viewMode = Natives.getViewMode(cb.dataptr)
+                    viewMode == 1 || viewMode == 3
+                } ?: false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun fallbackAlarmTrendResult(rate: Float): TrendEngine.TrendResult {
+        if (!rate.isFinite()) {
+            return TrendEngine.TrendResult(TrendEngine.TrendState.Unknown, 0f, 0f, 0f, 0f)
+        }
+
+        val state = when {
+            rate > 2.0f -> TrendEngine.TrendState.DoubleUp
+            rate > 1.0f -> TrendEngine.TrendState.SingleUp
+            rate > 0.05f -> TrendEngine.TrendState.FortyFiveUp
+            rate >= -0.05f -> TrendEngine.TrendState.Flat
+            rate >= -1.0f -> TrendEngine.TrendState.FortyFiveDown
+            rate >= -2.0f -> TrendEngine.TrendState.SingleDown
+            else -> TrendEngine.TrendState.DoubleDown
+        }
+        return TrendEngine.TrendResult(state, rate, 0f, 1f, 0f)
+    }
+
     private fun cancelAlarmNotification() {
         (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.cancel(81432)
     }
@@ -243,7 +317,7 @@ class AlarmActivity : ComponentActivity() {
         val alarmLabel: String,
         val supportingText: String,
         val severity: AlarmSeverity,
-        val rate: Float,
+        val trendResult: TrendEngine.TrendResult,
         val timeText: String,
         val alertType: AlertType?,
         val snoozeMinutes: Int

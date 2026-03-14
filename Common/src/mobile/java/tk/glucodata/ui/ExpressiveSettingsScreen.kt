@@ -65,7 +65,6 @@ import tk.glucodata.ui.theme.labelLargeExpressive
 import tk.glucodata.ui.viewmodel.DashboardViewModel
 //import tk.glucodata.ui.components.ExportDataDialog
 import tk.glucodata.ui.components.*
-import tk.glucodata.ui.overlay.FloatingSettingsSheet
 import java.util.Locale
 
 /**
@@ -130,9 +129,6 @@ fun ExpressiveSettingsScreen(
     var showFactoryResetDialog by remember { mutableStateOf(false) }
     var isClearing by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
-    var showAODSettingsSheet by remember { mutableStateOf(false) }
-    var showFloatingSettingsSheet by remember { mutableStateOf(false) }
-    var showNotificationSettingsSheet by remember { mutableStateOf(false) }
     var targetRangeExpanded by rememberSaveable { mutableStateOf(false) }
 
 
@@ -249,23 +245,23 @@ fun ExpressiveSettingsScreen(
                     icon = Icons.Default.ClearAll,
                     iconTint = notifColor,
                     position = CardPosition.MIDDLE,
-                    onClick = { showNotificationSettingsSheet = true }
+                    onClick = { navController.navigate("settings/notification-display") }
                 )
                 SettingsItem(
-                    title = "Floating glucose",
+                    title = stringResource(R.string.floatglucose),
                     subtitle = "Display overlay on other apps",
                     icon = Icons.Default.PictureInPicture,
                     iconTint = notifColor,
                     position = CardPosition.MIDDLE,
-                    onClick = { showFloatingSettingsSheet = true }
+                    onClick = { navController.navigate("settings/floating-display") }
                 )
                 SettingsItem(
-                    title = "Lock Screen (AOD)",
+                    title = "Lock screen (AOD)",
                     subtitle = "Customize always-on display",
                     icon = Icons.Default.Visibility,
                     iconTint = notifColor,
                     position = CardPosition.BOTTOM,
-                    onClick = { showAODSettingsSheet = true }
+                    onClick = { navController.navigate("settings/aod-display") }
                 )
             }
         }
@@ -555,31 +551,6 @@ fun ExpressiveSettingsScreen(
 
     // ... Bottom of function ...
 
-    if (showFloatingSettingsSheet) {
-        FloatingSettingsSheet(
-            viewModel = viewModel,
-            onDismiss = { showFloatingSettingsSheet = false }
-        )
-    }
-
-    if (showAODSettingsSheet) {
-        val sheetState = rememberModalBottomSheetState()
-        AODSettingsSheet(
-            onDismiss = { showAODSettingsSheet = false },
-            sheetState = sheetState,
-            context = context
-        )
-    }
-
-    if (showNotificationSettingsSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        NotificationSettingsSheet(
-            onDismiss = { showNotificationSettingsSheet = false },
-            sheetState = sheetState,
-            context = context,
-            viewModel = viewModel
-        )
-    }
 }
 
 @Composable

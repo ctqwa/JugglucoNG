@@ -17,9 +17,11 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothProfile
+import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import tk.glucodata.Applic
 import tk.glucodata.Log
 import tk.glucodata.Natives
 import tk.glucodata.SuperGattCallback
@@ -67,6 +69,16 @@ class AiDexBleManager(
         val CHAR_F002: UUID = UUID.fromString("0000f002-0000-1000-8000-00805f9b34fb")
         val CHAR_F003: UUID = UUID.fromString("0000f003-0000-1000-8000-00805f9b34fb")
 
+        // Standard BLE: Device Information Service (0x180A)
+        val SERVICE_DIS: UUID = UUID.fromString("0000180a-0000-1000-8000-00805f9b34fb")
+        val CHAR_MODEL_NUMBER: UUID = UUID.fromString("00002a24-0000-1000-8000-00805f9b34fb")
+        val CHAR_SOFTWARE_REV: UUID = UUID.fromString("00002a28-0000-1000-8000-00805f9b34fb")
+        val CHAR_MANUFACTURER: UUID = UUID.fromString("00002a29-0000-1000-8000-00805f9b34fb")
+
+        // Standard BLE: CGM Session Start Time (0x2AAA) under CGM service (0x181F = SERVICE_F000)
+        val CHAR_CGM_SESSION_START: UUID = UUID.fromString("00002aaa-0000-1000-8000-00805f9b34fb")
+        val CHAR_CGM_SESSION_RUN: UUID = UUID.fromString("00002aab-0000-1000-8000-00805f9b34fb")
+
         // -- GATT Queue --
         private const val GATT_OP_MAX_RETRIES = 10
         private const val NO_RESPONSE_ADVANCE_MS = 35L
@@ -85,7 +97,7 @@ class AiDexBleManager(
         private const val MIN_VALID_GLUCOSE_MGDL = 20
         private const val MAX_VALID_GLUCOSE_MGDL = 500
         private const val MAX_OFFSET_DAYS = 30
-        private const val WARMUP_DURATION_MS = 60L * 60_000L  // 1 hour
+        private const val WARMUP_DURATION_MS = 10L * 60_000L  // 10 minutes (matches AiDex sensor warmup)
         private const val HISTORY_SYNC_BATCH_SIZE = 500  // sync to Room every N entries
     }
 
@@ -118,7 +130,7 @@ class AiDexBleManager(
     private sealed class GattOp {
         var retryCount: Int = 0
         data class Write(val charUuid: UUID, val data: ByteArray) : GattOp()
-        data class Read(val charUuid: UUID) : GattOp()
+        data class Read(val charUuid: UUID, val serviceUuid: UUID = SERVICE_F000) : GattOp()
     }
 
     private val gattQueue = ArrayDeque<GattOp>()
@@ -145,16 +157,64 @@ class AiDexBleManager(
         }
     }
 
+    // -- SharedPreferences for per-sensor state persistence --
+    private val prefs by lazy {
+        Applic.app.getSharedPreferences("AiDexNativePrefs", Context.MODE_PRIVATE)
+    }
+
+    private fun prefKey(name: String): String = "${name}_${SerialNumber}"
+
+    private fun readIntPref(name: String, default: Int): Int {
+        val key = prefKey(name)
+        return if (prefs.contains(key)) prefs.getInt(key, default) else default
+    }
+
+    private fun writeIntPref(name: String, value: Int) {
+        prefs.edit().putInt(prefKey(name), value).apply()
+    }
+
     // -- History State --
     @Volatile private var historyDownloading = false
     private var historyRawNextIndex = 0
     private var historyBriefNextIndex = 0
     private var historyNewestOffset = 0
     private var historyStoredCount = 0  // entries stored via aidexProcessData this download
+    private var historyDownloadStartIndex = 0  // snapshot of starting index for progress display
+    private var historyPhase: HistoryPhase = HistoryPhase.IDLE
+
+    init {
+        // Restore persisted history offsets so reconnects only download new data.
+        // Matches the vendor driver's Edit 47 approach (SharedPreferences persistence).
+        historyRawNextIndex = readIntPref("historyRawNextIndex", 0)
+        historyBriefNextIndex = readIntPref("historyBriefNextIndex", 0)
+        if (historyRawNextIndex > 0 || historyBriefNextIndex > 0) {
+            Log.i(TAG, "Restored history offsets: raw=$historyRawNextIndex, brief=$historyBriefNextIndex")
+        }
+    }
+
+    private enum class HistoryPhase {
+        IDLE,
+        DOWNLOADING_CALIBRATED,  // 0x23 (calibrated glucose)
+        DOWNLOADING_RAW,         // 0x24 (ADC/raw data)
+    }
+
+    // -- History Merge Cache --
+    // 0x23 calibrated glucose values, keyed by offset minute.
+    // Populated during 0x23 download, consumed during 0x24 download.
+    // The vendor driver does the same: caches raw ADC by offset, then
+    // merges with calibrated glucose when storing.
+    // Our wire format is swapped: 0x23 = calibrated, 0x24 = raw ADC.
+    private val calibratedGlucoseCache = HashMap<Int, Int>()
 
     // -- F003 Live Data --
     private var lastGlucoseTimeMs: Long = 0L
     private var lastOffsetMinutes: Int = 0
+
+    // -- Calibration State --
+    /** End index of sensor's calibration range (from GET_CALIBRATION_RANGE). */
+    private var calibrationRangeEndIndex: Int = 0
+    /** Whether a calibration download is in progress. */
+    private var calibrationDownloading: Boolean = false
 
     // -- Device Info (0x21) Retry --
     private var deviceInfoRetryCount = 0
@@ -162,16 +222,45 @@ class AiDexBleManager(
     private val DEVICE_INFO_RETRY_DELAY_MS = 3_000L
     @Volatile private var deviceInfoComplete = false
 
+    // -- Reconnection Prevention Flags --
+    // Matches vendor driver's layered defense against unwanted reconnection.
+    // _isPaused blocks external reconnection triggers (LossOfSensorAlarm, reconnectall).
+    // isUnpaired is a persistent flag for UI status display.
+    @Volatile private var _isPaused: Boolean = false
+    @Volatile private var isUnpaired: Boolean = false
+
+    // -- Live Offset Cutoff (History Dedup) --
+    // Tracks the highest offset stored by live F003 readings this session.
+    // History entries at or above this offset are skipped because the live
+    // pipeline already stored them. Matches vendor driver's
+    // vendorHistoryAutoUpdateCutoff mechanism.
+    @Volatile private var liveOffsetCutoff: Int = 0
+
     // -- AiDexDriver State --
     @Volatile private var _batteryMillivolts: Int = 0
     @Volatile private var _sensorExpired: Boolean = false
-    @Volatile private var _wearDays: Int = 14  // default 14-day sensor
+    @Volatile private var _wearDays: Int = 15  // default 15-day sensor (AIDEX_SENSOR_MAX_DAYS)
     @Volatile private var _firmwareVersion: String = ""
     @Volatile private var _hardwareVersion: String = ""
     @Volatile private var _modelName: String = ""
     @Volatile private var _calibrationRecords: List<SharedCalibrationRecord> = emptyList()
     @Volatile private var _viewModeInternal: Int = 0
     @Volatile private var _resetCompensationEnabled: Boolean = false
+
+    // -- Transient Status --
+    /** Temporary status message (e.g., calibration result) that auto-clears after 5 seconds. */
+    @Volatile private var transientStatusMessage: String? = null
+    private val transientStatusClearRunnable = Runnable {
+        transientStatusMessage = null
+        AiDexDriver.deviceListDirty = true
+    }
+
+    private fun showTransientStatus(message: String, durationMs: Long = 5000L) {
+        transientStatusMessage = message
+        AiDexDriver.deviceListDirty = true
+        handler.removeCallbacks(transientStatusClearRunnable)
+        handler.postDelayed(transientStatusClearRunnable, durationMs)
+    }
 
     // -- Listeners --
     /** Called when a live glucose reading is parsed from F003. */
@@ -185,6 +274,10 @@ class AiDexBleManager(
 
     /** Called when calibration records are parsed from 0x27. */
     var onCalibrationRecords: ((List<CalibrationRecord>) -> Unit)? = null
+
+    /** Called when calibration result is received from SET_CALIBRATION (0x25).
+     *  Parameters: (success: Boolean, message: String) */
+    var onCalibrationResult: ((Boolean, String) -> Unit)? = null
 
     /** Called when sensor info is received (activation date, etc.) */
     var onSensorInfo: ((SensorInfo) -> Unit)? = null
@@ -204,6 +297,45 @@ class AiDexBleManager(
 
     override fun getService(): UUID = SERVICE_F000
 
+    /**
+     * Guard against double-connect and unwanted reconnection.
+     *
+     * Multiple paths call connectDevice():
+     *   1. SensorBluetooth init (initializeBluetooth, possiblybluetooth→connectDevices)
+     *   2. LossOfSensorAlarm → reconnectall() → reconnect() → connectDevice(0)
+     *   3. Bluetooth STATE_ON → connectToAllActiveDevices(500)
+     *   4. othersworking() → shouldreconnect() → reconnect()
+     *
+     * The base SuperGattCallback.reconnect() does NOT check the `stop` flag
+     * before calling connectDevice(). We must guard here.
+     *
+     * Guards (matching vendor driver's connectDevice() at line 5595):
+     *   - isPaused / isUnpaired: set by unpairSensor(), softDisconnect()
+     *   - isBroadcastOnlyMode: set after auth failure exhaustion
+     *   - phase != IDLE: already actively connected/connecting
+     *   - mBluetoothGatt != null: GATT handle exists
+     */
+    override fun connectDevice(delayMillis: Long): Boolean {
+        // Guard: paused, unpaired, or broadcast-only — refuse connection
+        if (_isPaused || isUnpaired) {
+            Log.d(TAG, "connectDevice: skip — isPaused=$isPaused isUnpaired=$isUnpaired")
+            return true  // Return true so SensorBluetooth doesn't start a scan
+        }
+        if (reconnect.isBroadcastOnlyMode) {
+            Log.d(TAG, "connectDevice: skip — broadcast-only mode")
+            return false  // Return false: we don't want GATT, but scanning is ok
+        }
+        if (phase != Phase.IDLE) {
+            Log.d(TAG, "connectDevice: skip — already in phase $phase")
+            return true
+        }
+        if (mBluetoothGatt != null) {
+            Log.d(TAG, "connectDevice: skip — GATT already exists")
+            return true
+        }
+        return super.connectDevice(delayMillis)
+    }
+
     // =========================================================================
     // GATT Callbacks
     // =========================================================================
@@ -215,6 +347,8 @@ class AiDexBleManager(
             val now = System.currentTimeMillis()
             connectTime = now
             constatstatusstr = "Connected"
+            _isPaused = false  // Clear paused flag — connection is active
+            liveOffsetCutoff = 0  // Reset live offset cutoff for this connection session
             setPhase(Phase.DISCOVERING_SERVICES)
 
             // Reset per-connection state
@@ -268,6 +402,7 @@ class AiDexBleManager(
             postCccdStreamingPending = false
             historyDownloading = false
             cccdRetryCount = 0
+            discoveryRetryAttempt = 0
 
             // Handle specific failure cases
             when (status) {
@@ -278,8 +413,9 @@ class AiDexBleManager(
                         close()
                         handler.postDelayed({ connectDevice(0) }, delay)
                     } else {
-                        Log.w(TAG, "Auth failures exhausted — broadcast-only mode")
+                        Log.w(TAG, "Auth failures exhausted — broadcast-only fallback")
                         close()
+                        constatstatusstr = "Pairing failed"
                     }
                     return
                 }
@@ -303,6 +439,7 @@ class AiDexBleManager(
                 close()
                 handler.postDelayed({ connectDevice(0) }, delay)
             } else {
+                Log.i(TAG, "Broadcast-only mode — not scheduling reconnect")
                 close()
             }
         }
@@ -316,13 +453,15 @@ class AiDexBleManager(
             return
         }
         if (status != BluetoothGatt.GATT_SUCCESS) {
-            Log.e(TAG, "onServicesDiscovered: failed status=$status")
+            Log.e(TAG, "onServicesDiscovered: failed status=$status — triggering recovery")
+            recoverFromServiceDiscoveryFailure()
             return
         }
 
         val service = gatt.getService(SERVICE_F000)
         if (service == null) {
-            Log.e(TAG, "onServicesDiscovered: SERVICE_F000 (0x181F) not found!")
+            Log.e(TAG, "onServicesDiscovered: SERVICE_F000 (0x181F) not found! Triggering recovery")
+            recoverFromServiceDiscoveryFailure()
             return
         }
 
@@ -446,9 +585,100 @@ class AiDexBleManager(
             }
         }
 
-        if (uuid == CHAR_F002 && data != null && data.size == 17) {
-            // BOND data read response
-            handleBondData(data, gatt)
+        if (status != BluetoothGatt.GATT_SUCCESS || data == null) {
+            Log.w(TAG, "onCharacteristicRead: uuid=$uuid status=$status data=${data?.size}")
+            return
+        }
+
+        when (uuid) {
+            CHAR_F002 -> {
+                if (data.size == 17) handleBondData(data, gatt)
+            }
+            // Device Information Service reads
+            CHAR_MODEL_NUMBER -> {
+                _modelName = String(data, Charsets.UTF_8).trim('\u0000', ' ')
+                Log.i(TAG, "DIS Model Number: $_modelName")
+                applyWearProfileFromModel(_modelName)
+            }
+            CHAR_SOFTWARE_REV -> {
+                _firmwareVersion = String(data, Charsets.UTF_8).trim('\u0000', ' ')
+                Log.i(TAG, "DIS Software Revision: $_firmwareVersion")
+            }
+            CHAR_MANUFACTURER -> {
+                val manufacturer = String(data, Charsets.UTF_8).trim('\u0000', ' ')
+                Log.i(TAG, "DIS Manufacturer Name: $manufacturer")
+            }
+            // CGM Session Start Time (0x2AAA) — parse activation date + compute wear days
+            CHAR_CGM_SESSION_START -> handleCGMSessionStartTime(data)
+            // CGM Session Run Time (0x2AAB) — how long sensor has been running
+            CHAR_CGM_SESSION_RUN -> {
+                if (data.size >= 2) {
+                    val minutes = (data[0].toInt() and 0xFF) or ((data[1].toInt() and 0xFF) shl 8)
+                    Log.i(TAG, "CGM Session Run Time: ${minutes}min = ${minutes / 60}h = ~${minutes / 1440} days")
+                }
+            }
+            else -> Log.d(TAG, "onCharacteristicRead: unknown uuid=$uuid len=${data.size}")
+        }
+    }
+
+    /**
+     * Parse CGM Session Start Time (0x2AAA):
+     * Bytes: year(u16LE), month, day, hour, minute, second, timezone(s8), DST(u8)
+     * Sets sensorstartmsec and computes actual wear days from the sensor.
+     */
+    private fun handleCGMSessionStartTime(data: ByteArray) {
+        if (data.size < 7) {
+            Log.w(TAG, "CGM Session Start Time: too short (${data.size} bytes)")
+            return
+        }
+        val year = (data[0].toInt() and 0xFF) or ((data[1].toInt() and 0xFF) shl 8)
+        val month = data[2].toInt() and 0xFF
+        val day = data[3].toInt() and 0xFF
+        val hour = data[4].toInt() and 0xFF
+        val minute = data[5].toInt() and 0xFF
+        val second = data[6].toInt() and 0xFF
+
+        var tzOffsetSeconds = 0
+        if (data.size >= 9) {
+            val tz = data[7].toInt()  // signed, 15-minute increments
+            val dst = data[8].toInt() and 0xFF
+            tzOffsetSeconds = tz * 15 * 60
+            if (dst == 4) tzOffsetSeconds += 3600  // DST=4 means +1h
+            Log.i(TAG, "CGM Session Start: $year-$month-$day $hour:$minute:$second TZ=${tz * 15}min DST=$dst")
+        } else {
+            Log.i(TAG, "CGM Session Start: $year-$month-$day $hour:$minute:$second (no TZ)")
+        }
+
+        // Construct timestamp
+        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+        cal.set(year, month - 1, day, hour, minute, second)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        // The time in the characteristic is in the sensor's local timezone
+        val startMs = cal.timeInMillis - (tzOffsetSeconds * 1000L)
+
+        if (startMs > 0 && startMs < System.currentTimeMillis() + 86400_000L) {
+            val ageMs = System.currentTimeMillis() - startMs
+            val ageDays = ageMs.toDouble() / 86400_000.0
+            val remainDays = _wearDays - ageDays
+            Log.i(TAG, "CGM Session Start parsed: startMs=$startMs, age=${String.format("%.1f", ageDays)} days, remaining=${String.format("%.1f", remainDays)} days")
+
+            // Push wear days to C++ layer BEFORE start time — aidexSetStartTime
+            // uses info->days to compute wearduration2, so days must be set first
+            try {
+                Natives.aidexSetWearDays(dataptr, _wearDays)
+                Log.i(TAG, "aidexSetWearDays: days=$_wearDays (from CGM Session Start)")
+            } catch (_: Throwable) {}
+
+            // Update sensorstartmsec if not already set or if this is more accurate
+            if (sensorstartmsec <= 0L || kotlin.math.abs(sensorstartmsec - startMs) > 60_000L) {
+                Log.i(TAG, "Updating sensorstartmsec from CGM Session Start: $sensorstartmsec → $startMs")
+                sensorstartmsec = startMs
+                Natives.aidexSetStartTime(dataptr, startMs)
+            }
+
+            // Update expiry
+            val expiryMs = startMs + (_wearDays.toLong() * 24 * 3600_000L)
+            _sensorExpired = System.currentTimeMillis() > expiryMs
         }
     }
 
@@ -483,6 +713,19 @@ class AiDexBleManager(
             }
         } else if (bondState == BluetoothDevice.BOND_BONDING) {
             Log.d(TAG, "bonded() callback: BOND_BONDING — waiting for BOND_BONDED")
+        } else if (bondState == BluetoothDevice.BOND_NONE) {
+            // User cancelled pairing dialog or bonding failed
+            Log.w(TAG, "bonded() callback: BOND_NONE — pairing cancelled/failed")
+            val delay = reconnect.nextAuthFailureDelayMs()
+            if (delay == null) {
+                // Exhausted auth retries — stop trying
+                Log.w(TAG, "Pairing cancelled — max auth failures reached, stopping reconnect")
+                softDisconnect()
+                constatstatusstr = "Pairing cancelled — tap to retry"
+            } else {
+                Log.i(TAG, "Pairing cancelled — attempt ${reconnect.authFailureCount}/${reconnect.maxAuthFailures}, next retry in ${delay}ms")
+                // Don't disconnect here — the GATT disconnect callback will handle reconnect with backoff
+            }
         } else {
             Log.w(TAG, "bonded() callback: unexpected bond state $bondState")
         }
@@ -700,12 +943,36 @@ class AiDexBleManager(
         handler.removeCallbacks(keyExchangeWatchdog)  // Cancel watchdog — key exchange succeeded
         setPhase(Phase.STREAMING)
         reconnect.onConnectionSuccess()
-        constatstatusstr = "Streaming"
-        Log.i(TAG, "Streaming phase entered. Requesting device info + history...")
+        constatstatusstr = "Connected"
+        Log.i(TAG, "Streaming phase entered. Reading device info + requesting history...")
 
-        // Request device info and history range
+        // Read standard BLE characteristics for device info (model, firmware, start time)
+        readDeviceInformationService()
+        readCGMSessionCharacteristics()
+
+        // Request device info via F002 and history range
         requestDeviceInfo()
         handler.postDelayed({ requestHistoryRange() }, 300L)
+    }
+
+    /**
+     * Read Device Information Service (0x180A) characteristics:
+     * Model Number (0x2A24), Software Revision (0x2A28), Manufacturer Name (0x2A29).
+     */
+    private fun readDeviceInformationService() {
+        enqueueGattOp(GattOp.Read(CHAR_MODEL_NUMBER, SERVICE_DIS))
+        enqueueGattOp(GattOp.Read(CHAR_SOFTWARE_REV, SERVICE_DIS))
+        enqueueGattOp(GattOp.Read(CHAR_MANUFACTURER, SERVICE_DIS))
+    }
+
+    /**
+     * Read standard CGM characteristics under service 0x181F (same as SERVICE_F000):
+     * CGM Session Start Time (0x2AAA) — sensor activation date + timezone.
+     * CGM Session Run Time (0x2AAB) — how long the sensor has been running.
+     */
+    private fun readCGMSessionCharacteristics() {
+        enqueueGattOp(GattOp.Read(CHAR_CGM_SESSION_START, SERVICE_F000))
+        enqueueGattOp(GattOp.Read(CHAR_CGM_SESSION_RUN, SERVICE_F000))
     }
 
     // =========================================================================
@@ -724,6 +991,12 @@ class AiDexBleManager(
         }
 
         if (frameType != AiDexParser.FrameType.DATA) {
+            // 13-byte F003 frames appear after calibration commands (opcode 0x0A in logs).
+            // Decrypt and log them — they may be calibration-related notifications.
+            if (encryptedData.size == 13) {
+                handleCalibrationNotificationFrame(encryptedData)
+                return
+            }
             Log.w(TAG, "F003: Unknown frame size ${encryptedData.size}")
             return
         }
@@ -761,6 +1034,12 @@ class AiDexBleManager(
 
         // Update timestamps
         lastGlucoseTimeMs = now
+
+        // Track highest live offset for history dedup — history entries at or above
+        // this offset are already stored by the live pipeline and should be skipped.
+        if (lastOffsetMinutes > liveOffsetCutoff) {
+            liveOffsetCutoff = lastOffsetMinutes
+        }
 
         // Compute all three chart values
         val autoValue = frame.glucoseMgDl
@@ -843,6 +1122,43 @@ class AiDexBleManager(
         }
     }
 
+    /**
+     * Handle a 13-byte F003 frame — observed after calibration commands.
+     *
+     * The log shows frames like `0A EC 33 F1 EE 18 7D D2 ...` (opcode 0x0A) arriving
+     * immediately after SET_CALIBRATION (0x25) is acknowledged. These may be
+     * calibration-related notifications from the sensor confirming internal state changes.
+     *
+     * We decrypt, log, and attempt to parse any useful information.
+     */
+    private fun handleCalibrationNotificationFrame(encryptedData: ByteArray) {
+        val decrypted = keyExchange.decrypt(encryptedData)
+        if (decrypted == null) {
+            Log.d(TAG, "F003: 13-byte frame — cannot decrypt (no session key)")
+            return
+        }
+
+        val opcode = decrypted[0].toInt() and 0xFF
+        Log.i(TAG, "F003: 13-byte notification frame: opcode=0x${"%02X".format(opcode)}, " +
+                "decrypted=${AiDexParser.hexString(decrypted)}")
+
+        // Opcode 0x0A is the only 13-byte F003 opcode we've observed in logs.
+        // It appears to be a calibration state update notification.
+        // For now, log the payload. If the frame contains calibration data in a known
+        // format, we can parse it in the future.
+        when (opcode) {
+            0x0A -> {
+                Log.i(TAG, "F003: Calibration notification (opcode 0x0A, ${decrypted.size} bytes)")
+                // The sensor is confirming it updated its internal calibration state.
+                // We already auto-refresh calibration records after a successful SET_CALIBRATION ACK,
+                // so no additional action is needed here.
+            }
+            else -> {
+                Log.d(TAG, "F003: Unknown 13-byte frame opcode 0x${"%02X".format(opcode)}")
+            }
+        }
+    }
+
     // =========================================================================
     // F002 Command Responses
     // =========================================================================
@@ -881,7 +1197,19 @@ class AiDexBleManager(
             0x27 -> handleCalibrationResponse(plaintext)
             0x11 -> handleBroadcastDataResponse(plaintext)
             0x20 -> handleNewSensorAck(plaintext)
-            else -> Log.d(TAG, "F002: Unknown opcode 0x${"%02X".format(opcode)}")
+            else -> {
+                // AUTO_UPDATE_CALIBRATION detection: sensor pushes unsolicited calibration
+                // data with an unknown opcode. Heuristic: valid CRC, size >= 12 (opcode +
+                // status + startIndex_u16 + at least 1×8-byte calibration record), and the
+                // opcode doesn't match any known command.
+                if (plaintext.size >= 12 && Crc16CcittFalse.validateResponse(plaintext)) {
+                    Log.i(TAG, "F002: Unsolicited push (opcode=0x${"%02X".format(opcode)}): " +
+                            "attempting AUTO_UPDATE_CALIBRATION parse")
+                    handleAutoUpdateCalibration(plaintext)
+                } else {
+                    Log.d(TAG, "F002: Unknown opcode 0x${"%02X".format(opcode)}")
+                }
+            }
         }
     }
 
@@ -973,13 +1301,14 @@ class AiDexBleManager(
                     val now = System.currentTimeMillis()
                     lastOffsetMinutes = ((now - startUtcMs) / 60_000L).toInt()
 
-                    // Persist start time and wear days to native C++ layer
+                    // Persist wear days BEFORE start time — aidexSetStartTime
+                    // uses info->days to compute wearduration2
                     if (dataptr != 0L) {
                         try {
-                            Natives.aidexSetStartTime(dataptr, startUtcMs)
+                            Natives.aidexSetWearDays(dataptr, _wearDays)
                         } catch (_: Throwable) {}
                         try {
-                            Natives.aidexSetWearDays(dataptr, _wearDays)
+                            Natives.aidexSetStartTime(dataptr, startUtcMs)
                         } catch (_: Throwable) {}
                     }
 
@@ -1044,8 +1373,22 @@ class AiDexBleManager(
         historyNewestOffset = newest
         historyStoredCount = 0
         historyDownloading = true
-        constatstatusstr = "Downloading history…"
+        historyDownloadStartIndex = rawStart  // snapshot for progress display
+        historyPhase = HistoryPhase.DOWNLOADING_CALIBRATED
         Log.i(TAG, "History range: briefStart=$briefStart, rawStart=$rawStart, newest=$newest")
+
+        // Snapshot liveOffsetCutoff for history dedup.
+        // If live F003 readings have been stored this session, skip history entries
+        // at or above the cutoff (they're already stored by the live pipeline).
+        // Matches vendor driver's vendorHistoryAutoUpdateCutoff set at history range time.
+        if (liveOffsetCutoff == 0 && newest > 0) {
+            // No live readings yet this session — set cutoff to newest so we don't
+            // skip anything during initial history catch-up.
+            // (liveOffsetCutoff stays 0 — storeHistoryEntries guards on > 0)
+            Log.d(TAG, "History dedup: no live readings yet, liveOffsetCutoff stays 0 (no filtering)")
+        } else if (liveOffsetCutoff > 0) {
+            Log.i(TAG, "History dedup: liveOffsetCutoff=$liveOffsetCutoff (history entries >= this offset will be skipped)")
+        }
 
         // Update sensorstartmsec from the newest offset.
         // This is critical: SuperGattCallback constructor may have set sensorstartmsec to "now"
@@ -1056,13 +1399,39 @@ class AiDexBleManager(
             ensureSensorStartTime(System.currentTimeMillis())
         }
 
-        // Start history download from where we left off
+        // Start history download from where we left off (persisted from previous connection).
+        // Clamp to sensor's valid range.
         if (historyRawNextIndex < rawStart) historyRawNextIndex = rawStart
         if (historyBriefNextIndex < briefStart) historyBriefNextIndex = briefStart
+
+        // Guard: if persisted offset is far ahead of newest (stale data from different sensor),
+        // rewind to the sensor's start.
+        if (historyRawNextIndex > newest + 10) {
+            Log.w(TAG, "historyRawNextIndex=$historyRawNextIndex is ahead of newest=$newest — resetting to rawStart=$rawStart")
+            historyRawNextIndex = rawStart
+        }
+        if (historyBriefNextIndex > newest + 10) {
+            Log.w(TAG, "historyBriefNextIndex=$historyBriefNextIndex is ahead of newest=$newest — resetting to briefStart=$briefStart")
+            historyBriefNextIndex = briefStart
+        }
+
+        historyDownloadStartIndex = historyRawNextIndex  // snapshot for progress display
+        Log.i(TAG, "History download: starting from raw=$historyRawNextIndex, brief=$historyBriefNextIndex (sensor range: $rawStart..$newest)")
 
         // Fetch calibrated history first
         if (historyRawNextIndex <= newest) {
             requestHistoryPage(AiDexOpcodes.GET_HISTORIES_RAW, historyRawNextIndex)
+        } else {
+            // 0x23 already caught up — skip to 0x24 (brief/ADC history)
+            Log.i(TAG, "0x23 already up-to-date (rawNext=$historyRawNextIndex > newest=$newest)")
+            historyPhase = HistoryPhase.DOWNLOADING_RAW
+            if (historyBriefNextIndex <= newest) {
+                requestHistoryPage(AiDexOpcodes.GET_HISTORIES, historyBriefNextIndex)
+            } else {
+                // Both 0x23 and 0x24 already caught up — nothing to download
+                Log.i(TAG, "0x24 also up-to-date (briefNext=$historyBriefNextIndex > newest=$newest). No new history.")
+                onHistoryDownloadComplete()
+            }
         }
     }
 
@@ -1075,19 +1444,39 @@ class AiDexBleManager(
             Log.i(TAG, "History raw (0x23): ${entries.size} entries, offsets ${entries.first().timeOffsetMinutes}..${entries.last().timeOffsetMinutes}")
             onCalibratedHistory?.invoke(entries)
 
-            // Store each entry in native C++ layer.
-            // 0x23 returns factory-calibrated glucose (autoValue). No raw/ADC data.
-            storeHistoryEntries(entries.map { entry ->
-                HistoryStoreEntry(
-                    offsetMinutes = entry.timeOffsetMinutes,
-                    glucoseMgDl = entry.glucoseMgDl.toFloat(),
-                    rawMgDl = 0f,  // 0x23 doesn't have raw ADC data
-                    isValid = !entry.isSentinel,
-                )
-            })
+            // Cache 0x23 calibrated glucose by offset.
+            // DO NOT store yet — wait for 0x24 to provide raw ADC data,
+            // then store BOTH together in a single aidexProcessData call.
+            // This matches the vendor driver's approach (cache raw by offset,
+            // merge when brief history arrives).
+            //
+            // Skip the LAST entry of each page: it's a control/calibration value
+            // embedded by the sensor, not a real glucose reading. These cause
+            // spikes (e.g., 88→366→85) at every 120th offset.
+            var cached = 0
+            var skipped = 0
+            val lastIdx = entries.size - 1
+            for ((idx, entry) in entries.withIndex()) {
+                if (entry.isSentinel) { skipped++; continue }
+                if (idx == lastIdx && entries.size >= 120) {
+                    // Last entry of a full page — likely a control value.
+                    // Verify by checking if it deviates significantly from neighbors.
+                    val prevGlucose = if (idx > 0) entries[idx - 1].glucoseMgDl else entry.glucoseMgDl
+                    val deviation = kotlin.math.abs(entry.glucoseMgDl - prevGlucose)
+                    if (deviation > 50) {
+                        Log.i(TAG, "0x23: skipping control value at offset ${entry.timeOffsetMinutes} " +
+                                "(glucose=${entry.glucoseMgDl}, prev=$prevGlucose, dev=$deviation)")
+                        skipped++
+                        continue
+                    }
+                }
+                calibratedGlucoseCache[entry.timeOffsetMinutes] = entry.glucoseMgDl
+                cached++
+            }
+            Log.i(TAG, "0x23: cached $cached, skipped $skipped (cache size=${calibratedGlucoseCache.size})")
 
             historyRawNextIndex = entries.last().timeOffsetMinutes + 1
-            constatstatusstr = "History: $historyStoredCount entries"
+            writeIntPref("historyRawNextIndex", historyRawNextIndex)
 
             // Fetch next page if more data available
             if (historyRawNextIndex <= historyNewestOffset) {
@@ -1095,7 +1484,9 @@ class AiDexBleManager(
                     requestHistoryPage(AiDexOpcodes.GET_HISTORIES_RAW, historyRawNextIndex)
                 }, HISTORY_REQUEST_DELAY_MS)
             } else {
-                // Raw done — start brief history
+                // 0x23 done — start 0x24 (brief/ADC history)
+                Log.i(TAG, "0x23 complete. ${calibratedGlucoseCache.size} entries cached. Starting 0x24...")
+                historyPhase = HistoryPhase.DOWNLOADING_RAW
                 if (historyBriefNextIndex <= historyNewestOffset) {
                     handler.postDelayed({
                         requestHistoryPage(AiDexOpcodes.GET_HISTORIES, historyBriefNextIndex)
@@ -1115,20 +1506,27 @@ class AiDexBleManager(
             Log.i(TAG, "History brief (0x24): ${entries.size} entries, offsets ${entries.first().timeOffsetMinutes}..${entries.last().timeOffsetMinutes}")
             onAdcHistory?.invoke(entries)
 
-            // Store each entry in native C++ layer.
-            // 0x24 returns raw ADC data: i1, i2, vc. rawValue = i1*10.
-            // Invalid entries have i1==0 && i2==0 && vc==0.
+            // Merge 0x24 raw ADC data with cached 0x23 calibrated glucose.
+            // For each 0x24 entry, look up the corresponding 0x23 glucose by offset.
+            // Store BOTH glucose AND raw in a single aidexProcessData call.
+            // This matches the vendor driver's approach (storeHistoryRecord with both values).
+            var merged = 0
+            var rawOnly = 0
             storeHistoryEntries(entries.map { entry ->
+                val cachedGlucose = calibratedGlucoseCache.remove(entry.timeOffsetMinutes)
+                if (cachedGlucose != null) merged++ else rawOnly++
                 HistoryStoreEntry(
                     offsetMinutes = entry.timeOffsetMinutes,
-                    glucoseMgDl = 0f,  // 0x24 doesn't have calibrated glucose
+                    glucoseMgDl = cachedGlucose?.toFloat() ?: 0f,
                     rawMgDl = entry.rawValue,  // i1 * 10, matches Android selectVendorRawLane()
                     isValid = !(entry.i1 == 0f && entry.i2 == 0f && entry.vc == 0f),
                 )
             })
 
+            Log.i(TAG, "0x24: merged=$merged rawOnly=$rawOnly (cache remaining=${calibratedGlucoseCache.size})")
+
             historyBriefNextIndex = entries.last().timeOffsetMinutes + 1
-            constatstatusstr = "History: $historyStoredCount entries"
+            writeIntPref("historyBriefNextIndex", historyBriefNextIndex)
 
             // Fetch next page
             if (historyBriefNextIndex <= historyNewestOffset) {
@@ -1142,9 +1540,33 @@ class AiDexBleManager(
     }
 
     private fun handleCalibrationAck(data: ByteArray) {
-        if (data.size < 2) return
+        if (data.size < 2) {
+            Log.w(TAG, "Calibration ACK too short: ${data.size} bytes")
+            onCalibrationResult?.invoke(false, "Invalid calibration response from sensor")
+            return
+        }
         val statusByte = data[1].toInt() and 0xFF
         Log.i(TAG, "Calibration ACK: status=0x${"%02X".format(statusByte)}")
+
+        if (statusByte == 0x01) {
+            // Success — sensor accepted the calibration
+            onCalibrationResult?.invoke(true, "Calibration accepted by sensor")
+            showTransientStatus("Calibration accepted")
+            // Auto-refresh calibration records to include the new one
+            handler.postDelayed({
+                val cmd = commandBuilder.getCalibrationRange()
+                if (cmd != null) {
+                    Log.i(TAG, "Auto-refreshing calibration records after successful calibration")
+                    enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+                }
+            }, 200L)
+        } else {
+            onCalibrationResult?.invoke(
+                false,
+                "Sensor rejected calibration (status: 0x${"%02X".format(statusByte)})"
+            )
+            showTransientStatus("Calibration failed")
+        }
     }
 
     private fun handleCalibrationRangeResponse(data: ByteArray) {
@@ -1153,20 +1575,95 @@ class AiDexBleManager(
         val endIndex = u16LE(data, 4)
         Log.i(TAG, "Calibration range: start=$startIndex, end=$endIndex")
 
-        // Fetch calibration records
-        if (startIndex <= endIndex) {
-            requestCalibration(startIndex)
+        calibrationRangeEndIndex = endIndex
+
+        if (endIndex <= 0 || startIndex > endIndex) {
+            Log.i(TAG, "No calibration records available (start=$startIndex, end=$endIndex)")
+            return
         }
+
+        // Fetch all calibration records, starting from startIndex, chaining through endIndex
+        calibrationDownloading = true
+        requestCalibrationPaginated(startIndex, endIndex)
     }
 
     private fun handleCalibrationResponse(data: ByteArray) {
         if (data.size < 10) return
-        val payload = data.copyOfRange(2, data.size)
+        // Strip opcode (1 byte) + status (1 byte) from front and CRC-16 (2 bytes) from end
+        val crcEnd = if (data.size >= 4) data.size - 2 else data.size
+        val payload = data.copyOfRange(2, crcEnd)
+        Log.d(TAG, "Calibration payload: ${payload.size} bytes, hex=${AiDexParser.hexString(payload)}")
         val records = AiDexParser.parseCalibrationResponse(payload)
         if (records.isNotEmpty()) {
             Log.i(TAG, "Calibration records: ${records.size} entries")
             onCalibrationRecords?.invoke(records)
+
+            // Merge new records into existing list (dedup by index), then convert
+            // native CalibrationRecord → shared CalibrationRecord for UI.
+            mergeCalibrationRecords(records)
         }
+    }
+
+    /**
+     * Merge new native calibration records into the shared calibration record list,
+     * deduplicating by index. Converts native → shared type and sorts by index.
+     */
+    private fun mergeCalibrationRecords(newRecords: List<CalibrationRecord>) {
+        val existingByIndex = _calibrationRecords.associateBy { it.index }.toMutableMap()
+
+        for (rec in newRecords) {
+            val timestampMs = if (sensorstartmsec > 0L)
+                sensorstartmsec + rec.timeOffsetMinutes.toLong() * 60_000L
+            else 0L
+            val valid = rec.timeOffsetMinutes > 0 &&
+                    rec.timeOffsetMinutes.toLong() <= (MAX_OFFSET_DAYS * 24L * 60L) &&
+                    rec.referenceGlucoseMgDl in MIN_VALID_GLUCOSE_MGDL..MAX_VALID_GLUCOSE_MGDL
+            existingByIndex[rec.index] = SharedCalibrationRecord(
+                index = rec.index,
+                timeOffsetMinutes = rec.timeOffsetMinutes,
+                referenceGlucoseMgDl = rec.referenceGlucoseMgDl,
+                cf = rec.calibrationFactor,
+                offset = rec.calibrationOffset,
+                isValid = valid,
+                timestampMs = timestampMs,
+            )
+
+            Log.d(TAG, "CALIBRATION: index=${rec.index} glucose=${rec.referenceGlucoseMgDl}mg/dL " +
+                    "offset=${rec.timeOffsetMinutes}min cf=${String.format("%.2f", rec.calibrationFactor)} " +
+                    "calOffset=${String.format("%.2f", rec.calibrationOffset)} valid=$valid")
+        }
+
+        _calibrationRecords = existingByIndex.values.sortedBy { it.index }
+        Log.i(TAG, "Stored ${_calibrationRecords.size} calibration records for UI")
+    }
+
+    /**
+     * Handle AUTO_UPDATE_CALIBRATION — unsolicited calibration push from sensor.
+     *
+     * The sensor pushes calibration data when its internal calibration state changes.
+     * Same payload format as GET_CALIBRATION response: [opcode, status, startIndex_u16LE,
+     * N×8-byte calibration records, CRC-16 trailer].
+     */
+    private fun handleAutoUpdateCalibration(data: ByteArray) {
+        if (data.size < 12) return
+
+        // Strip opcode + status (2 bytes) from front, CRC-16 (2 bytes) from end
+        val payloadEnd = data.size - 2
+        if (payloadEnd <= 2) {
+            Log.d(TAG, "AUTO_UPDATE_CALIBRATION: no payload")
+            return
+        }
+        val payload = data.copyOfRange(2, payloadEnd)
+
+        val records = AiDexParser.parseCalibrationResponse(payload)
+        if (records.isEmpty()) {
+            Log.d(TAG, "AUTO_UPDATE_CALIBRATION: no records parsed from ${payload.size} bytes")
+            return
+        }
+
+        Log.i(TAG, "AUTO_UPDATE_CALIBRATION: received ${records.size} record(s)")
+        onCalibrationRecords?.invoke(records)
+        mergeCalibrationRecords(records)
     }
 
     private fun handleNewSensorAck(data: ByteArray) {
@@ -1204,6 +1701,32 @@ class AiDexBleManager(
     private fun requestCalibration(index: Int) {
         val cmd = commandBuilder.getCalibration(index) ?: return
         enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+    }
+
+    /**
+     * Fetch calibration records one index at a time from [currentIndex] through [lastIndex],
+     * with 100ms delay between requests (matching Android vendor driver's Thread.sleep(100)).
+     */
+    private fun requestCalibrationPaginated(currentIndex: Int, lastIndex: Int) {
+        requestCalibration(currentIndex)
+
+        // The response handler (handleCalibrationResponse) will parse and store records.
+        // Chain to next index after a delay. We track progress via calibrationRangeEndIndex.
+        // Note: The F002 response dispatch will call handleCalibrationResponse which
+        // stores records. We chain the next request after a delay here.
+        val nextIndex = currentIndex + 1
+        if (nextIndex <= lastIndex) {
+            handler.postDelayed({
+                requestCalibrationPaginated(nextIndex, lastIndex)
+            }, 100L)
+        } else {
+            // Last request sent — mark download complete after a brief delay
+            // to let the response arrive and be processed.
+            handler.postDelayed({
+                calibrationDownloading = false
+                Log.i(TAG, "Calibration download complete: ${_calibrationRecords.size} records stored")
+            }, 500L)
+        }
     }
 
     // -- Public Command Methods --
@@ -1307,10 +1830,10 @@ class AiDexBleManager(
                 }
             }
             is GattOp.Read -> {
-                val service = gatt.getService(SERVICE_F000)
+                val service = gatt.getService(next.serviceUuid)
                 val characteristic = service?.getCharacteristic(next.charUuid)
                 if (characteristic == null) {
-                    Log.w(TAG, "GATT read: characteristic ${next.charUuid} not found, skipping")
+                    Log.w(TAG, "GATT read: characteristic ${next.charUuid} not found in service ${next.serviceUuid}, skipping")
                     drainGattQueue()
                     return
                 }
@@ -1367,18 +1890,51 @@ class AiDexBleManager(
     }
 
     // =========================================================================
-    // Service Discovery Retry
+    // Service Discovery Retry + Watchdog
     // =========================================================================
 
+    private var discoveryRetryAttempt = 0
+
     private fun scheduleDiscoveryRetries(gatt: BluetoothGatt) {
-        for (attempt in 1..DISCOVERY_MAX_RETRIES) {
-            mainHandler.postDelayed({
-                if (mBluetoothGatt != null && !servicesReady) {
-                    Log.i(TAG, "Service discovery retry $attempt/$DISCOVERY_MAX_RETRIES")
-                    mBluetoothGatt?.discoverServices()
-                }
-            }, DISCOVERY_RETRY_DELAY_MS * attempt)
+        discoveryRetryAttempt = 0
+        scheduleNextDiscoveryRetry(gatt)
+    }
+
+    private fun scheduleNextDiscoveryRetry(gatt: BluetoothGatt) {
+        discoveryRetryAttempt++
+        if (discoveryRetryAttempt > DISCOVERY_MAX_RETRIES) {
+            // All retries exhausted — disconnect and reconnect cleanly
+            Log.w(TAG, "Service discovery retries exhausted ($DISCOVERY_MAX_RETRIES). Disconnecting and scheduling reconnect.")
+            recoverFromServiceDiscoveryFailure()
+            return
         }
+        mainHandler.postDelayed({
+            if (mBluetoothGatt != null && !servicesReady) {
+                Log.i(TAG, "Service discovery retry $discoveryRetryAttempt/$DISCOVERY_MAX_RETRIES")
+                mBluetoothGatt?.discoverServices()
+                // Schedule next retry (or the final recovery)
+                scheduleNextDiscoveryRetry(gatt)
+            }
+        }, DISCOVERY_RETRY_DELAY_MS)
+    }
+
+    /**
+     * Called when service discovery fails after all retries.
+     * Disconnects, closes, and schedules a reconnect — preventing the zombie state
+     * where the driver has a GATT object but services never became ready.
+     */
+    private fun recoverFromServiceDiscoveryFailure() {
+        Log.w(TAG, "recoverFromServiceDiscoveryFailure: closing GATT and scheduling reconnect")
+        constatstatusstr = "Reconnecting"
+        setPhase(Phase.IDLE)
+        // Cancel all pending retry/watchdog callbacks
+        mainHandler.removeCallbacksAndMessages(null)
+        // Close the GATT cleanly
+        close()
+        // Schedule reconnect on the worker handler (not mainHandler which we just cleared)
+        val delay = reconnect.nextReconnectDelayMs()
+        Log.i(TAG, "Scheduling reconnect after service discovery failure in ${delay}ms")
+        handler.postDelayed({ connectDevice(0) }, delay)
     }
 
     // =========================================================================
@@ -1413,6 +1969,11 @@ class AiDexBleManager(
                 sensorstartmsec = inferredStart
                 Log.i(TAG, "Updated sensorstartmsec from offset: ${lastOffsetMinutes}min → $inferredStart")
                 if (dataptr != 0L) {
+                    // Push wear days BEFORE start time — aidexSetStartTime
+                    // uses info->days to compute wearduration2
+                    try {
+                        Natives.aidexSetWearDays(dataptr, _wearDays)
+                    } catch (_: Throwable) {}
                     try {
                         Natives.aidexSetStartTime(dataptr, sensorstartmsec)
                     } catch (_: Throwable) {}
@@ -1423,9 +1984,18 @@ class AiDexBleManager(
             Log.i(TAG, "Fallback sensorstartmsec = now ($now)")
             if (dataptr != 0L) {
                 try {
+                    Natives.aidexSetWearDays(dataptr, _wearDays)
+                } catch (_: Throwable) {}
+                try {
                     Natives.aidexSetStartTime(dataptr, sensorstartmsec)
                 } catch (_: Throwable) {}
             }
+        }
+
+        // Update local expiry state whenever start time is set
+        if (sensorstartmsec > 0L) {
+            val expiryMs = sensorstartmsec + (_wearDays.toLong() * 24 * 3600_000L)
+            _sensorExpired = now > expiryMs
         }
     }
 
@@ -1462,6 +2032,14 @@ class AiDexBleManager(
             if (entry.offsetMinutes <= 0) continue
             if (entry.offsetMinutes.toLong() > MAX_OFFSET_DAYS * 24L * 60L) continue
 
+            // Skip entries beyond the sensor's reported newest offset — these contain
+            // uninitialized/corrupt data from the sensor's ring buffer write head.
+            if (historyNewestOffset > 0 && entry.offsetMinutes > historyNewestOffset) continue
+
+            // Skip entries at or above liveOffsetCutoff — these are already stored by
+            // the live F003 pipeline. Matches vendor driver's vendorHistoryAutoUpdateCutoff.
+            if (liveOffsetCutoff > 0 && entry.offsetMinutes >= liveOffsetCutoff) continue
+
             // Filter ADC saturation sentinel (≥1023 for calibrated, but raw can be higher)
             val glucoseInt = entry.glucoseMgDl.toInt()
             if (glucoseInt >= 1023 && entry.glucoseMgDl > 0f) continue
@@ -1472,7 +2050,7 @@ class AiDexBleManager(
             // Compute timestamp
             val historicalTimeMs = sensorstartmsec + (entry.offsetMinutes.toLong() * 60_000L)
 
-            // Warmup gate: skip readings from within first hour after sensor start
+            // Warmup gate: skip readings from within first 10 minutes after sensor start
             val sensorAgeAtRecordMs = historicalTimeMs - sensorstartmsec
             if (sensorAgeAtRecordMs in 0 until WARMUP_DURATION_MS) continue
 
@@ -1511,7 +2089,14 @@ class AiDexBleManager(
      */
     private fun onHistoryDownloadComplete() {
         historyDownloading = false
-        constatstatusstr = if (historyStoredCount > 0) "Streaming ($historyStoredCount history)" else "Streaming"
+        historyPhase = HistoryPhase.IDLE
+
+        // Log any remaining cached 0x23 entries that had no matching 0x24
+        if (calibratedGlucoseCache.isNotEmpty()) {
+            Log.i(TAG, "History complete: ${calibratedGlucoseCache.size} cached 0x23 entries had no matching 0x24")
+            calibratedGlucoseCache.clear()
+        }
+
         Log.i(TAG, "History download complete. Total entries stored: $historyStoredCount")
 
         // Final sync to Room DB
@@ -1552,7 +2137,7 @@ class AiDexBleManager(
         val normalized = modelName.trim().uppercase(java.util.Locale.US)
         _wearDays = when {
             normalized.startsWith("GX-01S") -> 15
-            else -> 14
+            else -> 15
         }
         Log.i(TAG, "Wear profile: model=$modelName days=$_wearDays")
     }
@@ -1561,16 +2146,72 @@ class AiDexBleManager(
     // AiDexDriver Interface Implementation
     // =========================================================================
 
-    override fun getDetailedBleStatus(): String = when (phase) {
-        Phase.IDLE -> "Disconnected"
-        Phase.GATT_CONNECTING -> "Connecting..."
-        Phase.DISCOVERING_SERVICES -> "Discovering services..."
-        Phase.CCCD_CHAIN -> "Configuring notifications..."
-        Phase.KEY_EXCHANGE -> "Key exchange..."
-        Phase.STREAMING -> if (reconnect.isBroadcastOnlyMode) "Broadcast Mode" else "Connected"
+    override fun getDetailedBleStatus(): String {
+        val now = System.currentTimeMillis()
+
+        return when (phase) {
+            Phase.IDLE -> {
+                if (isUnpaired || constatstatusstr == "Unpaired") "Unpaired — tap Pair to reconnect"
+                else if (stop && !reconnect.isBroadcastOnlyMode) "Paused"
+                else if (reconnect.isBroadcastOnlyMode) "Pairing failed — tap to retry"
+                else constatstatusstr ?: "Disconnected"
+            }
+            Phase.GATT_CONNECTING -> "Connecting..."
+            Phase.DISCOVERING_SERVICES -> {
+                val bondState = mBluetoothGatt?.device?.bondState
+                    ?: android.bluetooth.BluetoothDevice.BOND_NONE
+                when (bondState) {
+                    android.bluetooth.BluetoothDevice.BOND_BONDING -> "Bonding..."
+                    android.bluetooth.BluetoothDevice.BOND_NONE -> "Pairing..."
+                    else -> "Discovering services..."
+                }
+            }
+            Phase.CCCD_CHAIN -> "Configuring notifications..."
+            Phase.KEY_EXCHANGE -> "Key exchange..."
+            Phase.STREAMING -> {
+                if (reconnect.isBroadcastOnlyMode) return "Broadcast Mode"
+
+                // Transient status (calibration result, etc.) takes priority
+                transientStatusMessage?.let { return it }
+
+                // History download in progress — show phase and progress
+                if (historyDownloading) {
+                    val toDownload = historyNewestOffset - historyDownloadStartIndex
+                    return when (historyPhase) {
+                        HistoryPhase.DOWNLOADING_CALIBRATED -> {
+                            val cached = calibratedGlucoseCache.size
+                            if (toDownload > 0 && cached > 0)
+                                "Fetching history... $cached/$toDownload"
+                            else
+                                "Fetching history..."
+                        }
+                        HistoryPhase.DOWNLOADING_RAW -> {
+                            if (toDownload > 0 && historyStoredCount > 0)
+                                "Storing history... $historyStoredCount/$toDownload"
+                            else
+                                "Storing history..."
+                        }
+                        HistoryPhase.IDLE -> "Fetching history..."
+                    }
+                }
+
+                // Warmup countdown (first 10 minutes after sensor activation)
+                val startMs = sensorstartmsec
+                if (startMs > 0) {
+                    val ageMin = (now - startMs) / 60_000L
+                    if (ageMin in 0 until 10) {
+                        val remaining = 10 - ageMin
+                        return "Connected — Warmup ${remaining}m"
+                    }
+                }
+
+                // Normal connected state
+                "Connected"
+            }
+        }
     }
 
-    override val isPaused: Boolean get() = stop
+    override val isPaused: Boolean get() = _isPaused || stop
 
     override val broadcastOnlyConnection: Boolean get() = reconnect.isBroadcastOnlyMode
 
@@ -1637,17 +2278,21 @@ class AiDexBleManager(
 
     override fun softDisconnect() {
         Log.i(TAG, "softDisconnect: pausing sensor $SerialNumber")
+        _isPaused = true  // Block external reconnection triggers (LossOfSensorAlarm, reconnectall)
         stop = true  // Prevent auto-reconnect from disconnect handler
         handler.removeCallbacksAndMessages(null)   // Cancel pending reconnects/timeouts
         mainHandler.removeCallbacksAndMessages(null)
         try { mBluetoothGatt?.disconnect() } catch (_: Throwable) {}
         setPhase(Phase.IDLE)
-        constatstatusstr = "Paused"
+        // NOTE: callers set constatstatusstr after calling softDisconnect()
+        // (e.g., "Paused", "Unpaired", "Broadcast Only", "Pairing cancelled")
     }
 
     override fun manualReconnectNow() {
         Log.i(TAG, "manualReconnectNow: forcing reconnect for $SerialNumber")
-        reconnect.reset()
+        _isPaused = false   // Clear paused flag — user explicitly wants reconnection
+        isUnpaired = false // Clear unpaired flag — user explicitly wants reconnection
+        reconnect.reset()  // Clears isBroadcastOnlyMode + authFailureCount
         stop = false
         connectDevice(0L)
         AiDexDriver.deviceListDirty = true
@@ -1700,19 +2345,62 @@ class AiDexBleManager(
 
     override fun calibrateSensor(glucoseMgDl: Int): Boolean {
         Log.i(TAG, "calibrateSensor($glucoseMgDl mg/dL) for $SerialNumber")
-        if (lastOffsetMinutes <= 0) {
-            Log.e(TAG, "calibrateSensor: no offset available yet")
+
+        // Guard: session key must be available (encryption required)
+        if (!keyExchange.isComplete) {
+            Log.e(TAG, "calibrateSensor: session key not available (handshake not complete)")
+            onCalibrationResult?.invoke(false, "Cannot calibrate: not connected to sensor")
             return false
         }
+
+        // Guard: must not be in warmup
+        if (sensorstartmsec > 0L) {
+            val warmupEndMs = sensorstartmsec + WARMUP_DURATION_MS
+            val now = System.currentTimeMillis()
+            if (now < warmupEndMs) {
+                val remainingSec = ((warmupEndMs - now) / 1000).toInt()
+                Log.e(TAG, "calibrateSensor: sensor is warming up (${remainingSec}s remaining)")
+                onCalibrationResult?.invoke(false, "Cannot calibrate: sensor warming up ($remainingSec seconds remaining)")
+                return false
+            }
+        }
+
+        // Guard: must have current offset
+        if (lastOffsetMinutes <= 0) {
+            Log.e(TAG, "calibrateSensor: no offset available yet")
+            onCalibrationResult?.invoke(false, "Cannot calibrate: no sensor offset available yet")
+            return false
+        }
+
+        // Guard: glucose must be in valid range
+        if (glucoseMgDl < 30 || glucoseMgDl > 500) {
+            Log.e(TAG, "calibrateSensor: glucose $glucoseMgDl out of range (30-500)")
+            onCalibrationResult?.invoke(false, "Cannot calibrate: glucose value $glucoseMgDl out of range (30-500 mg/dL)")
+            return false
+        }
+
         sendCalibration(lastOffsetMinutes, glucoseMgDl)
+        showTransientStatus("Calibrating...", 10_000L)  // Show until ACK arrives (or 10s timeout)
         return true
     }
 
     override fun unpairSensor(): Boolean {
         Log.i(TAG, "unpairSensor: sending deleteBond (0xF2) for $SerialNumber")
+        isUnpaired = true  // Block reconnection permanently until re-pair
         val cmd = commandBuilder.deleteBond() ?: run {
-            Log.e(TAG, "unpairSensor: session key not available")
-            return false
+            Log.e(TAG, "unpairSensor: session key not available — disconnecting without 0xF2")
+            // Even without session key, disconnect and remove bond
+            try {
+                val device = mBluetoothGatt?.device
+                if (device?.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+                    val removeBond = device.javaClass.getMethod("removeBond")
+                    removeBond.invoke(device)
+                }
+            } catch (_: Throwable) {}
+            keyExchange.reset()
+            softDisconnect()
+            constatstatusstr = "Unpaired"
+            return true
         }
         enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
         // Also remove Android-level bond
@@ -1726,6 +2414,9 @@ class AiDexBleManager(
             Log.w(TAG, "unpairSensor: removeBond failed: ${t.message}")
         }
         keyExchange.reset()
+        // Disconnect GATT and prevent auto-reconnect
+        softDisconnect()
+        constatstatusstr = "Unpaired"
         return true
     }
 
@@ -1733,7 +2424,10 @@ class AiDexBleManager(
         Log.i(TAG, "rePairSensor: resetting key exchange and reconnecting for $SerialNumber")
         keyExchange.reset()
         softDisconnect()
+        constatstatusstr = "Re-pairing..."
         handler.postDelayed({
+            _isPaused = false   // Clear paused flag — user explicitly wants re-pair
+            isUnpaired = false // Clear unpaired flag — user explicitly wants re-pair
             stop = false
             connectDevice(500L)
         }, 1000L)

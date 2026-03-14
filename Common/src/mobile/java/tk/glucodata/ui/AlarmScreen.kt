@@ -61,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import tk.glucodata.Natives
-import tk.glucodata.Applic
 import tk.glucodata.R
 import tk.glucodata.logic.TrendEngine
 import tk.glucodata.ui.components.TrendIndicator
@@ -90,15 +89,13 @@ fun AlarmScreen(
     alarmLabel: String,
     supportingText: String,
     severity: AlarmSeverity,
-    rate: Float,
+    trendResult: TrendEngine.TrendResult,
     timeText: String,
     onSnooze: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val colorScheme = remember(severity) { severityColorScheme(severity) }
-    val normalizedRate = remember(rate) { normalizeAlarmRate(rate) }
-    val trend = remember(normalizedRate) { resolveTrend(normalizedRate) }
-    val trendResult = remember(normalizedRate) { alarmTrendResult(normalizedRate) }
+    val trend = remember(trendResult) { resolveTrend(trendResult) }
 
     MaterialTheme(colorScheme = colorScheme, typography = AppTypography) {
         val typographyChoice = rememberAlarmTypographyChoice()
@@ -469,52 +466,26 @@ private fun severityColorScheme(severity: AlarmSeverity) = when (severity) {
     )
 }
 
-private fun resolveTrend(rate: Float): Trend {
-    if (rate.isNaN()) {
+private fun resolveTrend(trendResult: TrendEngine.TrendResult): Trend {
+    val velocity = trendResult.velocity
+    if (!velocity.isFinite() || trendResult.state == TrendEngine.TrendState.Unknown) {
         return Trend(TrendDirection.UNKNOWN, null, "", 0)
     }
 
-    val label = Natives.getxDripTrendName(rate)
-    return when {
-        rate >= 0.05f -> Trend(TrendDirection.UP, Icons.AutoMirrored.Rounded.TrendingUp, label, -1)
-        rate > -0.05f -> Trend(TrendDirection.FLAT, Icons.AutoMirrored.Rounded.TrendingFlat, label, 0)
-        else -> Trend(TrendDirection.DOWN, Icons.AutoMirrored.Rounded.TrendingDown, label, 1)
-    }
-}
+    val label = Natives.getxDripTrendName(velocity)
+    return when (trendResult.state) {
+        TrendEngine.TrendState.DoubleUp,
+        TrendEngine.TrendState.SingleUp,
+        TrendEngine.TrendState.FortyFiveUp -> Trend(TrendDirection.UP, Icons.AutoMirrored.Rounded.TrendingUp, label, -1)
 
-private fun normalizeAlarmRate(rate: Float): Float {
-    if (rate.isNaN()) {
-        return Float.NaN
-    }
-    val unitAdjusted = if (Applic.unit == 1) rate * 18.0182f else rate
-    val nativeAdjusted = try {
-        Natives.thresholdchange(rate)
-    } catch (_: Throwable) {
-        Float.NaN
-    }
-    return when {
-        nativeAdjusted.isFinite() && kotlin.math.abs(nativeAdjusted) > kotlin.math.abs(unitAdjusted) -> nativeAdjusted
-        unitAdjusted.isFinite() -> unitAdjusted
-        else -> nativeAdjusted
-    }
-}
+        TrendEngine.TrendState.Flat -> Trend(TrendDirection.FLAT, Icons.AutoMirrored.Rounded.TrendingFlat, label, 0)
 
-private fun alarmTrendResult(rate: Float): TrendEngine.TrendResult {
-    if (rate.isNaN()) {
-        return TrendEngine.TrendResult(TrendEngine.TrendState.Unknown, 0f, 0f, 0f, 0f)
-    }
+        TrendEngine.TrendState.FortyFiveDown,
+        TrendEngine.TrendState.SingleDown,
+        TrendEngine.TrendState.DoubleDown -> Trend(TrendDirection.DOWN, Icons.AutoMirrored.Rounded.TrendingDown, label, 1)
 
-    val state = when {
-        rate > 2.0f -> TrendEngine.TrendState.DoubleUp
-        rate > 1.0f -> TrendEngine.TrendState.SingleUp
-        rate > 0.05f -> TrendEngine.TrendState.FortyFiveUp
-        rate >= -0.05f -> TrendEngine.TrendState.Flat
-        rate >= -1.0f -> TrendEngine.TrendState.FortyFiveDown
-        rate >= -2.0f -> TrendEngine.TrendState.SingleDown
-        else -> TrendEngine.TrendState.DoubleDown
+        TrendEngine.TrendState.Unknown -> Trend(TrendDirection.UNKNOWN, null, "", 0)
     }
-
-    return TrendEngine.TrendResult(state, rate, 0f, 1f, 0f)
 }
 
 private fun formatAlarmLabel(words: List<String>): String {

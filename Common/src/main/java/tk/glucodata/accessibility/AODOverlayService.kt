@@ -30,7 +30,6 @@ import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.strGlucose
 import java.util.Locale
-import kotlin.random.Random
 
 class AODOverlayService : AccessibilityService(), SensorEventListener {
 
@@ -47,9 +46,10 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
     private var isScreenOn = true
     private var isLocked = false
     
-    // Burn-in protection state
+    // Keep lock-screen position stable for the whole visible session.
     private var xOffset = 0
     private var yOffset = 0
+    private var currentOverlayPosition = "TOP"
 
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -107,11 +107,8 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
     
     private fun checkAndUpdateLockState() {
         val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
-        val wasLocked = isLocked
         isLocked = keyguardManager.isKeyguardLocked
-        if (wasLocked != isLocked) {
-            updateVisibility()
-        }
+        updateVisibility()
     }
 
     private val updateRunnable = object : Runnable {
@@ -152,8 +149,9 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
     }
 
     private fun updateVisibility() {
-        // Show if locked OR screen is off (e.g. timeout grace period before lock)
-        val shouldShow = isLocked || !isScreenOn
+        // Only show while the device is actually locked. Showing on mere screen-off can
+        // leave stale overlays hanging around during unlock transitions.
+        val shouldShow = isLocked
         
         if (shouldShow) {
             showOverlay()
@@ -221,9 +219,10 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             try {
                 windowManager?.addView(overlayView, params)
             } catch (e: Exception) {}
+            chooseOverlayPosition()
         }
         updateOverlayContent()
-        applyBurnInProtection()
+        applyBurnInProtection(force = true)
         
         // Cache opacity preference (avoid reading SharedPrefs in sensor callback)
         val prefs = getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
@@ -252,19 +251,24 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             } catch (e: Exception) {}
             overlayView = null
             params = null
+            currentOverlayPosition = "TOP"
         }
+    }
+
+    private fun chooseOverlayPosition() {
+        val prefs = getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
+        val positions = prefs.getStringSet("aod_positions", setOf("TOP")) ?: setOf("TOP")
+        val activePositions = if (positions.isNotEmpty()) positions.toList() else listOf("TOP")
+        currentOverlayPosition = activePositions.random()
+        xOffset = 0
+        yOffset = 0
     }
     
     // Polling removed as requested
     
-    private fun applyBurnInProtection() {
+    private fun applyBurnInProtection(force: Boolean = false) {
         val view = overlayView ?: return
         val p = params ?: return
-        
-        // Random usage to shift +/- 20 pixels
-        val maxShift = 50
-        val newX = Random.nextInt(-maxShift, maxShift)
-        val newY = Random.nextInt(0, maxShift*2) // Only shift down from top
         
         val prefs = getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
         val opacity = prefs.getFloat("aod_opacity", 1.0f)
@@ -273,13 +277,6 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         
         // Read "Positions" Set (Multi-select)
         // Default to TOP if empty or missing
-        val positions = prefs.getStringSet("aod_positions", setOf("TOP")) ?: setOf("TOP")
-        val activePositions = if (positions.isNotEmpty()) positions.toList() else listOf("TOP")
-        
-        // Randomly pick one valid position from the Set
-        val randomPosIndex = Random.nextInt(activePositions.size)
-        val currentPosition = activePositions[randomPosIndex]
-
         // Alignment logic
         val alignment = prefs.getString("aod_alignment", "CENTER") ?: "CENTER"
         
@@ -299,23 +296,28 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         chartImg?.scaleX = 1.0f
         chartImg?.scaleY = 1.0f
         
-        // Apply Alignment to Root Layout (LinearLayout in aod_overlay.xml)
+        // Keep the root centered and only move content inside it. This avoids visible
+        // whole-overlay shifting when the value width changes on the lock screen.
         val rootLayout = view.findViewById<android.widget.LinearLayout>(R.id.aod_root)
+        val textContainer = view.findViewById<android.widget.LinearLayout>(R.id.aod_text_container)
+        var alignGravity = Gravity.CENTER_HORIZONTAL
+        when(alignment) {
+            "LEFT" -> alignGravity = Gravity.START
+            "CENTER" -> alignGravity = Gravity.CENTER_HORIZONTAL
+            "RIGHT" -> alignGravity = Gravity.END
+        }
         if (rootLayout != null) {
-             var alignGravity = Gravity.CENTER_HORIZONTAL
-             when(alignment) {
-                 "LEFT" -> alignGravity = Gravity.START
-                 "CENTER" -> alignGravity = Gravity.CENTER_HORIZONTAL
-                 "RIGHT" -> alignGravity = Gravity.END
-             }
-             rootLayout.gravity = alignGravity
+             rootLayout.gravity = Gravity.CENTER_HORIZONTAL
+        }
+        if (textContainer != null) {
+            textContainer.gravity = alignGravity
         }
 
         // Apply Vertical Position
         var baseGravity = Gravity.CENTER_HORIZONTAL // This is WindowManager gravity
         var baseY = 0
         
-        when(currentPosition) {
+        when(currentOverlayPosition) {
             "TOP" -> {
                 baseGravity = baseGravity or Gravity.TOP
                 baseY = 100 // Status bar clearance
@@ -331,8 +333,8 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         }
         
         p.gravity = baseGravity
-        p.x = newX
-        p.y = baseY + newY
+        p.x = xOffset
+        p.y = baseY + yOffset
         
         try {
             windowManager?.updateViewLayout(view, p)
@@ -517,12 +519,24 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
 
         if (showChart) {
             val dm = resources.displayMetrics
-            // Generate Scaled Dimensions for High-Res Bitmap
-            val w = (dm.widthPixels * chartScale).toInt()
-            val h = (200 * dm.density * chartScale).toInt()
+            val baseChartHeightPx = (200 * dm.density).toInt()
+            val renderWidth = (dm.widthPixels * 2.0f).toInt()
+            val renderHeight = (baseChartHeightPx * 2.0f).toInt()
 
-            val chartBitmap = NotificationChartDrawer.drawChart(this, chartPoints, w, h, isMmol, viewMode, true, hasCalibration)
+            val chartBitmap = NotificationChartDrawer.drawChart(
+                this,
+                chartPoints,
+                renderWidth,
+                renderHeight,
+                isMmol,
+                viewMode,
+                true,
+                hasCalibration
+            )
             if (chartImg != null) {
+                chartImg.layoutParams = chartImg.layoutParams?.also { params ->
+                    params.height = (baseChartHeightPx * chartScale).toInt()
+                }
                 chartImg.setImageBitmap(chartBitmap)
                 chartImg.visibility = View.VISIBLE
             }
@@ -546,7 +560,14 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            checkAndUpdateLockState()
+            val packageName = event.packageName?.toString()
+            if (isScreenOn && packageName != null && !isLockscreenPackage(packageName)) {
+                isLocked = false
+                cancelQuickLockCheck()
+                updateVisibility()
+            } else {
+                checkAndUpdateLockState()
+            }
         }
     }
 
@@ -562,6 +583,10 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             sensorManager?.unregisterListener(this)
         } catch (e: Exception) {}
         handler.removeCallbacks(updateRunnable)
+    }
+
+    private fun isLockscreenPackage(packageName: String): Boolean {
+        return packageName == "com.android.systemui" || packageName.contains("systemui")
     }
     
     private fun updateAlpha() {

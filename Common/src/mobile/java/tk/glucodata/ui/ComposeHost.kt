@@ -703,6 +703,13 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     composable("settings/watch/wearos-config") { WearOsConfigScreen(navController) }
                     composable("settings/watch/garmin-status") { GarminStatusScreen(navController) }
                     composable("settings/webserver") { WebServerSettingsScreen(navController) }
+                    composable("settings/notification-display") {
+                        NotificationSettingsScreen(navController, dashboardViewModel)
+                    }
+                    composable("settings/floating-display") {
+                        FloatingGlucoseSettingsScreen(navController, dashboardViewModel)
+                    }
+                    composable("settings/aod-display") { AodSettingsScreen(navController) }
 
                     composable("settings/turnserver") { tk.glucodata.ui.TurnServerSettingsScreen(navController) }
                     composable("settings/debug") { DebugSettingsScreen(navController) }
@@ -821,6 +828,13 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("settings/watch/wearos-config") { WearOsConfigScreen(navController) }
                 composable("settings/watch/garmin-status") { GarminStatusScreen(navController) }
                 composable("settings/webserver") { WebServerSettingsScreen(navController) }
+                composable("settings/notification-display") {
+                    NotificationSettingsScreen(navController, dashboardViewModel)
+                }
+                composable("settings/floating-display") {
+                    FloatingGlucoseSettingsScreen(navController, dashboardViewModel)
+                }
+                composable("settings/aod-display") { AodSettingsScreen(navController) }
 
                 composable("settings/turnserver") { tk.glucodata.ui.TurnServerSettingsScreen(navController) }
                 composable("settings/debug") { DebugSettingsScreen(navController) }
@@ -4413,35 +4427,6 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                 }
             }
 
-            if (sensor.isAidex) {
-                // Broadcast only mode — compact row with subtitle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.broadcast_only_mode_title),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            stringResource(R.string.broadcast_only_mode_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    StyledSwitch(
-                        checked = sensor.broadcastOnlyConnection,
-                        onCheckedChange = { viewModel.setBroadcastOnlyConnection(sensor.serial, it) }
-                    )
-                }
-//                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-
 
             // Edit 79: Auto-calibration and auto-reset controls moved to Sibionics Calibration bottom sheet.
 
@@ -4452,7 +4437,7 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
             if (sensor.isAidex) {
 
                 // Full-width Calibrate button — disabled when vendor BLE is not connected
-                val canCalibrate = sensor.isVendorConnected && !sensor.broadcastOnlyConnection
+                val canCalibrate = sensor.isVendorConnected
                 FilledTonalButton(
                     onClick = { showAiDexCalibrateDialog = true },
                     enabled = canCalibrate,

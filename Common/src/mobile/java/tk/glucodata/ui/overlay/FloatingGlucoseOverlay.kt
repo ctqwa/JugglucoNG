@@ -263,7 +263,7 @@ fun FloatingGlucoseOverlay(
                         Text(dvs.primaryStr, color = finalTextColor, fontSize = fontSize.sp, fontFamily = fontFamily, fontWeight = fontWeight)
                     }
                     
-                    val secondaryText = if (showSecondary) dvs.secondaryStr ?: "" else dvs.secondaryStr
+                    val secondaryText = if (showSecondary) dvs.secondaryStr else null
                     if (!secondaryText.isNullOrEmpty()) {
                         if (isTransparent) {
                             OutlinedText(secondaryText, fontSize*0.7f, fontFamily, fontWeight, finalTextColor.copy(alpha=0.7f), Color.Black.copy(alpha=0.5f))

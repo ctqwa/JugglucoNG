@@ -65,7 +65,6 @@ data class SensorInfo(
     val customCalAutoReset: Boolean,
     val detailedStatus: String = "",
     val isActive: Boolean = false,  // True if this is the primary data source
-    val broadcastOnlyConnection: Boolean = false,  // AiDex: use BLE advertisements only
     val isVendorPaired: Boolean = false,  // AiDex: has saved vendor pairing keys
     val vendorCalibrations: List<VendorCalibrationInfo> = emptyList(),  // AiDex: calibration records from sensor
     val isVendorConnected: Boolean = false,  // AiDex: vendor BLE stack actively connected
@@ -293,7 +292,6 @@ class SensorViewModel : ViewModel() {
                             customCalAutoReset = false,
                             detailedStatus = meaningfulStatus,  // Meaningful status (Broadcast Mode, Scanning, etc.)
                             isActive = (activeSensorSerial == gatt.SerialNumber),
-                            broadcastOnlyConnection = gatt.broadcastOnlyConnection,
                             isVendorPaired = gatt.isVendorPaired(),
                             vendorCalibrations = calRecords,
                             isVendorConnected = vendorConnected,
@@ -386,8 +384,7 @@ class SensorViewModel : ViewModel() {
                             customCalIndex = customIndex,
                             customCalAutoReset = customAutoReset,
                             detailedStatus = displayStatus,
-                            isActive = isActiveSensor,
-                            broadcastOnlyConnection = false
+                            isActive = isActiveSensor
                         )
                     }
                 } catch (e: Exception) {
@@ -415,8 +412,7 @@ class SensorViewModel : ViewModel() {
                         customCalIndex = 0,
                         customCalAutoReset = false,
                         detailedStatus = "Error: ${e.message}",
-                        isActive = false,
-                        broadcastOnlyConnection = false
+                        isActive = false
                     )
                 }
             }
@@ -728,15 +724,6 @@ class SensorViewModel : ViewModel() {
                 gatt.viewMode = mode
             }
             Natives.setViewMode(gatt.dataptr, mode)
-            refreshSensors()
-        }
-    }
-
-    fun setBroadcastOnlyConnection(serial: String, enabled: Boolean) {
-        val gatts = SensorBluetooth.mygatts()
-        val gatt = gatts.find { it.SerialNumber == serial }
-        if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
-            gatt.setBroadcastOnlyConnection(enabled)
             refreshSensors()
         }
     }
