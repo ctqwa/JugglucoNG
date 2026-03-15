@@ -136,12 +136,17 @@ static public boolean deleteUrl(String urlstring,String secret) {
             }
     uploadstatus=" start deleteURL "+urlstring;
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setConnectTimeout(10000);
+        urlConnection.setConnectTimeout(15000);
         urlConnection.setReadTimeout(60000);
         if(secret!=null)
                 urlConnection.setRequestProperty("api-secret", secret);
-        else
-            urlConnection.setRequestProperty("Authorization", gettoken(uploadtime));
+        else {
+            final String auth = gettoken(uploadtime);
+            if(auth.isEmpty()) {
+                return false;
+            }
+            urlConnection.setRequestProperty("Authorization", auth);
+        }
         urlConnection.setRequestProperty("Content-Type", "application/json");
         urlConnection.setRequestMethod("DELETE");
 
@@ -202,7 +207,7 @@ private static String gettoken(long now) {
 
         URL url = new URL(authstr);
         HttpURLConnection  urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setConnectTimeout(10000);
+        urlConnection.setConnectTimeout(15000);
         urlConnection.setReadTimeout(60000);
         urlConnection.setRequestMethod("GET");
         final int code=urlConnection.getResponseCode();
@@ -246,14 +251,19 @@ static public int upload(String httpurl,byte[] postdata,String secret,boolean pu
       uploadstatus="start upload "+httpurl;
         URL url = new URL(httpurl);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setConnectTimeout(10000);
+        urlConnection.setConnectTimeout(15000);
         urlConnection.setReadTimeout(60000);
         urlConnection.setRequestMethod(put?"PUT":"POST");
         urlConnection.setDoOutput(true);
         if(secret!=null)
             urlConnection.setRequestProperty("api-secret", secret);
-        else
-            urlConnection.setRequestProperty("Authorization", gettoken(uploadtime));
+        else {
+            final String auth = gettoken(uploadtime);
+            if(auth.isEmpty()) {
+                return -1;
+            }
+            urlConnection.setRequestProperty("Authorization", auth);
+        }
         urlConnection.setRequestProperty("Content-Type", "application/json");
            urlConnection.setRequestProperty( "Content-Length", Integer.toString( postdata.length ));
 

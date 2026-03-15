@@ -22,6 +22,7 @@
 #include "fromjava.h"
 #include "net/netstuff.hpp"
 #include <alloca.h>
+#include <cstring>
 #include <jni.h>
 #include <string_view>
 #include <vector>
@@ -561,108 +562,157 @@ extern "C" JNIEXPORT jint JNICALL fromjava(makeHomeCopy)(JNIEnv *envin,
 #endif
 
 // TurnServer Implementation
-struct TurnServerData {
-  std::string host = "";
-  std::string user = "";
-  std::string password = "";
-  int port = 3478;
-};
+static updatedata::turnserver_t *getTurnServerSlot(bool create = false) {
+  if (!backup) {
+    return nullptr;
+  }
+  auto *data = backup->getupdatedata();
+  if (!create && data->NRturnserver == 0) {
+    return nullptr;
+  }
+  auto *slot = &data->turnserver[0];
+  if (create && data->NRturnserver == 0) {
+    if (!slot->port) {
+      slot->port = 3478;
+    }
+    data->NRturnserver = 1;
+  }
+  return slot;
+}
 
-static std::vector<TurnServerData> turnServerStorage;
+static void syncTurnServerPresence() {
+  if (!backup) {
+    return;
+  }
+  auto *data = backup->getupdatedata();
+  auto &slot = data->turnserver[0];
+  if (slot.hostname[0]) {
+    data->NRturnserver = 1;
+    if (!slot.port) {
+      slot.port = 3478;
+    }
+  } else {
+    data->NRturnserver = 0;
+  }
+}
+
+static void copyTurnString(JNIEnv *env, jstring val, char *dest, int maxlen) {
+  if (!dest || maxlen <= 0) {
+    return;
+  }
+  if (val == nullptr) {
+    dest[0] = '\0';
+    return;
+  }
+  const char *str = env->GetStringUTFChars(val, nullptr);
+  if (!str) {
+    dest[0] = '\0';
+    return;
+  }
+  strncpy(dest, str, maxlen - 1);
+  dest[maxlen - 1] = '\0';
+  env->ReleaseStringUTFChars(val, str);
+}
 
 extern "C" JNIEXPORT jint JNICALL fromjava(TurnServerNR)(JNIEnv *env,
                                                          jclass cl) {
-  return (jint)turnServerStorage.size();
+  return backup ? backup->getupdatedata()->NRturnserver : 0;
 }
 
 extern "C" JNIEXPORT jstring JNICALL fromjava(getTurnHost)(JNIEnv *env,
-                                                           jclass cl,
-                                                           jint pos) {
-  if (pos >= 0 && pos < (int)turnServerStorage.size()) {
-    return myNewStringUTF(env, turnServerStorage[pos].host);
+                                                            jclass cl,
+                                                            jint pos) {
+  if (pos == 0) {
+    if (const auto *slot = getTurnServerSlot(false)) {
+      return myNewStringUTF(env, slot->hostname);
+    }
   }
   return nullptr;
 }
 
 extern "C" JNIEXPORT void JNICALL fromjava(setTurnHost)(JNIEnv *env, jclass cl,
-                                                        jint pos, jstring val) {
-  if (pos >= 0) {
-    if (pos >= (int)turnServerStorage.size())
-      turnServerStorage.resize(pos + 1);
-    const char *str = env->GetStringUTFChars(val, NULL);
-    if (str) {
-      turnServerStorage[pos].host = str;
-      env->ReleaseStringUTFChars(val, str);
+                                                         jint pos, jstring val) {
+  if (pos == 0) {
+    if (auto *slot = getTurnServerSlot(true)) {
+      copyTurnString(env, val, slot->hostname,
+                     updatedata::turnserver_t::maxhostname);
+      syncTurnServerPresence();
     }
   }
 }
 
 extern "C" JNIEXPORT jint JNICALL fromjava(getTurnPort)(JNIEnv *env, jclass cl,
-                                                        jint pos) {
-  if (pos >= 0 && pos < (int)turnServerStorage.size()) {
-    return turnServerStorage[pos].port;
+                                                         jint pos) {
+  if (pos == 0) {
+    if (const auto *slot = getTurnServerSlot(false)) {
+      return slot->port;
+    }
   }
-  return 0;
+  return 3478;
 }
 
 extern "C" JNIEXPORT void JNICALL fromjava(setTurnPort)(JNIEnv *env, jclass cl,
-                                                        jint pos, jint port) {
-  if (pos >= 0) {
-    if (pos >= (int)turnServerStorage.size())
-      turnServerStorage.resize(pos + 1);
-    turnServerStorage[pos].port = port;
+                                                         jint pos, jint port) {
+  if (pos == 0) {
+    if (auto *slot = getTurnServerSlot(true)) {
+      slot->port = port > 0 ? port : 3478;
+      syncTurnServerPresence();
+    }
   }
 }
 
 extern "C" JNIEXPORT jstring JNICALL fromjava(getTurnUser)(JNIEnv *env,
-                                                           jclass cl,
-                                                           jint pos) {
-  if (pos >= 0 && pos < (int)turnServerStorage.size()) {
-    return myNewStringUTF(env, turnServerStorage[pos].user);
+                                                            jclass cl,
+                                                            jint pos) {
+  if (pos == 0) {
+    if (const auto *slot = getTurnServerSlot(false)) {
+      return myNewStringUTF(env, slot->username);
+    }
   }
   return nullptr;
 }
 
 extern "C" JNIEXPORT void JNICALL fromjava(setTurnUser)(JNIEnv *env, jclass cl,
-                                                        jint pos, jstring val) {
-  if (pos >= 0) {
-    if (pos >= (int)turnServerStorage.size())
-      turnServerStorage.resize(pos + 1);
-    const char *str = env->GetStringUTFChars(val, NULL);
-    if (str) {
-      turnServerStorage[pos].user = str;
-      env->ReleaseStringUTFChars(val, str);
+                                                         jint pos, jstring val) {
+  if (pos == 0) {
+    if (auto *slot = getTurnServerSlot(true)) {
+      copyTurnString(env, val, slot->username,
+                     updatedata::turnserver_t::maxusername);
+      syncTurnServerPresence();
     }
   }
 }
 
 extern "C" JNIEXPORT jstring JNICALL fromjava(getTurnPassword)(JNIEnv *env,
-                                                               jclass cl,
-                                                               jint pos) {
-  if (pos >= 0 && pos < (int)turnServerStorage.size()) {
-    return myNewStringUTF(env, turnServerStorage[pos].password);
+                                                                jclass cl,
+                                                                jint pos) {
+  if (pos == 0) {
+    if (const auto *slot = getTurnServerSlot(false)) {
+      return myNewStringUTF(env, slot->password);
+    }
   }
   return nullptr;
 }
 
 extern "C" JNIEXPORT void JNICALL fromjava(setTurnPassword)(JNIEnv *env,
-                                                            jclass cl, jint pos,
-                                                            jstring val) {
-  if (pos >= 0) {
-    if (pos >= (int)turnServerStorage.size())
-      turnServerStorage.resize(pos + 1);
-    const char *str = env->GetStringUTFChars(val, NULL);
-    if (str) {
-      turnServerStorage[pos].password = str;
-      env->ReleaseStringUTFChars(val, str);
+                                                             jclass cl, jint pos,
+                                                             jstring val) {
+  if (pos == 0) {
+    if (auto *slot = getTurnServerSlot(true)) {
+      copyTurnString(env, val, slot->password,
+                     updatedata::turnserver_t::maxpassword);
+      syncTurnServerPresence();
     }
   }
 }
 
 extern "C" JNIEXPORT void JNICALL fromjava(deleteTurnServer)(JNIEnv *env,
-                                                             jclass cl,
-                                                             jint pos) {
-  if (pos >= 0 && pos < (int)turnServerStorage.size()) {
-    turnServerStorage.erase(turnServerStorage.begin() + pos);
+                                                              jclass cl,
+                                                              jint pos) {
+  if (pos == 0) {
+    if (auto *slot = getTurnServerSlot(false)) {
+      slot->clear();
+      backup->getupdatedata()->NRturnserver = 0;
+    }
   }
 }

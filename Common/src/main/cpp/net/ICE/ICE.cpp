@@ -493,7 +493,7 @@ const juice_turn_server_t *turn_servers;
 int servercount;
 
 juice_turn_server_t conf_server;
-if(backup->getupdatedata()->NRturnserver) {
+if(backup->getupdatedata()->NRturnserver && backup->getupdatedata()->turnserver[0].hostname[0]) {
     conf_server.host=backup->getupdatedata()->turnserver[0].hostname;
     conf_server.username=backup->getupdatedata()->turnserver[0].username;
     conf_server.password=backup->getupdatedata()->turnserver[0].password;

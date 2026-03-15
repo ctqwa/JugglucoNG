@@ -1,12 +1,14 @@
 #if 1
 //#ifndef WEAROS
 #include <jni.h>
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <ctime>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 #include "settings/settings.hpp"
 #include "share/logs.hpp"
 #include "sensoren.hpp"
@@ -15,6 +17,8 @@
 extern Settings *settings;
 extern Sensoren *sensors;
 constexpr int HTTP_OK=200;
+constexpr int HTTP_CREATED=201;
+constexpr int HTTP_CONFLICT=409;
 /*[
   {
     "type": "string",
@@ -46,6 +50,12 @@ static std::atomic<long long> lastNightUploadAttemptTime{0};
 static std::atomic<long long> lastNightUploadSuccessTime{0};
 static std::atomic<int> lastNightUploadWaitMinutes{0};
 static bool lastNightUploadConfigError = false;
+struct NightUploadRange {
+    uint32_t start{};
+    uint32_t end{};
+    };
+static constexpr int maxRecentNightUploadSensors = 1024;
+static NightUploadRange recentNightUploads[maxRecentNightUploadSensors]{};
 /*
 void makeuploadurl(JNIEnv *env) {
         const int namelen=settings->data()->nightuploadnamelen;
@@ -232,12 +242,60 @@ static int getNightscoutCalibrationOverrideForItem(SensorGlucoseData *sens,const
     return overrideValue;
     }
 
+static bool isNightUploadSuccess(const int res) {
+    return res==HTTP_OK || res==HTTP_CREATED;
+    }
+
+static bool isNightUploadAccepted(const int res) {
+    return isNightUploadSuccess(res) || res==HTTP_CONFLICT;
+    }
+
+static NightUploadRange *getRecentNightUploadRange(const int sensorid,const bool ensure=false) {
+    if(sensorid<0 || sensorid>=maxRecentNightUploadSensors)
+        return nullptr;
+    auto *range=&recentNightUploads[sensorid];
+    if(!ensure && !range->start && !range->end)
+        return nullptr;
+    return range;
+    }
+
+static void rememberRecentNightUpload(const int sensorid,const uint32_t start,const uint32_t end) {
+    if(!start || !end)
+        return;
+    auto *range=getRecentNightUploadRange(sensorid,true);
+    if(!range)
+        return;
+    if(!range->start || start<range->start)
+        range->start=start;
+    if(end>range->end)
+        range->end=end;
+    }
+
+static void pruneRecentNightUpload(const int sensorid,const uint32_t tim) {
+    auto *range=getRecentNightUploadRange(sensorid);
+    if(!range)
+        return;
+    if(range->end && range->end+600<tim) {
+        *range={};
+        }
+    }
+
+static bool isRecentNightUploadCovered(const int sensorid,const uint32_t tim) {
+    const auto *range=getRecentNightUploadRange(sensorid);
+    if(!range)
+        return false;
+    return range->start && tim>=range->start && tim<=range->end;
+    }
+
+
 //static boolean upload(String httpurl,byte[] postdata,String secret) ;
 extern vector<Numdata*> numdatas;
 static void reset() {
     const int last=sensors->last();
     settings->data()->nightsensor=0;
     settings->data()->lastuploadtime=0;
+    for(auto &range:recentNightUploads)
+        range={};
     for(int sensorid=0;sensorid<=last;sensorid++) {
         if(SensorGlucoseData *sens=sensors->getSensorData(sensorid)) {
             sens->getinfo()->nightiter=0;
@@ -290,11 +348,13 @@ extern double     calibrateONEtest(const SensorGlucoseData *sens,const ScanData 
 #include "datestring.hpp"
 extern double getdelta(float change);
 extern std::string_view getdeltaname(float change);
-template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const char *sensorname,const T &item) {
+extern int mkv1streamid(char *outiter,const sensorname_t *name,int num);
+template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const sensorname_t *sensorname,const T &item,const bool includeId=false,const bool trailingComma=true) {
     const time_t tim=item.gettime();
+    const char *sensornameStr=sensorname->data();
     int mgdL;
     const int rawCurrent=sens->getRawForPoll(&item);
-    const int overrideValue=getNightscoutCalibrationOverrideForItem(sens,sensorname,item.getmgdL(),rawCurrent,tim*1000LL);
+    const int overrideValue=getNightscoutCalibrationOverrideForItem(sens,sensornameStr,item.getmgdL(),rawCurrent,tim*1000LL);
     if(overrideValue>0) {
         mgdL=overrideValue;
          }
@@ -308,8 +368,18 @@ template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const char
     double delta=getdelta(change);
     char timestr[50];
     Tdatestring(tim,timestr);
-
-    return sprintf(buf,R"({"type":"sgv","device":"%s","dateString":"%s","date":%lld,"sgv":%d,"delta":%.3f,"direction":"%s","noise":1,"filtered":%d,"unfiltered":%d,"rssi":100},)",sensorname,timestr,tim*1000LL,mgdL,delta,directionlabel,mgdL*1000,mgdL*1000);
+    char *out=buf;
+    out+=sprintf(out,R"({"type":"sgv","device":"%s","dateString":"%s","date":%lld,"sgv":%d,"delta":%.3f,"direction":"%s","noise":1,"filtered":%d,"unfiltered":%d,"rssi":100)",sensornameStr,timestr,tim*1000LL,mgdL,delta,directionlabel,mgdL*1000,mgdL*1000);
+    if(includeId) {
+        addar(out,R"(,"_id":")");
+        out+=mkv1streamid(out,sensorname,item.getid());
+        addar(out,R"(")");
+        }
+    if(trailingComma)
+        addar(out,R"(},)");
+    else
+        addar(out,R"(})");
+    return out-buf;
     }
 /*
 template <class T> int mkuploaditemv3(SensorGlucoseData *sens,char *buf,const char *sensorname,const T &item) {
@@ -332,7 +402,102 @@ template <class T> int mkuploaditemv3(SensorGlucoseData *sens,char *buf,const ch
 extern  const int nighttimeback;
 const int nighttimeback=60*60*24*30;
 
-static bool uploadCGM3() {
+static bool uploadRecentV1(const int sensorid,SensorGlucoseData *sens,const sensorname_t *sensorname,std::span<const ScanData> gdata,const uint32_t mintime) {
+    uint32_t newest=0;
+    uint32_t oldest=0;
+    for(int iter=gdata.size()-1;iter>=0;--iter) {
+        const ScanData &el=gdata[iter];
+        if(!el.valid(iter) || el.gettime()<=mintime)
+            continue;
+        pruneRecentNightUpload(sensorid,el.gettime());
+        if(isRecentNightUploadCovered(sensorid,el.gettime()))
+            return true;
+        char buf[512];
+        char *ptr=buf;
+        *ptr++='[';
+        ptr+=mkuploaditem(sens,ptr,sensorname,el,true,false);
+        *ptr++=']';
+        *ptr='\0';
+        const int res=nightuploadEntries(buf,ptr-buf);
+        if(!isNightUploadAccepted(res))
+            return false;
+        newest=el.gettime();
+        oldest=el.gettime();
+        break;
+        }
+    if(oldest && newest)
+        rememberRecentNightUpload(sensorid,oldest,newest);
+    return true;
+    }
+
+static bool uploadV1ChunkIndividually(const int sensorid,SensorGlucoseData *sens,const sensorname_t *sensorname,std::span<const ScanData> gdata,const int startiter,const int chunkend,const uint32_t mintime) {
+    for(int iter=startiter;iter<chunkend;iter++) {
+        const ScanData &el=gdata[iter];
+        if(!el.valid(iter) || el.gettime()<=mintime)
+            continue;
+        pruneRecentNightUpload(sensorid,el.gettime());
+        if(isRecentNightUploadCovered(sensorid,el.gettime()))
+            continue;
+        char buf[512];
+        char *ptr=buf;
+        *ptr++='[';
+        ptr+=mkuploaditem(sens,ptr,sensorname,el,true,false);
+        *ptr++=']';
+        *ptr='\0';
+        const int res=nightuploadEntries(buf,ptr-buf);
+        if(!isNightUploadAccepted(res))
+            return false;
+        }
+    return true;
+    }
+
+static const char *writeNightscoutV3UploadEntry(char *buf,SensorGlucoseData *sens,const sensorname_t *sensorname,const ScanData *el) {
+extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server=true);
+    const int overrideValue=getNightscoutCalibrationOverrideForItem(
+        sens,
+        sensorname->data(),
+        el->getmgdL(),
+        sens->getRawForPoll(el),
+        el->gettime()*1000LL
+    );
+    if(overrideValue>0) {
+        ScanData newel=*el;
+        newel.g=overrideValue;
+        return writev3entry(buf,&newel,sensorname,false);
+        }
+    if(double calibrated=calibrateONEtest(sens,*el);!isnan(calibrated)) {
+        ScanData newel=*el;
+        newel.g=(int32_t)round(calibrated);
+        return writev3entry(buf,&newel,sensorname,false);
+        }
+    return writev3entry(buf,el,sensorname,false);
+    }
+
+static bool uploadRecentV3(const int sensorid,SensorGlucoseData *sens,const sensorname_t *sensorname,std::span<const ScanData> gdata,const uint32_t mintime) {
+    uint32_t newest=0;
+    uint32_t oldest=0;
+    for(int iter=gdata.size()-1;iter>=0;--iter) {
+        const ScanData &el=gdata[iter];
+        if(!el.valid(iter) || el.gettime()<=mintime)
+            continue;
+        pruneRecentNightUpload(sensorid,el.gettime());
+        if(isRecentNightUploadCovered(sensorid,el.gettime()))
+            return true;
+        char buf[320];
+        const char *ptr=writeNightscoutV3UploadEntry(buf,sens,sensorname,&el);
+        const int res=nightuploadEntries3(buf,ptr-buf);
+        if(!isNightUploadAccepted(res))
+            return false;
+        newest=el.gettime();
+        oldest=el.gettime();
+        break;
+        }
+    if(oldest && newest)
+        rememberRecentNightUpload(sensorid,oldest,newest);
+    return true;
+    }
+
+static bool uploadCGM3(const bool prioritizeRecent=false) {
     LOGSTRING("upload\n");
     int last=sensors->last();
     if(last<0) {
@@ -359,38 +524,27 @@ static bool uploadCGM3() {
             int left=len-positer;
             bool send=false;
             if(left>=0) {
+                if(prioritizeRecent && left>1) {
+                    if(!uploadRecentV3(sensorid,sens,sensorname,gdata,mintime)) {
+                        settings->data()->nightsensor=newstartsensor;
+                        return false;
+                        }
+                    }
                 for(;positer<len;positer++) { //Geen overlappende data?
                     const ScanData *el= &gdata[positer];
                     if(el->valid(positer)&&el->gettime()>mintime) {
-                        constexpr const int max3entry=300;
-                        char buf[max3entry];
-extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server=true);
-
-                        const char *ptr;
-                        const int overrideValue=getNightscoutCalibrationOverrideForItem(
-                            sens,
-                            sensorname->data(),
-                            el->getmgdL(),
-                            sens->getRawForPoll(el),
-                            el->gettime()*1000LL
-                        );
-                        if(overrideValue>0) {
-                            ScanData newel=*el;
-                            newel.g=overrideValue;
-                            ptr=writev3entry(buf,&newel, sensorname,false);
-                             }
-                        else if(double calibrated=calibrateONEtest(sens,*el);!isnan(calibrated)) {
-                            ScanData newel=*el;
-                            newel.g=(int32_t)round(calibrated);
-                            ptr=writev3entry(buf,&newel, sensorname,false);
-                             }
-                        else  {
-                            ptr=writev3entry(buf,el, sensorname,false);
+                        pruneRecentNightUpload(sensorid,el->gettime());
+                        if(isRecentNightUploadCovered(sensorid,el->gettime())) {
+                            sens->getinfo()->nightiter=positer+1;
+                            continue;
                             }
+                        constexpr const int max3entry=320;
+                        char buf[max3entry];
+                        const char *ptr=writeNightscoutV3UploadEntry(buf,sens,sensorname,el);
                         const int buflen=ptr-buf;
                         logwriter(buf,buflen);
                         auto res=nightuploadEntries3(buf,buflen);
-                        if(res==200||res==201) {
+                        if(isNightUploadAccepted(res)) {
                             sens->getinfo()->nightiter=positer+1;
                             send=true;
                             }
@@ -417,7 +571,7 @@ extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *
     settings->data()->nightsensor=newstartsensor;
     return true;
     }
-static bool uploadCGM() {
+static bool uploadCGM(const bool prioritizeRecent=false) {
     LOGSTRING("upload\n");
     int last=sensors->last();
     if(last<0) {
@@ -429,26 +583,31 @@ static bool uploadCGM() {
     if(!settings->data()->nightsensor)
         settings->data()->nightsensor=sensors->firstafter(mintime);
     int startsensor= settings->data()->nightsensor;
-    constexpr const int itemsize=350;
+    constexpr const int itemsize=420;
 /*
     constexpr const auto twoweeks=15*24*60*60;
     time_t old=nu-twoweeks; */
 
     int newstartsensor=startsensor;
-    constexpr const int maxuploaditems=400;
+    constexpr const int maxuploaditems=120;
     for(int sensorid=last;sensorid>=startsensor;--sensorid) {
         if(SensorGlucoseData *sens=sensors->getSensorData(sensorid)) {
             std::span<const ScanData> gdata=sens->getPolldata();
             const sensorname_t *sensorname=sens->shortsensorname();
-            const char *sensornamestr=sensorname->data();
             const int totallen=gdata.size();
             int positer=sens->getinfo()->nightiter;
             LOGGER("%d: positer=%d\n",sensorid,positer);
             int left=totallen-positer;
             if(left>=0) {
                 bool sent=false;
+                if(prioritizeRecent && left>1) {
+                    if(!uploadRecentV1(sensorid,sens,sensorname,gdata,mintime)) {
+                        return false;
+                        }
+                    }
                 while(positer<totallen) {
-                    const int chunkend=std::min(totallen,positer+maxuploaditems);
+                    const int chunklimit=positer<120?40:maxuploaditems;
+                    const int chunkend=std::min(totallen,positer+chunklimit);
                     const int chunkitems=chunkend-positer;
                     const int arraysize=3+chunkitems*itemsize;
                     LOGGER("arraysize=%d\n",arraysize);
@@ -463,7 +622,11 @@ static bool uploadCGM() {
                     for(int iter=positer;iter<chunkend;iter++) { //Geen overlappende data?
                         const ScanData &el= gdata[iter];
                         if(el.valid(iter)&&el.gettime()>mintime) {
-                            ptr+=mkuploaditem(sens,ptr,sensornamestr,el);
+                            pruneRecentNightUpload(sensorid,el.gettime());
+                            if(isRecentNightUploadCovered(sensorid,el.gettime())) {
+                                continue;
+                                }
+                            ptr+=mkuploaditem(sens,ptr,sensorname,el,false,true);
                             }
                         }
                     LOGGER("%d new positer=%d\n",sensorid,chunkend);
@@ -474,10 +637,19 @@ static bool uploadCGM() {
                         LOGGER("%d: UPLOADER #%d\n",sensorid,datalen);
                         LOGGERN(start,datalen);
                         const int res = nightuploadEntries(start,datalen);
-                        if(res==HTTP_OK || res==201) {
+                        if(isNightUploadSuccess(res)) {
                             sens->getinfo()->nightiter=chunkend;
                             positer=chunkend;
                             LOGGER("%d nightupload Success\n",sensorid);
+                            LOGGER("%d saved nightiter=%d\n", sensorid,chunkend);
+                            newstartsensor=sensorid;
+                            sent=true;
+                            continue;
+                            }
+                        if(res==HTTP_CONFLICT && uploadV1ChunkIndividually(sensorid,sens,sensorname,gdata,positer,chunkend,mintime)) {
+                            sens->getinfo()->nightiter=chunkend;
+                            positer=chunkend;
+                            LOGGER("%d nightupload conflict resolved individually\n",sensorid);
                             LOGGER("%d saved nightiter=%d\n", sensorid,chunkend);
                             newstartsensor=sensorid;
                             sent=true;
@@ -546,8 +718,9 @@ static void uploaderthread() {
         const auto current=uploadercondition.dobackup;
         uploadercondition.dobackup=0;
         bool useV3=settings->data()->nightscoutV3;
+        const bool prioritizeRecent=(current&Backup::wakestream);
         if(current&(Backup::wakestream|Backup::wakeall)) {
-            bool uploaded = useV3?uploadCGM3():uploadCGM();
+            bool uploaded = useV3?uploadCGM3(prioritizeRecent):uploadCGM(prioritizeRecent);
             if(!uploaded && !useV3 && lastNightUploadCode==404) {
                 LOGSTRING("Nightscout v1 endpoint returned 404, retrying with v3\n");
                 settings->data()->nightscoutV3 = true;
@@ -556,7 +729,7 @@ static void uploaderthread() {
                 makeuploadsecret(env);
                 makeuploadurls(env);
                 useV3 = true;
-                uploaded = uploadCGM3();
+                uploaded = uploadCGM3(prioritizeRecent);
             }
             if(!uploaded) {
                 waitmin=lastNightUploadConfigError?0:15;

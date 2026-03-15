@@ -1117,6 +1117,9 @@ static jlong getlibreaccountidnumber() {
   const jlong num = settings->data()->libreaccountIDnum;
   if (num != -1LL)
     return num;
+  if (!settings->data()->sendtolibreview) {
+    return 0;
+  }
   auto &accountid = settings->data()->libreviewAccountID;
   uint32_t res = 0;
   for (auto el : accountid) {
@@ -1126,7 +1129,9 @@ static jlong getlibreaccountidnumber() {
   settings->data()->_nullchar1 = '\0';
   //    *accountid.end()='\0';
   const jlong lres = static_cast<jlong>(res);
-  LOGGER("accountID %s %" PRId64 "\n", accountid.data(), lres);
+  if (lres > 0) {
+    LOGGER("accountID %s %" PRId64 "\n", accountid.data(), lres);
+  }
   return lres;
 }
 extern "C" JNIEXPORT jlong JNICALL

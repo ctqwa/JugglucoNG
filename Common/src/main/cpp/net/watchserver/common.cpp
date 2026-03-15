@@ -80,7 +80,10 @@ char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorn
 	addar(outptr,R"(,"direction":")");
 	 std::string_view name=getdeltaname(val->ch);
 	 addstrview(outptr,name);
-	addar(outptr,R"(","type":"sgv","utcOffset":0,"identifier":")");
+	addar(outptr,R"(","type":"sgv")");
+	if(server)
+		addar(outptr,R"(,"utcOffset":0)");
+	addar(outptr,R"(,"identifier":")");
 	outptr+=mkv3streamid(outptr,sensorname,val->id);
 	if(server) {
 		addar(outptr,R"(","created_at":")");

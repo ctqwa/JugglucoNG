@@ -9,6 +9,8 @@
 #include "nightnumcategories.hpp"
 #include "common.hpp"
 constexpr int HTTP_OK=200;
+constexpr int HTTP_CREATED=201;
+constexpr int HTTP_CONFLICT=409;
 
 constexpr const int treatmentitemsize=300;
 
@@ -74,7 +76,7 @@ static bool sendtreatment3(int base,int iter,const Num *num,Numdata *numdata) {
 	if(char *end=writetreatmentV3(buf,base,iter,num,numdata->getnightIDstart());end!=buf) {
 		int datalen=end-buf;
 		logwriter(buf,datalen);
-		if(int res=nightuploadTreatments3(buf,datalen);res==200||res==201) {
+        if(int res=nightuploadTreatments3(buf,datalen);res==HTTP_OK||res==HTTP_CREATED||res==HTTP_CONFLICT) {
 			LOGGER("treatment base=%d len=%d nightupload Success\n",base,datalen);
 			numdata->setNightSend(iter+1);
 			return true;
@@ -190,7 +192,7 @@ char *writetreatmentV3(char *outiter,const int numbase,const int pos,const Num*n
 	else
 		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
 
-	addar(outiter,R"(000,"utcOffset":0,"eventType":"<none>","app":"Juggluco",)");
+	addar(outiter,R"(000,"eventType":"<none>","app":"Juggluco",)");
   
 
 	float w=0.0f;

@@ -130,7 +130,12 @@ fun TurnServerSettingsScreen(navController: NavController) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!isAbsent) {
                     OutlinedButton(
-                        onClick = { Natives.deleteTurnServer(0); navController.popBackStack() },
+                        onClick = {
+                            Natives.deleteTurnServer(0)
+                            Natives.resetnetwork()
+                            tk.glucodata.Applic.wakemirrors()
+                            navController.popBackStack()
+                        },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) { Text(stringResource(R.string.delete)) }
@@ -146,6 +151,8 @@ fun TurnServerSettingsScreen(navController: NavController) {
                         Natives.setTurnHost(0, host)
                         Natives.setTurnUser(0, user)
                         Natives.setTurnPassword(0, password)
+                        Natives.resetnetwork()
+                        tk.glucodata.Applic.wakemirrors()
                         navController.popBackStack()
                     },
                     modifier = Modifier.weight(1f)

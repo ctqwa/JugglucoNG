@@ -83,6 +83,8 @@ public static void show(Activity context,View parent) {
 
     delete.setOnClickListener(v->  {
         Natives.deleteTurnServer( 0);
+        Natives.resetnetwork();
+        Applic.wakemirrors();
         MainActivity.doonback();
         }
         );
@@ -109,6 +111,8 @@ public static void show(Activity context,View parent) {
             Natives.setTurnHost(0,hostedit.getText().toString());
             Natives.setTurnUser(0,useredit.getText().toString());
             Natives.setTurnPassword(0,passedit.getText().toString());
+            Natives.resetnetwork();
+            Applic.wakemirrors();
             MainActivity.doonback();
             }
             );

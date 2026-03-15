@@ -186,6 +186,25 @@ struct updateone {
 
 #include "maxsendtohost.h"
 struct updatedata {
+  struct turnserver_t {
+    static constexpr int maxhostname = 192;
+    static constexpr int maxusername = 96;
+    static constexpr int maxpassword = 128;
+    char hostname[maxhostname];
+    char username[maxusername];
+    char password[maxpassword];
+    uint16_t port;
+    uint16_t reserved;
+
+    void clear() {
+      hostname[0] = '\0';
+      username[0] = '\0';
+      password[0] = '\0';
+      port = 3478;
+      reserved = 0;
+    }
+  };
+
   int32_t hostnr;
   uint32_t receive;
   // uint32_t update;
@@ -194,6 +213,9 @@ struct updatedata {
   uint8_t sendnr;
   passhost_t allhosts[maxallhosts];
   updateone tosend[maxsendtohost];
+  uint8_t NRturnserver;
+  uint8_t reservedturn[3];
+  turnserver_t turnserver[1];
 
   void wakesender();
   void wakestreamsender();
@@ -347,6 +369,19 @@ public:
     startactivereceivers();
     if (!getupdatedata()->port[0])
       strcpy(getupdatedata()->port, defaultport);
+    if (getupdatedata()->NRturnserver > 1) {
+      getupdatedata()->NRturnserver = 0;
+    }
+    if (getupdatedata()->NRturnserver) {
+      auto &turn = getupdatedata()->turnserver[0];
+      if (!turn.port) {
+        turn.port = 3478;
+      }
+      if (!turn.hostname[0]) {
+        turn.clear();
+        getupdatedata()->NRturnserver = 0;
+      }
+    }
 
     void backupbase(string_view basedir);
     backupbase(globalbasedir);

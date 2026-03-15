@@ -1197,6 +1197,9 @@ void libreviewthread() {
 
 extern void wakeaftermin(const int waitmin);
 void wakeaftermin(const int waitmin) {
+  if (!settings->data()->sendtolibreview) {
+    return;
+  }
   if (libreviewrunning) {
     if (waitmin) {
       uint32_t now = time(nullptr);
@@ -1209,7 +1212,6 @@ void wakeaftermin(const int waitmin) {
     LOGGER("wakeaftermin(%d)\n", waitmin);
     librecondition.wakebackup(Backup::wakeall);
   } else {
-    LOGAR("wakeaftermin: no thread running");
     librecondition.dobackup = Backup::wakeall;
   }
 }
