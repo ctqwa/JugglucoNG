@@ -99,6 +99,16 @@ fun injectMirrorJson(jsonstr: String, context: Context): Boolean {
     }
 }
 
+private fun changeHostErrorMessage(context: Context, code: Int): String = when (code) {
+    -1 -> context.getString(R.string.portrange)
+    -2 -> context.getString(R.string.parseip)
+    -3 -> context.getString(R.string.toomanyhosts)
+    -4 -> context.getString(R.string.senthosts)
+    -5 -> "Hostname too long"
+    -6 -> "Database busy, try again"
+    else -> context.getString(R.string.mirror_error_with_code, code)
+}
+
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 @Composable
@@ -400,11 +410,15 @@ fun MirrorSettingsScreen(navController: NavController) {
                         onEdit = { editSheetPos = mirror.index },
                         onToggle = {
                             Natives.setHostDeactivated(mirror.index, !mirror.isDeactivated)
+                            Natives.resetnetwork()
+                            tk.glucodata.Applic.wakemirrors()
                             triggerRefresh++
                         },
                         onShowQR = { mirror.index },
                         onDelete = {
                             Natives.deletebackuphost(mirror.index)
+                            Natives.resetnetwork()
+                            tk.glucodata.Applic.wakemirrors()
                             triggerRefresh++
                         }
                     )
@@ -538,13 +552,20 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
 
     // Determine connection type from existing entry
     val existingICELabel = if (!isNew) Natives.getICElabel(pos) else null
-    val hasICE = existingICELabel != null
+    val hasICE = !existingICELabel.isNullOrBlank()
+    val existingAutoDetect = if (!isNew && !hasICE) Natives.detectIP(pos) else true
+    val existingHasHostname = if (!isNew && !hasICE) Natives.getbackupHasHostname(pos) else false
+    val existingActiveOnly = if (!isNew) Natives.getbackuphostactive(pos) else false
+    val existingPassiveOnly = if (!isNew) Natives.getbackuphostpassive(pos) else false
+    val originalConnectionType = when {
+        isNew -> ConnectionType.LOCAL
+        hasICE -> ConnectionType.ICE
+        existingHasHostname -> ConnectionType.DIRECT
+        else -> ConnectionType.LOCAL
+    }
 
     var connectionType by remember { mutableStateOf(
-        if (isNew) ConnectionType.LOCAL
-        else if (hasICE) ConnectionType.ICE
-        else if (Natives.getbackupHasHostname(pos)) ConnectionType.DIRECT
-        else ConnectionType.LOCAL
+        originalConnectionType
     )}
 
     // Connection fields
@@ -575,18 +596,37 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
 
     // Auto-detect IP (only for Local mode)
     var autoDetect by remember { mutableStateOf(
-        if (!isNew && !hasICE) Natives.detectIP(pos) else true
+        existingAutoDetect
     )}
 
-    fun save() {
+    fun save(): Boolean {
         val isICE = connectionType == ConnectionType.ICE
         val isDirect = connectionType == ConnectionType.DIRECT
         val isLocal = connectionType == ConnectionType.LOCAL
+        val preserveInitiationMode = !isNew && connectionType == originalConnectionType
+        val finalActiveOnly = if (preserveInitiationMode) existingActiveOnly else false
+        val finalPassiveOnly = if (preserveInitiationMode) existingPassiveOnly else (isSending && !isReceiving && !isICE)
+
+        if (!isSending && !isReceiving) {
+            Toast.makeText(context, context.getString(R.string.specifyreceiveordata), Toast.LENGTH_SHORT).show()
+            return false
+        }
+        if (isSending && isReceiving) {
+            Toast.makeText(context, context.getString(R.string.allsentnoreceive), Toast.LENGTH_LONG).show()
+            return false
+        }
+        if ((isDirect || (isLocal && !autoDetect)) && hostname.isBlank()) {
+            Toast.makeText(context, context.getString(R.string.specifyip), Toast.LENGTH_SHORT).show()
+            return false
+        }
 
         // Build names array
         val finalNames: Array<String>
         val nameCount: Int
         if (isICE) {
+            finalNames = arrayOf("")
+            nameCount = 0
+        } else if (isLocal && autoDetect) {
             finalNames = arrayOf("")
             nameCount = 0
         } else if (hostname.isNotEmpty()) {
@@ -603,7 +643,7 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
         // changebackuphost(pos, names, nr, detect, port, nums, stream, scans,
         //   recover, receive, activeonly, passiveonly, pass, starttime, label,
         //   testip, hasname, icelabel, side)
-        Natives.changebackuphost(
+        val result = Natives.changebackuphost(
             if (isNew) -1 else pos,
             finalNames,
             nameCount,
@@ -614,8 +654,8 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
             /* scans */ isSending,
             /* recover */ false,
             /* receive */ isReceiving,
-            /* activeonly */ false,
-            /* passiveonly */ isSending && !isReceiving && !isICE,
+            /* activeonly */ finalActiveOnly,
+            /* passiveonly */ finalPassiveOnly,
             /* pass */ password.ifEmpty { null },
             /* starttime */ 0L,
             /* label */ connectionLabel.ifEmpty { null },
@@ -624,7 +664,13 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
             /* icelabel */ if (isICE) iceLabel else "",
             /* side */ iceSide
         )
+        if (result < 0) {
+            Toast.makeText(context, changeHostErrorMessage(context, result), Toast.LENGTH_SHORT).show()
+            return false
+        }
+        Natives.resetnetwork()
         tk.glucodata.Applic.wakemirrors()
+        return true
     }
 
     ModalBottomSheet(
@@ -677,12 +723,23 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
             Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (connectionType) {
                     ConnectionType.LOCAL -> {
-                        OutlinedTextField(
-                            value = hostname, onValueChange = { hostname = it },
-                            label = { Text("IP Address (optional)") },
-                            supportingText = { Text("Leave blank to auto-detect") },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        SettingsSwitchItem(
+                            title = "Auto-detect IP",
+                            subtitle = "Use local network discovery for this connection",
+                            checked = autoDetect,
+                            onCheckedChange = { autoDetect = it },
+                            icon = Icons.Filled.Wifi,
+                            iconTint = MaterialTheme.colorScheme.tertiary,
+                            position = CardPosition.SINGLE
                         )
+                        if (!autoDetect) {
+                            OutlinedTextField(
+                                value = hostname, onValueChange = { hostname = it },
+                                label = { Text("IP Address") },
+                                supportingText = { Text("Manual local IP for this device") },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true
+                            )
+                        }
                     }
                     ConnectionType.ICE -> {
                         OutlinedTextField(
@@ -756,12 +813,17 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!isNew) {
                     OutlinedButton(
-                        onClick = { Natives.deletebackuphost(pos); onDismiss() },
+                        onClick = {
+                            Natives.deletebackuphost(pos)
+                            Natives.resetnetwork()
+                            tk.glucodata.Applic.wakemirrors()
+                            onDismiss()
+                        },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) { Text(stringResource(R.string.delete)) }
                 }
-                Button(onClick = { save(); onDismiss() }, modifier = Modifier.weight(1f)) {
+                Button(onClick = { if (save()) onDismiss() }, modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.save))
                 }
             }
@@ -778,11 +840,9 @@ data class MirrorItemData(
 
 fun getMirrorsList(): List<MirrorItemData> {
     val mirrors = mutableListOf<MirrorItemData>()
-    for (i in 0 until 64) {
-        val names = Natives.getbackupIPs(i)
-        if (names != null) {
-            mirrors.add(MirrorItemData(i, Natives.getbackuplabel(i), names, Natives.getbackuphostport(i), Natives.getHostDeactivated(i), Natives.mirrorStatus(i) ?: ""))
-        }
+    for (i in 0 until Natives.backuphostNr()) {
+        val names = Natives.getbackupIPs(i) ?: emptyArray()
+        mirrors.add(MirrorItemData(i, Natives.getbackuplabel(i), names, Natives.getbackuphostport(i), Natives.getHostDeactivated(i), Natives.mirrorStatus(i) ?: ""))
     }
     return mirrors
 }

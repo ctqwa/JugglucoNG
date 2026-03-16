@@ -228,17 +228,25 @@ class DashboardViewModel(
                     android.util.Log.e("DashboardVM", "AiDex getDetailedBleStatus failed for '$sName'", t)
                     null
                 }
-                val prioritizedAiDexStatus = aiDexStatus?.takeIf {
-                    nativeStatus.isBlank() ||
+                val aiDexDashboardStatus = aiDexStatus?.takeIf {
                     it.contains("warmup", ignoreCase = true) ||
                     it.contains("pair", ignoreCase = true) ||
+                    it.contains("bond", ignoreCase = true) ||
                     it.contains("connecting", ignoreCase = true) ||
                     it.contains("reconnecting", ignoreCase = true) ||
+                    it.contains("discover", ignoreCase = true) ||
                     it.contains("history", ignoreCase = true) ||
                     it.contains("broadcast", ignoreCase = true) ||
                     it.contains("handshak", ignoreCase = true) ||
                     it.contains("configur", ignoreCase = true) ||
-                    it.contains("key exchange", ignoreCase = true)
+                    it.contains("setting up", ignoreCase = true) ||
+                    it.contains("key exchange", ignoreCase = true) ||
+                    it.contains("initializing", ignoreCase = true) ||
+                    it.contains("scanning", ignoreCase = true) ||
+                    it.contains("fetching", ignoreCase = true) ||
+                    it.contains("storing", ignoreCase = true) ||
+                    it.contains("paused", ignoreCase = true) ||
+                    it.contains("unpaired", ignoreCase = true)
                 }
                 val snapshot = try {
                     Natives.getSensorUiSnapshot(sName)
@@ -253,7 +261,7 @@ class DashboardViewModel(
                     val expectedEnd = snapshot[3]
                     val officialEnd = snapshot[4]
                     val warmupStatus = getLegacyWarmupStatus(tk.glucodata.Applic.app, sensorKind, startMsec, nativeStatus)
-                    _sensorStatus.value = prioritizedAiDexStatus ?: warmupStatus ?: nativeStatus
+                    _sensorStatus.value = warmupStatus ?: nativeStatus.ifBlank { aiDexDashboardStatus.orEmpty() }
 
                     _viewMode.value = vm
 
@@ -292,7 +300,7 @@ class DashboardViewModel(
                     // Removed separate block that caused scope errors.
                     // All logic is now consolidated above.
                 } else {
-                     _sensorStatus.value = prioritizedAiDexStatus ?: nativeStatus
+                     _sensorStatus.value = nativeStatus.ifBlank { aiDexDashboardStatus.orEmpty() }
                      _viewMode.value = 0
                      _sensorProgress.value = 0f
                      _sensorHoursRemaining.value = 999L
