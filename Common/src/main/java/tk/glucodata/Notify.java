@@ -2625,7 +2625,7 @@ public class Notify {
                 ssb.append(valueText);
 
                 int secStart = ssb.length(); // Include separator in span
-                ssb.append(" / ");
+                ssb.append(" · ");
                 ssb.append(secondary);
 
                 // Secondary Style: Gray, 0.85x

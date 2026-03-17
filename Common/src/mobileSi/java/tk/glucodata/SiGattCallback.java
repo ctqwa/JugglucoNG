@@ -95,6 +95,41 @@ public class SiGattCallback extends SuperGattCallback {
    }
 
    boolean connected = false;
+   private boolean pendingHistoryUiRefresh = false;
+   private long historyReplayBaselineSec = 0L;
+   private final Runnable historyUiRefreshRunnable = new Runnable() {
+      @Override
+      public void run() {
+         pendingHistoryUiRefresh = false;
+         if (stop || dataptr == 0)
+            return;
+         final String mainSensor = Natives.lastsensorname();
+         if (mainSensor != null && !mainSensor.isEmpty() && !mainSensor.equals(SerialNumber))
+            return;
+         long[] lastGlucose = Natives.getlastGlucose();
+         if (lastGlucose == null || lastGlucose.length < 2 || lastGlucose[0] <= historyReplayBaselineSec) {
+            return;
+         }
+         if (constatstatusstr != null &&
+               (constatstatusstr.equals(Applic.app.getString(R.string.status_waiting_for_data)) ||
+                constatstatusstr.equals(Applic.app.getString(R.string.status_raw_values_received)))) {
+            constatstatusstr = "";
+         }
+         historyReplayBaselineSec = lastGlucose[0];
+         Applic.updatescreen();
+         UiRefreshBus.requestDataRefresh();
+      }
+   };
+
+   private void scheduleHistoryUiRefresh() {
+      long[] lastGlucose = Natives.getlastGlucose();
+      if (lastGlucose != null && lastGlucose.length >= 1) {
+         historyReplayBaselineSec = Math.max(historyReplayBaselineSec, lastGlucose[0]);
+      }
+      pendingHistoryUiRefresh = true;
+      Applic.app.getHandler().removeCallbacks(historyUiRefreshRunnable);
+      Applic.app.getHandler().postDelayed(historyUiRefreshRunnable, 250L);
+   }
 
    @SuppressLint("MissingPermission")
    @Override
@@ -476,8 +511,9 @@ public class SiGattCallback extends SuperGattCallback {
       }
       if (res == 1L) {
          sensorstartmsec = Natives.getSensorStartmsec(dataptr);
+         scheduleHistoryUiRefresh();
          return;
-      }
+       }
       if (res == 4L) {
          Applic.app.getHandler().postDelayed(() -> {
             authenticate();

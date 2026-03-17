@@ -197,18 +197,18 @@ public class NotificationChartDrawer {
         String part3 = "";
 
         // First split by " / " for primary vs rest
-        if (text.contains(" / ")) {
-            String[] mainSplit = text.split(" / ", 2);
+        if (text.contains(" · ")) {
+            String[] mainSplit = text.split(" · ", 2);
             part1 = mainSplit[0];
             String rest = mainSplit.length > 1 ? mainSplit[1] : "";
 
             // Then split rest by " · " for secondary vs tertiary
             if (rest.contains(" · ")) {
                 String[] subSplit = rest.split(" · ", 2);
-                part2 = " / " + subSplit[0];
+                part2 = " · " + subSplit[0];
                 part3 = " · " + subSplit[1];
             } else {
-                part2 = " / " + rest;
+                part2 = " · " + rest;
             }
         }
 

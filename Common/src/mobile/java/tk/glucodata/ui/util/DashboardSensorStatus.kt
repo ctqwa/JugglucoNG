@@ -10,7 +10,9 @@ private fun getDriverDashboardStatus(serial: String): String? {
                 it.isNotBlank() &&
                     !it.equals("Connected", ignoreCase = true) &&
                     !it.equals("Disconnected", ignoreCase = true) &&
-                    !it.equals("Receiving", ignoreCase = true)
+                    !it.equals("Receiving", ignoreCase = true) &&
+                    !it.equals("Broadcast", ignoreCase = true) &&
+                    !it.equals("Broadcast Mode", ignoreCase = true)
             }
     } catch (_: Throwable) {
         null

@@ -87,6 +87,11 @@ fun CommonAlertSettings(
                 if (config.vibrationEnabled) add("Vibrate")
                 if (config.flashEnabled) add("Flash")
             }
+            val modeLabels = mapOf(
+                "Sound" to stringResource(R.string.soundname),
+                "Vibrate" to stringResource(R.string.vibrationname),
+                "Flash" to stringResource(R.string.flash)
+            )
 
             ConnectedButtonGroup(
                 options = modes,
@@ -101,6 +106,7 @@ fun CommonAlertSettings(
                     }
                     onConfigChange(newConfig)
                 },
+                labelText = { modeLabels[it] ?: it },
                 label = {
                     val labelRes = when (it) {
                         "Sound" -> R.string.soundname
@@ -135,6 +141,7 @@ fun CommonAlertSettings(
                 options = AlertDeliveryMode.entries,
                 selectedOption = config.deliveryMode,
                 onOptionSelected = { onConfigChange(config.copy(deliveryMode = it)) },
+                labelText = { it.displayName },
                 label = { Text(it.displayName, style = MaterialTheme.typography.labelLarge) },
                 modifier = Modifier.fillMaxWidth(),
                 selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -154,6 +161,7 @@ fun CommonAlertSettings(
                 options = listOf(VolumeProfile.HIGH, VolumeProfile.MEDIUM, VolumeProfile.ASCENDING),
                 selectedOption = if (config.volumeProfile in listOf(VolumeProfile.VIBRATE_ONLY, VolumeProfile.SILENT)) VolumeProfile.MEDIUM else config.volumeProfile,
                 onOptionSelected = { onConfigChange(config.copy(volumeProfile = it)) },
+                labelText = { it.displayName },
                 label = { Text(it.displayName, style = MaterialTheme.typography.labelLarge) },
                 modifier = Modifier.fillMaxWidth(),
                 selectedContainerColor = MaterialTheme.colorScheme.primary,

@@ -10,11 +10,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import tk.glucodata.R
+import tk.glucodata.ui.util.rememberAdaptiveWindowMetrics
 
 enum class SensorType {
     SIBIONICS,
@@ -41,8 +41,7 @@ fun SensorTypePicker(
         val subtitleRes: Int
     )
 
-    val configuration = LocalConfiguration.current
-    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val compact = rememberAdaptiveWindowMetrics().isCompact
     val horizontalPadding = if (compact) 12.dp else 16.dp
     val bottomPadding = if (compact) 20.dp else 32.dp
     val itemSpacing = if (compact) 8.dp else 10.dp

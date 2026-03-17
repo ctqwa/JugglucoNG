@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -50,13 +51,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -65,6 +66,7 @@ import tk.glucodata.R
 import tk.glucodata.logic.TrendEngine
 import tk.glucodata.ui.components.TrendIndicator
 import tk.glucodata.ui.theme.AppTypography
+import tk.glucodata.ui.util.rememberAdaptiveWindowMetrics
 
 enum class AlarmSeverity { LOW, HIGH, NEUTRAL }
 
@@ -126,7 +128,7 @@ private fun PixelAlarmContent(
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
-    val compact = LocalConfiguration.current.screenHeightDp < 700
+    val compact = rememberAdaptiveWindowMetrics().isCompact
     val infiniteTransition = rememberInfiniteTransition(label = "alarm-motion")
     val arrowScale by infiniteTransition.animateFloat(
         initialValue = if (compact) 4.6f else 5.6f,
@@ -219,34 +221,34 @@ private fun AlarmHeader(
     fontFamily: FontFamily,
     modifier: Modifier = Modifier
 ) {
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val normalizedLabel = remember(alarmLabel) { alarmLabel.trim().replace(Regex("\\s+"), " ") }
     val labelWords = remember(normalizedLabel) {
         normalizedLabel.split(Regex("\\s+")).filter { it.isNotEmpty() }
     }
     val displayLabel = remember(labelWords) { formatAlarmLabel(labelWords) }
-    val titleFontSize = remember(displayLabel, labelWords, compact, screenWidthDp) {
-        adaptiveAlarmTitleSize(displayLabel, labelWords, compact, screenWidthDp)
-    }
-    val titleLineHeight = (titleFontSize.value + if (displayLabel.contains('\n')) 5f else 7f).sp
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val titleFontSize = remember(displayLabel, labelWords, compact, maxWidth) {
+            adaptiveAlarmTitleSize(displayLabel, labelWords, compact, maxWidth)
+        }
+        val titleLineHeight = (titleFontSize.value + if (displayLabel.contains('\n')) 5f else 7f).sp
 
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = displayLabel,
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontFamily = fontFamily,
-                fontSize = titleFontSize,
-                lineHeight = titleLineHeight,
-                fontWeight = FontWeight.W100,
-                letterSpacing = 0.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = displayLabel,
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontFamily = fontFamily,
+                    fontSize = titleFontSize,
+                    lineHeight = titleLineHeight,
+                    fontWeight = FontWeight.W100,
+                    letterSpacing = 0.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -506,12 +508,12 @@ private fun adaptiveAlarmTitleSize(
     displayLabel: String,
     words: List<String>,
     compact: Boolean,
-    screenWidthDp: Int
+    availableWidth: Dp
 ) = (
     when {
-        screenWidthDp < 340 -> 52
-        screenWidthDp < 380 -> 58
-        screenWidthDp < 430 -> 64
+        availableWidth < 280.dp -> 52
+        availableWidth < 320.dp -> 58
+        availableWidth < 360.dp -> 64
         else -> 70
     } -
         (if (compact) 4 else 0) -

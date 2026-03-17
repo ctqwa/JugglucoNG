@@ -46,6 +46,7 @@ import static tk.glucodata.Natives.getInvertColors;
 import static tk.glucodata.Natives.hasNeedScan;
 import static tk.glucodata.Natives.setShownintro;
 import static tk.glucodata.Natives.wakelibreview;
+import static tk.glucodata.XInfuus.sendSensorActivateBroadcast;
 import static tk.glucodata.help.hidekeyboard;
 import static tk.glucodata.settings.Settings.removeContentView;
 
@@ -1029,7 +1030,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             if (Natives.getlibrelinkused()) {
                 final var starttime = Natives.laststarttime();
                 if (starttime != 0L) {
-                    XInfuus.sendSensorActivateBroadcast(app, Natives.lastsensorname(), starttime);
+                    sendSensorActivateBroadcast(app, Natives.lastsensorname(), starttime);
                 }
             }
         } else {

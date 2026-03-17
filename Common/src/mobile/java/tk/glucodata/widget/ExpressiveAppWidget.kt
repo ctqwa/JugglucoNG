@@ -226,7 +226,7 @@ class ExpressiveAppWidget : GlanceAppWidget() {
                         // Separator + Secondary handled minimally to save space in pill
                         if (showSecondary) {
                             Text(
-                                text = " / ",
+                                text = " · ",
                                 style = TextStyle(
                                     color = GlanceTheme.colors.onSurfaceVariant,
                                     fontSize = 28.sp,

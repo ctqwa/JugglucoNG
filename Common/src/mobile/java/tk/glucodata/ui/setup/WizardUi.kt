@@ -1,10 +1,9 @@
 package tk.glucodata.ui.setup
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import tk.glucodata.ui.util.rememberAdaptiveWindowMetrics
 
 data class WizardUiMetrics(
     val compact: Boolean,
@@ -19,11 +18,7 @@ data class WizardUiMetrics(
 
 @Composable
 fun rememberWizardUiMetrics(): WizardUiMetrics {
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current.density
-    val compact = configuration.screenWidthDp <= 360 ||
-        configuration.screenHeightDp <= 700 ||
-        density <= 2.0f
+    val compact = rememberAdaptiveWindowMetrics().isCompact
 
     return if (compact) {
         WizardUiMetrics(

@@ -40,9 +40,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.key
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.ui.theme.displayLargeExpressive
@@ -85,15 +90,18 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.lerp
-import android.content.res.Configuration
 import kotlin.math.cos
 import kotlin.math.sin
 import tk.glucodata.R
 import tk.glucodata.Applic
 import tk.glucodata.logic.TrendEngine
+import tk.glucodata.ui.util.AdaptiveContentWidthClass
+import tk.glucodata.ui.util.adaptiveContentWidthClass
+import tk.glucodata.ui.util.rememberAdaptiveWindowMetrics
 
 private data class TrendCornerWeights(
     val topStart: Float,
@@ -179,11 +187,7 @@ fun DashboardCombinedHeader(
             tk.glucodata.logic.TrendEngine.TrendResult(tk.glucodata.logic.TrendEngine.TrendState.Unknown, 0f, 0f, 0f, 0f)
         }
     }
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val isCompactWidth = configuration.screenWidthDp <200
-    val startPadding = if (isCompactWidth) 20.dp else 28.dp
-    val trendIconSize = if (isCompactWidth) 34.dp else 40.dp
+    val isLandscape = rememberAdaptiveWindowMetrics().isLandscape
     val cornerWeights = remember(trendResult.velocity) { trendCornerWeightsFromVelocity(trendResult.velocity) }
     val cornerAnimSpec = spring<Dp>(
         dampingRatio = Spring.DampingRatioLowBouncy,
@@ -247,43 +251,6 @@ fun DashboardCombinedHeader(
     val hasSecondary = secondaryText != null
     val hasTertiary = tertiaryText != null
     val hasThreeValues = hasSecondary && hasTertiary
-    val primaryValueStyle = if (isCompactWidth) {
-        MaterialTheme.typography.displayMedium
-    } else {
-        MaterialTheme.typography.displayLargeExpressive
-    }
-    val secondaryInlineStyle = if (isCompactWidth) {
-        MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium)
-    } else {
-        MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium)
-    }
-    val slashStyle = if (isCompactWidth) {
-        MaterialTheme.typography.titleLarge
-    } else {
-        MaterialTheme.typography.headlineMedium
-    }
-    val secondaryThreeValueStyle = if (isCompactWidth) {
-        MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.18.sp
-        )
-    } else {
-        MaterialTheme.typography.titleLarge.copy(
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.12.sp
-        )
-    }
-    val tertiaryThreeValueStyle = if (isCompactWidth) {
-        MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 0.22.sp
-        )
-    } else {
-        MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 0.18.sp
-        )
-    }
 
     val heroCard: @Composable (Modifier) -> Unit = { modifier ->
         Card(
@@ -300,146 +267,136 @@ fun DashboardCombinedHeader(
                 bottomStart = heroBottomStart
             )
         ) {
-            if (isLandscape) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = startPadding, end = 16.dp, top = 12.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                            AnimatedContent(
-                                targetState = primaryText,
-                                transitionSpec = {
-                                    (slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { -it / 2 } + fadeIn(tween(200)))
-                                        .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it / 2 } + fadeOut(tween(100)))
-                                },
-                                label = "GlucoseHeroAnimation"
-                            ) {
-                                Text(
-                                    text = primaryText,
-                                    style = primaryValueStyle,
-                                    color = glucoseContentColor,
-                                    softWrap = false,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+            var heroContentWidthPx by remember { mutableStateOf(0) }
+            val density = LocalDensity.current
 
-                        tk.glucodata.ui.components.TrendIndicator(
-                            trendResult = trendResult,
-                            modifier = Modifier.size(trendIconSize),
-                            color = glucoseContentColor
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { heroContentWidthPx = it.width }
+            ) {
+                val heroWidthDp = with(density) { heroContentWidthPx.toDp() }
+                val heroWidthClass = if (heroContentWidthPx > 0) {
+                    adaptiveContentWidthClass(
+                        width = heroWidthDp,
+                        compactMax = 180.dp,
+                        mediumMax = 260.dp
+                    )
+                } else {
+                    AdaptiveContentWidthClass.Medium
+                }
+                val resolvedStartPadding = when {
+                    isLandscape -> 20.dp
+                    heroWidthClass == AdaptiveContentWidthClass.Compact -> 16.dp
+                    heroWidthClass == AdaptiveContentWidthClass.Medium -> 20.dp
+                    else -> 28.dp
+                }
+                val resolvedEndPadding = if (heroWidthClass == AdaptiveContentWidthClass.Compact) 12.dp else 16.dp
+                val resolvedVerticalPadding = if (heroWidthClass == AdaptiveContentWidthClass.Compact) 10.dp else 12.dp
+                val resolvedTrendIconSize = when (heroWidthClass) {
+                    AdaptiveContentWidthClass.Compact -> 30.dp
+                    AdaptiveContentWidthClass.Medium -> 38.dp
+                    AdaptiveContentWidthClass.Expanded -> 42.dp
+                }
+                val resolvedClusterGap = if (heroWidthClass == AdaptiveContentWidthClass.Compact) 8.dp else 12.dp
+                val primaryValueStyle = (
+                    if (heroWidthClass == AdaptiveContentWidthClass.Compact) MaterialTheme.typography.displayMedium
+                    else MaterialTheme.typography.displayLargeExpressive
+                ).copy(fontFeatureSettings = "tnum")
+                val secondaryInlineStyle = when (heroWidthClass) {
+                    AdaptiveContentWidthClass.Compact -> MaterialTheme.typography.headlineSmall
+                    AdaptiveContentWidthClass.Medium -> MaterialTheme.typography.headlineMedium
+                    AdaptiveContentWidthClass.Expanded -> MaterialTheme.typography.headlineLarge
+                }.copy(fontFeatureSettings = "tnum")
+                val slashStyle = when (heroWidthClass) {
+                    AdaptiveContentWidthClass.Compact -> MaterialTheme.typography.headlineSmall
+                    AdaptiveContentWidthClass.Medium -> MaterialTheme.typography.headlineMedium
+                    AdaptiveContentWidthClass.Expanded -> MaterialTheme.typography.headlineLarge
+                }.copy(fontFeatureSettings = "tnum")
+                val secondaryThreeValueStyle = (
+                    when (heroWidthClass) {
+                        AdaptiveContentWidthClass.Compact -> MaterialTheme.typography.titleLarge.copy(
+                            letterSpacing = 0.18.sp,
+                            lineHeight = 24.sp
+                        )
+                        AdaptiveContentWidthClass.Medium -> MaterialTheme.typography.headlineMedium.copy(
+                            letterSpacing = 0.10.sp,
+                            lineHeight = 34.sp
+                        )
+                        AdaptiveContentWidthClass.Expanded -> MaterialTheme.typography.headlineLarge.copy(
+                            letterSpacing = 0.06.sp,
+                            lineHeight = 40.sp
                         )
                     }
+                ).copy(fontFeatureSettings = "tnum")
+                val tertiaryThreeValueStyle = (
+                    when (heroWidthClass) {
+                        AdaptiveContentWidthClass.Compact -> MaterialTheme.typography.titleSmall.copy(
+                            letterSpacing = 0.22.sp,
+                            lineHeight = 18.sp
+                        )
+                        AdaptiveContentWidthClass.Medium -> MaterialTheme.typography.titleMedium.copy(
+                            letterSpacing = 0.16.sp,
+                            lineHeight = 24.sp
+                        )
+                        AdaptiveContentWidthClass.Expanded -> MaterialTheme.typography.titleLarge.copy(
+                            letterSpacing = 0.10.sp,
+                            lineHeight = 30.sp
+                        )
+                    }
+                ).copy(fontFeatureSettings = "tnum")
 
-                    if (hasThreeValues) {
+                if (isLandscape) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = resolvedStartPadding,
+                                end = resolvedEndPadding,
+                                top = resolvedVerticalPadding,
+                                bottom = resolvedVerticalPadding
+                            ),
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = secondaryText ?: "",
-                                style = secondaryThreeValueStyle,
-                                color = glucoseContentColor.copy(alpha = 0.90f),
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = "·",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = glucoseContentColor.copy(alpha = 0.40f),
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                            Text(
-                                text = tertiaryText ?: "",
-                                style = tertiaryThreeValueStyle,
-                                color = glucoseContentColor.copy(alpha = 0.66f),
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                        }
-                    } else if (hasSecondary) {
-                        Text(
-                            text = secondaryText ?: "",
-                            style = secondaryInlineStyle,
-                            color = glucoseContentColor.copy(alpha = 0.80f),
-                            softWrap = false,
-                            maxLines = 1,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    } else if (hasTertiary) {
-                        Text(
-                            text = tertiaryText ?: "",
-                            style = tertiaryThreeValueStyle,
-                            color = glucoseContentColor.copy(alpha = 0.60f),
-                            softWrap = false,
-                            maxLines = 1,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = startPadding, end = 16.dp, top = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AnimatedContent(
-                            targetState = primaryText,
-                            transitionSpec = {
-                                (slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { -it / 2 } + fadeIn(tween(200)))
-                                    .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it / 2 } + fadeOut(tween(100)))
-                            },
-                            label = "GlucoseHeroAnimation"
-                        ) {
-                            Text(
-                                text = primaryText,
-                                style = primaryValueStyle,
-                                color = glucoseContentColor,
-                                softWrap = false,
-                                maxLines = 1
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                DashboardHeroPrimaryText(
+                                    value = primaryText,
+                                    style = primaryValueStyle,
+                                    color = glucoseContentColor
+                                )
+                            }
+
+                            tk.glucodata.ui.components.TrendIndicator(
+                                trendResult = trendResult,
+                                modifier = Modifier.size(resolvedTrendIconSize),
+                                color = glucoseContentColor
                             )
                         }
 
                         if (hasThreeValues) {
                             Row(
-                                modifier = Modifier.padding(start = 6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "/",
-                                    style = slashStyle,
-                                    color = glucoseContentColor.copy(alpha = 0.70f),
-                                    softWrap = false,
-                                    maxLines = 1,
-                                    modifier = Modifier.offset(y = (-2).dp)
-                                )
                                 Text(
                                     text = secondaryText ?: "",
                                     style = secondaryThreeValueStyle,
                                     color = glucoseContentColor.copy(alpha = 0.90f),
                                     softWrap = false,
-                                    maxLines = 1,
-                                    modifier = Modifier
-                                        .padding(start = 4.dp)
-                                        .offset(y = 1.dp)
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = "·",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                                     color = glucoseContentColor.copy(alpha = 0.40f),
                                     modifier = Modifier.padding(horizontal = 4.dp)
                                 )
@@ -448,36 +405,62 @@ fun DashboardCombinedHeader(
                                     style = tertiaryThreeValueStyle,
                                     color = glucoseContentColor.copy(alpha = 0.66f),
                                     softWrap = false,
-                                    maxLines = 1,
-                                    modifier = Modifier.offset(y = (-2).dp)
+                                    maxLines = 1
                                 )
                             }
                         } else if (hasSecondary) {
                             Text(
-                                text = "/ ${secondaryText ?: ""}",
+                                text = secondaryText ?: "",
                                 style = secondaryInlineStyle,
                                 color = glucoseContentColor.copy(alpha = 0.80f),
                                 softWrap = false,
                                 maxLines = 1,
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(top = 4.dp)
                             )
                         } else if (hasTertiary) {
                             Text(
-                                text = "/ ${tertiaryText ?: ""}",
+                                text = tertiaryText ?: "",
                                 style = tertiaryThreeValueStyle,
                                 color = glucoseContentColor.copy(alpha = 0.60f),
                                 softWrap = false,
                                 maxLines = 1,
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(top = 4.dp)
                             )
                         }
                     }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = resolvedStartPadding,
+                                end = resolvedEndPadding,
+                                top = resolvedVerticalPadding,
+                                bottom = resolvedVerticalPadding
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DashboardHeroValueCluster(
+                            modifier = Modifier.weight(1f),
+                            primaryText = primaryText,
+                            secondaryText = secondaryText,
+                            tertiaryText = tertiaryText,
+                            primaryStyle = primaryValueStyle,
+                            secondaryInlineStyle = secondaryInlineStyle,
+                            separatorStyle = slashStyle,
+                            secondaryStackStyle = secondaryThreeValueStyle,
+                            tertiaryStackStyle = tertiaryThreeValueStyle,
+                            contentColor = glucoseContentColor
+                        )
 
-                    tk.glucodata.ui.components.TrendIndicator(
-                        trendResult = trendResult,
-                        modifier = Modifier.size(trendIconSize),
-                        color = glucoseContentColor
-                    )
+                        Spacer(modifier = Modifier.width(resolvedClusterGap))
+
+                        tk.glucodata.ui.components.TrendIndicator(
+                            trendResult = trendResult,
+                            modifier = Modifier.size(resolvedTrendIconSize),
+                            color = glucoseContentColor
+                        )
+                    }
                 }
             }
         }
@@ -536,6 +519,7 @@ fun DashboardCombinedHeader(
                                 style = MaterialTheme.typography.labelMedium, // M3 Standard
                                 color = sensorContentColor.copy(alpha = 0.7f),
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false) // Allow shrinking for dots
                             )
                             
@@ -620,14 +604,271 @@ fun DashboardCombinedHeader(
         ) {
             heroCard(
                 Modifier
-                    .weight(0.7f)
+                    .weight(0.72f)
                     .fillMaxHeight()
             )
             sensorCard(
                 Modifier
-                    .weight(0.3f)
+                    .weight(0.28f)
                     .fillMaxHeight()
             )
+        }
+    }
+}
+
+@Composable
+private fun DashboardHeroPrimaryText(
+    value: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    AnimatedContent(
+        targetState = value,
+        transitionSpec = {
+            (slideInVertically(
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) { -it / 2 } + fadeIn(tween(200)))
+                .togetherWith(
+                    slideOutVertically(
+                        spring(stiffness = Spring.StiffnessMedium)
+                    ) { it / 2 } + fadeOut(tween(100))
+                )
+        },
+        label = "GlucoseHeroAnimation"
+    ) { animatedValue ->
+        Text(
+            text = animatedValue,
+            style = style,
+            color = color,
+            softWrap = false,
+            maxLines = 1,
+            modifier = modifier
+        )
+    }
+}
+
+private enum class DashboardHeroValueLayoutMode {
+    PrimaryOnly,
+    InlinePair,
+    StackedPair,
+    InlineStack,
+    StackedStack
+}
+
+@Composable
+private fun DashboardHeroValueCluster(
+    primaryText: String,
+    secondaryText: String?,
+    tertiaryText: String?,
+    primaryStyle: TextStyle,
+    secondaryInlineStyle: TextStyle,
+    separatorStyle: TextStyle,
+    secondaryStackStyle: TextStyle,
+    tertiaryStackStyle: TextStyle,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val hasSecondary = secondaryText != null
+    val hasTertiary = tertiaryText != null
+    val hasThreeValues = hasSecondary && hasTertiary
+    val pairText = secondaryText ?: tertiaryText
+    val inlinePairColor = if (hasSecondary) {
+        contentColor.copy(alpha = 0.80f)
+    } else {
+        contentColor.copy(alpha = 0.60f)
+    }
+    val stackedPairStyle = if (hasSecondary) secondaryStackStyle else tertiaryStackStyle
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    var availableWidthPx by remember { mutableStateOf(0) }
+
+    Box(
+        modifier = modifier.onSizeChanged { availableWidthPx = it.width },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val primaryWidthPx = textMeasurer.measure(
+            text = primaryText,
+            style = primaryStyle,
+            maxLines = 1
+        ).size.width
+        val inlinePairWidthPx = if (!hasThreeValues && pairText != null) {
+            primaryWidthPx +
+                with(density) { 8.dp.roundToPx() } +
+                textMeasurer.measure(
+                    text = "· $pairText",
+                    style = secondaryInlineStyle,
+                    maxLines = 1
+                ).size.width
+        } else {
+            0
+        }
+        val inlineStackWidthPx = if (hasThreeValues) {
+            val separatorWidth = textMeasurer.measure(
+                text = "·",
+                style = separatorStyle,
+                maxLines = 1
+            ).size.width
+            val secondaryWidth = textMeasurer.measure(
+                text = secondaryText.orEmpty(),
+                style = secondaryStackStyle,
+                maxLines = 1
+            ).size.width
+            val tertiaryWidth = textMeasurer.measure(
+                text = tertiaryText.orEmpty(),
+                style = tertiaryStackStyle,
+                maxLines = 1
+            ).size.width
+            primaryWidthPx +
+                with(density) { 10.dp.roundToPx() } +
+                separatorWidth +
+                with(density) { 6.dp.roundToPx() } +
+                maxOf(secondaryWidth, tertiaryWidth)
+        } else {
+            0
+        }
+        val layoutMode = when {
+            hasThreeValues && inlineStackWidthPx <= availableWidthPx -> DashboardHeroValueLayoutMode.InlineStack
+            hasThreeValues -> DashboardHeroValueLayoutMode.StackedStack
+            pairText != null && inlinePairWidthPx <= availableWidthPx -> DashboardHeroValueLayoutMode.InlinePair
+            pairText != null -> DashboardHeroValueLayoutMode.StackedPair
+            else -> DashboardHeroValueLayoutMode.PrimaryOnly
+        }
+
+        when (layoutMode) {
+            DashboardHeroValueLayoutMode.PrimaryOnly -> {
+                DashboardHeroPrimaryText(
+                    value = primaryText,
+                    style = primaryStyle,
+                    color = contentColor
+                )
+            }
+
+            DashboardHeroValueLayoutMode.InlinePair -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DashboardHeroPrimaryText(
+                        value = primaryText,
+                        style = primaryStyle,
+                        color = contentColor
+                    )
+                    Text(
+                        text = "· ${pairText.orEmpty()}",
+                        style = secondaryInlineStyle,
+                        color = inlinePairColor,
+                        softWrap = false,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+
+            DashboardHeroValueLayoutMode.StackedPair -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    DashboardHeroPrimaryText(
+                        value = primaryText,
+                        style = primaryStyle,
+                        color = contentColor
+                    )
+                    Text(
+                        text = "· ${pairText.orEmpty()}",
+                        style = stackedPairStyle,
+                        color = inlinePairColor,
+                        softWrap = false,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                    )
+                }
+            }
+
+            DashboardHeroValueLayoutMode.InlineStack -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DashboardHeroPrimaryText(
+                        value = primaryText,
+                        style = primaryStyle,
+                        color = contentColor
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(
+                        text = "·",
+                        style = separatorStyle,
+                        color = contentColor.copy(alpha = 0.70f),
+                        softWrap = false,
+                        maxLines = 1
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Column(
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = secondaryText.orEmpty(),
+                            style = secondaryStackStyle,
+                            color = contentColor.copy(alpha = 0.90f),
+                            textAlign = TextAlign.Start,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = tertiaryText.orEmpty(),
+                            style = tertiaryStackStyle,
+                            color = contentColor.copy(alpha = 0.70f),
+                            textAlign = TextAlign.Start,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            DashboardHeroValueLayoutMode.StackedStack -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    DashboardHeroPrimaryText(
+                        value = primaryText,
+                        style = primaryStyle,
+                        color = contentColor
+                    )
+                    Column(
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "· ${secondaryText.orEmpty()}",
+                            style = secondaryStackStyle,
+                            color = contentColor.copy(alpha = 0.90f),
+                            textAlign = TextAlign.Start,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = tertiaryText.orEmpty(),
+                            style = tertiaryStackStyle,
+                            color = contentColor.copy(alpha = 0.70f),
+                            textAlign = TextAlign.Start,
+                            softWrap = false,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 12.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

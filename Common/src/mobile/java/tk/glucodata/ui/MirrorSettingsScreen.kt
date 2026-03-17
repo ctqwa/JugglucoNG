@@ -696,6 +696,13 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
                 options = ConnectionType.entries.toList(),
                 selectedOption = connectionType,
                 onOptionSelected = { connectionType = it },
+                labelText = { option ->
+                    when (option) {
+                        ConnectionType.LOCAL -> "Local"
+                        ConnectionType.ICE -> "ICE"
+                        ConnectionType.DIRECT -> "Direct IP"
+                    }
+                },
                 label = { option ->
                     Text(when (option) {
                         ConnectionType.LOCAL -> "Local"

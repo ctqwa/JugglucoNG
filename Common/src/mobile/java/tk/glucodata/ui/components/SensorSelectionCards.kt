@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.Font
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.glucodata.R
+import tk.glucodata.ui.util.rememberAdaptiveWindowMetrics
 
 @OptIn(ExperimentalTextApi::class)
 private fun jugglucoBrandFamily(weight: Int, width: Float): FontFamily {
@@ -59,8 +59,7 @@ fun SensorSelectionCards(
     onSensorSelected: (SensorType) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = LocalConfiguration.current
-    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val compact = rememberAdaptiveWindowMetrics().isCompact
     val horizontalPadding = 0.dp
     val cardGap = if (compact) 8.dp else 10.dp
     var visible by remember { mutableStateOf(false) }
@@ -296,8 +295,7 @@ fun DashboardEmptyState(
     onImportHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = LocalConfiguration.current
-    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val compact = rememberAdaptiveWindowMetrics().isCompact
     val sidePadding = 16.dp
     val scrollState = rememberScrollState()
     val brandWeight = if (compact) 450 else 470
@@ -381,8 +379,7 @@ fun SensorsEmptyState(
     onSensorSelected: (SensorType) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = LocalConfiguration.current
-    val compact = configuration.screenWidthDp <= 360 || configuration.screenHeightDp <= 700
+    val compact = rememberAdaptiveWindowMetrics().isCompact
     Column(
         modifier = modifier
             .fillMaxWidth()

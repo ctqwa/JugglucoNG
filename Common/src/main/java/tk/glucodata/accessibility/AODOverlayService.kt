@@ -442,14 +442,14 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
                     val rawSecondary = rawVal.takeIf { it > 0.1f }?.let {
                         tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol)
                     }
-                    if (rawSecondary != null) "$calText / $rawSecondary" else calText
+                    if (rawSecondary != null) "$calText · $rawSecondary" else calText
                 }
                 hasCalibration && hideInitialWhenCalibrated && viewMode == 3 -> {
                     val calText = tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
                     val autoSecondary = autoVal.takeIf { it > 0.1f }?.let {
                         tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol)
                     }
-                    if (autoSecondary != null) "$calText / $autoSecondary" else calText
+                    if (autoSecondary != null) "$calText · $autoSecondary" else calText
                 }
                 hasCalibration && hideInitialWhenCalibrated -> {
                     tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
@@ -458,12 +458,12 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
                     // 3 values: Calibrated / Secondary · Tertiary
                     val secondary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
                     val tertiary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol)
-                    "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} / $secondary · $tertiary"
+                    "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} · $secondary · $tertiary"
                 }
                 hasCalibration -> {
                     // 2 values: Calibrated / Base
                     val base = if (isRawMode) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
-                    "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} / $base"
+                    "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} · $base"
                 }
                 viewMode == 2 || viewMode == 3 -> {
                     // 2 values: Primary / Secondary
@@ -488,7 +488,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         }
 
         if (!showSecondary) {
-            valStr = valStr.substringBefore(" / ").substringBefore(" · ")
+            valStr = valStr.substringBefore(" · ").substringBefore(" · ")
         }
 
         val glucoseColor = NotificationChartDrawer.getGlucoseColor(this, glvalue, isMmol)

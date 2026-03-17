@@ -391,6 +391,7 @@ fun StatsScreen(
                         onOptionSelected = { quickDays ->
                             reportDaysInput = quickDays.toString()
                         },
+                        labelText = { days -> "${days}D" },
                         label = { days ->
                             Text(
                                 text = "${days}D",
@@ -753,6 +754,7 @@ private fun RangeSelectorCard(
             }
         }
 
+        val context = LocalContext.current
         ConnectedButtonGroup(
             options = ranges,
             selectedOption = selectedRange,
@@ -766,6 +768,7 @@ private fun RangeSelectorCard(
                     onRangeSelected(range)
                 }
             },
+            labelText = { option -> context.getString(option.labelResId) },
             label = { option -> Text(
                 text = stringResource(option.labelResId),
                 style = MaterialTheme.typography.labelLarge
@@ -1787,10 +1790,12 @@ private fun PatternsCard(
             }
 
             if (availableTabs.size > 1) {
+                val dailyTrendsLabel = stringResource(R.string.daily_trends)
                 ConnectedButtonGroup(
                     options = availableTabs,
                     selectedOption = selectedTab,
                     onOptionSelected = { selectedTab = it },
+                    labelText = { tab -> if (tab == PatternTab.AGP) "AGP" else dailyTrendsLabel },
                     label = { tab ->
                         Text(
                             text = if (tab == PatternTab.AGP) "AGP" else stringResource(R.string.daily_trends),

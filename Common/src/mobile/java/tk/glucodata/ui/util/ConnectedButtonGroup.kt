@@ -19,12 +19,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.rememberTextMeasurer
 
 /**
  * A Connected Button Group with M3 Expressive shape morphing.
@@ -46,6 +56,7 @@ fun <T> ConnectedButtonGroup(
     selectedOptions: List<T> = emptyList(),
     onOptionSelected: (T) -> Unit,
     label: @Composable (T) -> Unit,
+    labelText: ((T) -> String)? = null,
     icon: (@Composable (T) -> ImageVector?)? = null,
     modifier: Modifier = Modifier,
     multiSelect: Boolean = false,
@@ -111,30 +122,67 @@ fun <T> ConnectedButtonGroup(
                 contentColor = contentColor,
                 border = null 
             ) {
-                 Row(
+                var availableWidthPx by remember(option) { mutableIntStateOf(0) }
+                val customIcon = icon?.invoke(option)
+                val density = LocalDensity.current
+                val textMeasurer = rememberTextMeasurer()
+                val availableWidth = with(density) { availableWidthPx.toDp() }
+                val labelTextStyle: TextStyle = if (labelText != null && availableWidthPx > 0) {
+                    val horizontalPadding = 4.dp
+                    val iconAllowance = if (customIcon != null) 26.dp else 0.dp
+                    val textWidthPx = with(density) { (availableWidth - horizontalPadding - iconAllowance).coerceAtLeast(24.dp).toPx() }
+                    listOf(
+                        MaterialTheme.typography.labelLarge,
+                        MaterialTheme.typography.labelMedium,
+                        MaterialTheme.typography.labelSmall
+                    ).firstOrNull { style ->
+                        options.maxOfOrNull { item ->
+                            textMeasurer.measure(
+                                text = AnnotatedString(labelText(item)),
+                                style = style,
+                                maxLines = 1
+                            ).size.width
+                        }?.let { it <= textWidthPx } == true
+                    } ?: MaterialTheme.typography.labelSmall
+                } else {
+                    when {
+                        availableWidthPx == 0 -> MaterialTheme.typography.labelLarge
+                        availableWidth >= 92.dp -> MaterialTheme.typography.labelLarge
+                        availableWidth >= 72.dp -> MaterialTheme.typography.labelMedium
+                        else -> MaterialTheme.typography.labelSmall
+                    }
+                }
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp), // Reduce padding effectively to fit text
+                        .fillMaxHeight()
+                        .onSizeChanged { availableWidthPx = it.width }
+                        .padding(horizontal = 2.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Icon logic: Respect caller provided icon.
-                    // If caller wants an icon for selected state, they return it.
-                    val customIcon = icon?.invoke(option)
                     if (customIcon != null) {
-                         Icon(
+                        Icon(
                             imageVector = customIcon,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(if (availableWidth >= 72.dp) 8.dp else 4.dp))
                     }
 
-                    // Explicit Typography container to ensure consistency
-                    androidx.compose.material3.ProvideTextStyle(
-                         value = MaterialTheme.typography.labelLarge
-                    ) {
-                        label(option)
+                    if (labelText != null) {
+                        Text(
+                            text = labelText(option),
+                            style = labelTextStyle,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        androidx.compose.material3.ProvideTextStyle(value = labelTextStyle) {
+                            label(option)
+                        }
                     }
                 }
             }
