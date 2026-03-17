@@ -1082,8 +1082,13 @@ fun DashboardScreen(
     ) { padding ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val latestPoint = remember(glucoseHistory) { glucoseHistory.maxByOrNull { it.timestamp } }
-            val configuration = LocalConfiguration.current
-            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val adaptiveMetrics = rememberAdaptiveWindowMetrics()
+            val isLandscape = adaptiveMetrics.isLandscape
+            val topContentInset = padding.calculateTopPadding()
+            val bottomContentInset = padding.calculateBottomPadding()
+            val viewportHeight = remember(maxHeight, topContentInset, bottomContentInset) {
+                (maxHeight - topContentInset - bottomContentInset).coerceAtLeast(0.dp)
+            }
             val listState = rememberLazyListState()
             val collapseDistancePx = with(LocalDensity.current) { 220.dp.toPx() }
             val collapseFraction by remember(listState, collapseDistancePx, isLandscape) {
@@ -1119,100 +1124,109 @@ fun DashboardScreen(
                 label = "DashboardExpandedProgress"
             )
 
+            val contentHorizontalPadding = when (adaptiveMetrics.layoutDensity) {
+                AdaptiveLayoutDensity.Compact -> 12.dp
+                AdaptiveLayoutDensity.Regular -> 14.dp
+                AdaptiveLayoutDensity.Comfortable -> 16.dp
+            }
+            val contentGap = contentHorizontalPadding
+            val heroFallbackHeight = when (adaptiveMetrics.layoutDensity) {
+                AdaptiveLayoutDensity.Compact -> 84.dp
+                AdaptiveLayoutDensity.Regular -> 92.dp
+                AdaptiveLayoutDensity.Comfortable -> 100.dp
+            }
+            val dashboardListTopPadding = 16.dp
+            val dashboardItemSpacing = 12.dp
+            val readingsTopSpacing = 0.dp
+            val collapsedChartHorizontalPadding = when (adaptiveMetrics.layoutDensity) {
+                AdaptiveLayoutDensity.Compact -> 10.dp
+                AdaptiveLayoutDensity.Regular -> 12.dp
+                AdaptiveLayoutDensity.Comfortable -> 14.dp
+            }
+            val defaultVisibleReadingRows = when (adaptiveMetrics.layoutDensity) {
+                AdaptiveLayoutDensity.Compact -> 3.0f
+                AdaptiveLayoutDensity.Regular -> 3.5f
+                AdaptiveLayoutDensity.Comfortable -> 4.0f
+            }
+            val middleVisibleReadingRows = when (adaptiveMetrics.layoutDensity) {
+                AdaptiveLayoutDensity.Compact -> 1.0f
+                AdaptiveLayoutDensity.Regular -> 1.5f
+                AdaptiveLayoutDensity.Comfortable -> 2.0f
+            }
+            val fallbackReadingRowHeight = when (adaptiveMetrics.layoutDensity) {
+                AdaptiveLayoutDensity.Compact -> 56.dp
+                AdaptiveLayoutDensity.Regular -> 58.dp
+                AdaptiveLayoutDensity.Comfortable -> 60.dp
+            }
             val density = LocalDensity.current
-            val viewportContentHeight = (
-                maxHeight -
-                    padding.calculateTopPadding() -
-                    padding.calculateBottomPadding()
-                ).coerceAtLeast(0.dp)
-            val viewportProgress = ((viewportContentHeight.value - 680f) / 220f).coerceIn(0f, 1f)
-            fun lerpDp(small: Float, large: Float) = (small + (large - small) * viewportProgress).dp
-            fun lerpFloat(small: Float, large: Float) = small + (large - small) * viewportProgress
-
-            val contentHorizontalPadding = lerpDp(12f, 16f)
-            val contentGap = lerpDp(12f, 16f)
-
-            var dashboardHeaderHeightPx by remember { mutableIntStateOf(0) }
-            var dashboardReadingRowHeightPx by remember { mutableIntStateOf(0) }
-
+            var measuredHeaderHeightPx by remember { mutableIntStateOf(0) }
+            var measuredReadingRowHeightPx by remember { mutableIntStateOf(0) }
             val measuredHeaderHeight = with(density) {
-                if (dashboardHeaderHeightPx > 0) dashboardHeaderHeightPx.toDp() else lerpDp(96f, 108f)
+                if (measuredHeaderHeightPx > 0) measuredHeaderHeightPx.toDp() else heroFallbackHeight
             }
             val measuredReadingRowHeight = with(density) {
-                if (dashboardReadingRowHeightPx > 0) dashboardReadingRowHeightPx.toDp() else 56.dp
+                if (measuredReadingRowHeightPx > 0) measuredReadingRowHeightPx.toDp() else fallbackReadingRowHeight
             }
 
-            val portraitListTopPadding = 16.dp
-            val portraitListBottomPadding = 12.dp
-            val portraitItemSpacing = 12.dp
-            val readingsTopPadding = 8.dp
-
-            val portraitAvailableChartHeight = (
-                viewportContentHeight -
-                    portraitListTopPadding -
-                    measuredHeaderHeight -
-                    portraitItemSpacing -
-                    portraitListBottomPadding
-                ).coerceAtLeast(0.dp)
-
-            val collapsedVisibleRows = lerpFloat(3.05f, 4.0f)
-            val midVisibleRows = lerpFloat(1.2f, 1.85f)
-            val collapsedVisibleReadingsHeight = measuredReadingRowHeight * collapsedVisibleRows
-            val midVisibleReadingsHeight = measuredReadingRowHeight * midVisibleRows
-            val minChartConsumedHeight = lerpDp(220f, 300f).coerceAtMost(portraitAvailableChartHeight)
-            val collapsedChartConsumedCap = (
-                viewportContentHeight * lerpFloat(0.44f, 0.48f)
-            ).coerceAtMost(portraitAvailableChartHeight)
-            val midChartConsumedCap = (
-                viewportContentHeight * lerpFloat(0.58f, 0.64f)
-            ).coerceAtMost(portraitAvailableChartHeight)
-
-            val portraitCollapsedChartHeight = minOf(
-                (
-                portraitAvailableChartHeight -
-                    portraitItemSpacing -
-                    readingsTopPadding -
-                    collapsedVisibleReadingsHeight
-                ),
-                collapsedChartConsumedCap
-            ).coerceIn(minChartConsumedHeight, portraitAvailableChartHeight)
-
-            val portraitMidChartHeight = minOf(
-                (
-                portraitAvailableChartHeight -
-                    portraitItemSpacing -
-                    readingsTopPadding -
-                    midVisibleReadingsHeight
-                ),
-                midChartConsumedCap
-            ).coerceIn(portraitCollapsedChartHeight, portraitAvailableChartHeight)
-
-            val portraitFullChartHeight = portraitAvailableChartHeight
-            val chartCollapseDelta = lerpDp(32f, 72f)
-            val chartRestingConsumedHeight = (
-                portraitCollapsedChartHeight - (chartCollapseDelta * collapseFraction)
-            ).coerceIn(minChartConsumedHeight, portraitFullChartHeight)
-            val chartUnderlayBase = lerpDp(104f, 144f)
-
             // --- GESTURE-CONTROLLED CHART EXPANSION (Nested Scroll) ---
-            val maxChartBoostDp = (portraitFullChartHeight - portraitCollapsedChartHeight).coerceAtLeast(0.dp)
-            val midChartBoostDp = (portraitMidChartHeight - portraitCollapsedChartHeight).coerceIn(0.dp, maxChartBoostDp)
-            val maxChartBoostPx = with(density) { maxChartBoostDp.toPx() }
-            val midChartBoostPx = with(density) { midChartBoostDp.toPx() }
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val uiPrefs = remember { context.getSharedPreferences("tk.glucodata_ui_prefs", android.content.Context.MODE_PRIVATE) }
 
-            var chartHeightBoostPx by remember(maxChartBoostPx) {
-                mutableFloatStateOf(0f)
+            val chartViewportReserve = remember(
+                viewportHeight,
+                measuredHeaderHeight,
+                dashboardListTopPadding,
+                dashboardItemSpacing,
+                readingsTopSpacing
+            ) {
+                dashboardListTopPadding +
+                    measuredHeaderHeight +
+                    dashboardItemSpacing +
+                    dashboardItemSpacing +
+                    readingsTopSpacing
+            }
+            val fullscreenChartItemHeight = remember(viewportHeight, chartViewportReserve) {
+                (viewportHeight - chartViewportReserve).coerceAtLeast(0.dp)
+            }
+            val middleChartItemHeight = remember(
+                fullscreenChartItemHeight,
+                measuredReadingRowHeight,
+                middleVisibleReadingRows
+            ) {
+                (fullscreenChartItemHeight - (measuredReadingRowHeight * middleVisibleReadingRows))
+                    .coerceIn(0.dp, fullscreenChartItemHeight)
+            }
+            val collapsedChartItemHeight = remember(
+                fullscreenChartItemHeight,
+                middleChartItemHeight,
+                measuredReadingRowHeight,
+                defaultVisibleReadingRows
+            ) {
+                (fullscreenChartItemHeight - (measuredReadingRowHeight * defaultVisibleReadingRows))
+                    .coerceIn(0.dp, middleChartItemHeight)
+            }
+            val middleChartBoostDp = (middleChartItemHeight - collapsedChartItemHeight).coerceAtLeast(0.dp)
+            val maxChartBoostDp = (fullscreenChartItemHeight - collapsedChartItemHeight).coerceAtLeast(0.dp)
+            val middleChartBoostPx = with(density) { middleChartBoostDp.toPx() }
+            val maxChartBoostPx = with(density) { maxChartBoostDp.toPx() }
+
+            var chartBoostProgress by remember {
+                mutableFloatStateOf(uiPrefs.getFloat("chart_boost_progress", 0f).coerceIn(0f, 1f))
             }
 
             val scope = rememberCoroutineScope()
 
-            val nestedScrollConnection = remember(maxChartBoostPx, midChartBoostPx, listState) {
+            val nestedScrollConnection = remember(maxChartBoostPx, middleChartBoostPx, listState) {
                 object : NestedScrollConnection {
                     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        if (available.y < 0 && chartHeightBoostPx > 0f) {
-                            val newBoost = (chartHeightBoostPx + available.y).coerceAtLeast(0f)
-                            val consumed = newBoost - chartHeightBoostPx
-                            chartHeightBoostPx = newBoost
+                        // Dragging UP (scroll delta < 0): Shrink chart first.
+                        // 100% absorption means chart shrinks EXACTLY as finger moves, keeping top fixed.
+                        // Once boost hits 0, remainders pass to the list for uninterrupted scrolling.
+                        val currentBoostPx = chartBoostProgress * maxChartBoostPx
+                        if (available.y < 0 && currentBoostPx > 0f && maxChartBoostPx > 0f) {
+                            val newBoost = (currentBoostPx + available.y).coerceAtLeast(0f)
+                            val consumed = newBoost - currentBoostPx
+                            chartBoostProgress = (newBoost / maxChartBoostPx).coerceIn(0f, 1f)
                             return Offset(0f, consumed)
                         }
                         return Offset.Zero
@@ -1223,52 +1237,60 @@ fun DashboardScreen(
                         available: Offset,
                         source: NestedScrollSource
                     ): Offset {
-                        if (available.y > 0 && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                            val newBoost = (chartHeightBoostPx + available.y).coerceAtMost(maxChartBoostPx)
-                            val consumedY = newBoost - chartHeightBoostPx
-                            chartHeightBoostPx = newBoost
+                        // Dragging DOWN at top of list: Grow chart 1:1 with finger.
+                        // Removing artificial damping so it feels completely free, not restrictive or jiggly.
+                        val currentBoostPx = chartBoostProgress * maxChartBoostPx
+                        if (
+                            available.y > 0 &&
+                            maxChartBoostPx > 0f &&
+                            listState.firstVisibleItemIndex == 0 &&
+                            listState.firstVisibleItemScrollOffset == 0
+                        ) {
+                            val newBoost = (currentBoostPx + available.y).coerceAtMost(maxChartBoostPx)
+                            val consumedY = newBoost - currentBoostPx
+                            chartBoostProgress = (newBoost / maxChartBoostPx).coerceIn(0f, 1f)
                             return Offset(0f, consumedY)
                         }
                         return Offset.Zero
                     }
 
                     override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                        if (chartHeightBoostPx > 0f) {
-                            val middleAnchor = midChartBoostPx.coerceIn(0f, maxChartBoostPx)
-                            val progress = chartHeightBoostPx / maxChartBoostPx
-                            val lowThreshold = if (middleAnchor > 1f) middleAnchor * 0.5f else maxChartBoostPx * 0.35f
-                            val highThreshold = if (middleAnchor < maxChartBoostPx - 1f) {
-                                (middleAnchor + maxChartBoostPx) * 0.5f
-                            } else {
-                                maxChartBoostPx * 0.75f
-                            }
+                        val currentBoostPx = chartBoostProgress * maxChartBoostPx
+                        if (currentBoostPx > 0f && maxChartBoostPx > 0f) {
+                            val middleAnchor = middleChartBoostPx.coerceIn(0f, maxChartBoostPx)
 
                             val target = when {
+                                // FAST EXIT: extremely strong upward fling → collapse to 0
                                 available.y < -3000f -> 0f
+                                // GRADUAL EXIT: moderate upward fling → step DOWN one state
                                 available.y < -400f -> {
-                                    if (middleAnchor > 1f && chartHeightBoostPx > middleAnchor + 10f) middleAnchor
+                                    if (currentBoostPx > middleAnchor + 10f) middleAnchor
                                     else 0f
                                 }
+                                // FAST EXPAND: extremely strong downward fling → jump full expand
                                 available.y > 3000f -> maxChartBoostPx
+                                // GRADUAL EXPAND: moderate downward fling → step UP one state
                                 available.y > 400f -> {
-                                    if (middleAnchor > 1f && chartHeightBoostPx < middleAnchor - 10f) middleAnchor
+                                    if (currentBoostPx < middleAnchor - 10f) middleAnchor
                                     else maxChartBoostPx
                                 }
+                                // NO FLING (slow release): position-based zones
                                 else -> when {
-                                    chartHeightBoostPx < lowThreshold || progress < 0.2f -> 0f
-                                    middleAnchor > 1f && chartHeightBoostPx < highThreshold -> middleAnchor
+                                    currentBoostPx <= middleAnchor * 0.5f -> 0f
+                                    currentBoostPx < ((middleAnchor + maxChartBoostPx) * 0.5f) -> middleAnchor
                                     else -> maxChartBoostPx
                                 }
                             }
 
-                            if (chartHeightBoostPx >= maxChartBoostPx - 1f && available.y > 0) {
+                            // Already maxed and flinging down → let list handle overscroll glow
+                            if (currentBoostPx >= maxChartBoostPx - 1f && available.y > 0) {
                                 return androidx.compose.ui.unit.Velocity.Zero
                             }
 
-                            val isCollapsing = target < chartHeightBoostPx
+                            val isCollapsing = target < currentBoostPx
                             scope.launch {
                                 androidx.compose.animation.core.animate(
-                                    initialValue = chartHeightBoostPx,
+                                    initialValue = currentBoostPx,
                                     targetValue = target,
                                     animationSpec = androidx.compose.animation.core.spring(
                                         dampingRatio = 0.85f,
@@ -1276,21 +1298,35 @@ fun DashboardScreen(
                                                     else androidx.compose.animation.core.Spring.StiffnessMediumLow
                                     )
                                 ) { value, _ ->
-                                    chartHeightBoostPx = value
+                                    chartBoostProgress = (value / maxChartBoostPx).coerceIn(0f, 1f)
                                 }
                             }
 
+                            // If we are fully collapsing to 0, let the list have the leftover momentum
+                            // so the user can swipe down in a single uninterrupted motion.
+                            // Otherwise, consume velocity to prevent list scrolling while snapping to a mid/max state.
                             return if (target == 0f && isCollapsing) androidx.compose.ui.unit.Velocity.Zero else available
                         }
                         return androidx.compose.ui.unit.Velocity.Zero
                     }
                 }
             }
+
+            LaunchedEffect(maxChartBoostPx) {
+                if (maxChartBoostPx <= 0f) {
+                    chartBoostProgress = 0f
+                } else {
+                    chartBoostProgress = chartBoostProgress.coerceIn(0f, 1f)
+                }
+            }
+
+            val chartHeightBoostPx = chartBoostProgress * maxChartBoostPx
             val chartHeightBoostDp = with(density) { chartHeightBoostPx.toDp() }
-            val chartBoostProgress = if (maxChartBoostPx > 0f) {
-                (chartHeightBoostPx / maxChartBoostPx).coerceIn(0f, 1f)
-            } else {
-                0f
+
+            // Persist the chart boost progress debounced to avoid thrashing during drag gestures
+            androidx.compose.runtime.LaunchedEffect(chartBoostProgress) {
+                kotlinx.coroutines.delay(500)
+                uiPrefs.edit().putFloat("chart_boost_progress", chartBoostProgress).apply()
             }
 
             // --- REUSABLE UI SECTIONS ---
@@ -1444,14 +1480,14 @@ fun DashboardScreen(
                     .nestedScroll(nestedScrollConnection)
                     .padding(padding),
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 12.dp)
+                verticalArrangement = Arrangement.spacedBy(dashboardItemSpacing),
+                contentPadding = PaddingValues(top = dashboardListTopPadding, bottom = 12.dp)
             ) {
                 item {
                     Box(
                         modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .onSizeChanged { dashboardHeaderHeightPx = it.height }
+                            .padding(horizontal = contentHorizontalPadding)
+                            .onSizeChanged { measuredHeaderHeightPx = it.height }
                     ) {
                         DashboardCombinedHeader(
                             currentGlucose = currentGlucose,
@@ -1478,18 +1514,18 @@ fun DashboardScreen(
                 }
 
                 item {
-                    val chartConsumedHeightTarget = (
-                        chartRestingConsumedHeight + chartHeightBoostDp
-                    ).coerceIn(minChartConsumedHeight, portraitFullChartHeight)
-                    val chartHorizontalPaddingTarget = (16f * collapseFraction).dp
-                    val chartUnderlayBottomTarget = chartUnderlayBase * expandedProgress
-                    val animatedChartConsumedHeight by animateDpAsState(
-                        targetValue = chartConsumedHeightTarget,
+                    // Portrait chart sizing is anchored to explicit visible-row budgets:
+                    // top state shows ~3-4 rows, middle shows ~1-2, fullscreen hides the list.
+                    val chartItemHeightTarget = (collapsedChartItemHeight + chartHeightBoostDp)
+                        .coerceIn(collapsedChartItemHeight, fullscreenChartItemHeight)
+                    val chartHorizontalPaddingTarget = (collapsedChartHorizontalPadding.value * collapseFraction).dp
+                    val animatedChartItemHeight by animateDpAsState(
+                        targetValue = chartItemHeightTarget,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioNoBouncy,
                             stiffness = Spring.StiffnessLow
                         ),
-                        label = "DashboardChartConsumedHeight"
+                        label = "DashboardChartItemHeight"
                     )
                     val animatedChartHorizontalPadding by animateDpAsState(
                         targetValue = chartHorizontalPaddingTarget,
@@ -1499,15 +1535,6 @@ fun DashboardScreen(
                         ),
                         label = "DashboardChartHorizontalPadding"
                     )
-                    val animatedChartUnderlayBottom by animateDpAsState(
-                        targetValue = chartUnderlayBottomTarget,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "DashboardChartUnderlayBottom"
-                    )
-                    val chartUnderlayBottomPx = with(LocalDensity.current) { animatedChartUnderlayBottom.roundToPx() }
                     Box(
                         modifier = Modifier
                             .padding(horizontal = animatedChartHorizontalPadding.coerceAtLeast(0.dp))
@@ -1515,20 +1542,7 @@ fun DashboardScreen(
                         DashboardChartSection(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(animatedChartConsumedHeight + animatedChartUnderlayBottom)
-                                .then(
-                                    if (chartUnderlayBottomPx > 0) {
-                                        Modifier.layout { measurable, constraints ->
-                                            val placeable = measurable.measure(constraints)
-                                            val consumedHeight = (placeable.height - chartUnderlayBottomPx).coerceAtLeast(0)
-                                            layout(placeable.width, consumedHeight) {
-                                                placeable.placeRelative(0, 0)
-                                            }
-                                        }
-                                    } else {
-                                        Modifier
-                                    }
-                                )
+                                .height(animatedChartItemHeight)
                                 .padding(bottom = 0.dp),
 
                             glucoseHistory = glucoseHistory,
@@ -1541,7 +1555,7 @@ fun DashboardScreen(
                             selectedTimeRange = timeRange,
                             isExpanded = isChartExpanded,
                             expandedProgress = expandedProgress,
-                            expandedUnderlayBottom = chartUnderlayBase,
+                            expandedUnderlayBottom = 0.dp,
                             onToggleExpanded = null,
                             chartBoostProgress = chartBoostProgress,
                             onPointClick = { point ->
@@ -1558,7 +1572,7 @@ fun DashboardScreen(
                 item {
                     Box(
                         modifier = Modifier
-                            .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+                            .padding(start = 16.dp, top = readingsTopSpacing, end = 16.dp)
                     ) {
                         RecentReadingsCard(
                             recentReadings = recentReadings,
@@ -1577,7 +1591,7 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .then(
                                         if (index == 0) {
-                                            Modifier.onSizeChanged { dashboardReadingRowHeightPx = it.height }
+                                            Modifier.onSizeChanged { measuredReadingRowHeightPx = it.height }
                                         } else {
                                             Modifier
                                         }
