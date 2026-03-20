@@ -144,7 +144,8 @@ fun DashboardChartSection(
     calibrations: List<tk.glucodata.data.calibration.CalibrationEntity> = emptyList(),
     onPointClick: ((GlucosePoint) -> Unit)? = null,
     onCalibrationClick: ((tk.glucodata.data.calibration.CalibrationEntity) -> Unit)? = null,
-    chartBoostProgress: Float = 0f
+    chartBoostProgress: Float = 0f,
+    layoutItemSpacing: androidx.compose.ui.unit.Dp = 12.dp
 ) {
     val chartContent: @Composable () -> Unit = {
         Column(modifier = Modifier.padding(bottom = 0.dp)) {
@@ -165,7 +166,8 @@ fun DashboardChartSection(
                         onToggleExpanded = onToggleExpanded,
                         onPointClick = onPointClick,
                         onCalibrationClick = onCalibrationClick,
-                        chartBoostProgress = chartBoostProgress
+                        chartBoostProgress = chartBoostProgress,
+                        layoutItemSpacing = layoutItemSpacing
                     )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.no_data_available)) }
@@ -210,7 +212,8 @@ fun InteractiveGlucoseChart(
     onToggleExpanded: (() -> Unit)? = null,
     onPointClick: ((GlucosePoint) -> Unit)? = null,
     onCalibrationClick: ((tk.glucodata.data.calibration.CalibrationEntity) -> Unit)? = null,
-    chartBoostProgress: Float = 0f
+    chartBoostProgress: Float = 0f,
+    layoutItemSpacing: androidx.compose.ui.unit.Dp = 12.dp
 ) {
     // --- THEME & PAINTS ---
     val isDark = isSystemInDarkTheme()
@@ -650,11 +653,11 @@ fun InteractiveGlucoseChart(
 
 
     Column(modifier = Modifier.fillMaxSize()) {
-        BoxWithConstraints(
-            modifier = Modifier
+    BoxWithConstraints(
+        modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .pointerInput(Unit) {
+            .pointerInput(Unit) {
                     // Manual Gesture Handler for:
                     // 1. Pan / Inertia
                     // 2. Pinch Zoom
@@ -1928,8 +1931,8 @@ fun InteractiveGlucoseChart(
         val configuration = LocalConfiguration.current
         val density = LocalDensity.current
         val items = TimeRange.values()
-        val now = System.currentTimeMillis()
-        val targetTime = now - visibleDuration / 2
+    val currentTimeMillis = System.currentTimeMillis()
+    val targetTime = currentTimeMillis - visibleDuration / 2
         val isAtNow = abs(centerTime - targetTime) < 60 * 60 * 1000 // 1 hour threshold (Old behavior)
         val showBackToNow = !isAtNow
         val isScrolledRight = centerTime > targetTime
@@ -1950,7 +1953,11 @@ fun InteractiveGlucoseChart(
         val baseInterItemSpacing = 2.dp // Consistent 1dp everywhere for ranges
         val baseLabelStyle = MaterialTheme.typography.labelLarge // Richer, chunkier font (16sp) to match bigger layout
 
-        val pickerVerticalOffset = -(chartUnderlayBottomDp + (8.dp * safeExpandedProgress))
+        // Since InteractiveGlucoseChart is stretching into the underlays, the physical bottom
+        // of this container is 108dp lower than the top edge of the LazyColumn gap. We need
+        // to float the pickers UP by (underlayBottom - gap) so they rest exactly OVER the gap
+        // (i.e. perfectly aligned with the start of the gap).
+        val pickerVerticalOffset = -(chartUnderlayBottomDp - layoutItemSpacing * safeExpandedProgress)
 
         // Two-phase dynamic shrink: measure the ideal pill width against the available
         // screen width. Phase 1 reduces inter-item spacing. Phase 2 scales everything.

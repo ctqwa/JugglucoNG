@@ -604,12 +604,12 @@ fun DashboardCombinedHeader(
         ) {
             heroCard(
                 Modifier
-                    .weight(0.72f)
+                    .weight(0.7f)
                     .fillMaxHeight()
             )
             sensorCard(
                 Modifier
-                    .weight(0.28f)
+                    .weight(0.3f)
                     .fillMaxHeight()
             )
         }

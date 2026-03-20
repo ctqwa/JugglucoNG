@@ -544,6 +544,7 @@ fun MirrorConnectionCard(
 // ── Edit Sheet ───────────────────────────────────────────────────────────────
 
 enum class ConnectionType { LOCAL, ICE, DIRECT }
+enum class ConnectionDirection { PASSIVE, ACTIVE, BOTH }
 
 @Composable
 fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
@@ -599,13 +600,21 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
         existingAutoDetect
     )}
 
+    // Connection direction: passive (listen only), active (connect out only), or both
+    var direction by remember { mutableStateOf(
+        when {
+            existingPassiveOnly -> ConnectionDirection.PASSIVE
+            existingActiveOnly -> ConnectionDirection.ACTIVE
+            else -> ConnectionDirection.BOTH
+        }
+    )}
+
     fun save(): Boolean {
         val isICE = connectionType == ConnectionType.ICE
         val isDirect = connectionType == ConnectionType.DIRECT
         val isLocal = connectionType == ConnectionType.LOCAL
-        val preserveInitiationMode = !isNew && connectionType == originalConnectionType
-        val finalActiveOnly = if (preserveInitiationMode) existingActiveOnly else false
-        val finalPassiveOnly = if (preserveInitiationMode) existingPassiveOnly else (isSending && !isReceiving && !isICE)
+        val finalActiveOnly = direction == ConnectionDirection.ACTIVE
+        val finalPassiveOnly = direction == ConnectionDirection.PASSIVE
 
         if (!isSending && !isReceiving) {
             Toast.makeText(context, context.getString(R.string.specifyreceiveordata), Toast.LENGTH_SHORT).show()
@@ -782,6 +791,41 @@ fun MirrorEditSheet(pos: Int, sheetState: SheetState, onDismiss: () -> Unit) {
                 supportingText = { Text("Human-readable name for this connection") },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), singleLine = true
             )
+
+            // Connection Direction (visible for Local and Direct only)
+            if (connectionType != ConnectionType.ICE) {
+                SectionLabel("Direction", modifier = Modifier.padding(horizontal = 24.dp))
+                ConnectedButtonGroup(
+                    options = ConnectionDirection.entries.toList(),
+                    selectedOption = direction,
+                    onOptionSelected = { direction = it },
+                    labelText = { option ->
+                        when (option) {
+                            ConnectionDirection.PASSIVE -> "Passive"
+                            ConnectionDirection.ACTIVE -> "Active"
+                            ConnectionDirection.BOTH -> "Both"
+                        }
+                    },
+                    label = { option ->
+                        Text(when (option) {
+                            ConnectionDirection.PASSIVE -> "Passive"
+                            ConnectionDirection.ACTIVE -> "Active"
+                            ConnectionDirection.BOTH -> "Both"
+                        })
+                    },
+                    itemHeight = 40.dp,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                )
+                val dirHint = when (direction) {
+                    ConnectionDirection.PASSIVE -> "Only listen for incoming connections."
+                    ConnectionDirection.ACTIVE -> "Only connect outbound to the other device."
+                    ConnectionDirection.BOTH -> "Both listen and connect outbound."
+                }
+                Text(dirHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            }
 
             // Role
             SectionLabel("Role", modifier = Modifier.padding(horizontal = 24.dp))
