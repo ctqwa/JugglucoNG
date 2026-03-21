@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.Natives
+import tk.glucodata.UiRefreshBus
 import tk.glucodata.bluediag
 import tk.glucodata.ui.util.getLegacyWarmupStatus
 import kotlin.math.abs
@@ -672,6 +673,7 @@ class SensorViewModel : ViewModel() {
             // Room DB needs sync to reflect the recalibrated values.
             // Multi-sensor: sync only this sensor, not destructive clearAllTables
             try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(serial) } catch (_: Throwable) {}
+            UiRefreshBus.requestStatusRefresh()
             refreshSensors()
         }
     }
@@ -724,6 +726,7 @@ class SensorViewModel : ViewModel() {
                 gatt.viewMode = mode
             }
             Natives.setViewMode(gatt.dataptr, mode)
+            UiRefreshBus.requestStatusRefresh()
             refreshSensors()
         }
     }
@@ -754,6 +757,7 @@ class SensorViewModel : ViewModel() {
                 "updateCustomCalibration[$opId]: serial=$serial from(enabled=$currentEnabled,index=$currentIndex,autoReset=$currentAutoReset) " +
                     "to(enabled=$enabled,index=$index,autoReset=$autoReset) offToOn=$offToOn"
             )
+            UiRefreshBus.requestStatusRefresh()
             refreshSensors()
         }
     }
@@ -792,6 +796,7 @@ class SensorViewModel : ViewModel() {
                 android.util.Log.i("SensorVM", "disableCustomCal[$opId]: serial=$serial wasCustomEnabled=0 fallbackPath=none")
             }
             try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(serial) } catch (_: Throwable) {}
+            UiRefreshBus.requestStatusRefresh()
             refreshSensors()
         }
     }
