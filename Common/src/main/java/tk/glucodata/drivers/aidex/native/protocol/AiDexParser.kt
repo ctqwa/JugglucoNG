@@ -36,8 +36,6 @@ object AiDexParser {
         if (data.size != AiDexOpcodes.DATA_FRAME_LENGTH) return null
 
         val opcode = data[0].toInt() and 0xFF
-        val secondsSinceStart = u32LE(data, 1)
-        val timeOffsetMinutes = (secondsSinceStart / 60).toInt()
         val glucosePacked = u16LE(data, 6)
         val rawGlucose = glucosePacked and AiDexOpcodes.GLUCOSE_MASK
         val i1Raw = u16LE(data, 8)
@@ -57,7 +55,6 @@ object AiDexParser {
 
         return GlucoseFrame(
             opcode = opcode,
-            timeOffsetMinutes = timeOffsetMinutes,
             glucoseMgDl = glucoseMgDl,
             rawGlucosePacked = glucosePacked,
             i1 = i1,
@@ -229,13 +226,6 @@ object AiDexParser {
     private fun u16LE(data: ByteArray, offset: Int): Int {
         return (data[offset].toInt() and 0xFF) or
                 ((data[offset + 1].toInt() and 0xFF) shl 8)
-    }
-
-    private fun u32LE(data: ByteArray, offset: Int): Long {
-        return (data[offset].toInt() and 0xFF).toLong() or
-                ((data[offset + 1].toInt() and 0xFF).toLong() shl 8) or
-                ((data[offset + 2].toInt() and 0xFF).toLong() shl 16) or
-                ((data[offset + 3].toInt() and 0xFF).toLong() shl 24)
     }
 
     private fun s16LE(data: ByteArray, offset: Int): Int {

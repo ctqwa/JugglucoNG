@@ -1254,11 +1254,7 @@ class AiDexBleManager(
             return
         }
 
-        // Update timestamps — keep lastOffsetMinutes current from every F003 frame
-        // to prevent ensureSensorStartTime() from drifting sensorstartmsec forward.
-        if (frame.timeOffsetMinutes > 0) {
-            lastOffsetMinutes = frame.timeOffsetMinutes
-        }
+        // Update timestamps
         lastGlucoseTimeMs = now
         handler.removeCallbacks(broadcastAssistRunnable)
         if (postResetWarmupExtensionActive) {
