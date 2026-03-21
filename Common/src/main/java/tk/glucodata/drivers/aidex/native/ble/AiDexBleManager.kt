@@ -2363,7 +2363,6 @@ class AiDexBleManager(
      * Called when all history pages (both raw and brief) have been downloaded.
      */
     private fun onHistoryDownloadComplete() {
-        val now = System.currentTimeMillis()
         handler.removeCallbacks(historyPageWatchdog)  // History done — cancel any pending page timeout
         historyDownloading = false
         historyPhase = HistoryPhase.IDLE
