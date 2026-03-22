@@ -33,6 +33,24 @@ public final class NightscoutCalibration {
         return value;
     }
 
+    private static boolean isMmolApp() {
+        return Applic.unit == 1;
+    }
+
+    private static float mgdlToDisplay(float valueMgdl) {
+        if (!Float.isFinite(valueMgdl) || valueMgdl <= 0f) {
+            return 0f;
+        }
+        return isMmolApp() ? (valueMgdl / MGDL_PER_MMOLL) : valueMgdl;
+    }
+
+    private static float displayToMgdl(float displayValue) {
+        if (!Float.isFinite(displayValue) || displayValue <= 0f) {
+            return 0f;
+        }
+        return isMmolApp() ? (displayValue * MGDL_PER_MMOLL) : displayValue;
+    }
+
     @Keep
     public static int resolveExportedValueMgdl(
             String sensorId,
@@ -98,22 +116,22 @@ public final class NightscoutCalibration {
                 return 0f;
             }
 
-            final float baseValue = rawPrimary ? rawMgdl : autoMgdl;
+            final float baseValue = mgdlToDisplay(rawPrimary ? rawMgdl : autoMgdl);
             if (!Float.isFinite(baseValue) || baseValue <= 0f) {
                 return 0f;
             }
 
-            final float calibrated = CalibrationAccess.getCalibratedValue(
+            final float calibratedDisplay = CalibrationAccess.getCalibratedValue(
                     baseValue,
                     timestampMillis,
                     rawPrimary,
                     false,
                     resolvedSensorId
             );
-            if (!Float.isFinite(calibrated) || calibrated <= 0f) {
+            if (!Float.isFinite(calibratedDisplay) || calibratedDisplay <= 0f) {
                 return 0f;
             }
-            return calibrated;
+            return displayToMgdl(calibratedDisplay);
         } catch (Throwable ignored) {
             return 0f;
         }

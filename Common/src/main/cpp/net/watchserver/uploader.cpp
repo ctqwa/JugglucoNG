@@ -36,6 +36,7 @@ constexpr int HTTP_CONFLICT=409;
 [{"device":"xDrip-LibreReceiver","date":1678294924000,"dateString":"2023-03-08T18:02:04.000+0100","sgv":63,"delta":-1.993,"direction":"Flat","type":"sgv","filtered":63000,"unfiltered":63000,"rssi":100,"noise":1}]1
 */
 extern JNIEnv *getenv();
+extern jclass JNINightscoutCalibration;
 
 jclass nightpostclass=nullptr;
 jstring jnightuploadEntriesurl=nullptr;
@@ -192,11 +193,17 @@ bool inituploader(JNIEnv *env) {
             return false;
             }
         }
+    if(nightscoutcalibrationclass==nullptr && JNINightscoutCalibration!=nullptr) {
+        nightscoutcalibrationclass=JNINightscoutCalibration;
+        }
     if(nightscoutcalibrationclass==nullptr) {
         constexpr const char calibrationclassstr[]="tk/glucodata/NightscoutCalibration";
         if(jclass cl=env->FindClass(calibrationclassstr)) {
             nightscoutcalibrationclass=(jclass)env->NewGlobalRef(cl);
             env->DeleteLocalRef(cl);
+            }
+        else if(env->ExceptionCheck()) {
+            env->ExceptionClear();
             }
         }
     makeuploadsecret(env); 
@@ -224,8 +231,11 @@ static int getNightscoutCalibrationOverrideForItem(SensorGlucoseData *sens,const
         "getNightscoutCalibrationOverride",
         "(Ljava/lang/String;IIIJ)I"
     );
-    if(nightscoutCalibrationOverride==nullptr)
+    if(nightscoutCalibrationOverride==nullptr) {
+        if(env->ExceptionCheck())
+            env->ExceptionClear();
         return 0;
+        }
     auto jsensor=env->NewStringUTF(sensorname);
     const auto *info=sens->getinfo();
     const int viewMode=info?info->viewMode:0;
@@ -239,6 +249,10 @@ static int getNightscoutCalibrationOverrideForItem(SensorGlucoseData *sens,const
         timestampMillis
     );
     env->DeleteLocalRef(jsensor);
+    if(env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return 0;
+        }
     return overrideValue;
     }
 

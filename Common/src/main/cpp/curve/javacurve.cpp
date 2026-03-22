@@ -106,7 +106,7 @@ jmethodID jdoglucose = nullptr, jupdateDevices = nullptr,
 jmethodID jopenSettingsPanel = nullptr, jopenSensorListPanel = nullptr,
           jlaunchQrScan = nullptr;
 // jmethodID jchangedProfile;
-jclass JNIApplic, JNIString, JNIMainActivity;
+jclass JNIApplic, JNIString, JNIMainActivity, JNINightscoutCalibration;
 #ifdef OLDEVERSENSE
 #ifndef WEAROS
 jclass EverSense;
@@ -271,6 +271,17 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     } else {
       LOGAR(R"(FindClass("tk/glucodata/Applic") failed)"
             "");
+    }
+  }
+
+  {
+    const static jclass cl = env->FindClass("tk/glucodata/NightscoutCalibration");
+    if (cl) {
+      JNINightscoutCalibration = (jclass)env->NewGlobalRef(cl);
+      env->DeleteLocalRef(cl);
+    } else {
+      LOGAR(R"(FindClass("tk/glucodata/NightscoutCalibration") failed)");
+      env->ExceptionClear();
     }
   }
 

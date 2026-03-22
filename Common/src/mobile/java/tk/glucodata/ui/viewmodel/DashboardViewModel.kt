@@ -394,12 +394,10 @@ class DashboardViewModel(
         // Natives.alarmhigh() returns value in User Unit
         val highThreshold = Natives.alarmhigh()
         val highEnabled = Natives.hasalarmhigh()
-        
-        val available = Natives.hasvaluealarm()
         val loss = Natives.hasalarmloss()
         
         // Natives.setalarms expects User Units
-        Natives.setalarms(threshold, highThreshold, enabled, highEnabled, available, loss)
+        Natives.setalarms(threshold, highThreshold, enabled, highEnabled, false, loss)
         refreshData()
     }
 
@@ -407,11 +405,9 @@ class DashboardViewModel(
         // Natives.alarmlow() returns value in User Unit
         val lowThreshold = Natives.alarmlow()
         val lowEnabled = Natives.hasalarmlow()
-        
-        val available = Natives.hasvaluealarm()
         val loss = Natives.hasalarmloss()
         
-        Natives.setalarms(lowThreshold, threshold, lowEnabled, enabled, available, loss)
+        Natives.setalarms(lowThreshold, threshold, lowEnabled, enabled, false, loss)
         refreshData()
     }
 

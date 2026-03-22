@@ -95,6 +95,7 @@ public class Notify {
     };
     static public final int glucosetimeoutSEC = 30 * 11;
     static public final long glucosetimeout = 1000L * glucosetimeoutSEC;
+    static private final int FOREGROUND_GLUCOSE_NOTIFICATION_KIND = -1;
     static private final long INTERACTIVE_NOTIFICATION_REFRESH_DELAY_MS = 750L;
     static private final Handler glucoseRefreshHandler = new Handler(Looper.getMainLooper());
 
@@ -264,7 +265,7 @@ public class Notify {
         if (android.os.Build.VERSION.SDK_INT >= 21) {
             try {
                 // Use ALARM stream only if disturb=true AND USEALARM is enabled
-                boolean useAlarmStream = (kind != 2 && getUSEALARM() && disturb);
+                boolean useAlarmStream = (!AlertType.Companion.isLegacyOnlyId(kind) && getUSEALARM() && disturb);
                 ring.setAudioAttributes(useAlarmStream ? ScanNfcV.audioattributes : notification_audio);
             } catch (Throwable e) {
                 Log.stack(LOG_ID, "mkring", e);
@@ -500,7 +501,8 @@ public class Notify {
 
     void showglucose(notGlucose strgl, float gl) {
         var message = format(usedlocale, glucoseformat, gl);
-        arrowglucosenotification(2, gl, message, strgl, GLUCOSENOTIFICATION, true);
+        arrowglucosenotification(FOREGROUND_GLUCOSE_NOTIFICATION_KIND, gl, message, strgl, GLUCOSENOTIFICATION,
+                true);
     }
     /*
      * void overwriteglucose() {
@@ -520,7 +522,8 @@ public class Notify {
         final var gl = SuperGattCallback.previousglucosevalue;
         if (strgl == null || gl < 2.0f)
             return;
-        noti.postForegroundGlucoseNotification(2, gl, format(usedlocale, glucoseformat, gl), strgl);
+        noti.postForegroundGlucoseNotification(FOREGROUND_GLUCOSE_NOTIFICATION_KIND, gl,
+                format(usedlocale, glucoseformat, gl), strgl);
     }
 
     void normalglucose(notGlucose strgl, float gl, float rate, boolean waiting) {
@@ -528,6 +531,7 @@ public class Notify {
         var act = MainActivity.thisone;
         if (act != null)
             act.cancelglucosedialog();
+        final String message = format(usedlocale, glucoseformat, gl);
         {
             if (doLog) {
                 Log.i(LOG_ID, "normalglucose waiting=" + waiting);
@@ -535,8 +539,9 @@ public class Notify {
             ;
         }
         ;
-        if (waiting)
-            arrowglucosealarm(2, gl, format(usedlocale, glucoseformat, gl), strgl, GLUCOSENOTIFICATION, true);
+        if (waiting) {
+            updateForegroundGlucoseNotification(FOREGROUND_GLUCOSE_NOTIFICATION_KIND, gl, strgl);
+        }
 
         else if (!isWearable) {
             {
@@ -547,10 +552,9 @@ public class Notify {
             }
             ;
             if (showalways || alertwatch) {
-                var message = format(usedlocale, glucoseformat, gl);
-                if (alertwatch)
-                    makeseparatenotification(gl, message, strgl, GLUCOSENOTIFICATION, 2);
-                arrowglucosenotification(2, gl, message, strgl, GLUCOSENOTIFICATION, !alertwatch);
+                arrowglucosenotification(FOREGROUND_GLUCOSE_NOTIFICATION_KIND, gl, message, strgl,
+                        GLUCOSENOTIFICATION,
+                        !alertwatch);
             } else {
                 if (hasvalue) {
                     if (keeprunning.started)
@@ -636,7 +640,7 @@ public class Notify {
                 }
                 BatteryTrace.bump("notify.glucose.followup", 20L, "interactive=true");
                 postForegroundGlucoseNotification(
-                        2,
+                        FOREGROUND_GLUCOSE_NOTIFICATION_KIND,
                         glucoseValue,
                         format(usedlocale, glucoseformat, glucoseValue),
                         snapshot);
@@ -1453,6 +1457,9 @@ public class Notify {
 
     }
     private String getDeliveryMode(int kind) {
+        if (AlertType.Companion.isLegacyOnlyId(kind)) {
+            return "NOTIFICATION_ONLY";
+        }
         try {
             android.content.SharedPreferences prefs = Applic.app.getSharedPreferences("tk.glucodata.alerts",
                     android.content.Context.MODE_PRIVATE);
@@ -1926,7 +1933,7 @@ public class Notify {
         boolean activityLaunched = false;
         boolean skipBanner = false;
 
-        if (kind != 2) {
+        if (!AlertType.Companion.isLegacyOnlyId(kind)) {
             String deliveryMode = getDeliveryMode(kind);
 
             boolean isSystem = "SYSTEM_ALARM".equals(deliveryMode);
@@ -1970,7 +1977,7 @@ public class Notify {
         }
         ;
         if (alarm) {
-            if (kind != 2) {
+            if (!AlertType.Companion.isLegacyOnlyId(kind)) {
                 String deliveryMode = getDeliveryMode(kind);
                 boolean isSystem = "SYSTEM_ALARM".equals(deliveryMode);
                 boolean isBoth = "BOTH".equals(deliveryMode);
@@ -2016,6 +2023,18 @@ public class Notify {
             ;
         }
         ;
+
+        if (AlertType.Companion.isLegacyOnlyId(kind)) {
+            final AlertType hiddenType = AlertType.Companion.fromId(kind);
+            if (hiddenType != null) {
+                SnoozeManager.INSTANCE.clearSnooze(hiddenType);
+                AlertStateTracker.INSTANCE.resetState(hiddenType);
+            }
+            if (strglucose != null && GLUCOSENOTIFICATION.equals(type)) {
+                updateForegroundGlucoseNotification(FOREGROUND_GLUCOSE_NOTIFICATION_KIND, glvalue, strglucose);
+            }
+            return false;
+        }
 
         boolean incomingAlarm = alarm; // Capture initial state from Native/Caller
         AlertType alertType = null;
@@ -2546,25 +2565,9 @@ public class Notify {
     // Helper to format "Value · Raw" consistently
     // Helper to format "Value · Raw" with HTML styling and comma separator
     // Helper to format "Value · Raw" with HTML styling and comma separator
-    public static CharSequence formatGlucoseText(String value, float glvalue, java.util.List<GlucosePoint> points,
-            int viewMode,
-            long targetTime,
-            String calibrationSensorId) {
-        final boolean isMmol = Applic.unit == 1;
-        final CurrentDisplaySource.Snapshot resolved = CurrentDisplaySource.resolveFromLive(
-                value,
-                glvalue,
-                Float.NaN,
-                CurrentGlucoseSource.normalizeTimeMillis(targetTime),
-                calibrationSensorId,
-                0,
-                0,
-                "notification",
-                points != null ? points : java.util.Collections.emptyList(),
-                viewMode,
-                isMmol);
+    private static CharSequence buildFormattedGlucoseText(CurrentDisplaySource.Snapshot resolved, float fallbackValue) {
         if (resolved == null) {
-            return format(java.util.Locale.getDefault(), pureglucoseformat, glvalue);
+            return format(java.util.Locale.getDefault(), pureglucoseformat, fallbackValue);
         }
 
         final String valueText = resolved.getPrimaryStr();
@@ -2596,6 +2599,26 @@ public class Notify {
         }
 
         return ssb;
+    }
+
+    public static CharSequence formatGlucoseText(String value, float glvalue, java.util.List<GlucosePoint> points,
+            int viewMode,
+            long targetTime,
+            String calibrationSensorId) {
+        final boolean isMmol = Applic.unit == 1;
+        final CurrentDisplaySource.Snapshot resolved = CurrentDisplaySource.resolveFromLive(
+                value,
+                glvalue,
+                Float.NaN,
+                CurrentGlucoseSource.normalizeTimeMillis(targetTime),
+                calibrationSensorId,
+                0,
+                0,
+                "notification",
+                points != null ? points : java.util.Collections.emptyList(),
+                viewMode,
+                isMmol);
+        return buildFormattedGlucoseText(resolved, glvalue);
     }
 
     // Helper for relative time "1m", "5m", "now"
@@ -2674,16 +2697,24 @@ public class Notify {
         boolean isRawMode = (viewMode == 1 || viewMode == 3);
         boolean hasCalibration = NightscoutCalibration.hasCalibrationForViewMode(activeSensorSerial, viewMode);
 
-        CharSequence valueText = formatGlucoseText(
+        final CurrentDisplaySource.Snapshot resolvedDisplay = CurrentDisplaySource.resolveFromLive(
                 glucose.value,
                 glvalue,
+                Float.NaN,
+                CurrentGlucoseSource.normalizeTimeMillis(glucose.time),
+                activeSensorSerial,
+                0,
+                0,
+                "notification",
                 nativePoints,
                 viewMode,
-                glucose.time,
-                activeSensorSerial);
+                isMmol);
+
+        CharSequence valueText = buildFormattedGlucoseText(resolvedDisplay, glvalue);
+        final float displayGlucoseValue = resolvedDisplay != null ? resolvedDisplay.getPrimaryValue() : glvalue;
 
         // Semantic Color
-        int glucoseColor = NotificationChartDrawer.getGlucoseColor(Applic.app, glvalue, isMmol);
+        int glucoseColor = NotificationChartDrawer.getGlucoseColor(Applic.app, displayGlucoseValue, isMmol);
 
         // ========== READ NOTIFICATION PREFERENCES ==========
         android.content.SharedPreferences prefs = Applic.app
@@ -2876,7 +2907,7 @@ public class Notify {
         var GluNotBuilder = mkbuilder(type);
         GluNotBuilder.setOnlyAlertOnce(once);
 
-        setIcon(GluNotBuilder, glvalue, glucose.sensorgen2);
+        setIcon(GluNotBuilder, displayGlucoseValue, glucose.sensorgen2);
 
         GluNotBuilder.setVisibility(VISIBILITY_PUBLIC);
 
@@ -3366,7 +3397,6 @@ public class Notify {
         fornotify(getforgroundnotification());
         // notificationManager.notify(glucosenotificationid,getforgroundnotification());
     }
-
     public void foregroundno(Service service) {
         Notification not = getforgroundnotification();
         if (Build.VERSION.SDK_INT >= 29) {

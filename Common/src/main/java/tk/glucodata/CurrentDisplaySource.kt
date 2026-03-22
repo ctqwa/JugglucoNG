@@ -5,7 +5,6 @@ import tk.glucodata.ui.DisplayValues
 
 object CurrentDisplaySource {
     private const val DEFAULT_HISTORY_WINDOW_MS = 15 * 60 * 1000L
-    private const val MGDL_PER_MMOL = 18.0182f
     private const val MATCH_WINDOW_MS = 60 * 1000L
 
     data class Snapshot(
@@ -155,30 +154,25 @@ object CurrentDisplaySource {
             return liveValue
         }
 
-        val autoMgdl = toMgdl(autoValue, isMmol)
-        val rawMgdl = toMgdl(rawValue, isMmol)
-        val calibratedMgdl = NightscoutCalibration.getCalibratedValueForViewMode(
-            sensorId,
-            viewMode,
-            autoMgdl,
-            rawMgdl,
-            targetTimeMillis
+        val isRawMode = isRawPrimary(viewMode)
+        val baseValue = (if (isRawMode) rawValue else autoValue).takeIf { it.isFinite() && it > 0.1f }
+            ?: autoValue.takeIf { it.isFinite() && it > 0.1f }
+            ?: rawValue.takeIf { it.isFinite() && it > 0.1f }
+            ?: return liveValue?.takeIf { it.isFinite() && it > 0.1f }
+
+        val calibratedValue = CalibrationAccess.getCalibratedValue(
+            baseValue,
+            targetTimeMillis,
+            isRawMode,
+            false,
+            sensorId
         )
-        if (!calibratedMgdl.isFinite() || calibratedMgdl <= 0f) {
-            return liveValue?.takeIf { it.isFinite() && it > 0.1f }
-        }
-        return if (isMmol) calibratedMgdl / MGDL_PER_MMOL else calibratedMgdl
+        return calibratedValue.takeIf { it.isFinite() && it > 0.1f }
+            ?: liveValue?.takeIf { it.isFinite() && it > 0.1f }
     }
 
     private fun shouldHideInitialWhenCalibrated(): Boolean {
         return CalibrationAccess.shouldHideInitialWhenCalibrated()
-    }
-
-    private fun toMgdl(value: Float, isMmol: Boolean): Float {
-        if (!value.isFinite() || value <= 0f) {
-            return 0f
-        }
-        return if (isMmol) value * MGDL_PER_MMOL else value
     }
 
     private fun isRawPrimary(viewMode: Int): Boolean = viewMode == 1 || viewMode == 3

@@ -13,6 +13,7 @@
 #include "logs.hpp"
 #include "nightnumcategories.hpp"
 extern JNIEnv *getenv();
+extern jclass JNINightscoutCalibration;
 extern double getdelta(float change);
 extern std::string_view getdeltaname(float rate);
 extern double calibrateONE(const SensorGlucoseData *sens,const ScanData &value);
@@ -22,12 +23,18 @@ static jclass exportvalueclass=nullptr;
 static bool ensureexportvalueclass(JNIEnv *env) {
     if(exportvalueclass!=nullptr)
         return true;
+    if(JNINightscoutCalibration!=nullptr) {
+        exportvalueclass=JNINightscoutCalibration;
+        return true;
+        }
     constexpr const char calibrationclassstr[]="tk/glucodata/NightscoutCalibration";
     if(jclass cl=env->FindClass(calibrationclassstr)) {
         exportvalueclass=(jclass)env->NewGlobalRef(cl);
         env->DeleteLocalRef(cl);
         return exportvalueclass!=nullptr;
         }
+    if(env->ExceptionCheck())
+        env->ExceptionClear();
     LOGGER("FindClass(%s) failed\n",calibrationclassstr);
     return false;
     }
@@ -49,8 +56,11 @@ int resolveExportedMgdl(const SensorGlucoseData *sens, const ScanData *val,
         "resolveExportedValueMgdl",
         "(Ljava/lang/String;IIIJ)I"
     );
-    if(exportedValueMethod==nullptr)
+    if(exportedValueMethod==nullptr) {
+        if(env->ExceptionCheck())
+            env->ExceptionClear();
         return autoMgdl;
+        }
     auto jsensor=env->NewStringUTF(sensorname->data());
     const auto *info=sens->getinfo();
     const int viewMode=info?info->viewMode:0;
@@ -65,6 +75,10 @@ int resolveExportedMgdl(const SensorGlucoseData *sens, const ScanData *val,
         (jlong)val->gettime()*1000LL
     );
     env->DeleteLocalRef(jsensor);
+    if(env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return autoMgdl;
+        }
     return resolved>0?resolved:autoMgdl;
     }
 

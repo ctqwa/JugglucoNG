@@ -689,20 +689,23 @@ static private void alarmsettings(MainActivity context,View parview) {
     alarmlow.setText( float2string(Natives.alarmlow()));
     alarmhigh.setText( float2string(Natives.alarmhigh()));
     CheckBox isvalue = new CheckBox(context);
-    final boolean hasvalue=Natives.hasvaluealarm();
+    final boolean hasvalue=false;
     isvalue.setChecked(hasvalue); //Value
     isvalue.setText(R.string.valueavailablenotification);
+    isvalue.setEnabled(false);
+    isvalue.setVisibility(GONE);
     Button ringisvalue=getbutton(context,R.string.ringtonename);
+    ringisvalue.setVisibility(GONE);
     Button help=getbutton(context,R.string.helpname);
     help.setOnClickListener(v->{help(R.string.alarmhelp,(MainActivity)(v.getContext())); });
-    if(!hasvalue) ringisvalue.setVisibility(INVISIBLE);
+    if(!hasvalue) ringisvalue.setVisibility(GONE);
     isvalue.setOnCheckedChangeListener(
              (buttonView,  isChecked) -> {
-             if(isChecked) {
+            if(isChecked) {
                 ringisvalue.setVisibility(VISIBLE);
                 }
             else {
-                ringisvalue.setVisibility(INVISIBLE);
+                ringisvalue.setVisibility(GONE);
                 }
             });
 
@@ -845,7 +848,7 @@ new View[]{isvalue},new View[]{ringisvalue},new View[]{usealarm},new View[]{adva
          boolean hashigh=((CheckBox) highalarm[0]).isChecked();
          Natives.setalarms(str2float(((EditText)lowalarm[1]).getText().toString()),
                     str2float(((EditText)highalarm[1]).getText().toString()),
-                     haslow, hashigh, isvalue.isChecked(),hasloss);
+                     haslow, hashigh, false,hasloss);
          return true;
          };
     Save.setOnClickListener(v->{
