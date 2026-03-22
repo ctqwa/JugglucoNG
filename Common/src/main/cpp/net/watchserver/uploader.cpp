@@ -352,17 +352,13 @@ extern int mkv1streamid(char *outiter,const sensorname_t *name,int num);
 template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const sensorname_t *sensorname,const T &item,const bool includeId=false,const bool trailingComma=true) {
     const time_t tim=item.gettime();
     const char *sensornameStr=sensorname->data();
-    int mgdL;
     const int rawCurrent=sens->getRawForPoll(&item);
-    const int overrideValue=getNightscoutCalibrationOverrideForItem(sens,sensornameStr,item.getmgdL(),rawCurrent,tim*1000LL);
-    if(overrideValue>0) {
-        mgdL=overrideValue;
-         }
-    else if(double calibrated=calibrateONEtest(sens,item);!isnan(calibrated)) {
-        mgdL=(int)round(calibrated);
-         }
-    else
-        mgdL=item.getmgdL();
+    int autoMgdl=item.getmgdL();
+    if(double calibrated=calibrateONEtest(sens,item);!isnan(calibrated))
+        autoMgdl=(int)round(calibrated);
+    int mgdL=getNightscoutCalibrationOverrideForItem(sens,sensornameStr,autoMgdl,rawCurrent,tim*1000LL);
+    if(mgdL<=0)
+        mgdL=autoMgdl;
     float change= item.getchange();
     const char * directionlabel=getdeltaname(change).data();
     double delta=getdelta(change);
@@ -453,10 +449,13 @@ static bool uploadV1ChunkIndividually(const int sensorid,SensorGlucoseData *sens
 
 static const char *writeNightscoutV3UploadEntry(char *buf,SensorGlucoseData *sens,const sensorname_t *sensorname,const ScanData *el) {
 extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server=true);
+    int autoMgdl=el->getmgdL();
+    if(double calibrated=calibrateONEtest(sens,*el);!isnan(calibrated))
+        autoMgdl=(int)round(calibrated);
     const int overrideValue=getNightscoutCalibrationOverrideForItem(
         sens,
         sensorname->data(),
-        el->getmgdL(),
+        autoMgdl,
         sens->getRawForPoll(el),
         el->gettime()*1000LL
     );
@@ -465,9 +464,9 @@ extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *
         newel.g=overrideValue;
         return writev3entry(buf,&newel,sensorname,false);
         }
-    if(double calibrated=calibrateONEtest(sens,*el);!isnan(calibrated)) {
+    if(autoMgdl!=el->getmgdL()) {
         ScanData newel=*el;
-        newel.g=(int32_t)round(calibrated);
+        newel.g=autoMgdl;
         return writev3entry(buf,&newel,sensorname,false);
         }
     return writev3entry(buf,el,sensorname,false);

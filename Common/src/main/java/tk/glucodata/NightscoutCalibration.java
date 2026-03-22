@@ -2,8 +2,6 @@ package tk.glucodata;
 
 import androidx.annotation.Keep;
 
-import tk.glucodata.data.calibration.CalibrationManager;
-
 public final class NightscoutCalibration {
     private static final float MGDL_PER_MMOLL = 18.0182f;
 
@@ -28,11 +26,58 @@ public final class NightscoutCalibration {
         return current != null ? current : "";
     }
 
+    private static float sanitizeMgdl(float value) {
+        if (!Float.isFinite(value) || value <= 0f) {
+            return 0f;
+        }
+        return value;
+    }
+
+    @Keep
+    public static int resolveExportedValueMgdl(
+            String sensorId,
+            int viewMode,
+            int autoMgdl,
+            int rawCurrent,
+            long timestampMillis
+    ) {
+        try {
+            final float autoValue = sanitizeMgdl(autoMgdl);
+            final float rawValue = sanitizeMgdl(rawCurrentToMgdl(rawCurrent));
+
+            float primaryValue = autoValue;
+            if (isRawPrimary(viewMode) && rawValue > 0f) {
+                primaryValue = rawValue;
+            }
+            if (primaryValue <= 0f) {
+                primaryValue = autoValue > 0f ? autoValue : rawValue;
+            }
+            if (primaryValue <= 0f) {
+                return 0;
+            }
+
+            final float calibrated = getCalibratedValueForViewMode(
+                    sensorId,
+                    viewMode,
+                    autoValue,
+                    rawValue,
+                    timestampMillis
+            );
+            final float exported = calibrated > 0f ? calibrated : primaryValue;
+            if (!Float.isFinite(exported) || exported <= 0f) {
+                return 0;
+            }
+            return Math.round(exported);
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
     @Keep
     public static boolean hasCalibrationForViewMode(String sensorId, int viewMode) {
         try {
             final boolean rawPrimary = isRawPrimary(viewMode);
-            return CalibrationManager.INSTANCE.hasActiveCalibration(rawPrimary, resolveSensorId(sensorId));
+            return CalibrationAccess.hasActiveCalibration(rawPrimary, resolveSensorId(sensorId));
         } catch (Throwable ignored) {
             return false;
         }
@@ -49,7 +94,7 @@ public final class NightscoutCalibration {
         try {
             final boolean rawPrimary = isRawPrimary(viewMode);
             final String resolvedSensorId = resolveSensorId(sensorId);
-            if (!CalibrationManager.INSTANCE.hasActiveCalibration(rawPrimary, resolvedSensorId)) {
+            if (!CalibrationAccess.hasActiveCalibration(rawPrimary, resolvedSensorId)) {
                 return 0f;
             }
 
@@ -58,7 +103,7 @@ public final class NightscoutCalibration {
                 return 0f;
             }
 
-            final float calibrated = CalibrationManager.INSTANCE.getCalibratedValue(
+            final float calibrated = CalibrationAccess.getCalibratedValue(
                     baseValue,
                     timestampMillis,
                     rawPrimary,
@@ -82,20 +127,6 @@ public final class NightscoutCalibration {
             int rawCurrent,
             long timestampMillis
     ) {
-        try {
-            final float calibrated = getCalibratedValueForViewMode(
-                    sensorId,
-                    viewMode,
-                    autoMgdl,
-                    rawCurrentToMgdl(rawCurrent),
-                    timestampMillis
-            );
-            if (!Float.isFinite(calibrated) || calibrated <= 0f) {
-                return 0;
-            }
-            return Math.round(calibrated);
-        } catch (Throwable ignored) {
-            return 0;
-        }
+        return resolveExportedValueMgdl(sensorId, viewMode, autoMgdl, rawCurrent, timestampMillis);
     }
 }

@@ -30,7 +30,7 @@ import tk.glucodata.Notify
 import tk.glucodata.R
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
-import tk.glucodata.logic.TrendEngine
+import tk.glucodata.TrendAccess
 import java.util.Locale
 
 class AODOverlayService : AccessibilityService(), SensorEventListener {
@@ -366,7 +366,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         // 1. Fetch Data
         val endT = System.currentTimeMillis()
         val startT = endT - 3 * 60 * 60 * 1000L
-        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
+        val isMmol = Applic.unit == 1
         val activeSensorSerial = NotificationHistorySource.resolveSensorSerial(Natives.lastsensorname())
 
         var chartPoints: List<GlucosePoint>
@@ -392,125 +392,43 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
             }
         }
 
-        val isRawMode = (viewMode == 1 || viewMode == 3)
         val hasCalibration = tk.glucodata.NightscoutCalibration.hasCalibrationForViewMode(activeSensorSerial, viewMode)
-        val hideInitialWhenCalibrated = hasCalibration &&
-            tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
         val prefs = getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE)
         val showSecondary = prefs.getBoolean("aod_show_secondary", false)
-        val trendResult = if (chartPoints.isNotEmpty()) {
-            TrendEngine.calculateTrend(chartPoints, useRaw = isRawMode, isMmol = isMmol)
-        } else {
-            TrendEngine.TrendResult(TrendEngine.TrendState.Unknown, 0f, 0f, 0f, 0f)
-        }
-
         // Current Value
         var glvalue = 0f
         var valStr = "---"
         var time = 0L
 
         val current = tk.glucodata.CurrentGlucoseSource.getFresh()
+        val resolvedDisplay = tk.glucodata.CurrentDisplaySource.resolveFromLive(
+            liveValueText = current?.valueText,
+            liveNumericValue = current?.numericValue ?: Float.NaN,
+            rate = current?.rate ?: Float.NaN,
+            targetTimeMillis = current?.timeMillis ?: chartPoints.lastOrNull()?.timestamp ?: 0L,
+            sensorId = activeSensorSerial,
+            sensorGen = current?.sensorGen ?: 0,
+            index = current?.index ?: 0,
+            source = current?.source ?: if (chartPoints.isNotEmpty()) "history" else "none",
+            recentPoints = chartPoints,
+            viewMode = viewMode,
+            isMmol = isMmol
+        )
 
-        if (current != null) {
-            time = current.timeMillis
-            if (current.numericValue > 0.1f) {
-                glvalue = current.numericValue
-                valStr = tk.glucodata.Notify.formatGlucoseText(
-                    current.valueText,
-                    current.numericValue,
-                    chartPoints,
-                    viewMode,
-                    time,
-                    activeSensorSerial
-                ).toString()
-            } else {
-                // Fallback to history reconstruction only when the live string cannot be parsed.
-                var rawVal = 0f
-                var autoVal = 0f
-                if (chartPoints.isNotEmpty()) {
-                    for (i in chartPoints.size - 1 downTo 0) {
-                        val p = chartPoints[i]
-                        if (kotlin.math.abs(p.timestamp - time) < 60000) {
-                            rawVal = p.rawValue
-                            autoVal = p.value
-                            break
-                        }
-                    }
-                    if (rawVal < 0.1f && autoVal < 0.1f) {
-                        val latest = chartPoints[chartPoints.size - 1]
-                        rawVal = latest.rawValue
-                        autoVal = latest.value
-                    }
-                }
-
-                val calibratedVal = if (hasCalibration) {
-                    val baseVal = if (isRawMode) rawVal else autoVal
-                    if (baseVal.isFinite() && baseVal > 0.1f) {
-                        val autoMgdl = if (isMmol) autoVal * 18.0182f else autoVal
-                        val rawMgdl = if (isMmol) rawVal * 18.0182f else rawVal
-                        val calibratedMgdl = tk.glucodata.NightscoutCalibration.getCalibratedValueForViewMode(
-                            activeSensorSerial,
-                            viewMode,
-                            autoMgdl,
-                            rawMgdl,
-                            time
-                        )
-                        if (calibratedMgdl > 0f && isMmol) calibratedMgdl / 18.0182f else calibratedMgdl
-                    } else {
-                        0f
-                    }
-                } else 0f
-
-                valStr = when {
-                    hasCalibration && hideInitialWhenCalibrated && viewMode == 2 -> {
-                        val calText = tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
-                        val rawSecondary = rawVal.takeIf { it > 0.1f }?.let {
-                            tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol)
-                        }
-                        if (rawSecondary != null) "$calText · $rawSecondary" else calText
-                    }
-                    hasCalibration && hideInitialWhenCalibrated && viewMode == 3 -> {
-                        val calText = tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
-                        val autoSecondary = autoVal.takeIf { it > 0.1f }?.let {
-                            tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol)
-                        }
-                        if (autoSecondary != null) "$calText · $autoSecondary" else calText
-                    }
-                    hasCalibration && hideInitialWhenCalibrated -> {
-                        tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)
-                    }
-                    hasCalibration && (viewMode == 2 || viewMode == 3) -> {
-                        val secondary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
-                        val tertiary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol)
-                        "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} · $secondary · $tertiary"
-                    }
-                    hasCalibration -> {
-                        val base = if (isRawMode) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
-                        "${tk.glucodata.ui.util.GlucoseFormatter.format(calibratedVal, isMmol)} · $base"
-                    }
-                    viewMode == 2 || viewMode == 3 -> {
-                        val primary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol)
-                        val secondary = if (viewMode == 3) tk.glucodata.ui.util.GlucoseFormatter.format(autoVal, isMmol) else tk.glucodata.ui.util.GlucoseFormatter.format(rawVal, isMmol)
-                        "$primary / $secondary"
-                    }
-                    else -> {
-                        tk.glucodata.ui.util.GlucoseFormatter.format(if (isRawMode) rawVal else autoVal, isMmol)
-                    }
-                }
-
-                glvalue = if (hasCalibration) calibratedVal else if (isRawMode) rawVal else autoVal
-            }
+        if (resolvedDisplay != null) {
+            time = resolvedDisplay.timeMillis
+            glvalue = resolvedDisplay.primaryValue
+            valStr = if (showSecondary) resolvedDisplay.fullFormatted else resolvedDisplay.primaryStr
         } else if (chartPoints.isNotEmpty()) {
             val p = chartPoints[chartPoints.size - 1]
             glvalue = p.value
-            try {
-                valStr = tk.glucodata.ui.util.GlucoseFormatter.format(glvalue, isMmol)
-            } catch (e: Exception) {}
+            valStr = if (isMmol) String.format(Locale.getDefault(), "%.1f", glvalue)
+            else String.format(Locale.getDefault(), "%.0f", glvalue)
         }
 
-        if (!showSecondary) {
-            valStr = valStr.substringBefore(" · ").substringBefore(" · ")
-        }
+        val displayRate = resolvedDisplay?.rate?.takeIf { it.isFinite() }
+            ?: current?.rate?.takeIf { it.isFinite() }
+            ?: TrendAccess.calculateVelocity(chartPoints, useRaw = (viewMode == 1 || viewMode == 3), isMmol = isMmol)
 
         val glucoseColor = NotificationChartDrawer.getGlucoseColor(this, glvalue, isMmol)
 
@@ -535,7 +453,7 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         if (showArrow) {
             val arrowBitmap = NotificationChartDrawer.drawArrow(
                 this,
-                trendResult.velocity,
+                displayRate,
                 isMmol,
                 glucoseColor,
                 textScale * arrowScale

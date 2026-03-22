@@ -4,11 +4,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import tk.glucodata.Applic
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
 import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.R
-import tk.glucodata.strGlucose
 
 object AlertRuntimeManager {
     private const val LOG_ID = "AlertRuntimeManager"
@@ -179,16 +179,16 @@ object AlertRuntimeManager {
             return
         }
         val latest = try {
-            Natives.lastglucose()
+            CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
         } catch (t: Throwable) {
             null
         } ?: return
 
         if (lastReadingTimeMs <= 0L) {
-            lastReadingTimeMs = latest.time * 1000L
+            lastReadingTimeMs = latest.timeMillis
         }
         if (!lastGlucoseValue.isFinite()) {
-            lastGlucoseValue = parseLatestValue(latest)
+            lastGlucoseValue = latest.primaryValue
         }
         if (!lastRate.isFinite()) {
             lastRate = latest.rate
@@ -209,9 +209,5 @@ object AlertRuntimeManager {
         }
         bootstrapLastReadingLocked()
         return lastRate.takeIf { it.isFinite() } ?: Float.NaN
-    }
-
-    private fun parseLatestValue(latest: strGlucose): Float {
-        return latest.value.replace(',', '.').toFloatOrNull() ?: Float.NaN
     }
 }

@@ -100,22 +100,22 @@ static private void updateAppWidget(Context context, AppWidgetManager appWidgetM
       setWidth(widthdip);
       }
    RemoteViews  views;
-   strGlucose glu;
    int id= R.id.arrowandvalue;
    synchronized (widgetLock) {
       if (remote == null) {
          setWidth(widthdip == 0 ? 200 : widthdip);
       }
-      if (SuperGattCallback.previousglucose != null || (((glu = Natives.lastglucose()) != null) && ((SuperGattCallback.previousglucose = new notGlucose(glu.time * 1000L, glu.value, glu.rate, glu.sensorgen2)) != null))) {
+	      final var current = CurrentDisplaySource.getFreshNotGlucose(glucosetimeout);
+      if (current != null) {
          final var now = System.currentTimeMillis();
-         final var time = SuperGattCallback.previousglucose.time;
+         final var time = current.time;
          if ((now - time) > oldage) {
             final String tformat = timef.format(time);
             String message = "\n  " + context.getString(R.string.nonewvalue) + tformat;
             views = remoteMessage(message);
             id = R.id.content;
          } else {
-            views = remote.arrowremote(50, SuperGattCallback.previousglucose, false);
+            views = remote.arrowremote(50, current, false);
          }
       } else {
          views = remoteMessage("\n  " + context.getString(R.string.novalue));

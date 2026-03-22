@@ -605,8 +605,8 @@ public static void config(MainActivity context) {
             context.doonback();
             });
         test.setOnClickListener(v->  {
-            var gl=lastglucose();
-            var say=(gl!=null&&gl.value!=null)?gl.value:"8.7";
+            var current = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
+            var say=(current!=null&&current.getPrimaryStr()!=null)?current.getPrimaryStr():"8.7";
             getvalues.run();
             if(istalking()) {
                 var talk=SuperGattCallback.talker;

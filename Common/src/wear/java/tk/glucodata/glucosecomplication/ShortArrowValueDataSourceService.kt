@@ -40,9 +40,9 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import tk.glucodata.Applic
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
 import tk.glucodata.MainActivity
-import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.R
 import java.lang.Math.min
@@ -65,15 +65,15 @@ fun getview(type: ComplicationType):GlucoseValue {
       return glview as GlucoseValue;
       }
     override fun getPreviewData(type: ComplicationType): ComplicationData {
-      val glucose=Natives.lastglucose()
+      val glucose=CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
       val rate:Float
       val value:String
       val now = System.currentTimeMillis()
       val time: Long
-     if (glucose != null&&(now-glucose.time*1000L)<tk.glucodata.Notify.glucosetimeout) {
+     if (glucose != null&&(now-glucose.timeMillis)<tk.glucodata.Notify.glucosetimeout) {
           rate = glucose.rate
-          value = glucose.value
-           time = glucose.time * 1000L
+          value = glucose.primaryStr
+           time = glucose.timeMillis
            }
       else {
            rate =1.0f
@@ -95,9 +95,9 @@ fun getview(type: ComplicationType):GlucoseValue {
         Log.d(LOG_ID, "onComplicationRequest() id: ${request.complicationInstanceId}")
         val complicationPendingIntent = Notify.mkpending();
         val type=        request.complicationType
-      val glucose = Natives.lastglucose()
+      val glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
    	 val now = System.currentTimeMillis()
-      if(glucose==null ||(now-glucose.time*1000L)>=tk.glucodata.Notify.glucosetimeout) {
+      if(glucose==null ||(now-glucose.timeMillis)>=tk.glucodata.Notify.glucosetimeout) {
          Log.i(LOG_ID,"no glucose") 
            return ShortTextComplicationData.Builder(text= PlainComplicationText.Builder(text = Applic.app.getString( R.string.novalue)).build()
              ,contentDescription = PlainComplicationText.Builder(text = "Small Glucose").build())
@@ -106,10 +106,10 @@ fun getview(type: ComplicationType):GlucoseValue {
          }
       else {
 
-            val bitmap=getview(type).getArrowTimeBitmap(glucose.time*1000L,glucose.rate);
-            Log.i(LOG_ID," glucose==${glucose.value}") 
+            val bitmap=getview(type).getArrowTimeBitmap(glucose.timeMillis,glucose.rate);
+            Log.i(LOG_ID," glucose==${glucose.primaryStr}") 
                 val image=Icon.createWithBitmap(bitmap)
-             return ShortTextComplicationData.Builder(text= PlainComplicationText.Builder(text = glucose.value).build()
+             return ShortTextComplicationData.Builder(text= PlainComplicationText.Builder(text = glucose.primaryStr).build()
              ,contentDescription = PlainComplicationText.Builder(text = "Small Glucose").build())
                 .setSmallImage(SmallImage.Builder( image, SmallImageType.PHOTO).build())
                 .setMonochromaticImage(MonochromaticImage.Builder( image).build())

@@ -46,7 +46,6 @@ import androidx.glance.text.TextStyle
 import tk.glucodata.MainActivity
 import tk.glucodata.Natives
 import tk.glucodata.R
-import tk.glucodata.SuperGattCallback
 import tk.glucodata.data.GlucoseRepository
 import tk.glucodata.ui.GlucosePoint
 import tk.glucodata.ui.util.GlucoseFormatter
@@ -66,15 +65,17 @@ class ExpressiveAppWidget : GlanceAppWidget() {
         }
         
         // 2. Get Current Reading
-        val lastGlucose = Natives.lastglucose()
-        val webGlucose = SuperGattCallback.previousglucose
-        
-        val validGlucose = if (webGlucose != null && (System.currentTimeMillis() - webGlucose.time < 15 * 60 * 1000)) {
-             GlucosePoint(webGlucose.value.toFloatOrNull() ?: 0f, "", webGlucose.time, 0f, webGlucose.rate)
-        } else if (lastGlucose != null) {
-             GlucosePoint(lastGlucose.value.toFloatOrNull() ?: 0f, "", lastGlucose.time * 1000L, 0f, lastGlucose.rate)
+        val currentDisplay = tk.glucodata.CurrentDisplaySource.resolveCurrent(tk.glucodata.Notify.glucosetimeout)
+        val validGlucose = if (currentDisplay != null) {
+            GlucosePoint(
+                currentDisplay.primaryValue,
+                "",
+                currentDisplay.timeMillis,
+                currentDisplay.displayValues.secondaryValue ?: 0f,
+                currentDisplay.rate
+            )
         } else {
-             history.lastOrNull()
+            history.lastOrNull()
         }
 
         // 3. Calculate Delta (Change from previous reading)
@@ -96,7 +97,8 @@ class ExpressiveAppWidget : GlanceAppWidget() {
                 WidgetContent(
                     validGlucose = validGlucose,
                     history = history,
-                    delta = delta
+                    delta = delta,
+                    currentDisplay = currentDisplay
                 )
             }
         }
@@ -106,28 +108,33 @@ class ExpressiveAppWidget : GlanceAppWidget() {
     fun WidgetContent(
         validGlucose: GlucosePoint?,
         history: List<GlucosePoint>,
-        delta: Float 
+        delta: Float,
+        currentDisplay: tk.glucodata.CurrentDisplaySource.Snapshot?
     ) {
         val context = LocalContext.current
         val size = LocalSize.current
         
         val isMmol = GlucoseFormatter.isMmolApp()
         
-        val primaryStr = if (validGlucose != null) {
+        val primaryStr = if (currentDisplay != null) {
+            currentDisplay.primaryStr
+        } else if (validGlucose != null) {
             GlucoseFormatter.format(validGlucose.value, isMmol)
         } else {
             "--"
         }
-        
-        val rawValue = validGlucose?.rawValue ?: 0f
-        val showSecondary = validGlucose != null && rawValue > 0f && Math.abs(validGlucose.value - rawValue) > 0.1f
-        val secondaryStr = if (showSecondary) {
-            GlucoseFormatter.format(rawValue, isMmol)
+
+        val showSecondary = !(currentDisplay?.secondaryStr.isNullOrEmpty()) ||
+            (validGlucose != null && validGlucose.rawValue > 0f && Math.abs(validGlucose.value - validGlucose.rawValue) > 0.1f)
+        val secondaryStr = if (!(currentDisplay?.secondaryStr.isNullOrEmpty())) {
+            currentDisplay?.secondaryStr ?: ""
+        } else if (validGlucose != null && validGlucose.rawValue > 0f && Math.abs(validGlucose.value - validGlucose.rawValue) > 0.1f) {
+            GlucoseFormatter.format(validGlucose.rawValue, isMmol)
         } else {
             ""
         }
-        
-        val rate = validGlucose?.rate ?: 0f
+
+        val rate = currentDisplay?.rate ?: validGlucose?.rate ?: 0f
         
         val showChart = size.height >= 120.dp
         
@@ -372,4 +379,3 @@ class ExpressiveAppWidget : GlanceAppWidget() {
         }
     }
 }
-

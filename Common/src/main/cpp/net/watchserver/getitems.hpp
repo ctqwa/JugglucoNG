@@ -1,5 +1,6 @@
 #pragma once
 #include "sensoren.hpp"
+#include "common.hpp"
 extern Sensoren *sensors;
 
 
@@ -72,18 +73,10 @@ uint32_t getitems(char *&outiter,const int  datnr,uint32_t newer,uint32_t older,
 
 			}
 			timenext=iter->t-interval;
-                        ScanData calitem;
-                        const ScanData *itemptr;
-                        double calibrated;
-extern double     calibrateONE(const SensorGlucoseData *sens,const ScanData &value);
-                        if(settings->data()->DoCalibrate&&(calibrated=calibrateONE(sens,*iter),!isnan(calibrated))) {
-                                calitem=*iter;
-                                calitem.g=round(calibrated);
-                                itemptr=&calitem;
-                                }
-                          else {
+                        ScanData exportitem;
+                        const ScanData *itemptr=makeExportedScan(sens,iter,sensorname,exportitem);
+                        if(itemptr==nullptr)
                                 itemptr=iter;
-                                }
 
 			auto outitem=writeitem(outiter,datit,itemptr,sensorname,starttime);
 			if(!datit&&outiter!=outitem)

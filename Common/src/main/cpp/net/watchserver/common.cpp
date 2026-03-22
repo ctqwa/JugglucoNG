@@ -4,14 +4,82 @@
 #include <stdint.h>
 #include <system_error>
 #include <inttypes.h>
+#include <cmath>
+#include <jni.h>
 
 #include "SensorGlucoseData.hpp"
 #include "gltype.hpp"
 #include "common.hpp"
 #include "logs.hpp"
 #include "nightnumcategories.hpp"
+extern JNIEnv *getenv();
 extern double getdelta(float change);
 extern std::string_view getdeltaname(float rate);
+extern double calibrateONE(const SensorGlucoseData *sens,const ScanData &value);
+
+static jclass exportvalueclass=nullptr;
+
+static bool ensureexportvalueclass(JNIEnv *env) {
+    if(exportvalueclass!=nullptr)
+        return true;
+    constexpr const char calibrationclassstr[]="tk/glucodata/NightscoutCalibration";
+    if(jclass cl=env->FindClass(calibrationclassstr)) {
+        exportvalueclass=(jclass)env->NewGlobalRef(cl);
+        env->DeleteLocalRef(cl);
+        return exportvalueclass!=nullptr;
+        }
+    LOGGER("FindClass(%s) failed\n",calibrationclassstr);
+    return false;
+    }
+
+int resolveExportedMgdl(const SensorGlucoseData *sens, const ScanData *val,
+                        const sensorname_t *sensorname) {
+    if(!sens||!val||!sensorname)
+        return 0;
+    int autoMgdl=val->getmgdL();
+    if(settings->data()->DoCalibrate) {
+        if(double calibrated=calibrateONE(sens,*val);!isnan(calibrated))
+            autoMgdl=(int)round(calibrated);
+        }
+    auto env=getenv();
+    if(env==nullptr||!ensureexportvalueclass(env))
+        return autoMgdl;
+    const static jmethodID exportedValueMethod = env->GetStaticMethodID(
+        exportvalueclass,
+        "resolveExportedValueMgdl",
+        "(Ljava/lang/String;IIIJ)I"
+    );
+    if(exportedValueMethod==nullptr)
+        return autoMgdl;
+    auto jsensor=env->NewStringUTF(sensorname->data());
+    const auto *info=sens->getinfo();
+    const int viewMode=info?info->viewMode:0;
+    const int rawCurrent=sens->getRawForPoll(val);
+    const int resolved=env->CallStaticIntMethod(
+        exportvalueclass,
+        exportedValueMethod,
+        jsensor,
+        viewMode,
+        autoMgdl,
+        rawCurrent,
+        (jlong)val->gettime()*1000LL
+    );
+    env->DeleteLocalRef(jsensor);
+    return resolved>0?resolved:autoMgdl;
+    }
+
+const ScanData *makeExportedScan(const SensorGlucoseData *sens,
+                                 const ScanData *val,
+                                 const sensorname_t *sensorname,
+                                 ScanData &storage) {
+    if(!val)
+        return nullptr;
+    storage=*val;
+    const int mgdL=resolveExportedMgdl(sens,val,sensorname);
+    if(mgdL>0)
+        storage.g=mgdL;
+    return &storage;
+    }
 int mkv3streamid(char *outiter,const sensorname_t *name,int num) { 
 //LOGGER("sensorname=%s\n",name->data());
 const uint16_t *gets=reinterpret_cast<const uint16_t*>(name->data());

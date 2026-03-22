@@ -34,8 +34,8 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import tk.glucodata.Applic
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
-import tk.glucodata.Natives
 import tk.glucodata.Notify
 
 class NumberDataSourceService: SuspendingComplicationDataSourceService()  {
@@ -52,11 +52,11 @@ private val glview= GlucoseValue(100,100)
         val value: String
         val time: Long
         val index: Int
-        val glucose = Natives.lastglucose()
+        val glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
         val now = System.currentTimeMillis()
-        if (glucose != null&&(now-glucose.time*1000L)<tk.glucodata.Notify.glucosetimeout) {
-            time = glucose.time * 1000L
-            value = glucose.value
+        if (glucose != null&&(now-glucose.timeMillis)<tk.glucodata.Notify.glucosetimeout) {
+            time = glucose.timeMillis
+            value = glucose.primaryStr
             index = glucose.index
         } else {
             value = if (Applic.unit == 1) "5.6" else "101"
@@ -77,16 +77,16 @@ private val glview= GlucoseValue(100,100)
 
         return when (request.complicationType) {
             ComplicationType.SMALL_IMAGE-> {
-	      val glucose = Natives.lastglucose()
+		      val glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
 	      var image=
 	      if(glucose==null) {
 		 Log.i(LOG_ID,"glucose==null") 
 		  glview.getnovalue()
 		 }
 	      else {
-		    Log.i(LOG_ID,"glucose==${glucose.value}") 
+		    Log.i(LOG_ID,"glucose==${glucose.primaryStr}") 
    		   val now = System.currentTimeMillis()
-		   glview.getNumberBitmap(glucose.value,glucose.time*1000L,glucose.index,now)
+			   glview.getNumberBitmap(glucose.primaryStr,glucose.timeMillis,glucose.index,now)
 		  }
                 SmallImageComplicationData.Builder( SmallImage.Builder( Icon.createWithBitmap(image), SmallImageType.PHOTO).build(), contentDescription = PlainComplicationText.Builder("Glucose Number").build()).setTapAction(complicationPendingIntent).build()
 		}

@@ -38,9 +38,9 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import tk.glucodata.Applic
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
 import tk.glucodata.MainActivity
-import tk.glucodata.Natives
 import tk.glucodata.Notify
 import java.lang.Math.min
 
@@ -116,15 +116,15 @@ fun getview(type: ComplicationType):GlucoseValue {
 
         val complicationPendingIntent = Notify.mkpending();
     val type=        request.complicationType
-      val glucose = Natives.lastglucose()
+      val glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
       val bitmap=
       if(glucose==null) {
          Log.i(LOG_ID,"glucose==null") 
 	      getview(type).getnovalue()
          }
 	else {
-         Log.i(LOG_ID,"glucose==${glucose.value}") 
-      getview(type).getArrowValueBitmap(glucose.value,glucose.time*1000L,glucose.index,glucose.rate)
+         Log.i(LOG_ID,"glucose==${glucose.primaryStr}") 
+      getview(type).getArrowValueBitmap(glucose.primaryStr,glucose.timeMillis,glucose.index,glucose.rate)
 	}
 
 	val image=Icon.createWithBitmap(bitmap)

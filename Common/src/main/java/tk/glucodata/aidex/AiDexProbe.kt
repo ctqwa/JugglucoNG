@@ -18,10 +18,10 @@ import android.os.ParcelUuid
 import android.os.Handler
 import android.os.Looper
 import tk.glucodata.Applic
+import tk.glucodata.HistorySyncAccess
 import tk.glucodata.Log
 import tk.glucodata.Natives
 import tk.glucodata.R
-import tk.glucodata.data.HistoryRepository
 import java.util.Queue
 import java.util.LinkedList
 import java.util.UUID
@@ -363,11 +363,7 @@ class AiDexProbe private constructor() {
                                         // Otherwise the normal sync path (getGlucoseHistory)
                                         // will pick up the main sensor's data instead.
                                         if (isAiDexMainSensor()) {
-                                            HistoryRepository.storeReadingAsync(
-                                                now,
-                                                glucoseMmol,
-                                                HistoryRepository.GLUCODATA_SOURCE_AIDEX
-                                            )
+                                            HistorySyncAccess.storeAidexReadingAsync(now, glucoseMmol)
                                         }
                                         Log.i(TAG, "Stored glucose: $glucoseMgDl mg/dL")
                                     } else {
@@ -838,7 +834,7 @@ class AiDexProbe private constructor() {
                                    
                                    // Store the corrected value (only if AiDex is main sensor)
                                    if (isAiDexMainSensor()) {
-                                       HistoryRepository.storeReadingAsync(System.currentTimeMillis(), correctedMmol, HistoryRepository.GLUCODATA_SOURCE_AIDEX)
+                                       HistorySyncAccess.storeAidexReadingAsync(System.currentTimeMillis(), correctedMmol)
                                    }
                                }
                               
@@ -936,7 +932,7 @@ class AiDexProbe private constructor() {
                     
                     Log.i(TAG, "Parsed History $progress: Glucose=$correctedVal TimeOff=$timeOffset TS=${ts}")
                     if (isAiDexMainSensor()) {
-                        HistoryRepository.storeReadingAsync(ts, glucoseMmol, HistoryRepository.GLUCODATA_SOURCE_AIDEX)
+                        HistorySyncAccess.storeAidexReadingAsync(ts, glucoseMmol)
                     }
                 }
             }

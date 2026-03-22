@@ -428,7 +428,7 @@ public class NotificationChartDrawer {
         }
 
         boolean hideInitialWhenCalibrated = hasCalibration &&
-                tk.glucodata.data.calibration.CalibrationManager.INSTANCE.shouldHideInitialWhenCalibrated();
+                CalibrationAccess.shouldHideInitialWhenCalibrated();
         boolean isRawModeForCal = (viewMode == 1 || viewMode == 3);
         // Determine which lines to show
         boolean hideRawSource = hideInitialWhenCalibrated && isRawModeForCal;
@@ -503,7 +503,7 @@ public class NotificationChartDrawer {
             for (GlucosePoint p : visiblePoints) {
                 float baseVal = isRawModeForCal ? p.rawValue : p.value;
                 if (baseVal > 0) {
-                    float calVal = tk.glucodata.data.calibration.CalibrationManager.INSTANCE.getCalibratedValue(
+                    float calVal = CalibrationAccess.getCalibratedValue(
                             baseVal,
                             p.timestamp,
                             isRawModeForCal,
@@ -752,7 +752,7 @@ public class NotificationChartDrawer {
             for (GlucosePoint p : visiblePoints) {
                 float baseVal = isRawModeforCal ? p.rawValue : p.value;
                 if (baseVal > 0) {
-                    float val = tk.glucodata.data.calibration.CalibrationManager.INSTANCE.getCalibratedValue(baseVal,
+                    float val = CalibrationAccess.getCalibratedValue(baseVal,
                             p.timestamp, isRawModeforCal, false, calibrationSensorId);
 
                     if (val > 0.1f) {

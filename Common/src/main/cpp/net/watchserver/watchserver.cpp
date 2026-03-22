@@ -952,6 +952,8 @@ static bool    currentjson(std::string_view orign,recdata *outdata);
 static bool givecurrent(std::string_view origin,recdata *outdata) {
    int sensorid=sensors->last();
    const SensorGlucoseData *sens=getStreamSensor(sensorid);;
+   if(!sens)
+      return givenothing(outdata);
    const std::span<const ScanData> gdata=sens->getPolldata();
    const ScanData *first=&gdata.begin()[0];
    const ScanData *iter=&gdata.end()[-1];
@@ -959,18 +961,14 @@ static bool givecurrent(std::string_view origin,recdata *outdata) {
       if(--iter<=first)
          return givenothing(outdata);
       }
-   const ScanData *value=iter;;
+   const sensorname_t *sensorname=sens->shortsensorname();
+   ScanData exportitem;
+   const ScanData *value=makeExportedScan(sens,iter,sensorname,exportitem);
+   if(!value)
+      value=iter;
    outdata->allbuf=new(std::nothrow) char[300+1024];
    if(!outdata->allbuf)
       return outofmemory(outdata);
-
-extern double     calibrateNow(const SensorGlucoseData *sens,const ScanData &value) ;
-   if(double   calibrated=calibrateNow(sens,*value);!isnan(calibrated)) {
-         ScanData *tmp= (ScanData*)alloca(sizeof(ScanData));
-         *tmp=*value;
-         tmp->g=(int32_t) round(calibrated);
-         value=tmp;
-         }
    char *start=outdata->allbuf+152,*outiter=start;
    outiter=textitem(outiter,value)-2;
 /*
@@ -1136,6 +1134,8 @@ char *getdeltastr(char *start) {
    char *outiter=start;
    int sensorid=sensors->last();
    const SensorGlucoseData *sens=getStreamSensor(sensorid);;
+   if(!sens)
+      return start;
    const std::span<const ScanData> gdata=sens->getPolldata();
    const ScanData *first=&gdata.begin()[0];
    const ScanData *iter=&gdata.end()[-1];
@@ -1144,28 +1144,25 @@ char *getdeltastr(char *start) {
          return start;
       }
    const char *sensorname= sens->shortsensorname()->data();
+   const sensorname_t *shortsensorname=sens->shortsensorname();
    int timedif=4*62;
    auto nu=iter->gettime();
-
-extern double     calibrateNow(const SensorGlucoseData *sens,const ScanData &value) ;
-  int nuval;
-   if(double   calibrated=calibrateNow(sens,*iter);!isnan(calibrated)) {
-         nuval=(int)round(calibrated);
-            }
-   else 
-        nuval=iter->getmgdL();
+   ScanData currentExport;
+   const ScanData *currentValue=makeExportedScan(sens,iter,shortsensorname,currentExport);
+   if(!currentValue)
+      currentValue=iter;
+   int nuval=currentValue->getmgdL();
     --iter;
 //   auto nuval=(iter--)->getmgdL(); //CALIBRATE
    auto old=nu-timedif;
    while(iter>=first) {
       auto wastime=iter->gettime();
       if(wastime<old) {
-         int prevmgdl;
-         if(double   calibrated=calibrateNow(sens,*iter);!isnan(calibrated)) {
-                prevmgdl=(int)round(calibrated);
-               }
-         else
-             prevmgdl=iter->getmgdL();
+         ScanData previousExport;
+         const ScanData *previousValue=makeExportedScan(sens,iter,shortsensorname,previousExport);
+         if(!previousValue)
+            previousValue=iter;
+         int prevmgdl=previousValue->getmgdL();
          auto diff=nuval-prevmgdl;
          longlongtype nowmmsec=nu*1000LL;
          longlongtype prevmmsec=wastime*1000LL;
@@ -1188,6 +1185,8 @@ extern double     calibrateNow(const SensorGlucoseData *sens,const ScanData &val
 static char * givebgnow(char *start) {
    int sensorid=sensors->last();
    const SensorGlucoseData *sens=getStreamSensor(sensorid);;
+   if(!sens)
+      return start;
    const std::span<const ScanData> gdata=sens->getPolldata();
    const ScanData *first=&gdata.begin()[0];
    const ScanData *iter=&gdata.end()[-1];
@@ -1196,13 +1195,11 @@ static char * givebgnow(char *start) {
          return start;
       }
    longlongtype mmsectime=iter->gettime()*1000LL;
-extern double     calibrateNow(const SensorGlucoseData *sens,const ScanData &value) ;
-  int mgdl;
-   if(double   calibrated=calibrateNow(sens,*iter);!isnan(calibrated)) {
-        mgdl=(int)round(calibrated); 
-         }
-     else
-          mgdl=iter->getmgdL(); 
+   ScanData exportitem;
+   const ScanData *displayValue=makeExportedScan(sens,iter,sens->shortsensorname(),exportitem);
+   if(!displayValue)
+      displayValue=iter;
+   const int mgdl=displayValue->getmgdL();
    int valueid=iter->getid();
    const char * changelabel=getdeltaname(iter->ch).data();
    const char *sensorname= sens->shortsensorname()->data();
@@ -3448,4 +3445,3 @@ bool getv3entries(const char *cmdstart,const char *cmdend,std::string_view origi
 
 
 #endif
-

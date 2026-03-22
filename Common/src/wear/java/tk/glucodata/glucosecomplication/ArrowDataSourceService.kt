@@ -34,8 +34,8 @@ import androidx.wear.watchface.complications.data.SmallImageType
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
-import tk.glucodata.Natives
 import tk.glucodata.Notify
 
 class ArrowDataSourceService: SuspendingComplicationDataSourceService()  {
@@ -49,7 +49,7 @@ private val glview= GlucoseValue(100,100)
     }
 
     override fun getPreviewData(type: ComplicationType): ComplicationData {
-      val rate = Natives.lastglucose()?.rate?:1.0f
+      val rate = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)?.rate?:1.0f
         return SmallImageComplicationData.Builder(
             smallImage =  SmallImage.Builder( Icon.createWithBitmap(glview.getArrowBitmap(rate)), SmallImageType.PHOTO).build(),
             contentDescription = PlainComplicationText.Builder(text = "Glucose Arrow").build() )

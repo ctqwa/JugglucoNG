@@ -2309,9 +2309,7 @@ public class Notify {
                 float displayRate = glucose.rate;
                 try {
                     boolean useRaw = (viewMode == 1 || viewMode == 3);
-                    tk.glucodata.logic.TrendEngine.TrendResult res = tk.glucodata.logic.TrendEngine.INSTANCE
-                            .calculateTrend(nativePoints, useRaw, isMmol);
-                    displayRate = res.getVelocity();
+                    displayRate = TrendAccess.calculateVelocity(nativePoints, useRaw, isMmol);
                 } catch (Throwable t) {
                     // keep original rate if fails
                 }
@@ -2552,147 +2550,52 @@ public class Notify {
             int viewMode,
             long targetTime,
             String calibrationSensorId) {
-        String valueText;
-        boolean isSimple = false;
-        try {
-            Float.parseFloat(value);
-            // If simple number, use PURE formatter
-            valueText = format(java.util.Locale.getDefault(), pureglucoseformat, glvalue);
-            isSimple = true;
-        } catch (NumberFormatException e) {
-            // Complex string? Skip parsing legacy string.
-            // Format primary value and let logic below reconstruct full string from points
-            // data.
-            valueText = format(java.util.Locale.getDefault(), pureglucoseformat, glvalue);
-            isSimple = true;
+        final boolean isMmol = Applic.unit == 1;
+        final CurrentDisplaySource.Snapshot resolved = CurrentDisplaySource.resolveFromLive(
+                value,
+                glvalue,
+                Float.NaN,
+                CurrentGlucoseSource.normalizeTimeMillis(targetTime),
+                calibrationSensorId,
+                0,
+                0,
+                "notification",
+                points != null ? points : java.util.Collections.emptyList(),
+                viewMode,
+                isMmol);
+        if (resolved == null) {
+            return format(java.util.Locale.getDefault(), pureglucoseformat, glvalue);
         }
 
-        if (isSimple && points != null && !points.isEmpty()) {
-            boolean isRawMode = (viewMode == 1 || viewMode == 3);
-            boolean hasCalibration = tk.glucodata.data.calibration.CalibrationManager.INSTANCE
-                    .hasActiveCalibration(isRawMode, calibrationSensorId);
-            boolean hideInitialWhenCalibrated = hasCalibration
-                    && tk.glucodata.data.calibration.CalibrationManager.INSTANCE.shouldHideInitialWhenCalibrated();
-
-            // If calibration is active, 'glvalue' passed in IS the calibrated value.
-            // We need to find the Base values (Raw & Auto) from the points.
-
-            float rawVal = 0f;
-            float autoVal = 0f;
-            boolean found = false;
-
-            // Find matching point
-            for (int i = points.size() - 1; i >= 0; i--) {
-                GlucosePoint p = points.get(i);
-                if (targetTime > 0 && Math.abs(p.timestamp - targetTime) > 60000)
-                    continue;
-
-                // Match logic:
-                // If hasCalibration: we can't easily match value to p.value/p.rawValue because
-                // glvalue is calibrated.
-                // Trust the TIME match.
-                if (targetTime > 0 && Math.abs(p.timestamp - targetTime) < 2000) {
-                    rawVal = p.rawValue;
-                    autoVal = p.value;
-                    found = true;
-                    break;
-                }
-
-                // If no time, try value match ONLY if NO calibration (fallback)
-                if (!hasCalibration) {
-                    if (viewMode == 3 && Math.abs(p.rawValue - glvalue) < 0.1) {
-                        rawVal = p.rawValue;
-                        autoVal = p.value;
-                        found = true;
-                        break;
-                    }
-                    if (viewMode == 2 && Math.abs(p.value - glvalue) < 0.1) {
-                        rawVal = p.rawValue;
-                        autoVal = p.value;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-
-            // Fallback: Use latest if not found
-            if (!found && !points.isEmpty()) {
-                GlucosePoint latest = points.get(points.size() - 1);
-                rawVal = latest.rawValue;
-                autoVal = latest.value;
-            }
-
-            // Build Strings
-            String secondary = null;
-            String tertiary = null;
-
-            // Helper to format float
-            // We can't use local func in Java, so standard code
-
-            if (hasCalibration) {
-                if (hideInitialWhenCalibrated) {
-                    if (viewMode == 2 && rawVal > 0.1f) {
-                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, rawVal);
-                    } else if (viewMode == 3 && autoVal > 0.1f) {
-                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, autoVal);
-                    }
-                } else if (viewMode == 2 || viewMode == 3) {
-                    // 3 Values: Calibrated / Sec · Ter
-                    // Mode 2 (Auto+Raw): Sec=Auto, Ter=Raw
-                    // Mode 3 (Raw+Auto): Sec=Raw, Ter=Auto
-                    float secVal = (viewMode == 3) ? rawVal : autoVal;
-                    float terVal = (viewMode == 3) ? autoVal : rawVal;
-
-                    if (secVal > 0.1f)
-                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, secVal);
-                    if (terVal > 0.1f)
-                        tertiary = format(java.util.Locale.getDefault(), pureglucoseformat, terVal);
-                } else {
-                    // 2 Values: Calibrated / Base
-                    float baseVal = isRawMode ? rawVal : autoVal;
-                    if (baseVal > 0.1f)
-                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, baseVal);
-                }
-            } else {
-                // No Calibration - Original Logic
-                if (viewMode == 2 || viewMode == 3) {
-                    float secVal = (viewMode == 3) ? autoVal : rawVal;
-                    if (secVal > 0.1f)
-                        secondary = format(java.util.Locale.getDefault(), pureglucoseformat, secVal);
-                }
-            }
-
-            // Build Spannable
-            if (secondary != null) {
-                android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder();
-                ssb.append(valueText);
-
-                int secStart = ssb.length(); // Include separator in span
-                ssb.append(" · ");
-                ssb.append(secondary);
-
-                // Secondary Style: Gray, 0.85x
-                ssb.setSpan(new android.text.style.ForegroundColorSpan(0xFF888888), secStart, ssb.length(),
-                        android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
-                ssb.setSpan(new android.text.style.RelativeSizeSpan(0.85f), secStart, ssb.length(),
-                        android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
-
-                if (tertiary != null) {
-                    int terStart = ssb.length(); // Include separator in span
-                    ssb.append(" · ");
-                    ssb.append(tertiary);
-
-                    // Tertiary Style: Lighter Gray, 0.7x
-                    ssb.setSpan(new android.text.style.ForegroundColorSpan(0xFFAAAAAA), terStart, ssb.length(),
-                            android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
-                    ssb.setSpan(new android.text.style.RelativeSizeSpan(0.7f), terStart, ssb.length(),
-                            android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
-                }
-
-                return ssb;
-            }
+        final String valueText = resolved.getPrimaryStr();
+        final String secondary = resolved.getSecondaryStr();
+        final String tertiary = resolved.getTertiaryStr();
+        if (secondary == null) {
+            return valueText;
         }
-        return valueText;
+
+        android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder();
+        ssb.append(valueText);
+
+        int secStart = ssb.length();
+        ssb.append(" · ");
+        ssb.append(secondary);
+        ssb.setSpan(new android.text.style.ForegroundColorSpan(0xFF888888), secStart, ssb.length(),
+                android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+        ssb.setSpan(new android.text.style.RelativeSizeSpan(0.85f), secStart, ssb.length(),
+                android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+
+        if (tertiary != null) {
+            int terStart = ssb.length();
+            ssb.append(" · ");
+            ssb.append(tertiary);
+            ssb.setSpan(new android.text.style.ForegroundColorSpan(0xFFAAAAAA), terStart, ssb.length(),
+                    android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+            ssb.setSpan(new android.text.style.RelativeSizeSpan(0.7f), terStart, ssb.length(),
+                    android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+        }
+
+        return ssb;
     }
 
     // Helper for relative time "1m", "5m", "now"
@@ -2762,17 +2665,14 @@ public class Notify {
         // Recalculate rate using shared TrendEngine for consistency
         try {
             boolean useRaw = (viewMode == 1 || viewMode == 3);
-            tk.glucodata.logic.TrendEngine.TrendResult res = tk.glucodata.logic.TrendEngine.INSTANCE
-                    .calculateTrend(nativePoints, useRaw, isMmol);
-            rate = res.getVelocity();
+            rate = TrendAccess.calculateVelocity(nativePoints, useRaw, isMmol);
         } catch (Throwable t) {
             // keep original rate if fails
         }
 
         // If ViewMode == 3 (Combined), we force appending Raw if available
         boolean isRawMode = (viewMode == 1 || viewMode == 3);
-        boolean hasCalibration = tk.glucodata.data.calibration.CalibrationManager.INSTANCE
-                .hasActiveCalibration(isRawMode, activeSensorSerial);
+        boolean hasCalibration = NightscoutCalibration.hasCalibrationForViewMode(activeSensorSerial, viewMode);
 
         CharSequence valueText = formatGlucoseText(
                 glucose.value,
@@ -3066,15 +2966,9 @@ public class Notify {
 
         // Startup Text using the shared current-value resolver.
         CharSequence startupValue = "---";
-        CurrentGlucoseSource.Snapshot current = CurrentGlucoseSource.getFresh();
+        CurrentDisplaySource.Snapshot current = CurrentDisplaySource.resolveCurrent(glucosetimeout, activeSensorSerial);
         if (current != null) {
-            startupValue = formatGlucoseText(
-                    current.getValueText(),
-                    current.getNumericValue(),
-                    nativePoints,
-                    viewMode,
-                    current.getTimeMillis(),
-                    activeSensorSerial);
+            startupValue = current.getFullFormatted();
         } else if (!chartPoints.isEmpty()) {
             // Fallback if Natives.lastglucose() is not ready but history is
             // Manual fall back logic if formatGlucoseText can't be used (no string value)
@@ -3146,7 +3040,7 @@ public class Notify {
         // Semantic Color Logic for Startup
         float colorVal = 0f;
         if (current != null) {
-            colorVal = current.getNumericValue();
+            colorVal = current.getPrimaryValue();
         } else if (!chartPoints.isEmpty()) {
             colorVal = chartPoints.get(chartPoints.size() - 1).value;
         } else if (SuperGattCallback.previousglucose != null && SuperGattCallback.previousglucosevalue >= 2.0f) {

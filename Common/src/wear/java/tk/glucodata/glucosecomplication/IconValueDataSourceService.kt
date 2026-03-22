@@ -40,9 +40,9 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import tk.glucodata.Applic
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
 import tk.glucodata.MainActivity
-import tk.glucodata.Natives
 import tk.glucodata.Notify
 import tk.glucodata.R
 import java.lang.Math.min
@@ -68,14 +68,16 @@ fun getview(type: ComplicationType):GlucoseValue {
         val value: String
         val time: Long
         val index: Int
-        val glucose = Natives.lastglucose()
+        val glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
         val now = System.currentTimeMillis()
-        if (glucose != null&&(now-glucose.time*1000L)<tk.glucodata.Notify.glucosetimeout) {
-            time = glucose.time * 1000L
-            value = glucose.value
+        if (glucose != null&&(now-glucose.timeMillis)<tk.glucodata.Notify.glucosetimeout) {
+            time = glucose.timeMillis
+            value = glucose.primaryStr
+            index = glucose.index
         } else {
             value = if (Applic.unit == 1) "5.6" else "101"
 	        time=now
+            index = 0
         }
         return MonochromaticImageComplicationData.Builder(
              MonochromaticImage.Builder( Icon.createWithBitmap(getview(type).getNumberBitmap(value,time,-1,now))).build(),
@@ -88,14 +90,14 @@ fun getview(type: ComplicationType):GlucoseValue {
         Log.d(LOG_ID, "onComplicationRequest() id: ${request.complicationInstanceId}")
         val type=        request.complicationType
     if(type== MONOCHROMATIC_IMAGE) {
-            val glucose = Natives.lastglucose()
+            val glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
             val now = System.currentTimeMillis()
-            val bitmap= if(glucose==null ||(now-glucose.time*1000L)>=tk.glucodata.Notify.glucosetimeout){
+            val bitmap= if(glucose==null ||(now-glucose.timeMillis)>=tk.glucodata.Notify.glucosetimeout){
                   Log.i(LOG_ID,"MonochromaticImage novalue")
                  getview(type).getnovalue()
                  } else {
-                     Log.i(LOG_ID,"MonochromaticImage ${glucose.value}")
-                    getview(type).getNumberBitmap(glucose.value,glucose.time*1000L,-1,now)
+                     Log.i(LOG_ID,"MonochromaticImage ${glucose.primaryStr}")
+                    getview(type).getNumberBitmap(glucose.primaryStr,glucose.timeMillis,glucose.index,now)
                      }
              val image=Icon.createWithBitmap(bitmap)
              val complicationPendingIntent = Notify.mkpending()

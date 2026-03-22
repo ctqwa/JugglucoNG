@@ -41,7 +41,6 @@ import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import javax.crypto.spec.IvParameterSpec
-import tk.glucodata.data.HistoryRepository
 import com.microtechmd.blecomm.entity.AidexXDatetimeEntity
 import tk.glucodata.R
 
@@ -4107,7 +4106,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                                 vendorHistoryDownloading) {
                                 vendorHistoryLastProgressiveSyncAt = vendorHistoryRecordsStored
                                 Log.i(TAG, "Edit 73: Progressive sync at $vendorHistoryRecordsStored records")
-                                try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
+                                try { tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                             }
 
                             // Request next page if more records remain
@@ -4120,7 +4119,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                                             vendorHistoryDownloading = false
                                             // Still sync what we have so far
                                             if (vendorHistoryRecordsStored > 0) {
-                                                try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
+                                                try { tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                                             }
                                             return@execute
                                         }
@@ -4131,7 +4130,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                                         Log.e(TAG, "GET_HISTORIES: pagination failed: ${t.message}")
                                         vendorHistoryDownloading = false
                                         if (vendorHistoryRecordsStored > 0) {
-                                            try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
+                                            try { tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                                         }
                                     }
                                 }
@@ -4152,8 +4151,8 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                                     // Small delay to ensure all native writes from aidexProcessData are flushed
                                     try { Thread.sleep(300) } catch (_: Throwable) {}
                                     try {
-                                        tk.glucodata.data.HistoryRepository.resetBackfillFlag()
-                                        tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "")
+                                        tk.glucodata.HistorySyncAccess.resetBackfillFlag()
+                                        tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber ?: "")
                                     } catch (_: Throwable) {}
                                     Log.i(TAG, "GET_HISTORIES: HistorySync.forceFullSyncForSensor() triggered after $vendorHistoryRecordsStored records")
                                 }
@@ -4171,7 +4170,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                         vendorHistoryDownloading = false
                         clearRawHistoryPageState()
                         if (vendorHistoryRecordsStored > 0) {
-                            try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
+                            try { tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                         }
                     }
                 } else {
@@ -4183,7 +4182,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
                     }
                     clearRawHistoryPageState()
                     if (vendorHistoryRecordsStored > 0) {
-                        try { tk.glucodata.data.HistorySync.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
+                        try { tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber ?: "") } catch (_: Throwable) {}
                     }
                 }
             }
@@ -8921,7 +8920,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
             handleGlucoseResult(res, timeMs)
 
             // Trigger a targeted sync for just this sensor's live reading.
-            tk.glucodata.data.HistorySync.syncSensorFromNative(
+            tk.glucodata.HistorySyncAccess.syncSensorFromNative(
                 tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
             )
 

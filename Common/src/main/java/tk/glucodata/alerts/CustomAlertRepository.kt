@@ -2,7 +2,6 @@ package tk.glucodata.alerts
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.journeyapps.barcodescanner.Util
 import org.json.JSONArray
 import tk.glucodata.Applic
 

@@ -48,7 +48,6 @@ import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Log.showbytes;
 import static tk.glucodata.Natives.thresholdchange;
 import static tk.glucodata.SensorBluetooth.blueone;
-import tk.glucodata.data.calibration.CalibrationManager;
 import tk.glucodata.alerts.AlertStateTracker;
 import tk.glucodata.alerts.AlertType;
 
@@ -232,6 +231,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     public static tk.glucodata.GlucoseAlarms glucosealarms = null;
     public static notGlucose previousglucose = null;
     static float previousglucosevalue = 0.0f;
+    public static String previousglucosesensorid = null;
 
     static public void initAlarmTalk() {
         if (glucosealarms == null)
@@ -415,7 +415,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             Applic.updatescreen();
             if (!isAiDexSerial) {
                 if (SerialNumber != null && !SerialNumber.isEmpty()) {
-                    tk.glucodata.data.HistorySync.syncSensorFromNative(SerialNumber);
+                    HistorySyncAccess.syncSensorFromNative(SerialNumber);
                 }
                 UiRefreshBus.requestDataRefresh();
             }
@@ -430,6 +430,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 sensorgen);
         previousglucose = sglucose;
         previousglucosevalue = gl;
+        previousglucosesensorid = SerialNumber;
         final var fview = Floating.floatview;
         // MainActivity.showmessage=null;
         boolean[] alarmspeak = { false };
@@ -510,7 +511,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         Applic.updatescreen();
         if (!isAiDexSerial) {
             if (SerialNumber != null && !SerialNumber.isEmpty()) {
-                tk.glucodata.data.HistorySync.syncSensorFromNative(SerialNumber);
+                HistorySyncAccess.syncSensorFromNative(SerialNumber);
             }
             UiRefreshBus.requestDataRefresh();
         }
@@ -612,7 +613,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                                 glucoseToUse = glucoseToUse / (float) mgdLmult;
                             }
                             // Apply calibration
-                            glucoseToUse = CalibrationManager.INSTANCE.getCalibratedValue(glucoseToUse, timmsec, true);
+                            glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, true);
                             mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
                             
                             if (doLog) {
@@ -620,8 +621,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                             }
                             
                             dowithglucose(SerialNumber, mgdlToUse, glucoseToUse, rate, alarm, timmsec, sensorstartmsec, showtime, sensorgen);
-                            tk.glucodata.logic.CustomAlertManager.INSTANCE.checkAndTrigger(tk.glucodata.Applic.app,
-                                    glucoseToUse, rate, timmsec);
+                            CustomAlertAccess.checkAndTrigger(tk.glucodata.Applic.app, glucoseToUse, rate, timmsec);
                             charcha[0] = timmsec;
                             
                             if (!isWearable && Natives.gethealthConnect() && Build.VERSION.SDK_INT >= 28) {
@@ -700,15 +700,14 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             }
 
             // Apply Kotlin calibration if enabled
-            glucoseToUse = CalibrationManager.INSTANCE.getCalibratedValue(glucoseToUse, timmsec, isRawMode);
+            glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, isRawMode);
             mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
             alarm = reconcileAlertCodeWithCalibratedValue(alarm, glucoseToUse, rate);
 
             dowithglucose(SerialNumber, mgdlToUse, glucoseToUse, rate, alarm, timmsec, sensorstartmsec, showtime,
                     sensorgen);
             // Hook for Custom Alerts
-            tk.glucodata.logic.CustomAlertManager.INSTANCE.checkAndTrigger(tk.glucodata.Applic.app, glucoseToUse,
-                    rate, timmsec);
+            CustomAlertAccess.checkAndTrigger(tk.glucodata.Applic.app, glucoseToUse, rate, timmsec);
 
             charcha[0] = timmsec;
 

@@ -297,20 +297,6 @@ fun getTrendDescription(rate: Float): String {
     }
 }
 
-data class DisplayValues(
-    val primaryValue: Float,
-    val secondaryValue: Float? = null,
-    val tertiaryValue: Float? = null,
-    val primaryStr: String,
-    val secondaryStr: String? = null,
-    val tertiaryStr: String? = null,
-    val fullFormatted: String
-)
-
-/**
- * Get display values based on view mode and optional calibration.
- * When calibration is active, calibrated value becomes primary and others shift down.
- */
 fun getDisplayValues(
     point: GlucosePoint, 
     viewMode: Int, 
@@ -318,114 +304,17 @@ fun getDisplayValues(
     calibratedValue: Float? = null
 ): DisplayValues {
     val isMmol = if (unit.isNotEmpty()) tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit) else tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
-
-    val rawDisplayValue = if (point.rawValue.isFinite() && point.rawValue > 0f) point.rawValue else Float.NaN
-    val rawStr = if (rawDisplayValue.isFinite()) {
-        tk.glucodata.ui.util.GlucoseFormatter.format(rawDisplayValue, isMmol)
-    } else {
-        "--"
-    }
-    val valStr = tk.glucodata.ui.util.GlucoseFormatter.format(point.value, isMmol)
-    val isRawPrimaryMode = viewMode == 1 || viewMode == 3
-    // In raw-primary views, do not show a calibrated value when raw is absent.
-    // Otherwise we can end up calibrating auto/fallback values with raw-mode coefficients.
-    val effectiveCalibratedValue = when {
-        calibratedValue == null -> null
-        isRawPrimaryMode && !rawDisplayValue.isFinite() -> null
-        else -> calibratedValue
-    }
-    val calStr = effectiveCalibratedValue?.let { tk.glucodata.ui.util.GlucoseFormatter.format(it, isMmol) }
-    val hideInitialWhenCalibrated = effectiveCalibratedValue != null &&
+    val hideInitialWhenCalibrated = calibratedValue != null &&
         tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
-    
-    // If calibration is active, it becomes primary and everything shifts down
-    if (effectiveCalibratedValue != null && calStr != null) {
-        if (hideInitialWhenCalibrated) {
-            return when (viewMode) {
-                2 -> DisplayValues( // Auto + Raw → Calibrated primary, Raw secondary
-                    primaryValue = effectiveCalibratedValue,
-                    secondaryValue = rawDisplayValue.takeIf { it.isFinite() },
-                    primaryStr = calStr,
-                    secondaryStr = rawStr.takeUnless { it == "--" },
-                    fullFormatted = if (rawDisplayValue.isFinite()) "$calStr · $rawStr $unit" else "$calStr $unit"
-                )
-                3 -> DisplayValues( // Raw + Auto → Calibrated primary, Auto secondary
-                    primaryValue = effectiveCalibratedValue,
-                    secondaryValue = point.value,
-                    primaryStr = calStr,
-                    secondaryStr = valStr,
-                    fullFormatted = "$calStr · $valStr $unit"
-                )
-                else -> DisplayValues(
-                    primaryValue = effectiveCalibratedValue,
-                    primaryStr = calStr,
-                    fullFormatted = "$calStr $unit"
-                )
-            }
-        }
-        return when (viewMode) {
-            1 -> DisplayValues( // Raw → Calibrated primary, Raw secondary
-                primaryValue = effectiveCalibratedValue,
-                secondaryValue = rawDisplayValue,
-                primaryStr = calStr,
-                secondaryStr = rawStr,
-                fullFormatted = "$calStr · $rawStr $unit"
-            )
-            2 -> DisplayValues( // Auto + Raw → Calibrated primary, Auto secondary, Raw tertiary
-                primaryValue = effectiveCalibratedValue,
-                secondaryValue = point.value,
-                tertiaryValue = rawDisplayValue.takeIf { it.isFinite() },
-                primaryStr = calStr,
-                secondaryStr = valStr,
-                tertiaryStr = rawStr.takeUnless { it == "--" },
-                fullFormatted = if (rawDisplayValue.isFinite()) "$calStr · $valStr · $rawStr $unit" else "$calStr · $valStr $unit"
-            )
-            3 -> DisplayValues( // Raw + Auto → Calibrated primary, Raw secondary, Auto tertiary
-                primaryValue = effectiveCalibratedValue,
-                secondaryValue = rawDisplayValue.takeIf { it.isFinite() },
-                tertiaryValue = point.value.takeIf { rawDisplayValue.isFinite() },
-                primaryStr = calStr,
-                secondaryStr = rawStr.takeUnless { it == "--" },
-                tertiaryStr = valStr.takeIf { rawDisplayValue.isFinite() },
-                fullFormatted = if (rawDisplayValue.isFinite()) "$calStr · $rawStr · $valStr $unit" else "$calStr $unit"
-            )
-            else -> DisplayValues( // Auto → Calibrated primary, Auto secondary
-                primaryValue = effectiveCalibratedValue,
-                secondaryValue = point.value,
-                primaryStr = calStr,
-                secondaryStr = valStr,
-                fullFormatted = "$calStr · $valStr $unit"
-            )
-        }
-    }
-    
-    // No calibration - original logic
-    return when (viewMode) {
-        1 -> DisplayValues( // Raw
-            primaryValue = rawDisplayValue,
-            primaryStr = rawStr,
-            fullFormatted = "$rawStr $unit"
-        )
-        2 -> DisplayValues( // Auto + Raw
-            primaryValue = point.value,
-            secondaryValue = rawDisplayValue.takeIf { it.isFinite() },
-            primaryStr = valStr,
-            secondaryStr = rawStr.takeUnless { it == "--" },
-            fullFormatted = if (rawDisplayValue.isFinite()) "$valStr · $rawStr $unit" else "$valStr $unit"
-        )
-        3 -> DisplayValues( // Raw + Auto
-            primaryValue = if (rawDisplayValue.isFinite()) rawDisplayValue else point.value,
-            secondaryValue = point.value.takeIf { rawDisplayValue.isFinite() },
-            primaryStr = if (rawDisplayValue.isFinite()) rawStr else valStr,
-            secondaryStr = valStr.takeIf { rawDisplayValue.isFinite() },
-            fullFormatted = if (rawDisplayValue.isFinite()) "$rawStr · $valStr $unit" else "$valStr $unit"
-        )
-        else -> DisplayValues( // Auto (0)
-            primaryValue = point.value,
-            primaryStr = valStr,
-            fullFormatted = "$valStr $unit"
-        )
-    }
+    return DisplayValueResolver.resolve(
+        autoValue = point.value,
+        rawValue = point.rawValue,
+        viewMode = viewMode,
+        isMmol = isMmol,
+        unitLabel = unit,
+        calibratedValue = calibratedValue,
+        hideInitialWhenCalibrated = hideInitialWhenCalibrated
+    )
 }
 
 

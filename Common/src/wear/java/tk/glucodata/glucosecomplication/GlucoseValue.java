@@ -56,6 +56,7 @@ import android.os.Build;
 import tk.glucodata.Log;
 
 import tk.glucodata.Applic;
+import tk.glucodata.CurrentDisplaySource;
 import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.R;
@@ -222,17 +223,17 @@ Bitmap getArrowBitmap(Float rate) {
 	}
 	
 Bitmap getArrowBitmap() {
-   var glucose = Natives.lastglucose();
+   var glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
    if(glucose==null) {
      {if(doLog) {Log.d(LOG_ID,"lastglucose()==null");};};
       return getnovalue();
       }
 
-    if((System.currentTimeMillis()-(glucose.time*1000L))>=tk.glucodata.Notify.glucosetimeout) {
-         {if(doLog) {Log.d(LOG_ID,"oldvalue "+glucose.time);};};
+    if((System.currentTimeMillis()-glucose.getTimeMillis())>=tk.glucodata.Notify.glucosetimeout) {
+         {if(doLog) {Log.d(LOG_ID,"oldvalue "+glucose.getTimeMillis());};};
          return getnovalue();
          }
-    return getArrowBitmap(glucose.rate);
+    return getArrowBitmap(glucose.getRate());
    }
 static int getTextColor( ) {
    int col=Natives.getComplicationTextColor( );
@@ -304,13 +305,13 @@ Bitmap previewbitmap() {
         String value;
         float rate;
         int index;
-        final var glucose = Natives.lastglucose();
+        final var glucose = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
          var now = System.currentTimeMillis();
         long  time;
-        if(glucose != null&&((time = glucose.time * 1000L)!=0L&&(now-time)<tk.glucodata.Notify.glucosetimeout)) {
-            value = glucose.value;
-            index = glucose.index;
-            rate = glucose.rate;
+        if(glucose != null&&((time = glucose.getTimeMillis())!=0L&&(now-time)<tk.glucodata.Notify.glucosetimeout)) {
+            value = glucose.getPrimaryStr();
+            index = glucose.getIndex();
+            rate = glucose.getRate();
         } else {
             value = (Applic.unit == 1)?"5.6": "101";
             time = now;

@@ -37,6 +37,7 @@ import com.eveningoutpost.dexdrip.services.broadcastservice.models.Settings;
 
 public class watchdrip extends BroadcastReceiver {
 private static String  LOG_ID="watchdrip";
+private static final double MGDL_PER_MMOLL=18.0182;
 
  static   String  tostring(Bundle bundle) {
         if(bundle==null)
@@ -68,6 +69,15 @@ private static String  LOG_ID="watchdrip";
 					return;
 				}
 			WearInt.mapsettings.put(key,settings);
+			var current=CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
+			if(current!=null) {
+				double mgdl=Applic.unit==1?current.getPrimaryValue()*MGDL_PER_MMOLL:current.getPrimaryValue();
+				var newintent=WearInt.mksendglucoseintent(settings,mgdl,current.getRate(),0,current.getTimeMillis());
+				newintent.putExtra( "FUNCTION","update_bg_force");
+				newintent.setPackage(key);
+				Applic.app.sendBroadcast(newintent);
+				return;
+				}
 			var gl=Natives.getlastGlucose();
 			if(gl==null)
 					return;

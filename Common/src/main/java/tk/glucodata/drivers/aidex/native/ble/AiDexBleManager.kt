@@ -1318,7 +1318,7 @@ class AiDexBleManager(
                 }
 
                 // Sync only this sensor; live packets should not trigger a full all-sensor backfill.
-                tk.glucodata.data.HistorySync.syncSensorFromNative(
+                tk.glucodata.HistorySyncAccess.syncSensorFromNative(
                     tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
                 )
             } catch (e: UnsatisfiedLinkError) {
@@ -2369,7 +2369,7 @@ class AiDexBleManager(
             if (historyStoredCount % HISTORY_SYNC_BATCH_SIZE == 0) {
                 try {
                     val bareSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
-                    tk.glucodata.data.HistorySync.forceFullSyncForSensor(bareSerial)
+                    tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(bareSerial)
                     Log.i(TAG, "Progressive sync at $historyStoredCount entries")
                 } catch (_: Throwable) {}
             }
@@ -2401,12 +2401,12 @@ class AiDexBleManager(
         if (historyStoredCount > 0) {
             val bareSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
             try {
-                tk.glucodata.data.HistorySync.forceFullSyncForSensor(bareSerial)
+                tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(bareSerial)
             } catch (t: Throwable) {
                 Log.e(TAG, "HistorySync.forceFullSyncForSensor failed: $t")
                 // Fallback
                 try {
-                    tk.glucodata.data.HistorySync.syncSensorFromNative(bareSerial, forceFull = true)
+                    tk.glucodata.HistorySyncAccess.syncSensorFromNative(bareSerial, forceFull = true)
                 } catch (_: Throwable) {}
             }
         }
@@ -3076,7 +3076,7 @@ class AiDexBleManager(
                 lastBroadcastStoredTime = now
 
                 // Sync only the AiDex sensor that produced this broadcast frame.
-                tk.glucodata.data.HistorySync.syncSensorFromNative(
+                tk.glucodata.HistorySyncAccess.syncSensorFromNative(
                     tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
                 )
             } catch (e: Throwable) {

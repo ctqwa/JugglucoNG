@@ -60,10 +60,9 @@ import tk.glucodata.Applic
 import tk.glucodata.Applic.removescreenupdater
 import tk.glucodata.Applic.setscreenupdater
 import tk.glucodata.CommonCanvas
+import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.Log
 import tk.glucodata.Log.doLog
-import tk.glucodata.Natives
-import tk.glucodata.strGlucose
 import tk.glucodata.watchface.data.watchface.ColorStyleIdAndResourceIds
 import tk.glucodata.watchface.data.watchface.WatchFaceColorPalette.Companion.convertToWatchFaceColorPalette
 import tk.glucodata.watchface.data.watchface.WatchFaceData
@@ -300,7 +299,7 @@ override fun render(canvas: Canvas, bounds: Rect, zonedDateTime: ZonedDateTime,s
         if(renderParameters.watchFaceLayers.contains(WatchFaceLayer.COMPLICATIONS_OVERLAY)) {
             val unixtime = zonedDateTime.toEpochSecond()
             rendertime=unixtime
-            val glucose: strGlucose? = Natives.lastglucose()
+            val glucose = CurrentDisplaySource.resolveCurrent(tk.glucodata.Notify.glucosetimeout)
             val drawAmbient = renderParameters.drawMode == DrawMode.AMBIENT
             if (drawAmbient) {
                 timePaint.color = watchFaceColors.ambientPrimaryColor
@@ -380,10 +379,10 @@ override fun render(canvas: Canvas, bounds: Rect, zonedDateTime: ZonedDateTime,s
     private val agePaint = Paint().apply {
         setARGB(0xFF,0xFF,0,0xFF)
        }
-private fun   showglucose(canvas:Canvas,glucosePaint:Paint,agePaint:Paint,getxin:Float,gety:Float,density:Float,unixtime:Long,glucose:strGlucose)  {
+private fun   showglucose(canvas:Canvas,glucosePaint:Paint,agePaint:Paint,getxin:Float,gety:Float,density:Float,unixtime:Long,glucose:CurrentDisplaySource.Snapshot)  {
       var getx=getxin
-      Log.i(LOG_ID,"glucose=${glucose.value} time=${glucose.time}")
-      var age:Int=(unixtime-glucose.time).toInt()
+      Log.i(LOG_ID,"glucose=${glucose.primaryStr} time=${glucose.timeMillis}")
+      var age:Int=(unixtime-(glucose.timeMillis/1000L)).toInt()
 //           val oldage=(60.0f*5.0f)
 
       val oldage=tk.glucodata.Notify.glucosetimeoutSEC
@@ -398,10 +397,10 @@ private fun   showglucose(canvas:Canvas,glucosePaint:Paint,agePaint:Paint,getxin
                 else  {
                     CommonCanvas.drawarrow(this,glucosePaint,density,rate,width*.25f,height*.55f)
                     }
-                 drawText(glucose.value,getx,gety, glucosePaint)
+                 drawText(glucose.primaryStr,getx,gety, glucosePaint)
                  val idbounds=Rect()
                  glucosePaint.textSize/=5.0f
-                 val sensorid=glucose.sensorid
+                 val sensorid=glucose.sensorId ?: ""
                  glucosePaint.getTextBounds(sensorid, 0,sensorid.length, idbounds)
                  val yid= gety+idbounds.height()*1.5f
                  val wid= idbounds.width()

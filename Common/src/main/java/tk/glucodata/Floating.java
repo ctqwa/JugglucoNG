@@ -503,10 +503,10 @@ public class Floating extends View {
         return true;
     }
 
-    private void oldfloatmessage(Canvas floatCanvas, long time) {
+    private void oldfloatmessage(Canvas floatCanvas, long timeMillis) {
         floatCanvas.drawColor(floatingbackground);
         floatPaint.setColor(floatingforeground);
-        final String tformat = timef.format(time * 1000L);
+        final String tformat = timef.format(timeMillis);
         float fontsize = floatfontsize;
         var gety = floatCanvas.getHeight() * 0.37f;
         floatPaint.setTextSize(fontsize * .3f);
@@ -555,11 +555,11 @@ public class Floating extends View {
             ;
         }
         ;
-        final strGlucose glucose = Natives.lastglucose();
-        if (glucose != null) {
-            final var now = System.currentTimeMillis() / 1000L;
-            final var age = now - glucose.time;
-            if (age < oldage) {
+        final var current = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
+        if (current != null) {
+            final var now = System.currentTimeMillis();
+            final var age = now - current.getTimeMillis();
+            if (age < (oldage * 1000L)) {
                 if (hide) {
                     {
                         if (doLog) {
@@ -572,20 +572,20 @@ public class Floating extends View {
                     final var xpos = 0.2f;
                     floatCanvas.drawColor(floatingbackground);
                     floatPaint.setColor(floatingforeground);
-                    floatCanvas.drawText(glucose.value, xpos, gety, floatPaint);
+                    floatCanvas.drawText(current.getPrimaryStr(), xpos, gety, floatPaint);
                     return;
                 }
                 floatCanvas.drawColor(floatingbackground);
                 floatPaint.setColor(floatingforeground);
                 var gety = (floatCanvas.getHeight() - timeHeight) * 0.98f;
                 var xpos = floatglucosex;
-                var rate = glucose.rate;
+                var rate = current.getRate();
                 if (!isNaN(rate)) {
                     float weightrate = (rate > 1.6 ? -1.0f : (rate < -1.6 ? 1.0f : (rate / -1.6f)));
                     float arrowy = gety - floatfontsize * .4f + weightrate * floatfontsize * .4f;
                     drawarrow(floatCanvas, floatPaint, floatdensity, rate, xpos * .85f, arrowy);
                 }
-                final var value = glucose.value;
+                final var value = current.getPrimaryStr();
                 floatCanvas.drawText(value, xpos, gety * .9659f, floatPaint);
                 /*
                  * if(colorAge) {
@@ -595,13 +595,13 @@ public class Floating extends View {
                  * }
                  */
                 if (showtime) {
-                    var timestr = minhourstr(glucose.time * 1000L);
+                    var timestr = minhourstr(current.getTimeMillis());
                     floatPaint.setTextSize(timesize);
                     floatCanvas.drawText(timestr, density, gety + timeHeight, floatPaint);
                     floatPaint.setTextSize(floatfontsize);
                     {
                         if (doLog) {
-                            Log.i(LOG_ID, "time: " + glucose.time + " " + timestr);
+                            Log.i(LOG_ID, "time: " + current.getTimeMillis() + " " + timestr);
                         }
                         ;
                     }
@@ -610,7 +610,7 @@ public class Floating extends View {
                 return;
             } else {
                 if (!hide) {
-                    oldfloatmessage(floatCanvas, glucose.time);
+                    oldfloatmessage(floatCanvas, current.getTimeMillis());
                     return;
                 }
             }

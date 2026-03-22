@@ -11,6 +11,7 @@ object CurrentGlucoseSource {
         val rate: Float,
         val sensorId: String?,
         val sensorGen: Int,
+        val index: Int,
         val source: String
     )
 
@@ -52,8 +53,9 @@ object CurrentGlucoseSource {
             valueText = latest.value ?: "",
             numericValue = numericValue,
             rate = latest.rate,
-            sensorId = null,
+            sensorId = SuperGattCallback.previousglucosesensorid ?: Natives.lastsensorname(),
             sensorGen = latest.sensorgen2,
+            index = 0,
             source = "callback"
         )
     }
@@ -74,7 +76,17 @@ object CurrentGlucoseSource {
             rate = latest.rate,
             sensorId = latest.sensorid,
             sensorGen = latest.sensorgen2,
+            index = latest.index,
             source = "native"
         )
     }
+
+    @JvmStatic
+    fun getFreshNotGlucose(maxAgeMillis: Long): notGlucose? {
+        val snapshot = getFresh(maxAgeMillis) ?: return null
+        return notGlucose(snapshot.timeMillis, snapshot.valueText, snapshot.rate, snapshot.sensorGen)
+    }
+
+    @JvmStatic
+    fun getFreshNotGlucose(): notGlucose? = getFreshNotGlucose(DEFAULT_MAX_AGE_MS)
 }
