@@ -11,6 +11,8 @@ package tk.glucodata.drivers.aidex.native.data
 data class GlucoseFrame(
     /** Opcode byte (byte[0]) — determines scaling and frame type */
     val opcode: Int,
+    /** Minutes since sensor start (decoded from bytes[1..4] seconds / 60) */
+    val timeOffsetMinutes: Int,
     /** Calibrated glucose in mg/dL (after opcode scaling) */
     val glucoseMgDl: Float,
     /** Raw 10-bit glucose value before scaling */

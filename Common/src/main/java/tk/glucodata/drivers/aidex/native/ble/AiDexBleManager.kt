@@ -1623,6 +1623,11 @@ class AiDexBleManager(
             Log.i(TAG, "History dedup: liveOffsetCutoff=$liveOffsetCutoff (history entries >= this offset will be skipped)")
         }
 
+        if (liveOffsetCutoff == 0 && lastGlucoseTimeMs > 0L && newest > 0) {
+            liveOffsetCutoff = newest
+            Log.i(TAG, "History dedup: snapped liveOffsetCutoff to newest history offset $newest because live data already arrived this session")
+        }
+
         // Update sensorstartmsec from the newest offset.
         // This is critical: SuperGattCallback constructor may have set sensorstartmsec to "now"
         // (via Natives.getSensorStartmsec for a newly-registered sensor), but the sensor has
@@ -2406,9 +2411,13 @@ class AiDexBleManager(
         // so the stream resumes immediately without waiting for the next F003 (~60s).
         // Uses manual pack (not aidexProcessData) to avoid double-writing data
         // that was already stored by storeHistoryEntries().
-        if (lastHistoryNewestGlucose > 0f && lastHistoryNewestOffset > 0) {
+        if (lastHistoryNewestGlucose > 0f &&
+            lastHistoryNewestOffset > 0 &&
+            (liveOffsetCutoff == 0 || lastHistoryNewestOffset > liveOffsetCutoff)
+        ) {
             val mgdlInt = lastHistoryNewestGlucose.toInt().coerceIn(0, 0xFFFF) * 10
-            handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, System.currentTimeMillis())
+            val catchUpTimestamp = sensorstartmsec + (lastHistoryNewestOffset.toLong() * 60_000L)
+            handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, catchUpTimestamp)
             Log.i(TAG, "History catch-up broadcast: glucose=$lastHistoryNewestGlucose offset=$lastHistoryNewestOffset")
         }
         lastHistoryNewestGlucose = 0f

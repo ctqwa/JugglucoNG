@@ -555,26 +555,124 @@ sealed class CalibrationSheetState {
 }
 
 @Composable
-fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
-    val navController = rememberNavController()
-    val dashboardViewModel: DashboardViewModel = viewModel()
-    
-    // Hoisted Calibration Sheet State
-    var calibrationSheetState by remember { mutableStateOf<CalibrationSheetState>(CalibrationSheetState.Hidden) }
-    
-    // Shared Data for Sheet
+private fun DashboardRoute(
+    dashboardViewModel: DashboardViewModel,
+    navController: androidx.navigation.NavController,
+    onTriggerCalibration: (CalibrationSheetState) -> Unit
+) {
+    val calibrations by tk.glucodata.data.calibration.CalibrationManager.calibrations.collectAsState()
+
+    DashboardScreen(
+        viewModel = dashboardViewModel,
+        calibrations = calibrations,
+        onNavigateToCalibrations = { navController.navigate("calibrations") },
+        onNavigateToHistory = { navController.navigate("history") },
+        onTriggerCalibration = onTriggerCalibration
+    )
+}
+
+@Composable
+private fun HistoryRoute(
+    dashboardViewModel: DashboardViewModel,
+    onBack: () -> Unit,
+    onTriggerCalibration: (CalibrationSheetState) -> Unit
+) {
     val glucoseHistory by dashboardViewModel.glucoseHistory.collectAsState()
     val unit by dashboardViewModel.unit.collectAsState()
     val viewMode by dashboardViewModel.viewMode.collectAsState()
     val targetLow by dashboardViewModel.targetLow.collectAsState()
     val targetHigh by dashboardViewModel.targetHigh.collectAsState()
-    val currentGlucose by dashboardViewModel.currentGlucose.collectAsState()
-    
-    // Reactive Calibration State
     val calibrations by tk.glucodata.data.calibration.CalibrationManager.calibrations.collectAsState()
-    val isRawEnabled by tk.glucodata.data.calibration.CalibrationManager.isEnabledForRaw.collectAsState()
-    val isAutoEnabled by tk.glucodata.data.calibration.CalibrationManager.isEnabledForAuto.collectAsState()
-    
+
+    HistoryBrowseScreen(
+        glucoseHistory = glucoseHistory,
+        unit = unit,
+        viewMode = viewMode,
+        targetLow = targetLow,
+        targetHigh = targetHigh,
+        calibrations = calibrations,
+        onBack = onBack,
+        onPointClick = { point ->
+            onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
+        }
+    )
+}
+
+@Composable
+private fun CalibrationListRoute(
+    dashboardViewModel: DashboardViewModel,
+    navController: androidx.navigation.NavController,
+    onTriggerCalibration: (CalibrationSheetState) -> Unit
+) {
+    val glucoseHistory by dashboardViewModel.glucoseHistory.collectAsState()
+    val unit by dashboardViewModel.unit.collectAsState()
+    val viewMode by dashboardViewModel.viewMode.collectAsState()
+    val currentGlucose by dashboardViewModel.currentGlucose.collectAsState()
+
+    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit)
+
+    tk.glucodata.ui.calibration.CalibrationListScreen(
+        navController = navController,
+        isMmol = isMmol,
+        viewMode = viewMode,
+        onAdd = {
+            val latest = glucoseHistory.firstOrNull()
+            val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+            val rawVal = latest?.rawValue ?: autoVal
+            onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
+        },
+        onEdit = { entity ->
+            onTriggerCalibration(CalibrationSheetState.Edit(entity))
+        }
+    )
+}
+
+@Composable
+private fun CalibrationSheetHost(
+    sheetState: CalibrationSheetState,
+    dashboardViewModel: DashboardViewModel,
+    onDismiss: () -> Unit,
+    onNavigateToCalibrations: () -> Unit
+) {
+    if (sheetState is CalibrationSheetState.Hidden) return
+
+    val glucoseHistory by dashboardViewModel.glucoseHistory.collectAsState()
+    val unit by dashboardViewModel.unit.collectAsState()
+    val viewMode by dashboardViewModel.viewMode.collectAsState()
+
+    val (initAuto, initRaw, initTime) = when (sheetState) {
+        is CalibrationSheetState.New -> Triple(sheetState.auto, sheetState.raw, sheetState.timestamp)
+        is CalibrationSheetState.Edit -> Triple(
+            sheetState.entity.sensorValue,
+            sheetState.entity.sensorValueRaw,
+            sheetState.entity.timestamp
+        )
+        CalibrationSheetState.Hidden -> Triple(0f, 0f, 0L)
+    }
+
+    tk.glucodata.ui.calibration.CalibrationBottomSheet(
+        onDismiss = onDismiss,
+        initialValueAuto = initAuto,
+        initialValueRaw = initRaw,
+        initialTimestamp = initTime,
+        glucoseHistory = glucoseHistory.map { tk.glucodata.GlucosePoint(it.timestamp, it.value, it.rawValue) },
+        isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
+        viewMode = viewMode,
+        onNavigateToHistory = {
+            onDismiss()
+            onNavigateToCalibrations()
+        }
+    )
+}
+
+@Composable
+fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
+    val navController = rememberNavController()
+    val dashboardViewModel: DashboardViewModel = viewModel()
+
+    // Hoisted Calibration Sheet State
+    var calibrationSheetState by remember { mutableStateOf<CalibrationSheetState>(CalibrationSheetState.Hidden) }
+
     val onTriggerCalibration: (CalibrationSheetState) -> Unit = { state ->
         calibrationSheetState = state
     }
@@ -599,7 +697,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
     // Navigation Items Logic (Shared)
     // Top-level routes that appear in the navbar
     val topLevelRoutes = setOf("dashboard", "stats", "sensors", "settings")
-    
+
     // Map subpages to their parent top-level destination
     fun getParentRoute(route: String?): String? = when {
         route == null -> null
@@ -609,11 +707,11 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
         route == "calibrations" -> "dashboard"  // calibrations is a dashboard subpage
         else -> null
     }
-    
+
     val onNavigate = { route: String ->
         val parentOfCurrent = getParentRoute(currentRoute)
         val isOnSubpageOf = parentOfCurrent == route
-        
+
         when {
             // If we're on a subpage of the clicked nav item, pop back to it
             isOnSubpageOf -> navController.popBackStack(route, inclusive = false)
@@ -671,27 +769,18 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     startDestination = "dashboard",
                     modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
                 ) {
-                    composable("dashboard") { 
-                        DashboardScreen(
-                            viewModel = dashboardViewModel,
-                            calibrations = calibrations,
-                            onNavigateToCalibrations = { navController.navigate("calibrations") },
-                            onNavigateToHistory = { navController.navigate("history") },
+                    composable("dashboard") {
+                        DashboardRoute(
+                            dashboardViewModel = dashboardViewModel,
+                            navController = navController,
                             onTriggerCalibration = onTriggerCalibration
-                        ) 
+                        )
                     }
                     composable("history") {
-                        HistoryBrowseScreen(
-                            glucoseHistory = glucoseHistory,
-                            unit = unit,
-                            viewMode = viewMode,
-                            targetLow = targetLow,
-                            targetHigh = targetHigh,
-                            calibrations = calibrations,
+                        HistoryRoute(
+                            dashboardViewModel = dashboardViewModel,
                             onBack = { navController.popBackStack() },
-                            onPointClick = { point ->
-                                onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
-                            }
+                            onTriggerCalibration = onTriggerCalibration
                         )
                     }
                     composable("stats") { tk.glucodata.ui.stats.StatsScreen() }
@@ -718,42 +807,18 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     composable("settings/debug") { DebugSettingsScreen(navController) }
                     composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                     composable("settings/calibrations") {
-                        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
-                        val viewMode by dashboardViewModel.viewMode.collectAsState()
-                        tk.glucodata.ui.calibration.CalibrationListScreen(
+                        CalibrationListRoute(
+                            dashboardViewModel = dashboardViewModel,
                             navController = navController,
-                            isMmol = isMmol,
-                            viewMode = viewMode,
-                            onAdd = {
-                                val latest = glucoseHistory.firstOrNull()
-                                val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
-                                val rawVal = latest?.rawValue ?: autoVal
-                                onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
-                            },
-                            onEdit = { entity ->
-                                onTriggerCalibration(CalibrationSheetState.Edit(entity))
-                            }
+                            onTriggerCalibration = onTriggerCalibration
                         )
                     }
-                    composable("calibrations") { 
-                        val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
-                        val viewMode by dashboardViewModel.viewMode.collectAsState()
-                        tk.glucodata.ui.calibration.CalibrationListScreen(
-                            navController = navController, 
-                            isMmol = isMmol, 
-                            viewMode = viewMode,
-                            onAdd = {
-                                // Logic to get current value for "Add"
-                                // We can use history.firstOrNull() as latest point
-                                val latest = glucoseHistory.firstOrNull()
-                                val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
-                                val rawVal = latest?.rawValue ?: autoVal
-                                onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
-                            },
-                            onEdit = { entity ->
-                                onTriggerCalibration(CalibrationSheetState.Edit(entity))
-                            }
-                        ) 
+                    composable("calibrations") {
+                        CalibrationListRoute(
+                            dashboardViewModel = dashboardViewModel,
+                            navController = navController,
+                            onTriggerCalibration = onTriggerCalibration
+                        )
                     }
                 }
             }
@@ -796,27 +861,18 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 popEnterTransition = { fadeIn(animationSpec = tween(200)) },
                 popExitTransition = { fadeOut(animationSpec = tween(200)) }
             ) {
-                composable("dashboard") { 
-                    DashboardScreen(
-                        viewModel = dashboardViewModel, 
-                        calibrations = calibrations,
-                        onNavigateToCalibrations = { navController.navigate("calibrations") },
-                        onNavigateToHistory = { navController.navigate("history") },
+                composable("dashboard") {
+                    DashboardRoute(
+                        dashboardViewModel = dashboardViewModel,
+                        navController = navController,
                         onTriggerCalibration = onTriggerCalibration
-                    ) 
+                    )
                 }
                 composable("history") {
-                    HistoryBrowseScreen(
-                        glucoseHistory = glucoseHistory,
-                        unit = unit,
-                        viewMode = viewMode,
-                        targetLow = targetLow,
-                        targetHigh = targetHigh,
-                        calibrations = calibrations,
+                    HistoryRoute(
+                        dashboardViewModel = dashboardViewModel,
                         onBack = { navController.popBackStack() },
-                        onPointClick = { point ->
-                            onTriggerCalibration(CalibrationSheetState.New(point.value, point.rawValue, point.timestamp))
-                        }
+                        onTriggerCalibration = onTriggerCalibration
                     )
                 }
                 composable("stats") { tk.glucodata.ui.stats.StatsScreen() }
@@ -843,69 +899,30 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("settings/debug") { DebugSettingsScreen(navController) }
                 composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
                 composable("settings/calibrations") {
-                    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
-                    val viewMode by dashboardViewModel.viewMode.collectAsState()
-                    tk.glucodata.ui.calibration.CalibrationListScreen(
+                    CalibrationListRoute(
+                        dashboardViewModel = dashboardViewModel,
                         navController = navController,
-                        isMmol = isMmol,
-                        viewMode = viewMode,
-                        onAdd = {
-                            val latest = glucoseHistory.firstOrNull()
-                            val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
-                            val rawVal = latest?.rawValue ?: autoVal
-                            onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
-                        },
-                        onEdit = { entity ->
-                            onTriggerCalibration(CalibrationSheetState.Edit(entity))
-                        }
+                        onTriggerCalibration = onTriggerCalibration
                     )
                 }
-                composable("calibrations") { 
-                    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(dashboardViewModel.unit.value)
-                    val viewMode by dashboardViewModel.viewMode.collectAsState()
-                    tk.glucodata.ui.calibration.CalibrationListScreen(
-                        navController = navController, 
-                        isMmol = isMmol, 
-                        viewMode = viewMode,
-                        onAdd = {
-                            val latest = glucoseHistory.firstOrNull()
-                            val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
-                            val rawVal = latest?.rawValue ?: autoVal
-                            onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
-                        },
-                        onEdit = { entity ->
-                            onTriggerCalibration(CalibrationSheetState.Edit(entity))
-                        }
-                    ) 
+                composable("calibrations") {
+                    CalibrationListRoute(
+                        dashboardViewModel = dashboardViewModel,
+                        navController = navController,
+                        onTriggerCalibration = onTriggerCalibration
+                    )
                 }
             }
         }
     }
-    
+
     // --- CALIBRATION BOTTOM SHEET (Global) ---
-    val sheetState = calibrationSheetState
-    if (sheetState !is CalibrationSheetState.Hidden) {
-        // Resolve initial values
-        val (initAuto, initRaw, initTime) = when(sheetState) {
-            is CalibrationSheetState.New -> Triple(sheetState.auto, sheetState.raw, sheetState.timestamp)
-            is CalibrationSheetState.Edit -> Triple(sheetState.entity.sensorValue, sheetState.entity.sensorValueRaw, sheetState.entity.timestamp)
-            else -> Triple(0f, 0f, 0L) // Should not happen
-        }
-    
-        tk.glucodata.ui.calibration.CalibrationBottomSheet(
-            onDismiss = { calibrationSheetState = CalibrationSheetState.Hidden },
-            initialValueAuto = initAuto,
-            initialValueRaw = initRaw,
-            initialTimestamp = initTime,
-            glucoseHistory = glucoseHistory.map { tk.glucodata.GlucosePoint(it.timestamp, it.value, it.rawValue) },
-            isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
-            viewMode = viewMode,
-            onNavigateToHistory = {
-                calibrationSheetState = CalibrationSheetState.Hidden
-                navController.navigate("calibrations")
-            }
-        )
-    }
+    CalibrationSheetHost(
+        sheetState = calibrationSheetState,
+        dashboardViewModel = dashboardViewModel,
+        onDismiss = { calibrationSheetState = CalibrationSheetState.Hidden },
+        onNavigateToCalibrations = { navController.navigate("calibrations") }
+    )
 }
 
 @Composable
@@ -1176,25 +1193,32 @@ fun DashboardScreen(
             val fullscreenChartItemHeight = remember(viewportHeight, chartViewportReserve) {
                 (viewportHeight - chartViewportReserve).coerceAtLeast(0.dp)
             }
+            val boundedFullscreenChartItemHeight = fullscreenChartItemHeight.coerceAtLeast(0.dp)
             val middleChartItemHeight = remember(
-                fullscreenChartItemHeight,
+                boundedFullscreenChartItemHeight,
                 measuredReadingRowHeight,
                 middleVisibleReadingRows
             ) {
-                (fullscreenChartItemHeight - (measuredReadingRowHeight * middleVisibleReadingRows))
-                    .coerceIn(0.dp, fullscreenChartItemHeight)
+                (boundedFullscreenChartItemHeight - (measuredReadingRowHeight * middleVisibleReadingRows))
+                    .coerceIn(0.dp, boundedFullscreenChartItemHeight)
             }
+            val boundedMiddleChartItemHeight = middleChartItemHeight
+                .coerceAtLeast(0.dp)
+                .coerceAtMost(boundedFullscreenChartItemHeight)
             val collapsedChartItemHeight = remember(
-                fullscreenChartItemHeight,
-                middleChartItemHeight,
+                boundedFullscreenChartItemHeight,
+                boundedMiddleChartItemHeight,
                 measuredReadingRowHeight,
                 defaultVisibleReadingRows
             ) {
-                (fullscreenChartItemHeight - (measuredReadingRowHeight * defaultVisibleReadingRows))
-                    .coerceIn(0.dp, middleChartItemHeight)
+                (boundedFullscreenChartItemHeight - (measuredReadingRowHeight * defaultVisibleReadingRows))
+                    .coerceIn(0.dp, boundedMiddleChartItemHeight)
             }
-            val middleChartBoostDp = (middleChartItemHeight - collapsedChartItemHeight).coerceAtLeast(0.dp)
-            val maxChartBoostDp = (fullscreenChartItemHeight - collapsedChartItemHeight).coerceAtLeast(0.dp)
+            val boundedCollapsedChartItemHeight = collapsedChartItemHeight
+                .coerceAtLeast(0.dp)
+                .coerceAtMost(boundedFullscreenChartItemHeight)
+            val middleChartBoostDp = (boundedMiddleChartItemHeight - boundedCollapsedChartItemHeight).coerceAtLeast(0.dp)
+            val maxChartBoostDp = (boundedFullscreenChartItemHeight - boundedCollapsedChartItemHeight).coerceAtLeast(0.dp)
             val middleChartBoostPx = with(density) { middleChartBoostDp.toPx() }
             val maxChartBoostPx = with(density) { maxChartBoostDp.toPx() }
 
@@ -1497,8 +1521,8 @@ fun DashboardScreen(
                 item {
                     // Portrait chart sizing is anchored to explicit visible-row budgets:
                     // top state shows ~3-4 rows, middle shows ~1-2, fullscreen hides the list.
-                    val chartItemHeightTarget = (collapsedChartItemHeight + chartHeightBoostDp)
-                        .coerceIn(collapsedChartItemHeight, fullscreenChartItemHeight)
+                    val chartItemHeightTarget = (boundedCollapsedChartItemHeight + chartHeightBoostDp)
+                        .coerceIn(boundedCollapsedChartItemHeight, boundedFullscreenChartItemHeight)
                     val chartHorizontalPaddingTarget = (collapsedChartHorizontalPadding.value * collapseFraction).dp
                     val animatedChartItemHeight by animateDpAsState(
                                 targetValue = chartItemHeightTarget,

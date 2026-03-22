@@ -1,11 +1,15 @@
 package tk.glucodata
 
+import android.graphics.BitmapFactory
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import org.junit.Ignore
 import org.junit.Test
 import java.io.File
-import javax.imageio.ImageIO
-import com.google.zxing.*
-import com.google.zxing.common.HybridBinarizer
 
+@Ignore("Manual local QR decode helper; not part of the Android unit test suite")
 class QrTest {
     @Test
     fun decodeUserImage() {
@@ -17,11 +21,14 @@ class QrTest {
         }
 
         try {
-            val image = ImageIO.read(file)
+            val image = BitmapFactory.decodeFile(path) ?: run {
+                println("Could not decode image: $path")
+                return
+            }
             val width = image.width
             val height = image.height
             val pixels = IntArray(width * height)
-            image.getRGB(0, 0, width, height, pixels, 0, width)
+            image.getPixels(pixels, 0, width, 0, 0, width, height)
 
             val source = RGBLuminanceSource(width, height, pixels)
             val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
