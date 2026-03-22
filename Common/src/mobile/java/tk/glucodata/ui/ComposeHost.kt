@@ -618,7 +618,7 @@ private fun CalibrationListRoute(
         viewMode = viewMode,
         onAdd = {
             val latest = glucoseHistory.firstOrNull()
-            val autoVal = latest?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+            val autoVal = latest?.value ?: tk.glucodata.GlucoseValueParser.parseFirstOrZero(currentGlucose)
             val rawVal = latest?.rawValue ?: autoVal
             onTriggerCalibration(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
         },
@@ -1439,7 +1439,7 @@ fun DashboardScreen(
                             calibratedValue = calibratedValue,
                             isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onHeroClick = {
-                                val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                                val autoVal = latestPoint?.value ?: tk.glucodata.GlucoseValueParser.parseFirstOrZero(currentGlucose)
                                 val rawVal = latestPoint?.rawValue ?: autoVal
                                 triggerCalibrationIfEnabled(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
                             }
@@ -1533,7 +1533,7 @@ fun DashboardScreen(
                             calibratedValue = calibratedValue,
                             isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onHeroClick = {
-                                val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                                val autoVal = latestPoint?.value ?: tk.glucodata.GlucoseValueParser.parseFirstOrZero(currentGlucose)
                                 val rawVal = latestPoint?.rawValue ?: autoVal
                                 triggerCalibrationIfEnabled(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
                             }
@@ -1640,7 +1640,7 @@ fun DashboardScreen(
                             viewMode = viewMode,
                             isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onAddCalibration = {
-                                val autoVal = latestPoint?.value ?: try { currentGlucose.toFloat() } catch (e: Exception) { 0f }
+                                val autoVal = latestPoint?.value ?: tk.glucodata.GlucoseValueParser.parseFirstOrZero(currentGlucose)
                                 val rawVal = latestPoint?.rawValue ?: autoVal
                                 triggerCalibrationIfEnabled(CalibrationSheetState.New(autoVal, rawVal, System.currentTimeMillis()))
                             },

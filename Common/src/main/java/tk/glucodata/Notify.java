@@ -3064,23 +3064,17 @@ public class Notify {
             }
         }
 
-        // Startup Text using Helper and Natives.lastglucose()
+        // Startup Text using the shared current-value resolver.
         CharSequence startupValue = "---";
-        strGlucose last = Natives.lastglucose();
-        if (last != null && last.value != null) {
-            long now = System.currentTimeMillis();
-            // Stale Data Check: If older than 15 minutes (900,000 ms), hide it
-            if (Math.abs(now - last.time) < 15 * 60 * 1000L) {
-                float val = 0f;
-                try {
-                    val = Float.parseFloat(last.value);
-                } catch (NumberFormatException e) {
-                    // ignore
-                }
-                // Use unified formatter with TIME check using NATIVE points
-                startupValue = formatGlucoseText(last.value, val, nativePoints, viewMode, last.time,
-                        activeSensorSerial);
-            }
+        CurrentGlucoseSource.Snapshot current = CurrentGlucoseSource.getFresh();
+        if (current != null) {
+            startupValue = formatGlucoseText(
+                    current.getValueText(),
+                    current.getNumericValue(),
+                    nativePoints,
+                    viewMode,
+                    current.getTimeMillis(),
+                    activeSensorSerial);
         } else if (!chartPoints.isEmpty()) {
             // Fallback if Natives.lastglucose() is not ready but history is
             // Manual fall back logic if formatGlucoseText can't be used (no string value)
@@ -3151,11 +3145,8 @@ public class Notify {
 
         // Semantic Color Logic for Startup
         float colorVal = 0f;
-        if (last != null && last.value != null) {
-            try {
-                colorVal = Float.parseFloat(last.value);
-            } catch (Exception e) {
-            }
+        if (current != null) {
+            colorVal = current.getNumericValue();
         } else if (!chartPoints.isEmpty()) {
             colorVal = chartPoints.get(chartPoints.size() - 1).value;
         } else if (SuperGattCallback.previousglucose != null && SuperGattCallback.previousglucosevalue >= 2.0f) {
@@ -3164,8 +3155,8 @@ public class Notify {
         int glucoseColor = NotificationChartDrawer.getGlucoseColor(Applic.app, colorVal, isMmol);
 
         float startupRate = 0f;
-        if (last != null) {
-            startupRate = last.rate;
+        if (current != null) {
+            startupRate = current.getRate();
         } else if (SuperGattCallback.previousglucose != null) {
             startupRate = SuperGattCallback.previousglucose.rate;
         }
