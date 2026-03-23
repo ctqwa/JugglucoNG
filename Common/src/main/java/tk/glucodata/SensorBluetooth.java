@@ -998,13 +998,6 @@ public class SensorBluetooth {
             blueone = null;
             return false;
         }
-        {
-            if (doLog) {
-                Log.i(LOG_ID, "updateDevicers");
-            }
-            ;
-        }
-        ;
         String[] nativeDevs = Natives.activeSensors();
 
         // Merge with AiDex sensors from Preferences
@@ -1042,33 +1035,12 @@ public class SensorBluetooth {
         String[] devs = allDevs.toArray(new String[0]);
         ArrayList<Integer> rem = new ArrayList<>();
         int gatnr = gattcallbacks.size();
-        {
-            if (doLog) {
-                Log.i(LOG_ID, "updateDevicers nr active: " + gatnr);
-            }
-            ;
-        }
-        ;
         if (devs == null) {
             for (int i = 0; i < gatnr; i++) {
                 String was = gattcallbacks.get(i).SerialNumber;
-                {
-                    if (doLog) {
-                        Log.i(LOG_ID, "null: can remove " + was);
-                    }
-                    ;
-                }
-                ;
                 rem.add(i);
             }
             if (rem.size() == 0) {
-                {
-                    if (doLog) {
-                        Log.i(LOG_ID, "Nothing to remove, no active sensors");
-                    }
-                    ;
-                }
-                ;
                 return false;
             }
         } else {
@@ -1080,45 +1052,17 @@ public class SensorBluetooth {
                 String was = gatt.SerialNumber;
                 int instr = was == null ? -1 : indexOf(devs, was);
                 if (instr < 0) {
-                    {
-                        if (doLog) {
-                            Log.i(LOG_ID, "can remove " + was);
-                        }
-                        ;
-                    }
-                    ;
                     rem.add(i);
                 } else {
                     gatt.stopHealth = false;
-                    {
-                        if (doLog) {
-                            Log.i(LOG_ID, "keep " + was);
-                        }
-                        ;
-                    }
-                    ;
                     heb++;
                     devs[instr] = null;
                 }
             }
             if (devs.length == heb && rem.size() == 0) {
-                {
-                    if (doLog) {
-                        Log.i(LOG_ID, "Nothing has to be done");
-                    }
-                    ;
-                }
-                ;
                 return false;
             }
         }
-        {
-            if (doLog) {
-                Log.i(LOG_ID, "needs update sensors");
-            }
-            ;
-        }
-        ;
         if (mBluetoothManager != null)
             stopScan(false);
         // rem.sort((x,y)->{return x-y;});

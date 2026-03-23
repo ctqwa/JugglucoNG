@@ -377,6 +377,84 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         return existingAlarm;
     }
 
+    private static long[] loadRecentSensorHistory(String sensorSerial, long startTimeSec) {
+        long[] history = null;
+        if (sensorSerial != null && !sensorSerial.isEmpty()) {
+            try {
+                history = Natives.getGlucoseHistoryForSensor(sensorSerial, startTimeSec);
+            } catch (Throwable ignored) {
+                history = null;
+            }
+            if ((history == null || history.length == 0) && sensorSerial.startsWith("X-") && sensorSerial.length() > 2) {
+                try {
+                    history = Natives.getGlucoseHistoryForSensor(sensorSerial.substring(2), startTimeSec);
+                } catch (Throwable ignored) {
+                    history = null;
+                }
+            }
+        }
+        if (history == null || history.length == 0) {
+            try {
+                history = Natives.getGlucoseHistory(startTimeSec);
+            } catch (Throwable ignored) {
+                history = null;
+            }
+        }
+        return history;
+    }
+
+    private static final class SensorHistoryMatch {
+        final long timestampMs;
+        final float rawMgdl;
+
+        SensorHistoryMatch(long timestampMs, float rawMgdl) {
+            this.timestampMs = timestampMs;
+            this.rawMgdl = rawMgdl;
+        }
+    }
+
+    private static SensorHistoryMatch findSensorHistoryMatchNear(String sensorSerial, long timeSec) {
+        long[] history = loadRecentSensorHistory(sensorSerial, timeSec - 30L);
+        if (history == null) {
+            return null;
+        }
+        for (int i = 0; i < history.length; i += 3) {
+            if (i + 2 >= history.length)
+                break;
+            long hTime = history[i];
+            if (Math.abs(hTime - timeSec) < 5L) {
+                long rawVal = history[i + 2];
+                float rawMgdl = rawVal > 0 ? (float) rawVal / 10.0f : Float.NaN;
+                return new SensorHistoryMatch(hTime * 1000L, rawMgdl);
+            }
+        }
+        return null;
+    }
+
+    private static float findRawMgdlNear(String sensorSerial, long timeSec) {
+        final SensorHistoryMatch match = findSensorHistoryMatchNear(sensorSerial, timeSec);
+        return match != null ? match.rawMgdl : Float.NaN;
+    }
+
+    private static void storeLiveReadingInRoom(String sensorSerial, long timmsec, float autoMgdl, float rawMgdl, float rate) {
+        if (sensorSerial == null || sensorSerial.isEmpty() || timmsec <= 0L) {
+            return;
+        }
+        if ((!Float.isFinite(autoMgdl) || autoMgdl <= 0f) && (!Float.isFinite(rawMgdl) || rawMgdl <= 0f)) {
+            return;
+        }
+        final SensorHistoryMatch match = findSensorHistoryMatchNear(sensorSerial, timmsec / 1000L);
+        final long storedTimestamp = match != null && match.timestampMs > 0L
+                ? match.timestampMs
+                : (timmsec / 1000L) * 1000L;
+        final float storedAuto = (Float.isFinite(autoMgdl) && autoMgdl > 0f) ? autoMgdl : 0f;
+        final float matchedRaw = match != null ? match.rawMgdl : Float.NaN;
+        final float storedRaw = (Float.isFinite(rawMgdl) && rawMgdl > 0f)
+                ? rawMgdl
+                : ((Float.isFinite(matchedRaw) && matchedRaw > 0f) ? matchedRaw : storedAuto);
+        HistorySyncAccess.storeCurrentReadingAsync(storedTimestamp, storedAuto, storedRaw, rate, sensorSerial);
+    }
+
     static void dowithglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,
             long sensorstartmsec, long showtime, int sensorgen) {
 
@@ -596,46 +674,36 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         // This handles warmup period where algorithm returns 0 but raw data exists
         if (glumgL == 0 && isRawMode) {
             long timeSec = timmsec / 1000L;
-            long[] history = Natives.getGlucoseHistory(timeSec - 30);
-            if (history != null) {
-                for (int i = 0; i < history.length; i += 3) {
-                    if (i + 2 >= history.length)
-                        break;
-                    long hTime = history[i];
-                    if (Math.abs(hTime - timeSec) < 5) {
-                        long rawVal = history[i + 2];
-                        if (rawVal != 0) {
-                            // Found raw value - use it even though calibrated is 0
-                            final float rawMgdl = (float) rawVal / 10.0f;
-                            int mgdlToUse = (int) Math.round(rawMgdl);
-                            float glucoseToUse = rawMgdl;
-                            if (Applic.unit == 1) {
-                                glucoseToUse = glucoseToUse / (float) mgdLmult;
-                            }
-                            // Apply calibration
-                            glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, true);
-                            mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
-                            
-                            if (doLog) {
-                                Log.i(LOG_ID, "RAW mode during warmup: using raw=" + glucoseToUse + " mgdl=" + mgdlToUse);
-                            }
-                            
-                            dowithglucose(SerialNumber, mgdlToUse, glucoseToUse, rate, alarm, timmsec, sensorstartmsec, showtime, sensorgen);
-                            CustomAlertAccess.checkAndTrigger(tk.glucodata.Applic.app, glucoseToUse, rate, timmsec);
-                            charcha[0] = timmsec;
-                            
-                            if (!isWearable && Natives.gethealthConnect() && Build.VERSION.SDK_INT >= 28) {
-                                if (dohealth(this)) {
-                                    final long sensorptr = Natives.getsensorptr(dataptr);
-                                    HealthConnection.Companion.writeAll(sensorptr, SerialNumber);
-                                }
-                            }
-                            SensorBluetooth.othersworking(this, timmsec);
-                            return;
-                        }
-                        break;
+            final float rawMgdl = findRawMgdlNear(SerialNumber, timeSec);
+            if (Float.isFinite(rawMgdl) && rawMgdl > 0f) {
+                // Found raw value - use it even though calibrated is 0
+                int mgdlToUse = (int) Math.round(rawMgdl);
+                float glucoseToUse = rawMgdl;
+                if (Applic.unit == 1) {
+                    glucoseToUse = glucoseToUse / (float) mgdLmult;
+                }
+                // Keep Room current from the real live packet; calibration overwrite is applied in the repository.
+                storeLiveReadingInRoom(SerialNumber, timmsec, 0f, rawMgdl, rate);
+                // Apply calibration
+                glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, true);
+                mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
+
+                if (doLog) {
+                    Log.i(LOG_ID, "RAW mode during warmup: using raw=" + glucoseToUse + " mgdl=" + mgdlToUse);
+                }
+
+                dowithglucose(SerialNumber, mgdlToUse, glucoseToUse, rate, alarm, timmsec, sensorstartmsec, showtime, sensorgen);
+                CustomAlertAccess.checkAndTrigger(tk.glucodata.Applic.app, glucoseToUse, rate, timmsec);
+                charcha[0] = timmsec;
+
+                if (!isWearable && Natives.gethealthConnect() && Build.VERSION.SDK_INT >= 28) {
+                    if (dohealth(this)) {
+                        final long sensorptr = Natives.getsensorptr(dataptr);
+                        HealthConnection.Companion.writeAll(sensorptr, SerialNumber);
                     }
                 }
+                SensorBluetooth.othersworking(this, timmsec);
+                return;
             }
             // No raw found yet - retry if possible
             if (retryCount < 3) {
@@ -658,35 +726,22 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             // LOGIC TO USE RAW VALUE IF VIEWMODE SPECIES SO
             float glucoseToUse = gl;
             int mgdlToUse = (int) Math.round(glumgL / 10.0f);
+            final float autoMgdl = glumgL / 10.0f;
+            float rawMgdl = Float.NaN;
 
             if (isRawMode) {
                 long timeSec = timmsec / 1000L;
-                long[] history = Natives.getGlucoseHistory(timeSec - 30); // Look back 30s to be safe
-                boolean found = false;
-                if (history != null) {
-                    for (int i = 0; i < history.length; i += 3) {
-                        if (i + 2 >= history.length)
-                            break;
-                        long hTime = history[i];
-                        if (Math.abs(hTime - timeSec) < 5) { // Allow small time diff
-                            long rawVal = history[i + 2];
-                            if (rawVal <= 0) {
-                                continue;
-                            }
-                            found = true;
-                            // rawVal is mg/dL * 10
-                            final float rawMgdl = (float) rawVal / 10.0f;
-                            mgdlToUse = (int) Math.round(rawMgdl);
-                            float glVal = rawMgdl;
-                            if (Applic.unit == 1) {
-                                glVal = glVal / (float) mgdLmult;
-                            }
-                            glucoseToUse = glVal;
-                            if (doLog) {
-                                Log.i(LOG_ID, "Using RAW value: " + glucoseToUse + " (mgdl: " + mgdlToUse + ")");
-                            }
-                            break;
-                        }
+                rawMgdl = findRawMgdlNear(SerialNumber, timeSec);
+                boolean found = Float.isFinite(rawMgdl) && rawMgdl > 0f;
+                if (found) {
+                    mgdlToUse = (int) Math.round(rawMgdl);
+                    float glVal = rawMgdl;
+                    if (Applic.unit == 1) {
+                        glVal = glVal / (float) mgdLmult;
+                    }
+                    glucoseToUse = glVal;
+                    if (doLog) {
+                        Log.i(LOG_ID, "Using RAW value: " + glucoseToUse + " (mgdl: " + mgdlToUse + ")");
                     }
                 }
                 if (!found && retryCount < 3) {
@@ -698,6 +753,11 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                     return;
                 }
             }
+
+            if (!Float.isFinite(rawMgdl) || rawMgdl <= 0f) {
+                rawMgdl = autoMgdl;
+            }
+            storeLiveReadingInRoom(SerialNumber, timmsec, autoMgdl, rawMgdl, rate);
 
             // Apply Kotlin calibration if enabled
             glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, isRawMode);

@@ -100,13 +100,50 @@ class AiDexBleManager(
         private const val KEY_EXCHANGE_TIMEOUT_MS = 35_000L
         private const val GATT_OP_TIMEOUT_MS = 15_000L    // Watchdog for stuck GATT operations
         private const val GATT_OP_WATCHDOG_RETRIES = 2  // Max retries on watchdog timeout before dropping op
+        private const val NO_STREAM_WATCHDOG_MS = 25_000L
+        private const val EXPECTED_LIVE_INTERVAL_MS = 60_000L
+        private const val EXPECTED_LIVE_GRACE_MS = 20_000L
+        private const val OFFICIAL_BONDED_STREAM_ARM_STEP_DELAY_MS = 200L
+        private const val OFFICIAL_BONDED_STREAM_ARM_READ_DELAY_MS = 120L
+        private const val OFFICIAL_BONDED_STREAM_ARM_SETTLE_MS = 800L
+        private const val POST_BONDED_STREAM_ARM_HISTORY_DELAY_MS = 1_500L
+
+        // Official bonded stream-enable burst observed in the old driver / timed captures.
+        // This needs to run before history requests so the direct F003 stream is armed
+        // on sensors that otherwise only serve history/current minute values.
+        private const val OFFICIAL_PAIRED_F001 = "91C5470280BB4C3D8FA8EDB1B06A0F06"
+        private val OFFICIAL_BONDED_STREAM_ARM_F002_STEPS = arrayOf(
+            "B0C58080",
+            "B1C5B1B3",
+            "94242D",
+            "A7142B",
+            "A689ECCD88",
+            "A600ECCD29",
+            "A6FFED133A",
+            "A676ED139B",
+            "A6EDEAE52F",
+            "A18DEC99C1",
+            "A1BCEC3DF7",
+            "A163EC24F2",
+            "A112EC4CC9",
+            "A1C1ED1999",
+            "A1F0EDBDAF",
+            "A1A7ED9538",
+            "A156ED6518",
+            "A105ED8943",
+            "A134ED2D75",
+            "A1DBEA4605",
+            "A18AEAC838",
+            "A1B9EA0E68",
+        )
+        private val OFFICIAL_BONDED_STREAM_ARM_RAW_OPCODES = setOf(0xB0, 0xB1, 0x94, 0xA7, 0xA6, 0xA1)
 
         // -- History Storage --
         private const val MIN_VALID_GLUCOSE_MGDL = 20
         private const val MAX_VALID_GLUCOSE_MGDL = 500
         private const val MAX_OFFSET_DAYS = 30
-        private const val WARMUP_DURATION_MS = 10L * 60_000L  // 10 minutes (matches AiDex sensor warmup)
-        private const val EXTENDED_WARMUP_GRACE_MS = 60L * 60_000L  // Extra visual grace for restarted sensors that still have no valid data
+        private const val WARMUP_DURATION_MS = 7L * 60_000L  // 7 minutes (matches Kotlin AiDex warmup gate)
+        private const val FIRST_VALID_READING_WAIT_MAX_MS = 60L * 60_000L  // Total wait window for the first usable reading
         private const val POST_RESET_WAITING_STATUS = "Waiting for first valid reading"
         private const val BROADCAST_FALLBACK_LIVE_TIMEOUT_MS = 90_000L
         private const val BROADCAST_ASSIST_SCAN_DELAY_MS = 15_000L
@@ -119,6 +156,7 @@ class AiDexBleManager(
         private const val BROADCAST_RECOVERY_SCAN_WINDOW_MS = 30_000L  // Larger window while recovering broadcasts
         private const val BROADCAST_SCAN_INTERVAL_MS = 60_000L  // Time between scans
         private const val BROADCAST_MIN_STORE_INTERVAL_MS = 50_000L  // Min interval between stored broadcast readings
+        private const val BROADCAST_DUPLICATE_SUPPRESS_MS = 70_000L
     }
 
     // -- Protocol Objects --
@@ -185,6 +223,23 @@ class AiDexBleManager(
     private var bondDataRead = false
     private var keyExchangePendingBond = false
 
+    private enum class PostCccdFollowUp {
+        NONE,
+        ENTER_STREAMING,
+        RESUME_STREAMING,
+    }
+
+    @Volatile private var postCccdFollowUp = PostCccdFollowUp.NONE
+    private var streamingStartedAtMs: Long = 0L
+    private var noStreamRecoveryAttempted = false
+    private var postBondLiveRefreshAttempted = false
+    private var bondedStreamArmInProgress = false
+    private var bondedStreamArmCompletedThisConnection = false
+    private var bondedStreamArmSawResponse = false
+    private var bondedStreamArmGeneration = 0
+    private var pendingInitialHistoryRequest = false
+    private var lastF002FrameTimeMs: Long = 0L
+
     /** Watchdog: force-disconnect if key exchange doesn't complete within timeout. */
     private val keyExchangeWatchdog = Runnable {
         if (phase == Phase.KEY_EXCHANGE) {
@@ -192,6 +247,47 @@ class AiDexBleManager(
             constatstatusstr = "Key exchange timeout"
             try { mBluetoothGatt?.disconnect() } catch (_: Throwable) {}
         }
+    }
+
+    /** Watchdog: re-arm live notifications once, then reconnect if F003 never appears. */
+    private val noStreamWatchdog = Runnable {
+        val gatt = mBluetoothGatt ?: return@Runnable
+        if (phase != Phase.STREAMING) return@Runnable
+        if (streamingStartedAtMs <= 0L || lastF003FrameTimeMs >= streamingStartedAtMs) return@Runnable
+        val now = System.currentTimeMillis()
+
+        if (hasRecentBroadcastData(now)) {
+            Log.i(TAG, "No direct F003 yet, but broadcast fallback is healthy — keeping session alive")
+            scheduleNoStreamWatchdog(EXPECTED_LIVE_INTERVAL_MS + EXPECTED_LIVE_GRACE_MS)
+            return@Runnable
+        }
+
+        if (historyDownloading) {
+            Log.i(TAG, "No F003 yet, but history download is still running — extending no-stream watchdog")
+            scheduleNoStreamWatchdog()
+            return@Runnable
+        }
+
+        if (!noStreamRecoveryAttempted) {
+            noStreamRecoveryAttempted = true
+            Log.w(TAG, "No F003 within ${NO_STREAM_WATCHDOG_MS / 1000}s of streaming start — refreshing F003/F002 CCCDs once")
+            refreshLiveCccds(PostCccdFollowUp.RESUME_STREAMING, "no-stream-watchdog")
+            return@Runnable
+        }
+
+        val delay = reconnect.nextReconnectDelayMs()
+        Log.w(TAG, "No F003 after live CCCD refresh — reconnecting in ${delay}ms")
+        constatstatusstr = "Reconnecting"
+        setPhase(Phase.IDLE)
+        close()
+        handler.postDelayed({ connectDevice(0) }, delay)
+    }
+
+    private val delayedInitialHistoryRequest = Runnable {
+        pendingInitialHistoryRequest = false
+        if (phase != Phase.STREAMING || mBluetoothGatt == null) return@Runnable
+        Log.i(TAG, "Initial history request starting after live-stream settle")
+        requestHistoryRange()
     }
 
     // -- SharedPreferences for per-sensor state persistence --
@@ -219,6 +315,15 @@ class AiDexBleManager(
         prefs.edit().putBoolean(prefKey(name), value).apply()
     }
 
+    private fun readLongPref(name: String, default: Long): Long {
+        val key = prefKey(name)
+        return if (prefs.contains(key)) prefs.getLong(key, default) else default
+    }
+
+    private fun writeLongPref(name: String, value: Long) {
+        prefs.edit().putLong(prefKey(name), value).apply()
+    }
+
     // -- History State --
     @Volatile private var historyDownloading = false
     private var historyRawNextIndex = 0
@@ -235,6 +340,9 @@ class AiDexBleManager(
     // survives driver instance recreation.
     @Volatile private var needsPostResetActivation: Boolean = false
     @Volatile private var postResetWarmupExtensionActive: Boolean = false
+    @Volatile private var firstValidReadingAnchorMs: Long = 0L
+    @Volatile private var hasAuthoritativeSessionStart: Boolean = false
+    @Volatile private var autoActivationAttemptedThisConnection: Boolean = false
 
     init {
         // Restore persisted history offsets so reconnects only download new data.
@@ -251,6 +359,7 @@ class AiDexBleManager(
             Log.i(TAG, "Restored needsPostResetActivation=true from prefs — will auto-activate on next connect")
         }
         postResetWarmupExtensionActive = readBoolPref("postResetWarmupExtensionActive", false)
+        firstValidReadingAnchorMs = readLongPref("firstValidReadingAnchorMs", 0L)
     }
 
     private enum class HistoryPhase {
@@ -285,6 +394,7 @@ class AiDexBleManager(
 
     // -- F003 Live Data --
     private var lastGlucoseTimeMs: Long = 0L
+    private var lastF003FrameTimeMs: Long = 0L
     private var lastOffsetMinutes: Int = 0
 
     // -- Calibration State --
@@ -350,6 +460,10 @@ class AiDexBleManager(
     @Volatile private var lastBroadcastGlucose: Float = 0f
     @Volatile private var lastBroadcastTime: Long = 0L
     @Volatile private var lastBroadcastStoredTime: Long = 0L
+    @Volatile private var lastBroadcastOffsetSeen: Long = -1L
+    @Volatile private var lastBroadcastTrendSeen: Int = Int.MIN_VALUE
+    @Volatile private var lastBroadcastGlucoseSeen: Int = Int.MIN_VALUE
+    @Volatile private var lastBroadcastOffsetSeenAtMs: Long = 0L
     @Volatile private var broadcastScanMisses: Int = 0
 
     // -- Transient Status --
@@ -357,14 +471,29 @@ class AiDexBleManager(
     @Volatile private var transientStatusMessage: String? = null
     private val broadcastAssistRunnable: Runnable = object : Runnable {
         override fun run() {
-            if (stop || reconnect.isBroadcastOnlyMode || hasRecentLiveData()) return
+            val now = System.currentTimeMillis()
+            if (stop || reconnect.isBroadcastOnlyMode || hasRecentLiveData(now)) return
+            val anchor = effectiveWarmupAnchorMs()
+            if (anchor > 0L && now >= anchor) {
+                val ageMs = now - anchor
+                val hasValidReadingSinceAnchor = lastGlucoseTimeMs >= anchor && lastGlucoseTimeMs > 0L
+                if (!hasValidReadingSinceAnchor && ageMs < FIRST_VALID_READING_WAIT_MAX_MS) {
+                    Log.i(
+                        TAG,
+                        "Waiting for first valid reading (${firstValidReadingWaitStatus(now) ?: "warming"}) — " +
+                            "starting assist scan for broadcast fallback"
+                    )
+                }
+            }
             if (phase == Phase.DISCOVERING_SERVICES || phase == Phase.CCCD_CHAIN || phase == Phase.KEY_EXCHANGE) {
-                val setupAge = if (connectTime > 0L) System.currentTimeMillis() - connectTime else 0L
+                val setupAge = if (connectTime > 0L) now - connectTime else 0L
                 if (setupAge in 1 until BROADCAST_ASSIST_SETUP_STALL_MS) {
+                    Log.d(TAG, "Waiting for first valid reading (${firstValidReadingWaitStatus(now) ?: "setup"}) — delaying assist scan until setup completes")
                     handler.postDelayed(this, BROADCAST_ASSIST_SCAN_DELAY_MS)
                     return
                 }
             }
+            Log.i(TAG, "Waiting for first valid reading (${firstValidReadingWaitStatus(now) ?: "no-anchor"}) — starting assist scan")
             startBroadcastScan("assist-no-data", continuous = false)
         }
     }
@@ -378,6 +507,81 @@ class AiDexBleManager(
         AiDexDriver.deviceListDirty = true
         handler.removeCallbacks(transientStatusClearRunnable)
         handler.postDelayed(transientStatusClearRunnable, durationMs)
+    }
+
+    private fun armFirstValidReadingWait(anchorMs: Long, reason: String) {
+        val normalizedAnchor = anchorMs.takeIf { it > 0L } ?: System.currentTimeMillis()
+        firstValidReadingAnchorMs = normalizedAnchor
+        writeLongPref("firstValidReadingAnchorMs", normalizedAnchor)
+        Log.i(TAG, "First-valid-reading wait armed at $normalizedAnchor ($reason)")
+        UiRefreshBus.requestStatusRefresh()
+        handler.removeCallbacks(broadcastAssistRunnable)
+        handler.postDelayed(broadcastAssistRunnable, BROADCAST_ASSIST_SCAN_DELAY_MS)
+    }
+
+    private fun clearFirstValidReadingWait(reason: String) {
+        if (firstValidReadingAnchorMs == 0L && !postResetWarmupExtensionActive) return
+        firstValidReadingAnchorMs = 0L
+        writeLongPref("firstValidReadingAnchorMs", 0L)
+        if (postResetWarmupExtensionActive) {
+            postResetWarmupExtensionActive = false
+            writeBoolPref("postResetWarmupExtensionActive", false)
+        }
+        if (constatstatusstr == POST_RESET_WAITING_STATUS) {
+            constatstatusstr = ""
+        }
+        Log.i(TAG, "First-valid-reading wait cleared ($reason)")
+        UiRefreshBus.requestStatusRefresh()
+    }
+
+    private fun noteValidReadingAvailable(timestampMs: Long, reason: String) {
+        if (timestampMs > 0L && timestampMs > lastGlucoseTimeMs) {
+            lastGlucoseTimeMs = timestampMs
+        }
+        handler.removeCallbacks(broadcastAssistRunnable)
+        clearFirstValidReadingWait(reason)
+        if (phase == Phase.STREAMING && streamingStartedAtMs > 0L && lastF003FrameTimeMs < streamingStartedAtMs) {
+            scheduleNoStreamWatchdog()
+        }
+    }
+
+    private fun effectiveWarmupAnchorMs(): Long {
+        if (hasAuthoritativeSessionStart && sensorstartmsec > 0L) return sensorstartmsec
+        if (firstValidReadingAnchorMs > 0L) return firstValidReadingAnchorMs
+        return sensorstartmsec.takeIf { it > 0L } ?: 0L
+    }
+
+    private fun hasRecentBroadcastData(now: Long = System.currentTimeMillis()): Boolean {
+        return lastBroadcastTime > 0L && (now - lastBroadcastTime) < BROADCAST_FALLBACK_LIVE_TIMEOUT_MS
+    }
+
+    private fun shouldContinueAssistScanning(now: Long = System.currentTimeMillis()): Boolean {
+        if (stop || reconnect.isBroadcastOnlyMode) return false
+        if (phase != Phase.STREAMING) return false
+        if (hasRecentLiveData(now)) return false
+        val anchor = effectiveWarmupAnchorMs()
+        if (anchor <= 0L || now < anchor) return false
+        val ageMs = now - anchor
+        val hasValidReadingSinceAnchor = lastGlucoseTimeMs >= anchor && lastGlucoseTimeMs > 0L
+        return ageMs < FIRST_VALID_READING_WAIT_MAX_MS
+    }
+
+    private fun firstValidReadingWaitStatus(now: Long = System.currentTimeMillis()): String? {
+        val anchor = effectiveWarmupAnchorMs()
+        if (anchor <= 0L || now < anchor) return null
+        val ageMs = now - anchor
+        val ageMin = ageMs / 60_000L
+        return when {
+            ageMs < WARMUP_DURATION_MS -> {
+                val remaining = ((WARMUP_DURATION_MS - ageMs) + 59_999L) / 60_000L
+                "age=${ageMin}m warmup=${remaining}m"
+            }
+            ageMs < FIRST_VALID_READING_WAIT_MAX_MS -> {
+                val remaining = ((FIRST_VALID_READING_WAIT_MAX_MS - ageMs) + 59_999L) / 60_000L
+                "age=${ageMin}m extended=${remaining}m"
+            }
+            else -> "age=${ageMin}m no-valid-data"
+        }
     }
 
     // -- Listeners --
@@ -476,7 +680,7 @@ class AiDexBleManager(
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
-            postCccdStreamingPending = false
+            postCccdFollowUp = PostCccdFollowUp.NONE
             gattQueue.clear()
             gattOpActive = false
             queuePausedForBonding = false
@@ -485,6 +689,24 @@ class AiDexBleManager(
             cccdWriteInProgress = false
             cccdRetryCount = 0
             deviceInfoComplete = false
+            autoActivationAttemptedThisConnection = false
+            hasAuthoritativeSessionStart = false
+            streamingStartedAtMs = 0L
+            lastF003FrameTimeMs = 0L
+            noStreamRecoveryAttempted = false
+            postBondLiveRefreshAttempted = false
+            bondedStreamArmInProgress = false
+            bondedStreamArmCompletedThisConnection = false
+            bondedStreamArmSawResponse = false
+            bondedStreamArmGeneration++
+            pendingInitialHistoryRequest = false
+            lastF002FrameTimeMs = 0L
+            handler.removeCallbacks(noStreamWatchdog)
+            handler.removeCallbacks(delayedInitialHistoryRequest)
+            lastBroadcastOffsetSeen = -1L
+            lastBroadcastTrendSeen = Int.MIN_VALUE
+            lastBroadcastGlucoseSeen = Int.MIN_VALUE
+            lastBroadcastOffsetSeenAtMs = 0L
 
             Log.i(TAG, "Connected to ${gatt.device?.address}. Requesting MTU 512...")
             gatt.requestMtu(512)
@@ -519,10 +741,24 @@ class AiDexBleManager(
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
-            postCccdStreamingPending = false
+            postCccdFollowUp = PostCccdFollowUp.NONE
             historyDownloading = false
             cccdRetryCount = 0
             discoveryRetryAttempt = 0
+            streamingStartedAtMs = 0L
+            lastF003FrameTimeMs = 0L
+            noStreamRecoveryAttempted = false
+            postBondLiveRefreshAttempted = false
+            bondedStreamArmInProgress = false
+            bondedStreamArmCompletedThisConnection = false
+            bondedStreamArmSawResponse = false
+            bondedStreamArmGeneration++
+            pendingInitialHistoryRequest = false
+            lastF002FrameTimeMs = 0L
+            lastBroadcastOffsetSeen = -1L
+            lastBroadcastTrendSeen = Int.MIN_VALUE
+            lastBroadcastGlucoseSeen = Int.MIN_VALUE
+            lastBroadcastOffsetSeenAtMs = 0L
 
             // Clear per-connection caches and state (bugs #6, #7, #12, #13)
             calibratedGlucoseCache.clear()
@@ -704,11 +940,20 @@ class AiDexBleManager(
         } else {
             cccdChainComplete = true
 
-            // Post-key-exchange CCCD re-registration complete?
-            if (postCccdStreamingPending) {
-                Log.i(TAG, "Post-key-exchange CCCD re-registration complete. Entering streaming...")
-                enterStreamingPhase()
-                return
+            when (postCccdFollowUp) {
+                PostCccdFollowUp.ENTER_STREAMING -> {
+                    postCccdFollowUp = PostCccdFollowUp.NONE
+                    Log.i(TAG, "Post-key-exchange CCCD re-registration complete. Arming live stream...")
+                    startLiveStreamArmThenEnterStreaming(requestHistory = true)
+                    return
+                }
+                PostCccdFollowUp.RESUME_STREAMING -> {
+                    postCccdFollowUp = PostCccdFollowUp.NONE
+                    Log.i(TAG, "Live CCCD refresh complete. Waiting for F003 stream...")
+                    resumeStreamingAfterLiveCccdRefresh()
+                    return
+                }
+                PostCccdFollowUp.NONE -> Unit
             }
 
             // Initial CCCD chain complete — check bond state before starting key exchange
@@ -787,7 +1032,11 @@ class AiDexBleManager(
 
         when (uuid) {
             CHAR_F002 -> {
-                if (data.size == 17) handleBondData(data, gatt)
+                if (!bondDataRead && phase == Phase.KEY_EXCHANGE && data.size == 17) {
+                    handleBondData(data, gatt)
+                } else {
+                    handleF002Response(data, gatt)
+                }
             }
             // Device Information Service reads
             CHAR_MODEL_NUMBER -> {
@@ -847,13 +1096,22 @@ class AiDexBleManager(
         // Detect uninitialized sensor (all-zeros start time after reset)
         if (year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0) {
             Log.i(TAG, "CGM Session Start: all zeros — sensor is uninitialized")
-            if (needsPostResetActivation) {
-                needsPostResetActivation = false
-                writeBoolPref("needsPostResetActivation", false)
-                Log.i(TAG, "Post-reset: auto-activating sensor with SET_NEW_SENSOR (0x20)")
+            hasAuthoritativeSessionStart = false
+            armFirstValidReadingWait(System.currentTimeMillis(), "zero-session-start")
+            if (!autoActivationAttemptedThisConnection) {
+                autoActivationAttemptedThisConnection = true
+                if (needsPostResetActivation) {
+                    needsPostResetActivation = false
+                    writeBoolPref("needsPostResetActivation", false)
+                    Log.i(TAG, "Post-reset: auto-activating sensor with SET_NEW_SENSOR (0x20)")
+                } else {
+                    Log.i(TAG, "Fresh sensor: auto-activating sensor with SET_NEW_SENSOR (0x20)")
+                }
                 startNewSensor()
                 // Re-read session start time after a delay so we pick up the new activation time
                 handler.postDelayed({ readCGMSessionCharacteristics() }, 2_000L)
+            } else {
+                Log.w(TAG, "CGM Session Start still zero after activation attempt — waiting for first valid reading")
             }
             return
         }
@@ -866,6 +1124,7 @@ class AiDexBleManager(
         val startMs = cal.timeInMillis - (tzOffsetSeconds * 1000L)
 
         if (startMs > 0 && startMs < System.currentTimeMillis() + 86400_000L) {
+            hasAuthoritativeSessionStart = true
             val ageMs = System.currentTimeMillis() - startMs
             val ageDays = ageMs.toDouble() / 86400_000.0
             val remainDays = _wearDays - ageDays
@@ -883,6 +1142,9 @@ class AiDexBleManager(
                 Log.i(TAG, "Updating sensorstartmsec from CGM Session Start: $sensorstartmsec → $startMs")
                 sensorstartmsec = startMs
                 Natives.aidexSetStartTime(dataptr, startMs)
+            }
+            if (lastGlucoseTimeMs < startMs) {
+                armFirstValidReadingWait(startMs, "authoritative-session-start")
             }
 
             // Update expiry
@@ -919,6 +1181,31 @@ class AiDexBleManager(
                 // matching vendor driver's approach (AiDexSensor.kt line 6013)
                 Log.i(TAG, "Bond complete. Starting deferred key exchange after 500ms settle delay...")
                 handler.postDelayed({ startKeyExchange(gatt) }, 500L)
+            } else if (
+                phase == Phase.STREAMING &&
+                keyExchange.isComplete &&
+                !historyDownloading &&
+                !gattOpActive &&
+                cccdQueue.isEmpty() &&
+                !postBondLiveRefreshAttempted &&
+                streamingStartedAtMs > 0L &&
+                lastF003FrameTimeMs < streamingStartedAtMs
+            ) {
+                postBondLiveRefreshAttempted = true
+                handler.postDelayed({
+                    if (
+                        mBluetoothGatt === gatt &&
+                        phase == Phase.STREAMING &&
+                        !historyDownloading &&
+                        !gattOpActive &&
+                        cccdQueue.isEmpty() &&
+                        streamingStartedAtMs > 0L &&
+                        lastF003FrameTimeMs < streamingStartedAtMs
+                    ) {
+                        Log.i(TAG, "Bond completed after streaming start but no F003 arrived — refreshing live CCCDs once")
+                        refreshLiveCccds(PostCccdFollowUp.RESUME_STREAMING, "post-bond-no-f003")
+                    }
+                }, 800L)
             }
         } else if (bondState == BluetoothDevice.BOND_BONDING) {
             Log.d(TAG, "bonded() callback: BOND_BONDING — waiting for BOND_BONDED")
@@ -975,9 +1262,18 @@ class AiDexBleManager(
                 cccdQueue.pollFirst()
                 if (cccdQueue.isEmpty()) {
                     cccdChainComplete = true
-                    if (postCccdStreamingPending) {
-                        Log.w(TAG, "Post-key-exchange CCCD re-registration had failures. Entering streaming anyway...")
-                        enterStreamingPhase()
+                    when (postCccdFollowUp) {
+                        PostCccdFollowUp.ENTER_STREAMING -> {
+                            postCccdFollowUp = PostCccdFollowUp.NONE
+                            Log.w(TAG, "Post-key-exchange CCCD re-registration had failures. Arming live stream anyway...")
+                            startLiveStreamArmThenEnterStreaming(requestHistory = true)
+                        }
+                        PostCccdFollowUp.RESUME_STREAMING -> {
+                            postCccdFollowUp = PostCccdFollowUp.NONE
+                            Log.w(TAG, "Live CCCD refresh had failures. Resuming streaming wait anyway...")
+                            resumeStreamingAfterLiveCccdRefresh()
+                        }
+                        PostCccdFollowUp.NONE -> Unit
                     }
                 } else {
                     writeNextCccd(gatt)
@@ -1116,16 +1412,112 @@ class AiDexBleManager(
      */
     private fun onKeyExchangeComplete() {
         Log.i(TAG, "Key exchange complete — re-registering CCCDs then entering streaming phase")
+        refreshLiveCccds(PostCccdFollowUp.ENTER_STREAMING, "post-key-exchange")
+    }
 
+    private fun startLiveStreamArmThenEnterStreaming(requestHistory: Boolean) {
+        val gatt = mBluetoothGatt
+        if (gatt == null || gatt.device.bondState != BluetoothDevice.BOND_BONDED) {
+            enterStreamingPhase(requestHistory, afterBondedArm = false)
+            return
+        }
+        if (bondedStreamArmCompletedThisConnection) {
+            enterStreamingPhase(requestHistory, afterBondedArm = false)
+            return
+        }
+        if (bondedStreamArmInProgress) {
+            Log.i(TAG, "Bonded live-stream arm already in progress")
+            return
+        }
+
+        bondedStreamArmInProgress = true
+        bondedStreamArmSawResponse = false
+        val generation = ++bondedStreamArmGeneration
+        var delayMs = 0L
+
+        Log.i(TAG, "Running bonded live-stream arm sequence before history")
+        scheduleBondedStreamArmWrite(
+            generation = generation,
+            delayMs = delayMs,
+            charUuid = CHAR_F001,
+            payload = hexStringToBytes(OFFICIAL_PAIRED_F001),
+            label = "startup[bonded] F001 wake"
+        )
+        delayMs += OFFICIAL_BONDED_STREAM_ARM_STEP_DELAY_MS
+
+        OFFICIAL_BONDED_STREAM_ARM_F002_STEPS.forEach { hex ->
+            scheduleBondedStreamArmWrite(
+                generation = generation,
+                delayMs = delayMs,
+                charUuid = CHAR_F002,
+                payload = hexStringToBytes(hex),
+                label = "startup[bonded] F002 $hex"
+            )
+            scheduleBondedStreamArmReadback(
+                generation = generation,
+                delayMs = delayMs + OFFICIAL_BONDED_STREAM_ARM_READ_DELAY_MS,
+            )
+            delayMs += OFFICIAL_BONDED_STREAM_ARM_STEP_DELAY_MS
+        }
+
+        handler.postDelayed({
+            if (!shouldContinueBondedStreamArm(generation)) return@postDelayed
+            bondedStreamArmInProgress = false
+            bondedStreamArmCompletedThisConnection = true
+            Log.i(
+                TAG,
+                "Bonded live-stream arm queued${if (bondedStreamArmSawResponse) " with F002 response activity" else ""}. " +
+                    "Entering streaming..."
+            )
+            enterStreamingPhase(requestHistory, afterBondedArm = true)
+        }, delayMs + OFFICIAL_BONDED_STREAM_ARM_SETTLE_MS)
+    }
+
+    private fun scheduleBondedStreamArmWrite(
+        generation: Int,
+        delayMs: Long,
+        charUuid: UUID,
+        payload: ByteArray,
+        label: String,
+    ) {
+        handler.postDelayed({
+            if (!shouldContinueBondedStreamArm(generation)) return@postDelayed
+            Log.i(TAG, "$label queued")
+            enqueueGattOp(GattOp.Write(charUuid, payload.copyOf()))
+        }, delayMs)
+    }
+
+    private fun scheduleBondedStreamArmReadback(
+        generation: Int,
+        delayMs: Long,
+    ) {
+        handler.postDelayed({
+            if (!shouldContinueBondedStreamArm(generation)) return@postDelayed
+            val gatt = mBluetoothGatt ?: return@postDelayed
+            val characteristic = gatt.getService(SERVICE_F000)?.getCharacteristic(CHAR_F002) ?: return@postDelayed
+            if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_READ) == 0) return@postDelayed
+            Log.d(TAG, "startup[bonded] F002 readback queued")
+            enqueueGattOp(GattOp.Read(CHAR_F002))
+        }, delayMs)
+    }
+
+    private fun shouldContinueBondedStreamArm(generation: Int): Boolean {
+        if (generation != bondedStreamArmGeneration) return false
+        if (stop) return false
+        if (mBluetoothGatt == null) return false
+        return phase == Phase.KEY_EXCHANGE
+    }
+
+    private fun refreshLiveCccds(followUp: PostCccdFollowUp, reason: String) {
         val gatt = mBluetoothGatt
         if (gatt == null) {
-            Log.e(TAG, "onKeyExchangeComplete: no active GATT!")
+            Log.e(TAG, "refreshLiveCccds($reason): no active GATT!")
             return
         }
 
         val service = gatt.getService(SERVICE_F000)
         if (service == null) {
-            Log.e(TAG, "onKeyExchangeComplete: SERVICE_F000 not found!")
+            Log.e(TAG, "refreshLiveCccds($reason): SERVICE_F000 not found!")
             return
         }
 
@@ -1138,38 +1530,95 @@ class AiDexBleManager(
         cccdWriteInProgress = false
         cccdChainComplete = false
 
-        // After CCCDs are re-registered, enter streaming and send commands.
-        // We override the normal post-CCCD behavior by setting a flag.
-        postCccdStreamingPending = true
+        // After CCCDs are re-registered, either enter streaming (first connect)
+        // or just resume waiting for the live stream (recovery path).
+        postCccdFollowUp = followUp
 
-        Log.i(TAG, "Re-registering F003 + F002 CCCDs...")
+        Log.i(TAG, "Re-registering F003 + F002 CCCDs ($reason)...")
         writeNextCccd(gatt)
     }
-
-    /** Set when CCCDs are being re-registered after key exchange. */
-    @Volatile private var postCccdStreamingPending = false
 
     /**
      * Enter streaming phase and send initial commands.
      * Called after post-key-exchange CCCD re-registration completes.
      */
-    private fun enterStreamingPhase() {
-        postCccdStreamingPending = false
+    private fun enterStreamingPhase(requestHistory: Boolean, afterBondedArm: Boolean) {
         handler.removeCallbacks(keyExchangeWatchdog)  // Cancel watchdog — key exchange succeeded
         setPhase(Phase.STREAMING)
         reconnect.onConnectionSuccess()
         constatstatusstr = "Connected"
-        Log.i(TAG, "Streaming phase entered. Reading device info + requesting history...")
+        streamingStartedAtMs = System.currentTimeMillis()
+        noStreamRecoveryAttempted = false
+        bondedStreamArmInProgress = false
+        if (afterBondedArm) {
+            bondedStreamArmCompletedThisConnection = true
+        }
+        scheduleNoStreamWatchdog()
+        pendingInitialHistoryRequest = false
+        handler.removeCallbacks(delayedInitialHistoryRequest)
+        Log.i(
+            TAG,
+            "Streaming phase entered. Reading device info" +
+                when {
+                    requestHistory && afterBondedArm ->
+                        " + delaying initial history for ${POST_BONDED_STREAM_ARM_HISTORY_DELAY_MS}ms"
+                    requestHistory -> " + requesting history"
+                    else -> ""
+                } +
+                "..."
+        )
 
         // Read standard BLE characteristics for device info (model, firmware, start time).
         // These are the primary source — 0x21 F002 command always fails on tested sensors.
         readDeviceInformationService()
         readCGMSessionCharacteristics()
 
-        // Skip 0x21 (getDeviceInfo) — it always fails with status=0x01 on tested sensors
-        // and wastes ~45s in retries. DIS + 2AAA provide all needed info.
-        // Go straight to history range request.
-        handler.postDelayed({ requestHistoryRange() }, 300L)
+        if (requestHistory) {
+            pendingInitialHistoryRequest = true
+            val delayMs = if (afterBondedArm) POST_BONDED_STREAM_ARM_HISTORY_DELAY_MS else 300L
+            handler.postDelayed(delayedInitialHistoryRequest, delayMs)
+        }
+    }
+
+    private fun resumeStreamingAfterLiveCccdRefresh() {
+        if (phase != Phase.STREAMING) {
+            setPhase(Phase.STREAMING)
+        }
+        scheduleNoStreamWatchdog()
+    }
+
+    private fun scheduleNoStreamWatchdog(delayMs: Long = NO_STREAM_WATCHDOG_MS) {
+        handler.removeCallbacks(noStreamWatchdog)
+        if (phase == Phase.STREAMING && streamingStartedAtMs > 0L && lastF003FrameTimeMs < streamingStartedAtMs) {
+            val now = System.currentTimeMillis()
+            val latestKnownReadingMs = lastGlucoseTimeMs
+            val historyAwareDelay = if (latestKnownReadingMs > 0L) {
+                val waitUntil = latestKnownReadingMs + EXPECTED_LIVE_INTERVAL_MS + EXPECTED_LIVE_GRACE_MS
+                (waitUntil - now).takeIf { it > 0L }
+            } else {
+                null
+            }
+            val effectiveDelay = maxOf(delayMs, historyAwareDelay ?: 0L)
+            if (historyAwareDelay != null && effectiveDelay > delayMs + 1_000L) {
+                Log.i(
+                    TAG,
+                    "No-stream watchdog extended to ${effectiveDelay / 1000}s because latest known reading is " +
+                        "${(now - latestKnownReadingMs).coerceAtLeast(0L) / 1000}s old"
+                )
+            }
+            handler.postDelayed(noStreamWatchdog, effectiveDelay)
+        }
+    }
+
+    private fun hexStringToBytes(hex: String): ByteArray {
+        val cleaned = hex.replace(" ", "")
+        val out = ByteArray(cleaned.length / 2)
+        var pos = 0
+        while (pos < cleaned.length) {
+            out[pos / 2] = cleaned.substring(pos, pos + 2).toInt(16).toByte()
+            pos += 2
+        }
+        return out
     }
 
     /**
@@ -1198,6 +1647,8 @@ class AiDexBleManager(
 
     private fun handleF003(encryptedData: ByteArray) {
         val now = System.currentTimeMillis()
+        lastF003FrameTimeMs = now
+        handler.removeCallbacks(noStreamWatchdog)
         Log.i(TAG, "handleF003: len=${encryptedData.size}, raw=${AiDexParser.hexString(encryptedData.copyOfRange(0, minOf(encryptedData.size, 8)))}")
 
         // Status/keepalive frames (5 bytes) — decrypt and extract battery voltage
@@ -1228,9 +1679,16 @@ class AiDexBleManager(
         // Parse
         val frame = AiDexParser.parseDataFrame(decrypted)
         if (frame == null) {
-            Log.w(TAG, "F003: Failed to parse decrypted data frame")
+            Log.w(TAG, "F003: Failed to parse decrypted data frame (${AiDexParser.hexString(decrypted.copyOfRange(0, minOf(decrypted.size, 16)))})")
             return
         }
+
+        Log.i(
+            TAG,
+            "F003 parsed: offset=${frame.timeOffsetMinutes}min glucose=${frame.glucoseMgDl} mg/dL " +
+                "packed=${frame.rawGlucosePacked} i1=${frame.i1} i2=${frame.i2} " +
+                "opcode=0x${"%02X".format(frame.opcode)} valid=${frame.isValid}"
+        )
 
         // Validate CRC-16 embedded in frame (bytes 15-16)
         val frameCrc = Crc16CcittFalse.checksum(decrypted.copyOfRange(0, 15))
@@ -1239,15 +1697,16 @@ class AiDexBleManager(
             return
         }
 
-        Log.i(TAG, "F003: glucose=${frame.glucoseMgDl} mg/dL, i1=${frame.i1}, i2=${frame.i2}, " +
-                "opcode=0x${"%02X".format(frame.opcode)}, valid=${frame.isValid}")
-
         if (!frame.isValid) {
             Log.w(TAG, "F003: Invalid reading (sentinel or out of range)")
+            firstValidReadingWaitStatus(now)?.let {
+                Log.i(TAG, "F003: still waiting for first valid reading ($it)")
+            }
             // handleGlucoseResult() with 0 will set charcha[1] for failure tracking
             handleGlucoseResult(0L, now)
-            if (postResetWarmupExtensionActive) {
-                val warmupElapsed = sensorstartmsec > 0L && (now - sensorstartmsec) >= WARMUP_DURATION_MS
+            if (firstValidReadingAnchorMs > 0L || postResetWarmupExtensionActive) {
+                val warmupAnchor = effectiveWarmupAnchorMs()
+                val warmupElapsed = warmupAnchor > 0L && (now - warmupAnchor) >= WARMUP_DURATION_MS
                 if (warmupElapsed && constatstatusstr != POST_RESET_WAITING_STATUS) {
                     constatstatusstr = POST_RESET_WAITING_STATUS
                 }
@@ -1256,16 +1715,13 @@ class AiDexBleManager(
             return
         }
 
-        // Update timestamps
-        lastGlucoseTimeMs = now
-        handler.removeCallbacks(broadcastAssistRunnable)
-        if (postResetWarmupExtensionActive) {
-            postResetWarmupExtensionActive = false
-            writeBoolPref("postResetWarmupExtensionActive", false)
-            if (constatstatusstr == POST_RESET_WAITING_STATUS) {
-                constatstatusstr = ""
-            }
-            UiRefreshBus.requestStatusRefresh()
+        // Update timestamps / state
+        noteValidReadingAvailable(now, "valid-f003")
+        if (pendingInitialHistoryRequest && !historyDownloading) {
+            pendingInitialHistoryRequest = false
+            handler.removeCallbacks(delayedInitialHistoryRequest)
+            Log.i(TAG, "F003 arrived before initial history request — starting history now")
+            requestHistoryRange()
         }
 
         // Track highest live offset for history dedup — history entries at or above
@@ -1319,7 +1775,7 @@ class AiDexBleManager(
 
                 // Sync only this sensor; live packets should not trigger a full all-sensor backfill.
                 tk.glucodata.HistorySyncAccess.syncSensorFromNative(
-                    tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
+                    SerialNumber
                 )
             } catch (e: UnsatisfiedLinkError) {
                 Log.e(TAG, "F003: Native library mismatch: $e")
@@ -1412,7 +1868,17 @@ class AiDexBleManager(
 
     private fun handleF002Response(data: ByteArray, gatt: BluetoothGatt) {
         if (data.isEmpty()) return
+        lastF002FrameTimeMs = System.currentTimeMillis()
+        if (bondedStreamArmInProgress) {
+            bondedStreamArmSawResponse = true
+        }
         Log.i(TAG, "handleF002Response: len=${data.size}, raw=${AiDexParser.hexString(data.copyOfRange(0, minOf(data.size, 16)))}")
+
+        val rawOpcode = data[0].toInt() and 0xFF
+        if (bondedStreamArmInProgress && rawOpcode in OFFICIAL_BONDED_STREAM_ARM_RAW_OPCODES) {
+            Log.d(TAG, "F002 bonded stream-arm echo: opcode=0x${"%02X".format(rawOpcode)} len=${data.size}")
+            return
+        }
 
         // Decrypt if session key is available
         val plaintext = if (keyExchange.isComplete) {
@@ -1590,15 +2056,9 @@ class AiDexBleManager(
         deviceInfoComplete = true
     }
 
-    /**
-     * Handle GET_BROADCAST_DATA (0x11) response — live glucose from query.
-     */
+    /** Optional opcode 0x11 control response. Ignore unless it becomes protocol-relevant. */
     private fun handleBroadcastDataResponse(data: ByteArray) {
-        if (data.size < 4) return
-        Log.d(TAG, "Broadcast data response: len=${data.size}")
-        // This provides current glucose similar to F003, but via command/response.
-        // F003 notifications already deliver live glucose, so this is mostly
-        // used during initial pairing flow. Parse if needed in the future.
+        Log.d(TAG, "Ignoring optional F002 opcode 0x11 len=${data.size}")
     }
 
     private fun handleHistoryRangeResponse(data: ByteArray) {
@@ -1613,6 +2073,18 @@ class AiDexBleManager(
         historyDownloadStartIndex = rawStart  // snapshot for progress display
         historyPhase = HistoryPhase.DOWNLOADING_CALIBRATED
         Log.i(TAG, "History range: briefStart=$briefStart, rawStart=$rawStart, newest=$newest")
+
+        // Fresh/just-started sensors can legitimately report an empty range.
+        // Do not enqueue 0x23/0x24 page requests in that case, because the sensor
+        // responds with an empty page and the old logic would leave
+        // historyDownloading=true forever.
+        if (briefStart == 0 && rawStart == 0 && newest == 0) {
+            Log.i(TAG, "History range is empty — completing history download immediately")
+            historyRawNextIndex = 0
+            historyBriefNextIndex = 0
+            onHistoryDownloadComplete()
+            return
+        }
 
         // Snapshot liveOffsetCutoff for history dedup.
         // If live F003 readings have been stored this session, skip history entries
@@ -1683,6 +2155,18 @@ class AiDexBleManager(
         // data[1] = status, data[2..] = payload
         val payload = data.copyOfRange(2, data.size)
         val entries = AiDexParser.parseHistoryResponse(payload)
+        if (entries.isEmpty()) {
+            Log.i(TAG, "History raw (0x23): empty page at offset=$historyRawNextIndex newest=$historyNewestOffset")
+            historyPhase = HistoryPhase.DOWNLOADING_RAW
+            if (historyBriefNextIndex <= historyNewestOffset) {
+                handler.postDelayed({
+                    requestHistoryPage(AiDexOpcodes.GET_HISTORIES, historyBriefNextIndex)
+                }, HISTORY_REQUEST_DELAY_MS)
+            } else {
+                onHistoryDownloadComplete()
+            }
+            return
+        }
         if (entries.isNotEmpty()) {
             Log.i(TAG, "History raw (0x23): ${entries.size} entries, offsets ${entries.first().timeOffsetMinutes}..${entries.last().timeOffsetMinutes}")
             onCalibratedHistory?.invoke(entries)
@@ -1721,6 +2205,11 @@ class AiDexBleManager(
         handler.removeCallbacks(historyPageWatchdog)  // Response arrived — cancel page timeout
         val payload = data.copyOfRange(2, data.size)
         val entries = AiDexParser.parseBriefHistoryResponse(payload)
+        if (entries.isEmpty()) {
+            Log.i(TAG, "History brief (0x24): empty page at offset=$historyBriefNextIndex newest=$historyNewestOffset")
+            onHistoryDownloadComplete()
+            return
+        }
         if (entries.isNotEmpty()) {
             Log.i(TAG, "History brief (0x24): ${entries.size} entries, offsets ${entries.first().timeOffsetMinutes}..${entries.last().timeOffsetMinutes}")
             onAdcHistory?.invoke(entries)
@@ -1878,6 +2367,10 @@ class AiDexBleManager(
         if (data.size < 2) return
         val statusByte = data[1].toInt() and 0xFF
         Log.i(TAG, "New sensor ACK: status=0x${"%02X".format(statusByte)}")
+        if (statusByte == 0x00) {
+            armFirstValidReadingWait(System.currentTimeMillis(), "new-sensor-ack")
+            handler.postDelayed({ readCGMSessionCharacteristics() }, 1_000L)
+        }
     }
 
     /**
@@ -1961,6 +2454,8 @@ class AiDexBleManager(
 
     private fun requestHistoryRange() {
         val cmd = commandBuilder.getHistoryRange() ?: return
+        pendingInitialHistoryRequest = false
+        handler.removeCallbacks(delayedInitialHistoryRequest)
         historyDownloading = true
         enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
     }
@@ -2310,6 +2805,7 @@ class AiDexBleManager(
 
         val now = System.currentTimeMillis()
         var stored = 0
+        var newestStoredTimeMs = 0L
 
         for (entry in entries) {
             // Filter invalid
@@ -2338,7 +2834,7 @@ class AiDexBleManager(
             // No warmup gate — valid readings during warmup are stored and displayed.
             // The isValid/MIN_VALID check above already filters out garbage warmup data
             // (e.g., glucose=15 mg/dL). Valid-looking readings (>= MIN_VALID) are stored
-            // even during the first 10 minutes so the user sees data as soon as possible.
+            // even during the first 7 minutes so the user sees data as soon as possible.
 
             // Future-timestamp guard (2 minutes tolerance)
             if (historicalTimeMs > now + 120_000L) continue
@@ -2352,6 +2848,9 @@ class AiDexBleManager(
                 )
                 stored++
                 historyStoredCount++
+                if (historicalTimeMs > newestStoredTimeMs) {
+                    newestStoredTimeMs = historicalTimeMs
+                }
                 if (entry.offsetMinutes > lastHistoryNewestOffset) {
                     lastHistoryNewestOffset = entry.offsetMinutes
                     lastHistoryNewestGlucose = entry.glucoseMgDl
@@ -2368,14 +2867,14 @@ class AiDexBleManager(
             // instead of waiting until the entire history is fetched.
             if (historyStoredCount % HISTORY_SYNC_BATCH_SIZE == 0) {
                 try {
-                    val bareSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
-                    tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(bareSerial)
+                    tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber)
                     Log.i(TAG, "Progressive sync at $historyStoredCount entries")
                 } catch (_: Throwable) {}
             }
         }
 
         if (stored > 0) {
+            noteValidReadingAvailable(newestStoredTimeMs, "valid-history")
             Log.i(TAG, "storeHistoryEntries: stored $stored/${entries.size} entries (total=$historyStoredCount)")
         }
     }
@@ -2399,14 +2898,13 @@ class AiDexBleManager(
 
         // Final sync to Room DB
         if (historyStoredCount > 0) {
-            val bareSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
             try {
-                tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(bareSerial)
+                tk.glucodata.HistorySyncAccess.forceFullSyncForSensor(SerialNumber)
             } catch (t: Throwable) {
                 Log.e(TAG, "HistorySync.forceFullSyncForSensor failed: $t")
                 // Fallback
                 try {
-                    tk.glucodata.HistorySyncAccess.syncSensorFromNative(bareSerial, forceFull = true)
+                    tk.glucodata.HistorySyncAccess.syncSensorFromNative(SerialNumber, forceFull = true)
                 } catch (_: Throwable) {}
             }
         }
@@ -2464,21 +2962,25 @@ class AiDexBleManager(
         val now = System.currentTimeMillis()
 
         fun connectedWarmupStatus(connectionPart: String): String? {
-            val startMs = sensorstartmsec
+            val startMs = effectiveWarmupAnchorMs()
             if (startMs <= 0L) return null
             val ageMs = now - startMs
             if (ageMs < 0L) return null
 
+            val hasValidReadingSinceStart = lastGlucoseTimeMs >= startMs && lastGlucoseTimeMs > 0L
             val ageMin = ageMs / 60_000L
-            if (ageMin < 10L) {
-                val remaining = 10L - ageMin
+            if (ageMs < WARMUP_DURATION_MS) {
+                val remaining = ((WARMUP_DURATION_MS - ageMs) + 59_999L) / 60_000L
                 return "$connectionPart — Warmup ${remaining}m"
             }
 
-            val hasValidReadingSinceStart = lastGlucoseTimeMs >= startMs
-            if (postResetWarmupExtensionActive && !hasValidReadingSinceStart && ageMs < (WARMUP_DURATION_MS + EXTENDED_WARMUP_GRACE_MS)) {
-                val remaining = ((WARMUP_DURATION_MS + EXTENDED_WARMUP_GRACE_MS - ageMs) + 59_999L) / 60_000L
+            if (!hasValidReadingSinceStart && ageMs < FIRST_VALID_READING_WAIT_MAX_MS) {
+                val remaining = ((FIRST_VALID_READING_WAIT_MAX_MS - ageMs) + 59_999L) / 60_000L
                 return "$connectionPart — Warmup extended ${remaining}m"
+            }
+
+            if (!hasValidReadingSinceStart && firstValidReadingAnchorMs > 0L) {
+                return "$connectionPart — No valid data yet"
             }
 
             return null
@@ -2684,6 +3186,9 @@ class AiDexBleManager(
 
     override fun startNewSensor(): Boolean {
         Log.i(TAG, "startNewSensor: activating sensor $SerialNumber")
+        autoActivationAttemptedThisConnection = true
+        hasAuthoritativeSessionStart = false
+        armFirstValidReadingWait(System.currentTimeMillis(), "start-new-sensor")
 
         // Reset history indices — new sensor means history starts from scratch
         historyRawNextIndex = 0
@@ -2726,8 +3231,9 @@ class AiDexBleManager(
         }
 
         // Guard: must not be in warmup
-        if (sensorstartmsec > 0L) {
-            val warmupEndMs = sensorstartmsec + WARMUP_DURATION_MS
+        val warmupAnchor = effectiveWarmupAnchorMs()
+        if (warmupAnchor > 0L) {
+            val warmupEndMs = warmupAnchor + WARMUP_DURATION_MS
             val now = System.currentTimeMillis()
             if (now < warmupEndMs) {
                 val remainingSec = ((warmupEndMs - now) / 1000).toInt()
@@ -2857,7 +3363,8 @@ class AiDexBleManager(
      */
     @SuppressLint("MissingPermission")
     private fun hasRecentLiveData(now: Long = System.currentTimeMillis()): Boolean {
-        return lastGlucoseTimeMs > 0L && (now - lastGlucoseTimeMs) < BROADCAST_FALLBACK_LIVE_TIMEOUT_MS
+        return (lastGlucoseTimeMs > 0L && (now - lastGlucoseTimeMs) < BROADCAST_FALLBACK_LIVE_TIMEOUT_MS) ||
+            hasRecentBroadcastData(now)
     }
 
     private fun startBroadcastScan(reason: String, continuous: Boolean = reconnect.isBroadcastOnlyMode) {
@@ -2947,6 +3454,10 @@ class AiDexBleManager(
         // Schedule next scan if still in broadcast-only mode
         if (broadcastScanContinuousMode && reconnect.isBroadcastOnlyMode && !stop) {
             scheduleBroadcastScan("post-$reason")
+        } else if (!broadcastScanContinuousMode && !found && shouldContinueAssistScanning()) {
+            handler.removeCallbacks(broadcastAssistRunnable)
+            handler.postDelayed(broadcastAssistRunnable, BROADCAST_ASSIST_SCAN_DELAY_MS)
+            Log.i(TAG, "Broadcast assist scan rescheduled after $reason (${firstValidReadingWaitStatus() ?: "waiting"})")
         }
     }
 
@@ -3036,12 +3547,35 @@ class AiDexBleManager(
         val carry = data[6].toInt() and 0xFF
         val glucoseMgDlInt = lo or ((carry and 0x03) shl 8)
 
-        if (glucoseMgDlInt !in MIN_VALID_GLUCOSE_MGDL..MAX_VALID_GLUCOSE_MGDL) return
-
-        Log.i(TAG, "BROADCAST: offset=${offsetMinutes}min glucose=$glucoseMgDlInt mg/dL trend=$trend rssi=?")
+        Log.i(
+            TAG,
+            "BROADCAST sample: offset=${offsetMinutes}min glucose=$glucoseMgDlInt mg/dL trend=$trend " +
+                "inRange=${glucoseMgDlInt in MIN_VALID_GLUCOSE_MGDL..MAX_VALID_GLUCOSE_MGDL}"
+        )
+        if (glucoseMgDlInt !in MIN_VALID_GLUCOSE_MGDL..MAX_VALID_GLUCOSE_MGDL) {
+            return
+        }
 
         lastBroadcastGlucose = glucoseMgDlInt.toFloat()
         lastBroadcastTime = now
+
+        if (
+            offsetMinutes == lastBroadcastOffsetSeen &&
+            glucoseMgDlInt == lastBroadcastGlucoseSeen &&
+            trend == lastBroadcastTrendSeen &&
+            (now - lastBroadcastOffsetSeenAtMs) < BROADCAST_DUPLICATE_SUPPRESS_MS
+        ) {
+            Log.d(
+                TAG,
+                "BROADCAST duplicate suppressed: offset=${offsetMinutes}min glucose=$glucoseMgDlInt trend=$trend " +
+                    "ageMs=${now - lastBroadcastOffsetSeenAtMs}"
+            )
+            return
+        }
+        lastBroadcastOffsetSeen = offsetMinutes
+        lastBroadcastGlucoseSeen = glucoseMgDlInt
+        lastBroadcastTrendSeen = trend
+        lastBroadcastOffsetSeenAtMs = now
 
         // Update offset tracking
         lastOffsetMinutes = offsetMinutes.toInt()
@@ -3059,9 +3593,6 @@ class AiDexBleManager(
 
         // Dedup: don't store if too soon after last stored broadcast
         if (lastBroadcastStoredTime != 0L && (now - lastBroadcastStoredTime) < BROADCAST_MIN_STORE_INTERVAL_MS) {
-            // Still update notification with the glucose value
-            val mgdlPacked = (glucoseMgDlInt * 10).toLong() and 0xFFFFFFFFL
-            handleGlucoseResult(mgdlPacked, now)
             return
         }
 
@@ -3073,20 +3604,23 @@ class AiDexBleManager(
                     glucoseMgDlInt.toFloat(), 0f, 1.0f
                 )
                 handleGlucoseResult(res, now)
+                noteValidReadingAvailable(now, "valid-broadcast")
                 lastBroadcastStoredTime = now
 
                 // Sync only the AiDex sensor that produced this broadcast frame.
                 tk.glucodata.HistorySyncAccess.syncSensorFromNative(
-                    tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
+                    SerialNumber
                 )
             } catch (e: Throwable) {
                 Log.e(TAG, "Broadcast: aidexProcessData failed: $e")
                 val mgdlPacked = (glucoseMgDlInt * 10).toLong() and 0xFFFFFFFFL
                 handleGlucoseResult(mgdlPacked, now)
+                noteValidReadingAvailable(now, "valid-broadcast-fallback")
             }
         } else {
             val mgdlPacked = (glucoseMgDlInt * 10).toLong() and 0xFFFFFFFFL
             handleGlucoseResult(mgdlPacked, now)
+            noteValidReadingAvailable(now, "valid-broadcast-no-dataptr")
         }
 
         // Stop current scan, schedule next

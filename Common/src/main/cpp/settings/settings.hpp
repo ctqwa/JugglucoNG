@@ -986,8 +986,6 @@ public:
     return false;
   }
   bool veryhighAlarm(int val) const {
-    LOGGER("veryhighalarm(%d) has=%d threshold=%d\n", val,
-           data()->hasveryhighalarm(), data()->averyhighget());
     if (data()->hasveryhighalarm() && val > data()->averyhighget())
       return true;
     return false;

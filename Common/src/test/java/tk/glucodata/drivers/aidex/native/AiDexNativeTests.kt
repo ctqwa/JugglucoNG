@@ -1402,11 +1402,11 @@ class HistoryFilterTests {
 
     @Test
     fun testFilterWarmup() {
-        // Readings within first 10 minutes after sensor start should be filtered
-        // offset=9 -> timestamp = sensorStart + 9*60000 = sensorStart + 540000
-        // age = 540000 < 600000 (WARMUP_DURATION_MS) -> filtered
+        val warmupMinutes = (HistoryMerge.WARMUP_DURATION_MS / 60_000L).toInt()
+        // Readings within the configured warmup window should be filtered.
+        // offset=warmupMinutes-1 -> timestamp is still inside WARMUP_DURATION_MS.
         val result = HistoryMerge.filterForStorage(
-            listOf(storeEntry(offset = 9)), sensorStart, now
+            listOf(storeEntry(offset = warmupMinutes - 1)), sensorStart, now
         )
         assertEquals(0, result.passed.size)
         assertEquals(1, result.filteredCount)
@@ -1414,10 +1414,10 @@ class HistoryFilterTests {
 
     @Test
     fun testFilterWarmup_AtBoundary() {
-        // offset=10 -> timestamp = sensorStart + 10*60000 = sensorStart + 600000
-        // age = 600000, which is NOT in 0..<600000 -> should pass
+        val warmupMinutes = (HistoryMerge.WARMUP_DURATION_MS / 60_000L).toInt()
+        // offset=warmupMinutes lands exactly on the warmup boundary and should pass.
         val result = HistoryMerge.filterForStorage(
-            listOf(storeEntry(offset = 10)), sensorStart, now
+            listOf(storeEntry(offset = warmupMinutes)), sensorStart, now
         )
         assertEquals(1, result.passed.size)
     }
@@ -1446,13 +1446,14 @@ class HistoryFilterTests {
 
     @Test
     fun testMultipleFilters() {
+        val warmupMinutes = (HistoryMerge.WARMUP_DURATION_MS / 60_000L).toInt()
         val entries = listOf(
             storeEntry(offset = 1000, glucose = 100f),   // valid
             storeEntry(offset = 0, glucose = 100f),       // offset zero
             storeEntry(offset = 1001, glucose = 0f),      // glucose zero
             storeEntry(offset = 1002, glucose = 100f, valid = false),  // invalid
             storeEntry(offset = 1003, glucose = 1023f),   // ADC saturation
-            storeEntry(offset = 9, glucose = 100f),       // warmup
+            storeEntry(offset = warmupMinutes - 1, glucose = 100f),     // warmup
             storeEntry(offset = 1004, glucose = 80f),     // valid
         )
         val result = HistoryMerge.filterForStorage(entries, sensorStart, now)

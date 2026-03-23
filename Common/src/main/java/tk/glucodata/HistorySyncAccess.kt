@@ -1,6 +1,9 @@
 package tk.glucodata
 
+import android.util.Log
+
 object HistorySyncAccess {
+    private const val TAG = "HistorySyncAccess"
     private const val SYNC_CLASS_NAME = "tk.glucodata.data.HistorySync"
     private const val REPOSITORY_CLASS_NAME = "tk.glucodata.data.HistoryRepository"
     private const val DEFAULT_AIDEX_SOURCE = 4
@@ -30,6 +33,18 @@ object HistorySyncAccess {
             )
         }.getOrNull()
     }
+    private val storeReadingWithSerialMethod by lazy {
+        runCatching {
+            repositoryHolder?.getMethod(
+                "storeReadingAsync",
+                Long::class.javaPrimitiveType,
+                Float::class.javaPrimitiveType,
+                Float::class.javaPrimitiveType,
+                Float::class.javaPrimitiveType,
+                String::class.java
+            )
+        }.getOrNull()
+    }
     private val aidexSourceValue by lazy {
         runCatching {
             repositoryHolder?.getField("GLUCODATA_SOURCE_AIDEX")?.getInt(null)
@@ -40,13 +55,34 @@ object HistorySyncAccess {
     @JvmOverloads
     fun syncSensorFromNative(serial: String?, forceFull: Boolean = false) {
         if (serial.isNullOrBlank()) return
-        runCatching { syncSensorMethod?.invoke(syncInstance, serial, forceFull) }
+        val method = syncSensorMethod
+        val instance = syncInstance
+        if (method == null || instance == null) {
+            Log.w(TAG, "syncSensorFromNative unavailable for serial=$serial forceFull=$forceFull")
+            return
+        }
+        runCatching { method.invoke(instance, serial, forceFull) }
+            .onFailure { Log.w(TAG, "syncSensorFromNative failed for serial=$serial forceFull=$forceFull", it) }
     }
 
     @JvmStatic
     fun forceFullSyncForSensor(serial: String?) {
         if (serial.isNullOrBlank()) return
-        runCatching { forceFullSensorMethod?.invoke(syncInstance, serial) }
+        val instance = syncInstance
+        val forceMethod = forceFullSensorMethod
+        if (instance != null && forceMethod != null) {
+            val invoked = runCatching {
+                forceMethod.invoke(instance, serial)
+            }.onFailure {
+                Log.w(TAG, "forceFullSyncForSensor invoke failed for serial=$serial; falling back to syncSensorFromNative(forceFull=true)", it)
+            }.isSuccess
+            if (invoked) {
+                return
+            }
+        } else {
+            Log.w(TAG, "forceFullSyncForSensor unavailable for serial=$serial; falling back to syncSensorFromNative(forceFull=true)")
+        }
+        syncSensorFromNative(serial, forceFull = true)
     }
 
     @JvmStatic
@@ -57,5 +93,26 @@ object HistorySyncAccess {
     @JvmStatic
     fun storeAidexReadingAsync(timestamp: Long, valueMmol: Float) {
         runCatching { storeReadingMethod?.invoke(null, timestamp, valueMmol, aidexSourceValue) }
+    }
+
+    @JvmStatic
+    fun storeCurrentReadingAsync(
+        timestamp: Long,
+        valueMgdl: Float,
+        rawValueMgdl: Float,
+        rate: Float,
+        sensorSerial: String?
+    ) {
+        if (timestamp <= 0L || sensorSerial.isNullOrBlank()) return
+        runCatching {
+            storeReadingWithSerialMethod?.invoke(
+                null,
+                timestamp,
+                valueMgdl,
+                rawValueMgdl,
+                rate,
+                sensorSerial
+            )
+        }
     }
 }

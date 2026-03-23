@@ -314,7 +314,6 @@ extern "C" JNIEXPORT jint JNICALL fromjava(getViewMode)(JNIEnv *env, jclass cl,
   sistream *stream = reinterpret_cast<sistream *>(dataptr);
   if (stream->hist) {
     jint vm = stream->hist->getinfo()->viewMode;
-    LOGGER("JNI getViewMode: %d\n", vm);
     return vm;
   }
   return 0;

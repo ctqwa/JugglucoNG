@@ -32,6 +32,9 @@ import tk.glucodata.ui.overlay.FloatingGlucoseOverlay
 import tk.glucodata.Natives
 
 class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+    private companion object {
+        private const val FLOATING_HISTORY_WINDOW_MS = 6L * 60L * 60L * 1000L
+    }
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -155,7 +158,10 @@ class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, S
             setContent {
                 FloatingGlucoseOverlay(
                     repository = settingsRepository,
-                    historyFlow = glucoseRepository.getHistoryFlow(0L, Natives.getunit() == 1),
+                    historyFlow = glucoseRepository.getHistoryFlow(
+                        System.currentTimeMillis() - FLOATING_HISTORY_WINDOW_MS,
+                        Natives.getunit() == 1
+                    ),
                     onUpdatePosition = { x, y -> updateViewPosition(x, y) },
                     cutoutDataFlow = cutoutData,
                     statusBarHeightFlow = statusBarHeight

@@ -8921,7 +8921,7 @@ class AiDexSensor(context: Context, serial: String, dataptr: Long) : SuperGattCa
 
             // Trigger a targeted sync for just this sensor's live reading.
             tk.glucodata.HistorySyncAccess.syncSensorFromNative(
-                tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
+                SerialNumber
             )
 
             // History backfill is now handled asynchronously via checkAndRequestHistory()

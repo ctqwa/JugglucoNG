@@ -50,10 +50,20 @@ struct sensor {
   //   uint8_t reserved[4];
   uint16_t next;
   uint16_t prev;
+  size_t fulllen() const { return strnlen(name, sensornamelen); }
+  std::string_view fullname() const { return {name, fulllen()}; }
   const char *shortsensorname_chars() const {
     if (name[0] == 'X' && name[1] == '-')
       return name;
     return name + 5;
+  }
+  std::string_view shortsensorname_view() const {
+    if (name[0] == 'X' && name[1] == '-')
+      return fullname();
+    const size_t len = fulllen();
+    if (len <= 5)
+      return {};
+    return {name + 5, len - 5};
   }
   const sensorname_t *shortsensorname() const {
     return reinterpret_cast<const sensorname_t *>(shortsensorname_chars());
@@ -333,8 +343,11 @@ public:
     hist[lastpos] = histel;
     LOGGER("hist[%d]=%p\n", lastpos, histel);
     sensorlist()[lastpos].starttime = histel->getstarttime();
-    memcpy(sensorlist()[lastpos].name, name.data(), name.length());
-    sensorlist()[lastpos].name[sensornamelen] = '\0';
+    auto &sensorname = sensorlist()[lastpos].name;
+    memset(sensorname, 0, sizeof(sensorname));
+    const size_t copylen = min(name.length(), static_cast<size_t>(sensornamelen));
+    memcpy(sensorname, name.data(), copylen);
+    sensorname[copylen] = '\0';
     sensorlist()[lastpos].present = 1;
     sensorlist()[lastpos].endtime = 0;
     sensorlist()[lastpos].finished = 0;
@@ -641,10 +654,11 @@ public:
   }
 #endif
   const sensor *findsensor(const char *name) const {
+    const std::string_view wanted(name);
     const sensor *end = sensorlist() + last() + 1;
     const sensor *sens =
-        find_if(sensorlist(), end, [name](const sensor &sens) -> bool {
-          return !memcmp(name, sens.name, sensornamelen);
+        find_if(sensorlist(), end, [wanted](const sensor &sens) -> bool {
+          return sens.fullname() == wanted;
         });
     if (end == sens)
       return nullptr;
@@ -652,13 +666,14 @@ public:
   }
 
   const sensor *findsensorshort(const char *name) const {
+    const std::string_view wanted(name);
     const sensor *end = sensorlist() + last() + 1;
     const sensor *sens =
-        find_if(sensorlist(), end, [name](const sensor &sens) -> bool {
-          if (name[0] == 'X' && name[1] == '-') {
-            return !strcmp(name, sens.name);
+        find_if(sensorlist(), end, [wanted](const sensor &sens) -> bool {
+          if (wanted.rfind("X-", 0) == 0) {
+            return sens.fullname() == wanted;
           }
-          return !memcmp(name, sens.name + 5, 11);
+          return sens.shortsensorname_view() == wanted;
         });
     if (end == sens)
       return nullptr;
@@ -870,8 +885,8 @@ public:
         return nullptr;
       }
       LOGGER("getSensorData(%d) %s\n", ind, name);
-      hist[ind] = new SensorGlucoseData(
-          pathconcat(inbasedir, std::string_view(name, sensornamelen)), ind);
+      hist[ind] =
+          new SensorGlucoseData(pathconcat(inbasedir, sensorlist()[ind].fullname()), ind);
       LOGGER("hist[%d]=%p\n", ind, hist[ind]);
     }
     if (hist[ind]) {
@@ -1027,7 +1042,6 @@ public:
   }
 
   vector<int> bluetoothactive(uint32_t tim, uint32_t nu) {
-    LOGSTRING("bluetoothactive\n");
     vector<int> out;
     const uint32_t oldsecs = nu - maxSIhours * 60 * 60;
     const uint32_t newsecs = nu - youngsensorsecs;
@@ -1061,9 +1075,6 @@ public:
           }
           const auto lasttime = hist->lastused();
           bool canuse = hist->canusestreaming();
-          LOGGER("%s: can %suse streaming, lasttime=%d resetMode=%d\n",
-                 showsensorname(i), canuse ? "" : "not ", lasttime,
-                 hist->isInResetMode());
           // If in reset mode, ignore gap timeout to allow backfill.
           // isInResetMode() handles auto-clearing when gap closes.
           if (!canuse ||
@@ -1082,7 +1093,6 @@ public:
         out.push_back(i);
       }
     }
-    LOGGER("end bluetoothactive %zu\n", out.size());
     setlibre3nums();
     return out;
   }

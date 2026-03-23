@@ -4000,9 +4000,13 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
         // --- Dynamic Background Logic ---
         val now = System.currentTimeMillis()
         val start = sensor.startMs
-        val end = if (sensor.expectedEndMs > 0) sensor.expectedEndMs 
-                  else if (sensor.officialEndMs > 0) sensor.officialEndMs 
-                  else start + (14L * 24 * 3600 * 1000)
+        val end = when {
+            sensor.isAidex && sensor.officialEndMs > 0 -> sensor.officialEndMs
+            !sensor.isAidex && sensor.expectedEndMs > 0 -> sensor.expectedEndMs
+            sensor.officialEndMs > 0 -> sensor.officialEndMs
+            sensor.isAidex -> start + (15L * 24 * 3600 * 1000)
+            else -> start + (14L * 24 * 3600 * 1000)
+        }
         
         val totalDuration = (end - start).coerceAtLeast(1) // Avoid div/0
         val usedDuration = (now - start).coerceAtLeast(0)

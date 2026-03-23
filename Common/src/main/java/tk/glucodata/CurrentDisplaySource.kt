@@ -5,6 +5,7 @@ import tk.glucodata.ui.DisplayValues
 
 object CurrentDisplaySource {
     private const val DEFAULT_HISTORY_WINDOW_MS = 15 * 60 * 1000L
+    private const val LIVE_CONTEXT_WINDOW_MS = 2 * 60 * 1000L
     private const val MATCH_WINDOW_MS = 60 * 1000L
 
     data class Snapshot(
@@ -36,8 +37,12 @@ object CurrentDisplaySource {
             ?.takeIf { matchesSensor(it.sensorId, resolvedSensorId) }
         val isMmol = Applic.unit == 1
         val now = System.currentTimeMillis()
+        val historyStart = when {
+            current != null && current.timeMillis > 0L -> (current.timeMillis - LIVE_CONTEXT_WINDOW_MS).coerceAtLeast(0L)
+            else -> now - historyWindowMs
+        }
         val recentPoints = try {
-            NotificationHistorySource.getDisplayHistory(now - historyWindowMs, isMmol, resolvedSensorId)
+            NotificationHistorySource.getDisplayHistory(historyStart, isMmol, resolvedSensorId)
         } catch (_: Throwable) {
             emptyList()
         }

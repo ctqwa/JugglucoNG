@@ -56,9 +56,9 @@ object HistorySync {
     private const val MIN_FULL_SYNC_INTERVAL_MS = 5_000L
     private const val MIN_INCR_SYNC_INTERVAL_MS = 3_000L
 
-    // Incremental overlap: 5 minutes catches any very-recent backfill without
-    // re-processing thousands of readings every call.
-    private const val INCREMENTAL_OVERLAP_MS = 5 * 60 * 1000L
+    // Incremental overlap: keep a generous window so reconnect/vendor repair work
+    // does not leave permanent holes, while still avoiding all-history rescans.
+    private const val INCREMENTAL_OVERLAP_MS = 6 * 60 * 60 * 1000L
 
     /**
      * Sync data from native layer to Room for ALL active sensors.
@@ -231,7 +231,7 @@ object HistorySync {
                 isFullSync = false
             }
 
-            val rawHistory = Natives.getGlucoseHistoryForSensor(serial, startSec)
+            val rawHistory = loadNativeHistory(serial, startSec)
             if (rawHistory == null) {
                 // Sensor not found or no data yet — skip, don't reset state
                 Log.d(TAG, "getGlucoseHistoryForSensor($serial, $startSec) returned null — skipping")
@@ -293,6 +293,25 @@ object HistorySync {
         }
     }
 
+    private fun loadNativeHistory(serial: String, startSec: Long): LongArray? {
+        val exact = try {
+            Natives.getGlucoseHistoryForSensor(serial, startSec)
+        } catch (_: Throwable) {
+            null
+        }
+        if (exact != null) {
+            return exact
+        }
+        if (serial.startsWith("X-") && serial.length > 2) {
+            return try {
+                Natives.getGlucoseHistoryForSensor(serial.substring(2), startSec)
+            } catch (_: Throwable) {
+                null
+            }
+        }
+        return null
+    }
+
     /**
      * Force a full resync of ALL active sensors.
      * Useful after vendor history download or sensor data changes.
@@ -326,12 +345,20 @@ object HistorySync {
         Log.i(TAG, "forceFullSyncForSensor($serial) — deleting Room data then re-syncing")
         sensorStability.remove(serial)
         sensorLastSyncTimeMs.remove(serial)
+        val legacyAlias = if (serial.startsWith("X-") && serial.length > 2) serial.substring(2) else null
+        if (legacyAlias != null) {
+            sensorStability.remove(legacyAlias)
+            sensorLastSyncTimeMs.remove(legacyAlias)
+        }
         lastSyncTimeMs = 0L  // Allow immediate sync
         scope.launch {
             syncGate.withLock {
                 // Step 1: Delete existing Room data for this sensor
                 try {
                     historyRepository.deleteForSensor(serial)
+                    if (legacyAlias != null) {
+                        historyRepository.deleteForSensor(legacyAlias)
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error deleting Room data for $serial before resync: ${e.message}")
                 }

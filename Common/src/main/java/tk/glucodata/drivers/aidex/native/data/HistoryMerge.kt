@@ -53,7 +53,7 @@ object HistoryMerge {
     const val MIN_VALID_GLUCOSE_MGDL = 20
     const val MAX_VALID_GLUCOSE_MGDL = 500
     const val MAX_OFFSET_DAYS = 30
-    const val WARMUP_DURATION_MS = 10L * 60_000L  // 10 minutes
+    const val WARMUP_DURATION_MS = 7L * 60_000L  // 7 minutes
     private const val CONTROL_VALUE_DEVIATION_THRESHOLD = 50
 
     /**
@@ -159,7 +159,7 @@ object HistoryMerge {
      * - offsetMinutes >= liveOffsetCutoff (already stored by live F003)
      * - ADC saturation sentinel (glucoseInt >= 1023 and > 0)
      * - Out-of-range glucose (not in MIN_VALID..MAX_VALID)
-     * - Warmup period (first 10 minutes after sensor start)
+     * - Warmup period (first 7 minutes after sensor start)
      * - Future timestamps (> now + 2 minutes)
      *
      * @param entries List of history store entries to filter

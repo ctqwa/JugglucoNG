@@ -1073,8 +1073,6 @@ static jlong getalarmonly(const uint32_t mgL, float drate,
                                                                       hist->waiting
                                                                   ? isAgain
                                                                   : 0))))))));
-  LOGGER("mgL=%u, high=%d, low=%d res=%" PRId64 "\n", mgL,
-         settings->highAlarm(mgL), settings->lowAlarm(mgL), res);
   return res;
 }
 int getalarmcode(const uint32_t mgL, float drate, SensorGlucoseData *hist) {
@@ -1693,11 +1691,9 @@ extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
   const int len = usedsensors.size();
   jobjectArray sensjar = env->NewObjectArray(len, JNIString, nullptr);
 
-  LOGGER("activeSensors libre3 len=%d\n", len);
   for (int i = 0; i < len; i++) {
     int index = usedsensors[i];
     const char *name = sensors->shortsensorname_chars(index);
-    LOGGER("active: %s\n", name);
     env->SetObjectArrayElement(sensjar, i, env->NewStringUTF(name));
   }
 
@@ -1706,7 +1702,6 @@ extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
 #else
 extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
                                                                   jclass cl) {
-  LOGSTRING("activeSensors oldlibre\n");
   setusedsensors();
   const int len = usedsensors.size();
   const char *names[len];

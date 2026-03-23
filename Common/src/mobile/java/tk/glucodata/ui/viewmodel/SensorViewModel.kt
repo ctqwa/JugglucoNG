@@ -248,7 +248,6 @@ class SensorViewModel : ViewModel() {
                          val aiDexStreaming = !aiDexPaused
                          val startMs = if (aiDexDataptr != 0L) Natives.getSensorStartmsec(aiDexDataptr) else 0L
                          val officialEndMs = if (aiDexDataptr != 0L) Natives.getSensorEndTime(aiDexDataptr, true) else 0L
-                         val expectedEndMs = if (aiDexDataptr != 0L) Natives.getSensorEndTime(aiDexDataptr, false) else 0L
                          val currentViewMode = if (aiDexDataptr != 0L) Natives.getViewMode(aiDexDataptr) else 0
                          
                          // Get calibration records from the sensor
@@ -279,7 +278,7 @@ class SensorViewModel : ViewModel() {
                             rssi = gatt.readrssi,
                             dataptr = aiDexDataptr, 
                             officialEnd = if (officialEndMs > 0) tk.glucodata.bluediag.datestr(officialEndMs) else "",
-                            expectedEnd = if (expectedEndMs > 0) tk.glucodata.bluediag.datestr(expectedEndMs) else "",
+                            expectedEnd = "",
                             viewMode = currentViewMode, 
                             autoResetDays = 0,
                             isSibionics = false,
@@ -287,7 +286,7 @@ class SensorViewModel : ViewModel() {
                             isAidex = true,
                             startMs = startMs,
                             officialEndMs = officialEndMs,
-                            expectedEndMs = expectedEndMs,
+                            expectedEndMs = 0L,
                             customCalEnabled = false,
                             customCalIndex = 0,
                             customCalAutoReset = false,
