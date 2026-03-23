@@ -115,6 +115,8 @@ class AiDexBleManager(
         private const val FIRST_VALID_READING_WAIT_MAX_MS = 60L * 60_000L  // Total wait window for the first usable reading
         private const val POST_RESET_WAITING_STATUS = "Waiting for first valid reading"
         private const val BROADCAST_FALLBACK_LIVE_TIMEOUT_MS = 90_000L
+        private const val LIVE_HISTORY_CONTINUITY_BUCKET_MS = 60_000L
+        private const val LIVE_HISTORY_CONTINUITY_MAX_MISSING_BUCKETS = 10
         private const val BROADCAST_ASSIST_SCAN_DELAY_MS = 15_000L
         private const val BROADCAST_ASSIST_SCAN_WINDOW_MS = 12_000L
         private const val BROADCAST_ASSIST_SETUP_STALL_MS = 45_000L
@@ -371,6 +373,8 @@ class AiDexBleManager(
     private var lastGlucoseTimeMs: Long = 0L
     private var lastF003FrameTimeMs: Long = 0L
     private var lastOffsetMinutes: Int = 0
+    private var lastLiveReadingObservedTimeMs: Long = 0L
+    private var lastLiveContinuitySyncBucket: Long = -1L
 
     // -- Calibration State --
     /** End index of sensor's calibration range (from GET_CALIBRATION_RANGE). */
@@ -535,6 +539,34 @@ class AiDexBleManager(
         }
     }
 
+    private fun maybeRequestHistoryContinuitySyncAfterLive(now: Long, source: String) {
+        val previousReadingMs = lastLiveReadingObservedTimeMs
+        lastLiveReadingObservedTimeMs = now
+        if (previousReadingMs <= 0L || historyDownloading) {
+            return
+        }
+        val continuityDecision = tk.glucodata.LiveContinuityPolicy.decideContinuitySync(
+                previousReadingMs,
+                now,
+                LIVE_HISTORY_CONTINUITY_BUCKET_MS,
+                LIVE_HISTORY_CONTINUITY_MAX_MISSING_BUCKETS,
+            )
+        if (!continuityDecision.shouldRequestContinuitySync) {
+            return
+        }
+
+        if (lastLiveContinuitySyncBucket >= continuityDecision.currentBucket) {
+            return
+        }
+        lastLiveContinuitySyncBucket = continuityDecision.currentBucket
+        Log.i(
+            TAG,
+            "Detected $source continuity gap: missing ${continuityDecision.missingBuckets} minute bucket(s) between " +
+                "${continuityDecision.previousBucket} and ${continuityDecision.currentBucket} — requesting incremental history continuity sync"
+        )
+        tk.glucodata.HistorySyncAccess.syncSensorFromNative(SerialNumber)
+    }
+
     private fun effectiveWarmupAnchorMs(): Long {
         if (hasAuthoritativeSessionStart && sensorstartmsec > 0L) return sensorstartmsec
         if (firstValidReadingAnchorMs > 0L) return firstValidReadingAnchorMs
@@ -680,6 +712,8 @@ class AiDexBleManager(
             hasAuthoritativeSessionStart = false
             streamingStartedAtMs = 0L
             lastF003FrameTimeMs = 0L
+            lastLiveReadingObservedTimeMs = 0L
+            lastLiveContinuitySyncBucket = -1L
             noStreamRecoveryAttempted = false
             postBondLiveRefreshAttempted = false
             pendingInitialHistoryRequest = false
@@ -710,6 +744,8 @@ class AiDexBleManager(
 
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             Log.i(TAG, "Disconnected. status=$status")
+            lastLiveReadingObservedTimeMs = 0L
+            lastLiveContinuitySyncBucket = -1L
             constatstatusstr = "Disconnected"
             connectTime = 0L
             setPhase(Phase.IDLE)
@@ -1575,20 +1611,23 @@ class AiDexBleManager(
                 if (constatstatusstr == "Connected") {
                     constatstatusstr = ""
                 }
-                tk.glucodata.HistorySyncAccess.syncSensorFromNative(SerialNumber)
+                maybeRequestHistoryContinuitySyncAfterLive(now, source)
             } catch (e: UnsatisfiedLinkError) {
                 Log.e(TAG, "F003($source): Native library mismatch: $e")
                 val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
                 handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
+                maybeRequestHistoryContinuitySyncAfterLive(now, "$source-fallback")
             } catch (e: Throwable) {
                 Log.e(TAG, "F003($source): aidexProcessData failed: $e")
                 val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
                 handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
+                maybeRequestHistoryContinuitySyncAfterLive(now, "$source-fallback")
             }
         } else {
             Log.w(TAG, "F003($source): dataptr is 0 — cannot store reading")
             val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
             handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
+            maybeRequestHistoryContinuitySyncAfterLive(now, "$source-no-dataptr")
         }
     }
 
@@ -3600,21 +3639,19 @@ class AiDexBleManager(
                 handleGlucoseResult(res, now)
                 noteValidReadingAvailable(now, "valid-broadcast")
                 lastBroadcastStoredTime = now
-
-                // Sync only the AiDex sensor that produced this broadcast frame.
-                tk.glucodata.HistorySyncAccess.syncSensorFromNative(
-                    SerialNumber
-                )
+                maybeRequestHistoryContinuitySyncAfterLive(now, "broadcast")
             } catch (e: Throwable) {
                 Log.e(TAG, "Broadcast: aidexProcessData failed: $e")
                 val mgdlPacked = (glucoseMgDlInt * 10).toLong() and 0xFFFFFFFFL
                 handleGlucoseResult(mgdlPacked, now)
                 noteValidReadingAvailable(now, "valid-broadcast-fallback")
+                maybeRequestHistoryContinuitySyncAfterLive(now, "broadcast-fallback")
             }
         } else {
             val mgdlPacked = (glucoseMgDlInt * 10).toLong() and 0xFFFFFFFFL
             handleGlucoseResult(mgdlPacked, now)
             noteValidReadingAvailable(now, "valid-broadcast-no-dataptr")
+            maybeRequestHistoryContinuitySyncAfterLive(now, "broadcast-no-dataptr")
         }
 
         // Stop current scan, schedule next
