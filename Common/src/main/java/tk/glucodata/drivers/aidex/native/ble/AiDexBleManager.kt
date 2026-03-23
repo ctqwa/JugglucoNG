@@ -667,8 +667,6 @@ class AiDexBleManager(
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
-            bondStateAtConnection = BluetoothDevice.BOND_NONE
-            bondBecameBondedThisConnection = false
             postCccdFollowUp = PostCccdFollowUp.NONE
             gattQueue.clear()
             gattOpActive = false
@@ -863,6 +861,10 @@ class AiDexBleManager(
 
         if (gatt !== mBluetoothGatt) {
             Log.w(TAG, "onServicesDiscovered: stale callback, ignoring")
+            return
+        }
+        if (servicesReady || phase != Phase.DISCOVERING_SERVICES) {
+            Log.i(TAG, "onServicesDiscovered: duplicate callback in phase=$phase servicesReady=$servicesReady — ignoring")
             return
         }
         if (status != BluetoothGatt.GATT_SUCCESS) {
@@ -1400,7 +1402,10 @@ class AiDexBleManager(
      * On reconnections where the device is already bonded, this is a harmless no-op.
      */
     private fun onKeyExchangeComplete() {
-        val shouldRefreshLiveCccds = bondStateAtConnection != BluetoothDevice.BOND_BONDED || bondBecameBondedThisConnection
+        val shouldRefreshLiveCccds = AiDexStreamingPolicy.shouldRefreshLiveCccdsAfterKeyExchange(
+            bondStateAtConnection = bondStateAtConnection,
+            bondBecameBondedThisConnection = bondBecameBondedThisConnection,
+        )
         if (!shouldRefreshLiveCccds) {
             Log.i(TAG, "Key exchange complete — already-bonded reconnect, entering streaming without CCCD re-registration")
             handler.removeCallbacks(keyExchangeWatchdog)
@@ -1489,14 +1494,14 @@ class AiDexBleManager(
         if (phase == Phase.STREAMING && streamingStartedAtMs > 0L && lastF003FrameTimeMs < streamingStartedAtMs) {
             val now = System.currentTimeMillis()
             val latestKnownReadingMs = lastGlucoseTimeMs
-            val historyAwareDelay = if (latestKnownReadingMs > 0L) {
-                val waitUntil = latestKnownReadingMs + EXPECTED_LIVE_INTERVAL_MS + EXPECTED_LIVE_GRACE_MS
-                (waitUntil - now).takeIf { it > 0L }
-            } else {
-                null
-            }
-            val effectiveDelay = maxOf(delayMs, historyAwareDelay ?: 0L)
-            if (historyAwareDelay != null && effectiveDelay > delayMs + 1_000L) {
+            val effectiveDelay = AiDexStreamingPolicy.resolveNoStreamWatchdogDelayMs(
+                defaultDelayMs = delayMs,
+                nowMs = now,
+                latestKnownReadingMs = latestKnownReadingMs,
+                expectedLiveIntervalMs = EXPECTED_LIVE_INTERVAL_MS,
+                expectedLiveGraceMs = EXPECTED_LIVE_GRACE_MS,
+            )
+            if (latestKnownReadingMs > 0L && effectiveDelay > delayMs + 1_000L) {
                 Log.i(
                     TAG,
                     "No-stream watchdog extended to ${effectiveDelay / 1000}s because latest known reading is " +
@@ -2078,29 +2083,34 @@ class AiDexBleManager(
         historyPhase = HistoryPhase.DOWNLOADING_CALIBRATED
         Log.i(TAG, "History range: briefStart=$briefStart, rawStart=$rawStart, newest=$newest")
 
-        // Fresh/just-started sensors can legitimately report an empty range.
-        // Do not enqueue 0x23/0x24 page requests in that case, because the sensor
-        // responds with an empty page and the old logic would leave
-        // historyDownloading=true forever.
-        if (briefStart == 0 && rawStart == 0 && newest == 0) {
+        val downloadPlan = AiDexHistoryPolicy.planInitialDownload(
+            briefStart = briefStart,
+            rawStart = rawStart,
+            newest = newest,
+            persistedRawNextIndex = historyRawNextIndex,
+            persistedBriefNextIndex = historyBriefNextIndex,
+        )
+        historyRawNextIndex = downloadPlan.rawNextIndex
+        historyBriefNextIndex = downloadPlan.briefNextIndex
+        historyDownloadStartIndex = downloadPlan.downloadStartIndex
+
+        if (downloadPlan.action == AiDexHistoryPolicy.InitialAction.COMPLETE_EMPTY) {
             Log.i(TAG, "History range is empty — completing history download immediately")
-            historyRawNextIndex = 0
-            historyBriefNextIndex = 0
             onHistoryDownloadComplete()
             return
         }
 
         // Snapshot liveOffsetCutoff for history dedup.
-        // If live F003 readings have been stored this session, skip history entries
-        // at or above the cutoff (they're already stored by the live pipeline).
-        // Matches vendor driver's vendorHistoryAutoUpdateCutoff set at history range time.
+        // If live F003 readings have been stored this session, only skip the exact
+        // live-backed minute already written by the live pipeline. Reconnect history
+        // pages can legitimately contain newer missing minutes in the same page.
         if (liveOffsetCutoff == 0 && newest > 0) {
             // No live readings yet this session — set cutoff to newest so we don't
             // skip anything during initial history catch-up.
             // (liveOffsetCutoff stays 0 — storeHistoryEntries guards on > 0)
             Log.d(TAG, "History dedup: no live readings yet, liveOffsetCutoff stays 0 (no filtering)")
         } else if (liveOffsetCutoff > 0) {
-            Log.i(TAG, "History dedup: liveOffsetCutoff=$liveOffsetCutoff (history entries >= this offset will be skipped)")
+            Log.i(TAG, "History dedup: liveOffsetCutoff=$liveOffsetCutoff (only the exact live-backed offset will be skipped)")
         }
 
         if (liveOffsetCutoff == 0 && lastGlucoseTimeMs > 0L && newest > 0) {
@@ -2117,37 +2127,22 @@ class AiDexBleManager(
             ensureSensorStartTime(System.currentTimeMillis())
         }
 
-        // Start history download from where we left off (persisted from previous connection).
-        // Clamp to sensor's valid range.
-        if (historyRawNextIndex < rawStart) historyRawNextIndex = rawStart
-        if (historyBriefNextIndex < briefStart) historyBriefNextIndex = briefStart
-
-        // Guard: if persisted offset is far ahead of newest (stale data from different sensor),
-        // rewind to the sensor's start.
-        if (historyRawNextIndex > newest + 10) {
-            Log.w(TAG, "historyRawNextIndex=$historyRawNextIndex is ahead of newest=$newest — resetting to rawStart=$rawStart")
-            historyRawNextIndex = rawStart
-        }
-        if (historyBriefNextIndex > newest + 10) {
-            Log.w(TAG, "historyBriefNextIndex=$historyBriefNextIndex is ahead of newest=$newest — resetting to briefStart=$briefStart")
-            historyBriefNextIndex = briefStart
-        }
-
-        historyDownloadStartIndex = historyRawNextIndex  // snapshot for progress display
         Log.i(TAG, "History download: starting from raw=$historyRawNextIndex, brief=$historyBriefNextIndex (sensor range: $rawStart..$newest)")
 
-        // Fetch calibrated history first
-        if (historyRawNextIndex <= newest) {
-            requestHistoryPage(AiDexOpcodes.GET_HISTORIES_RAW, historyRawNextIndex)
-        } else {
-            // 0x23 already caught up — skip to 0x24 (brief/ADC history)
-            Log.i(TAG, "0x23 already up-to-date (rawNext=$historyRawNextIndex > newest=$newest)")
-            historyPhase = HistoryPhase.DOWNLOADING_RAW
-            if (historyBriefNextIndex <= newest) {
+        when (downloadPlan.action) {
+            AiDexHistoryPolicy.InitialAction.REQUEST_RAW -> {
+                requestHistoryPage(AiDexOpcodes.GET_HISTORIES_RAW, historyRawNextIndex)
+            }
+            AiDexHistoryPolicy.InitialAction.REQUEST_BRIEF -> {
+                Log.i(TAG, "0x23 already up-to-date (rawNext=$historyRawNextIndex > newest=$newest)")
+                historyPhase = HistoryPhase.DOWNLOADING_RAW
                 requestHistoryPage(AiDexOpcodes.GET_HISTORIES, historyBriefNextIndex)
-            } else {
-                // Both 0x23 and 0x24 already caught up — nothing to download
-                Log.i(TAG, "0x24 also up-to-date (briefNext=$historyBriefNextIndex > newest=$newest). No new history.")
+            }
+            AiDexHistoryPolicy.InitialAction.COMPLETE_ALREADY_CAUGHT_UP -> {
+                Log.i(TAG, "0x23 and 0x24 already up-to-date (rawNext=$historyRawNextIndex, briefNext=$historyBriefNextIndex, newest=$newest)")
+                onHistoryDownloadComplete()
+            }
+            AiDexHistoryPolicy.InitialAction.COMPLETE_EMPTY -> {
                 onHistoryDownloadComplete()
             }
         }
@@ -2822,9 +2817,14 @@ class AiDexBleManager(
             // uninitialized/corrupt data from the sensor's ring buffer write head.
             if (historyNewestOffset > 0 && entry.offsetMinutes > historyNewestOffset) continue
 
-            // Skip entries at or above liveOffsetCutoff — these are already stored by
-            // the live F003 pipeline. Matches vendor driver's vendorHistoryAutoUpdateCutoff.
-            if (liveOffsetCutoff > 0 && entry.offsetMinutes >= liveOffsetCutoff) continue
+            // Only skip the exact live-backed minute that was already stored by
+            // direct F003 before history started. On reconnect, newer history
+            // offsets in the same page are often legitimate backfill rows.
+            if (AiDexHistoryPolicy.shouldSkipHistoryEntryForLiveDedupe(
+                    entryOffsetMinutes = entry.offsetMinutes,
+                    liveOffsetCutoff = liveOffsetCutoff,
+                )
+            ) continue
 
             // Filter ADC saturation sentinel (≥1023 for calibrated, but raw can be higher)
             val glucoseInt = entry.glucoseMgDl.toInt()
@@ -2918,9 +2918,11 @@ class AiDexBleManager(
         // so the stream resumes immediately without waiting for the next F003 (~60s).
         // Uses manual pack (not aidexProcessData) to avoid double-writing data
         // that was already stored by storeHistoryEntries().
-        if (lastHistoryNewestGlucose > 0f &&
-            lastHistoryNewestOffset > 0 &&
-            (liveOffsetCutoff == 0 || lastHistoryNewestOffset > liveOffsetCutoff)
+        if (AiDexHistoryPolicy.shouldEmitCatchUpBroadcast(
+                lastHistoryNewestGlucose = lastHistoryNewestGlucose,
+                lastHistoryNewestOffset = lastHistoryNewestOffset,
+                liveOffsetCutoff = liveOffsetCutoff,
+            )
         ) {
             val mgdlInt = lastHistoryNewestGlucose.toInt().coerceIn(0, 0xFFFF) * 10
             val catchUpTimestamp = sensorstartmsec + (lastHistoryNewestOffset.toLong() * 60_000L)
