@@ -2677,11 +2677,13 @@ public class Notify {
                 for (SuperGattCallback cb : SensorBluetooth.gattcallbacks) {
                     if (cb.SerialNumber != null && cb.SerialNumber.equals(activeSensorSerial)) {
                         statusText = cb.constatstatusstr;
-                        viewMode = Natives.getViewMode(cb.dataptr);
                         break;
                     }
                 }
             }
+        }
+        if (viewMode == 0) {
+            viewMode = resolveSensorViewMode(activeSensorSerial);
         }
 
         // Get Consistently Formatted Text using NATIVE points (fresh data)
@@ -2978,7 +2980,6 @@ public class Notify {
             synchronized (SensorBluetooth.gattcallbacks) {
                 for (SuperGattCallback cb : SensorBluetooth.gattcallbacks) {
                     if (cb.SerialNumber != null && cb.SerialNumber.equals(activeSensorSerial)) {
-                        viewMode = Natives.getViewMode(cb.dataptr);
                         break;
                     }
                 }

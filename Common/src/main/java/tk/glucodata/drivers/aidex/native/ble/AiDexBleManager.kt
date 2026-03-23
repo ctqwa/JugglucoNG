@@ -100,43 +100,12 @@ class AiDexBleManager(
         private const val KEY_EXCHANGE_TIMEOUT_MS = 35_000L
         private const val GATT_OP_TIMEOUT_MS = 15_000L    // Watchdog for stuck GATT operations
         private const val GATT_OP_WATCHDOG_RETRIES = 2  // Max retries on watchdog timeout before dropping op
-        private const val NO_STREAM_WATCHDOG_MS = 25_000L
         private const val EXPECTED_LIVE_INTERVAL_MS = 60_000L
         private const val EXPECTED_LIVE_GRACE_MS = 20_000L
-        private const val OFFICIAL_BONDED_STREAM_ARM_STEP_DELAY_MS = 200L
-        private const val OFFICIAL_BONDED_STREAM_ARM_READ_DELAY_MS = 120L
-        private const val OFFICIAL_BONDED_STREAM_ARM_SETTLE_MS = 800L
-        private const val POST_BONDED_STREAM_ARM_HISTORY_DELAY_MS = 1_500L
-
-        // Official bonded stream-enable burst observed in the old driver / timed captures.
-        // This needs to run before history requests so the direct F003 stream is armed
-        // on sensors that otherwise only serve history/current minute values.
-        private const val OFFICIAL_PAIRED_F001 = "91C5470280BB4C3D8FA8EDB1B06A0F06"
-        private val OFFICIAL_BONDED_STREAM_ARM_F002_STEPS = arrayOf(
-            "B0C58080",
-            "B1C5B1B3",
-            "94242D",
-            "A7142B",
-            "A689ECCD88",
-            "A600ECCD29",
-            "A6FFED133A",
-            "A676ED139B",
-            "A6EDEAE52F",
-            "A18DEC99C1",
-            "A1BCEC3DF7",
-            "A163EC24F2",
-            "A112EC4CC9",
-            "A1C1ED1999",
-            "A1F0EDBDAF",
-            "A1A7ED9538",
-            "A156ED6518",
-            "A105ED8943",
-            "A134ED2D75",
-            "A1DBEA4605",
-            "A18AEAC838",
-            "A1B9EA0E68",
-        )
-        private val OFFICIAL_BONDED_STREAM_ARM_RAW_OPCODES = setOf(0xB0, 0xB1, 0x94, 0xA7, 0xA6, 0xA1)
+        private const val NO_STREAM_WATCHDOG_MS = EXPECTED_LIVE_INTERVAL_MS + EXPECTED_LIVE_GRACE_MS
+        private const val INITIAL_HISTORY_REQUEST_DELAY_MS = 65_000L
+        private const val POST_KEY_CCCD_REFRESH_DELAY_MS = 250L
+        private const val STREAMING_METADATA_REQUEST_DELAY_MS = 400L
 
         // -- History Storage --
         private const val MIN_VALID_GLUCOSE_MGDL = 20
@@ -222,6 +191,8 @@ class AiDexBleManager(
     private var challengeWritten = false
     private var bondDataRead = false
     private var keyExchangePendingBond = false
+    private var bondStateAtConnection: Int = BluetoothDevice.BOND_NONE
+    private var bondBecameBondedThisConnection = false
 
     private enum class PostCccdFollowUp {
         NONE,
@@ -233,11 +204,9 @@ class AiDexBleManager(
     private var streamingStartedAtMs: Long = 0L
     private var noStreamRecoveryAttempted = false
     private var postBondLiveRefreshAttempted = false
-    private var bondedStreamArmInProgress = false
-    private var bondedStreamArmCompletedThisConnection = false
-    private var bondedStreamArmSawResponse = false
-    private var bondedStreamArmGeneration = 0
     private var pendingInitialHistoryRequest = false
+    private var pendingStreamingMetadataRead = false
+    private var pendingStreamingMetadataReason: String? = null
     private var lastF002FrameTimeMs: Long = 0L
 
     /** Watchdog: force-disconnect if key exchange doesn't complete within timeout. */
@@ -288,6 +257,12 @@ class AiDexBleManager(
         if (phase != Phase.STREAMING || mBluetoothGatt == null) return@Runnable
         Log.i(TAG, "Initial history request starting after live-stream settle")
         requestHistoryRange()
+    }
+
+    private val delayedStreamingMetadataRequest = Runnable {
+        val reason = pendingStreamingMetadataReason ?: "scheduled"
+        pendingStreamingMetadataReason = null
+        requestStreamingMetadataIfNeeded(reason)
     }
 
     // -- SharedPreferences for per-sensor state persistence --
@@ -473,6 +448,21 @@ class AiDexBleManager(
         override fun run() {
             val now = System.currentTimeMillis()
             if (stop || reconnect.isBroadcastOnlyMode || hasRecentLiveData(now)) return
+            AiDexRuntimePolicy.initialAssistDelayMs(
+                nowMs = now,
+                phaseStreaming = phase == Phase.STREAMING,
+                pendingInitialHistoryRequest = pendingInitialHistoryRequest,
+                historyDownloading = historyDownloading,
+                streamingStartedAtMs = streamingStartedAtMs,
+                initialHistoryRequestDelayMs = INITIAL_HISTORY_REQUEST_DELAY_MS,
+            )?.let { remainingMs ->
+                Log.d(
+                    TAG,
+                    "Waiting for initial history/live handoff — delaying assist scan for ${remainingMs / 1000}s"
+                )
+                handler.postDelayed(this, remainingMs)
+                return
+            }
             val anchor = effectiveWarmupAnchorMs()
             if (anchor > 0L && now >= anchor) {
                 val ageMs = now - anchor
@@ -556,32 +546,27 @@ class AiDexBleManager(
     }
 
     private fun shouldContinueAssistScanning(now: Long = System.currentTimeMillis()): Boolean {
-        if (stop || reconnect.isBroadcastOnlyMode) return false
-        if (phase != Phase.STREAMING) return false
-        if (hasRecentLiveData(now)) return false
-        val anchor = effectiveWarmupAnchorMs()
-        if (anchor <= 0L || now < anchor) return false
-        val ageMs = now - anchor
-        val hasValidReadingSinceAnchor = lastGlucoseTimeMs >= anchor && lastGlucoseTimeMs > 0L
-        return ageMs < FIRST_VALID_READING_WAIT_MAX_MS
+        return AiDexRuntimePolicy.shouldContinueAssistScanning(
+            stop = stop,
+            broadcastOnlyMode = reconnect.isBroadcastOnlyMode,
+            phaseStreaming = phase == Phase.STREAMING,
+            hasRecentLiveData = hasRecentLiveData(now),
+            pendingInitialHistoryRequest = pendingInitialHistoryRequest,
+            historyDownloading = historyDownloading,
+            anchorMs = effectiveWarmupAnchorMs(),
+            nowMs = now,
+            lastGlucoseTimeMs = lastGlucoseTimeMs,
+            firstValidReadingWaitMaxMs = FIRST_VALID_READING_WAIT_MAX_MS,
+        )
     }
 
     private fun firstValidReadingWaitStatus(now: Long = System.currentTimeMillis()): String? {
-        val anchor = effectiveWarmupAnchorMs()
-        if (anchor <= 0L || now < anchor) return null
-        val ageMs = now - anchor
-        val ageMin = ageMs / 60_000L
-        return when {
-            ageMs < WARMUP_DURATION_MS -> {
-                val remaining = ((WARMUP_DURATION_MS - ageMs) + 59_999L) / 60_000L
-                "age=${ageMin}m warmup=${remaining}m"
-            }
-            ageMs < FIRST_VALID_READING_WAIT_MAX_MS -> {
-                val remaining = ((FIRST_VALID_READING_WAIT_MAX_MS - ageMs) + 59_999L) / 60_000L
-                "age=${ageMin}m extended=${remaining}m"
-            }
-            else -> "age=${ageMin}m no-valid-data"
-        }
+        return AiDexRuntimePolicy.firstValidReadingWaitStatus(
+            anchorMs = effectiveWarmupAnchorMs(),
+            nowMs = now,
+            warmupDurationMs = WARMUP_DURATION_MS,
+            firstValidReadingWaitMaxMs = FIRST_VALID_READING_WAIT_MAX_MS,
+        )
     }
 
     // -- Listeners --
@@ -674,12 +659,16 @@ class AiDexBleManager(
             setPhase(Phase.DISCOVERING_SERVICES)
 
             // Reset per-connection state
+            bondStateAtConnection = gatt.device?.bondState ?: BluetoothDevice.BOND_NONE
+            bondBecameBondedThisConnection = false
             keyExchange.reset()
             challengeWritten = false
             bondDataRead = false
             servicesReady = false
             cccdChainComplete = false
             keyExchangePendingBond = false
+            bondStateAtConnection = BluetoothDevice.BOND_NONE
+            bondBecameBondedThisConnection = false
             postCccdFollowUp = PostCccdFollowUp.NONE
             gattQueue.clear()
             gattOpActive = false
@@ -695,14 +684,13 @@ class AiDexBleManager(
             lastF003FrameTimeMs = 0L
             noStreamRecoveryAttempted = false
             postBondLiveRefreshAttempted = false
-            bondedStreamArmInProgress = false
-            bondedStreamArmCompletedThisConnection = false
-            bondedStreamArmSawResponse = false
-            bondedStreamArmGeneration++
             pendingInitialHistoryRequest = false
+            pendingStreamingMetadataRead = false
+            pendingStreamingMetadataReason = null
             lastF002FrameTimeMs = 0L
             handler.removeCallbacks(noStreamWatchdog)
             handler.removeCallbacks(delayedInitialHistoryRequest)
+            handler.removeCallbacks(delayedStreamingMetadataRequest)
             lastBroadcastOffsetSeen = -1L
             lastBroadcastTrendSeen = Int.MIN_VALUE
             lastBroadcastGlucoseSeen = Int.MIN_VALUE
@@ -749,11 +737,9 @@ class AiDexBleManager(
             lastF003FrameTimeMs = 0L
             noStreamRecoveryAttempted = false
             postBondLiveRefreshAttempted = false
-            bondedStreamArmInProgress = false
-            bondedStreamArmCompletedThisConnection = false
-            bondedStreamArmSawResponse = false
-            bondedStreamArmGeneration++
             pendingInitialHistoryRequest = false
+            pendingStreamingMetadataRead = false
+            pendingStreamingMetadataReason = null
             lastF002FrameTimeMs = 0L
             lastBroadcastOffsetSeen = -1L
             lastBroadcastTrendSeen = Int.MIN_VALUE
@@ -943,8 +929,8 @@ class AiDexBleManager(
             when (postCccdFollowUp) {
                 PostCccdFollowUp.ENTER_STREAMING -> {
                     postCccdFollowUp = PostCccdFollowUp.NONE
-                    Log.i(TAG, "Post-key-exchange CCCD re-registration complete. Arming live stream...")
-                    startLiveStreamArmThenEnterStreaming(requestHistory = true)
+                    Log.i(TAG, "Post-key-exchange CCCD re-registration complete. Entering streaming...")
+                    enterStreamingPhase(requestHistory = true)
                     return
                 }
                 PostCccdFollowUp.RESUME_STREAMING -> {
@@ -1161,6 +1147,9 @@ class AiDexBleManager(
         Log.i(TAG, "bonded() callback: bondState=$bondState")
 
         if (bondState == BluetoothDevice.BOND_BONDED) {
+            if (bondStateAtConnection != BluetoothDevice.BOND_BONDED) {
+                bondBecameBondedThisConnection = true
+            }
             reconnect.onBondSuccess()
 
             // Resume GATT queue if it was paused for bonding
@@ -1265,8 +1254,8 @@ class AiDexBleManager(
                     when (postCccdFollowUp) {
                         PostCccdFollowUp.ENTER_STREAMING -> {
                             postCccdFollowUp = PostCccdFollowUp.NONE
-                            Log.w(TAG, "Post-key-exchange CCCD re-registration had failures. Arming live stream anyway...")
-                            startLiveStreamArmThenEnterStreaming(requestHistory = true)
+                            Log.w(TAG, "Post-key-exchange CCCD re-registration had failures. Entering streaming anyway...")
+                            enterStreamingPhase(requestHistory = true)
                         }
                         PostCccdFollowUp.RESUME_STREAMING -> {
                             postCccdFollowUp = PostCccdFollowUp.NONE
@@ -1411,101 +1400,19 @@ class AiDexBleManager(
      * On reconnections where the device is already bonded, this is a harmless no-op.
      */
     private fun onKeyExchangeComplete() {
-        Log.i(TAG, "Key exchange complete — re-registering CCCDs then entering streaming phase")
-        refreshLiveCccds(PostCccdFollowUp.ENTER_STREAMING, "post-key-exchange")
-    }
-
-    private fun startLiveStreamArmThenEnterStreaming(requestHistory: Boolean) {
-        val gatt = mBluetoothGatt
-        if (gatt == null || gatt.device.bondState != BluetoothDevice.BOND_BONDED) {
-            enterStreamingPhase(requestHistory, afterBondedArm = false)
+        val shouldRefreshLiveCccds = bondStateAtConnection != BluetoothDevice.BOND_BONDED || bondBecameBondedThisConnection
+        if (!shouldRefreshLiveCccds) {
+            Log.i(TAG, "Key exchange complete — already-bonded reconnect, entering streaming without CCCD re-registration")
+            handler.removeCallbacks(keyExchangeWatchdog)
+            enterStreamingPhase(requestHistory = true)
             return
         }
-        if (bondedStreamArmCompletedThisConnection) {
-            enterStreamingPhase(requestHistory, afterBondedArm = false)
-            return
-        }
-        if (bondedStreamArmInProgress) {
-            Log.i(TAG, "Bonded live-stream arm already in progress")
-            return
-        }
-
-        bondedStreamArmInProgress = true
-        bondedStreamArmSawResponse = false
-        val generation = ++bondedStreamArmGeneration
-        var delayMs = 0L
-
-        Log.i(TAG, "Running bonded live-stream arm sequence before history")
-        scheduleBondedStreamArmWrite(
-            generation = generation,
-            delayMs = delayMs,
-            charUuid = CHAR_F001,
-            payload = hexStringToBytes(OFFICIAL_PAIRED_F001),
-            label = "startup[bonded] F001 wake"
-        )
-        delayMs += OFFICIAL_BONDED_STREAM_ARM_STEP_DELAY_MS
-
-        OFFICIAL_BONDED_STREAM_ARM_F002_STEPS.forEach { hex ->
-            scheduleBondedStreamArmWrite(
-                generation = generation,
-                delayMs = delayMs,
-                charUuid = CHAR_F002,
-                payload = hexStringToBytes(hex),
-                label = "startup[bonded] F002 $hex"
-            )
-            scheduleBondedStreamArmReadback(
-                generation = generation,
-                delayMs = delayMs + OFFICIAL_BONDED_STREAM_ARM_READ_DELAY_MS,
-            )
-            delayMs += OFFICIAL_BONDED_STREAM_ARM_STEP_DELAY_MS
-        }
-
+        Log.i(TAG, "Key exchange complete — settling briefly before CCCD re-registration")
         handler.postDelayed({
-            if (!shouldContinueBondedStreamArm(generation)) return@postDelayed
-            bondedStreamArmInProgress = false
-            bondedStreamArmCompletedThisConnection = true
-            Log.i(
-                TAG,
-                "Bonded live-stream arm queued${if (bondedStreamArmSawResponse) " with F002 response activity" else ""}. " +
-                    "Entering streaming..."
-            )
-            enterStreamingPhase(requestHistory, afterBondedArm = true)
-        }, delayMs + OFFICIAL_BONDED_STREAM_ARM_SETTLE_MS)
-    }
-
-    private fun scheduleBondedStreamArmWrite(
-        generation: Int,
-        delayMs: Long,
-        charUuid: UUID,
-        payload: ByteArray,
-        label: String,
-    ) {
-        handler.postDelayed({
-            if (!shouldContinueBondedStreamArm(generation)) return@postDelayed
-            Log.i(TAG, "$label queued")
-            enqueueGattOp(GattOp.Write(charUuid, payload.copyOf()))
-        }, delayMs)
-    }
-
-    private fun scheduleBondedStreamArmReadback(
-        generation: Int,
-        delayMs: Long,
-    ) {
-        handler.postDelayed({
-            if (!shouldContinueBondedStreamArm(generation)) return@postDelayed
-            val gatt = mBluetoothGatt ?: return@postDelayed
-            val characteristic = gatt.getService(SERVICE_F000)?.getCharacteristic(CHAR_F002) ?: return@postDelayed
-            if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_READ) == 0) return@postDelayed
-            Log.d(TAG, "startup[bonded] F002 readback queued")
-            enqueueGattOp(GattOp.Read(CHAR_F002))
-        }, delayMs)
-    }
-
-    private fun shouldContinueBondedStreamArm(generation: Int): Boolean {
-        if (generation != bondedStreamArmGeneration) return false
-        if (stop) return false
-        if (mBluetoothGatt == null) return false
-        return phase == Phase.KEY_EXCHANGE
+            if (mBluetoothGatt != null && phase == Phase.KEY_EXCHANGE) {
+                refreshLiveCccds(PostCccdFollowUp.ENTER_STREAMING, "post-key-exchange")
+            }
+        }, POST_KEY_CCCD_REFRESH_DELAY_MS)
     }
 
     private fun refreshLiveCccds(followUp: PostCccdFollowUp, reason: String) {
@@ -1542,41 +1449,31 @@ class AiDexBleManager(
      * Enter streaming phase and send initial commands.
      * Called after post-key-exchange CCCD re-registration completes.
      */
-    private fun enterStreamingPhase(requestHistory: Boolean, afterBondedArm: Boolean) {
+    private fun enterStreamingPhase(requestHistory: Boolean) {
         handler.removeCallbacks(keyExchangeWatchdog)  // Cancel watchdog — key exchange succeeded
         setPhase(Phase.STREAMING)
         reconnect.onConnectionSuccess()
         constatstatusstr = "Connected"
         streamingStartedAtMs = System.currentTimeMillis()
         noStreamRecoveryAttempted = false
-        bondedStreamArmInProgress = false
-        if (afterBondedArm) {
-            bondedStreamArmCompletedThisConnection = true
-        }
         scheduleNoStreamWatchdog()
         pendingInitialHistoryRequest = false
+        pendingStreamingMetadataRead = true
         handler.removeCallbacks(delayedInitialHistoryRequest)
         Log.i(
             TAG,
-            "Streaming phase entered. Reading device info" +
-                when {
-                    requestHistory && afterBondedArm ->
-                        " + delaying initial history for ${POST_BONDED_STREAM_ARM_HISTORY_DELAY_MS}ms"
-                    requestHistory -> " + requesting history"
-                    else -> ""
+            "Streaming phase entered." +
+                if (requestHistory) {
+                    " Waiting for first F003 before history (${INITIAL_HISTORY_REQUEST_DELAY_MS / 1000}s max)"
+                } else {
+                    " Waiting for first live data"
                 } +
                 "..."
         )
 
-        // Read standard BLE characteristics for device info (model, firmware, start time).
-        // These are the primary source — 0x21 F002 command always fails on tested sensors.
-        readDeviceInformationService()
-        readCGMSessionCharacteristics()
-
         if (requestHistory) {
             pendingInitialHistoryRequest = true
-            val delayMs = if (afterBondedArm) POST_BONDED_STREAM_ARM_HISTORY_DELAY_MS else 300L
-            handler.postDelayed(delayedInitialHistoryRequest, delayMs)
+            handler.postDelayed(delayedInitialHistoryRequest, INITIAL_HISTORY_REQUEST_DELAY_MS)
         }
     }
 
@@ -1610,15 +1507,189 @@ class AiDexBleManager(
         }
     }
 
-    private fun hexStringToBytes(hex: String): ByteArray {
-        val cleaned = hex.replace(" ", "")
-        val out = ByteArray(cleaned.length / 2)
-        var pos = 0
-        while (pos < cleaned.length) {
-            out[pos / 2] = cleaned.substring(pos, pos + 2).toInt(16).toByte()
-            pos += 2
+    private fun handleParsedLiveReading(
+        now: Long,
+        source: String,
+        autoValue: Float,
+        trustedTimeOffsetMinutes: Int?,
+        rawValue: Float?,
+        sensorGlucose: Float?,
+        rawI1: Float?,
+        rawI2: Float?,
+    ) {
+        trustedTimeOffsetMinutes?.let { trustedOffset ->
+            lastOffsetMinutes = trustedOffset
+            if (trustedOffset > liveOffsetCutoff) {
+                liveOffsetCutoff = trustedOffset
+            }
         }
-        return out
+        val shouldStartHistoryNow = AiDexRuntimePolicy.shouldStartHistoryImmediately(
+            pendingInitialHistoryRequest = pendingInitialHistoryRequest,
+            historyDownloading = historyDownloading,
+        )
+        noteValidReadingAvailable(now, "valid-$source")
+        if (shouldStartHistoryNow) {
+            pendingInitialHistoryRequest = false
+            handler.removeCallbacks(delayedInitialHistoryRequest)
+            Log.i(TAG, "First live reading arrived from $source — starting history now")
+            requestHistoryRange()
+        } else if (!historyDownloading) {
+            scheduleStreamingMetadataRead("first-live-$source")
+        }
+
+        if (broadcastScanActive && !broadcastScanContinuousMode) {
+            stopBroadcastScan("live-reading", found = true)
+        }
+
+        val bareSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
+        val reading = GlucoseReading(
+            timestamp = now,
+            sensorSerial = bareSerial,
+            autoValue = autoValue,
+            rawValue = rawValue,
+            sensorGlucose = sensorGlucose,
+            rawI1 = rawI1,
+            rawI2 = rawI2,
+            timeOffsetMinutes = trustedTimeOffsetMinutes ?: 0,
+        )
+        onGlucoseReading?.invoke(reading)
+
+        ensureSensorStartTime(now, trustedTimeOffsetMinutes)
+
+        if (dataptr != 0L) {
+            try {
+                val res = Natives.aidexProcessData(
+                    dataptr,
+                    byteArrayOf(0),
+                    now,
+                    autoValue,
+                    rawValue ?: 0f,
+                    1.0f
+                )
+                handleGlucoseResult(res, now)
+                if (constatstatusstr == "Connected") {
+                    constatstatusstr = ""
+                }
+                tk.glucodata.HistorySyncAccess.syncSensorFromNative(SerialNumber)
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e(TAG, "F003($source): Native library mismatch: $e")
+                val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
+                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
+            } catch (e: Throwable) {
+                Log.e(TAG, "F003($source): aidexProcessData failed: $e")
+                val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
+                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
+            }
+        } else {
+            Log.w(TAG, "F003($source): dataptr is 0 — cannot store reading")
+            val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
+            handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
+        }
+    }
+
+    private fun resolveTrustedLiveOffsetMinutes(frame: GlucoseFrame, now: Long): Pair<Int?, String?> {
+        val wireOffset = frame.timeOffsetMinutes
+        val maxOffsetMinutes = MAX_OFFSET_DAYS * 24L * 60L
+
+        fun trust(offset: Int, reason: String? = null): Pair<Int?, String?> = offset to reason
+        fun untrusted(reason: String): Pair<Int?, String?> = null to reason
+
+        if (wireOffset <= 0) {
+            return untrusted("wire offset=$wireOffset is not positive")
+        }
+        if (wireOffset.toLong() > maxOffsetMinutes) {
+            // 1.8.1 has been observed to produce correct glucose/raw with garbage timing bytes.
+            // Accept the reading, but do not let that field rewrite start time or dedupe state.
+            val derivedFromSession = deriveOffsetFromAuthoritativeSession(now)
+            if (derivedFromSession != null) {
+                return trust(
+                    derivedFromSession,
+                    "wire offset=$wireOffset invalid; derived live offset=$derivedFromSession from authoritative session"
+                )
+            }
+            val derivedFromHistory = deriveOffsetFromKnownHistory(now)
+            if (derivedFromHistory != null) {
+                return trust(
+                    derivedFromHistory,
+                    "wire offset=$wireOffset invalid; derived live offset=$derivedFromHistory from history cadence"
+                )
+            }
+            return untrusted("wire offset=$wireOffset exceeds ${MAX_OFFSET_DAYS}d limit")
+        }
+
+        if (historyNewestOffset > 0 && wireOffset > historyNewestOffset + 2) {
+            val derivedFromSession = deriveOffsetFromAuthoritativeSession(now)
+            if (derivedFromSession != null) {
+                return trust(
+                    derivedFromSession,
+                    "wire offset=$wireOffset ahead of history newest=$historyNewestOffset; using session-derived offset=$derivedFromSession"
+                )
+            }
+            val derivedFromHistory = deriveOffsetFromKnownHistory(now)
+            if (derivedFromHistory != null) {
+                return trust(
+                    derivedFromHistory,
+                    "wire offset=$wireOffset ahead of history newest=$historyNewestOffset; using history-derived offset=$derivedFromHistory"
+                )
+            }
+            return untrusted("wire offset=$wireOffset ahead of known history newest=$historyNewestOffset")
+        }
+
+        val startMs = sensorstartmsec.takeIf { it > 0L } ?: 0L
+        if (startMs > 0L) {
+            val timestampMs = startMs + wireOffset.toLong() * 60_000L
+            if (timestampMs > now + 5L * 60_000L) {
+                val derivedFromSession = deriveOffsetFromAuthoritativeSession(now)
+                if (derivedFromSession != null) {
+                    return trust(
+                        derivedFromSession,
+                        "wire offset=$wireOffset points into the future; using session-derived offset=$derivedFromSession"
+                    )
+                }
+                return untrusted("wire offset=$wireOffset points into the future")
+            }
+            val oldestAllowed = now - (MAX_OFFSET_DAYS * 24L * 60L * 60_000L)
+            if (timestampMs < oldestAllowed) {
+                return untrusted("wire offset=$wireOffset points older than ${MAX_OFFSET_DAYS}d")
+            }
+        }
+
+        return trust(wireOffset)
+    }
+
+    private fun deriveOffsetFromAuthoritativeSession(now: Long): Int? {
+        if (!hasAuthoritativeSessionStart || sensorstartmsec <= 0L || now <= sensorstartmsec) return null
+        val derived = ((now - sensorstartmsec + 30_000L) / 60_000L).toInt()
+        return derived.takeIf { it > 0 && it.toLong() <= (MAX_OFFSET_DAYS * 24L * 60L) }
+    }
+
+    private fun deriveOffsetFromKnownHistory(now: Long): Int? {
+        val baseOffset = maxOf(lastOffsetMinutes, historyNewestOffset, lastHistoryNewestOffset)
+        if (baseOffset <= 0) return null
+        val latestKnownTimeMs = lastGlucoseTimeMs.takeIf { it > 0L } ?: return baseOffset
+        val advanceMinutes = ((now - latestKnownTimeMs + 30_000L) / 60_000L).coerceAtLeast(0L).toInt()
+        val derived = baseOffset + advanceMinutes
+        return derived.takeIf { it > 0 && it.toLong() <= (MAX_OFFSET_DAYS * 24L * 60L) }
+    }
+
+    private fun requestStreamingMetadataIfNeeded(reason: String) {
+        if (!pendingStreamingMetadataRead) return
+        pendingStreamingMetadataRead = false
+        pendingStreamingMetadataReason = null
+        Log.i(TAG, "Requesting streaming metadata ($reason)")
+        // Keep these reads out of the first live-arm window. The clean 1.8.1
+        // trace reaches F003 without front-loading DIS/2AAA reads here, and
+        // our driver only needs this metadata after live data or history is
+        // already flowing.
+        readDeviceInformationService()
+        readCGMSessionCharacteristics()
+    }
+
+    private fun scheduleStreamingMetadataRead(reason: String) {
+        if (!pendingStreamingMetadataRead) return
+        pendingStreamingMetadataReason = reason
+        handler.removeCallbacks(delayedStreamingMetadataRequest)
+        handler.postDelayed(delayedStreamingMetadataRequest, STREAMING_METADATA_REQUEST_DELAY_MS)
     }
 
     /**
@@ -1715,83 +1786,25 @@ class AiDexBleManager(
             return
         }
 
-        // Update timestamps / state
-        noteValidReadingAvailable(now, "valid-f003")
-        if (pendingInitialHistoryRequest && !historyDownloading) {
-            pendingInitialHistoryRequest = false
-            handler.removeCallbacks(delayedInitialHistoryRequest)
-            Log.i(TAG, "F003 arrived before initial history request — starting history now")
-            requestHistoryRange()
+        val (trustedOffsetMinutes, offsetResolutionNote) = resolveTrustedLiveOffsetMinutes(frame, now)
+        offsetResolutionNote?.let {
+            Log.w(
+                TAG,
+                "F003 timing: $it " +
+                    "(wireOffset=${frame.timeOffsetMinutes} glucose=${frame.glucoseMgDl} i1=${frame.i1} i2=${frame.i2})"
+            )
         }
 
-        // Track highest live offset for history dedup — history entries at or above
-        // this offset are already stored by the live pipeline and should be skipped.
-        if (lastOffsetMinutes > liveOffsetCutoff) {
-            liveOffsetCutoff = lastOffsetMinutes
-        }
-        if (broadcastScanActive && !broadcastScanContinuousMode) {
-            stopBroadcastScan("live-reading", found = true)
-        }
-
-        // Compute all three chart values
-        val autoValue = frame.glucoseMgDl
-        val rawValue = frame.i1 * 10f
-
-        // Build GlucoseReading for listener callback
-        val reading = GlucoseReading(
-            timestamp = now,
-            sensorSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber),
-            autoValue = autoValue,
-            rawValue = rawValue,
+        handleParsedLiveReading(
+            now = now,
+            source = "native",
+            autoValue = frame.glucoseMgDl,
+            trustedTimeOffsetMinutes = trustedOffsetMinutes,
+            rawValue = frame.i1 * 10f,
             sensorGlucose = frame.i1 * 18.0182f,
             rawI1 = frame.i1,
             rawI2 = frame.i2,
-            timeOffsetMinutes = lastOffsetMinutes,
         )
-        onGlucoseReading?.invoke(reading)
-
-        // Ensure sensorstartmsec is set before storing.
-        // If no start time from 0x21 yet, infer from offset or use current time.
-        ensureSensorStartTime(now)
-
-        // Store in native C++ layer via JNI, matching vendor driver's storeAidexReading().
-        // aidexProcessData returns a packed long (lower 32 = glucose*10, bits 32-47 = rate,
-        // bits 48-55 = alarm) which is passed to handleGlucoseResult for notifications/broadcasts.
-        if (dataptr != 0L) {
-            try {
-                val res = Natives.aidexProcessData(
-                    dataptr, byteArrayOf(0), now, autoValue, rawValue, 1.0f
-                )
-                handleGlucoseResult(res, now)
-
-                // Clear "Connected" from notification — the glucose value itself is now
-                // the notification's primary content. Matches vendor driver behavior:
-                // AiDexSensor.kt:6745 deliberately avoids updating constatstatusstr during
-                // normal operation to prevent notification flicker. Setting to "" hides the
-                // status line entirely so only the glucose value is shown.
-                if (constatstatusstr == "Connected") {
-                    constatstatusstr = ""
-                }
-
-                // Sync only this sensor; live packets should not trigger a full all-sensor backfill.
-                tk.glucodata.HistorySyncAccess.syncSensorFromNative(
-                    SerialNumber
-                )
-            } catch (e: UnsatisfiedLinkError) {
-                Log.e(TAG, "F003: Native library mismatch: $e")
-                // Fallback: manual pack for handleGlucoseResult
-                val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
-                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
-            } catch (e: Throwable) {
-                Log.e(TAG, "F003: aidexProcessData failed: $e")
-                val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
-                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
-            }
-        } else {
-            Log.w(TAG, "F003: dataptr is 0 — cannot store reading")
-            val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
-            handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now)
-        }
     }
 
     /**
@@ -1869,16 +1882,7 @@ class AiDexBleManager(
     private fun handleF002Response(data: ByteArray, gatt: BluetoothGatt) {
         if (data.isEmpty()) return
         lastF002FrameTimeMs = System.currentTimeMillis()
-        if (bondedStreamArmInProgress) {
-            bondedStreamArmSawResponse = true
-        }
         Log.i(TAG, "handleF002Response: len=${data.size}, raw=${AiDexParser.hexString(data.copyOfRange(0, minOf(data.size, 16)))}")
-
-        val rawOpcode = data[0].toInt() and 0xFF
-        if (bondedStreamArmInProgress && rawOpcode in OFFICIAL_BONDED_STREAM_ARM_RAW_OPCODES) {
-            Log.d(TAG, "F002 bonded stream-arm echo: opcode=0x${"%02X".format(rawOpcode)} len=${data.size}")
-            return
-        }
 
         // Decrypt if session key is available
         val plaintext = if (keyExchange.isComplete) {
@@ -2742,12 +2746,13 @@ class AiDexBleManager(
      *   has been running for days)
      * - Last resort: use current time
      */
-    private fun ensureSensorStartTime(now: Long) {
-        if (lastOffsetMinutes > 0) {
-            val inferredStart = now - (lastOffsetMinutes.toLong() * 60_000L)
+    private fun ensureSensorStartTime(now: Long, trustedOffsetMinutes: Int? = null) {
+        val effectiveOffsetMinutes = trustedOffsetMinutes ?: lastOffsetMinutes.takeIf { it > 0 }
+        if (effectiveOffsetMinutes != null && effectiveOffsetMinutes > 0) {
+            val inferredStart = now - (effectiveOffsetMinutes.toLong() * 60_000L)
             if (sensorstartmsec == 0L || kotlin.math.abs(sensorstartmsec - inferredStart) > (10L * 60_000L)) {
                 sensorstartmsec = inferredStart
-                Log.i(TAG, "Updated sensorstartmsec from offset: ${lastOffsetMinutes}min → $inferredStart")
+                Log.i(TAG, "Updated sensorstartmsec from offset: ${effectiveOffsetMinutes}min → $inferredStart")
                 if (dataptr != 0L) {
                     // Push wear days BEFORE start time — aidexSetStartTime
                     // uses info->days to compute wearduration2
@@ -2931,6 +2936,7 @@ class AiDexBleManager(
             if (cmd != null) {
                 enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
             }
+            scheduleStreamingMetadataRead("post-history")
         }, 200L)
     }
 
@@ -2962,28 +2968,15 @@ class AiDexBleManager(
         val now = System.currentTimeMillis()
 
         fun connectedWarmupStatus(connectionPart: String): String? {
-            val startMs = effectiveWarmupAnchorMs()
-            if (startMs <= 0L) return null
-            val ageMs = now - startMs
-            if (ageMs < 0L) return null
-
-            val hasValidReadingSinceStart = lastGlucoseTimeMs >= startMs && lastGlucoseTimeMs > 0L
-            val ageMin = ageMs / 60_000L
-            if (ageMs < WARMUP_DURATION_MS) {
-                val remaining = ((WARMUP_DURATION_MS - ageMs) + 59_999L) / 60_000L
-                return "$connectionPart — Warmup ${remaining}m"
-            }
-
-            if (!hasValidReadingSinceStart && ageMs < FIRST_VALID_READING_WAIT_MAX_MS) {
-                val remaining = ((FIRST_VALID_READING_WAIT_MAX_MS - ageMs) + 59_999L) / 60_000L
-                return "$connectionPart — Warmup extended ${remaining}m"
-            }
-
-            if (!hasValidReadingSinceStart && firstValidReadingAnchorMs > 0L) {
-                return "$connectionPart — No valid data yet"
-            }
-
-            return null
+            return AiDexRuntimePolicy.connectedWarmupStatus(
+                connectionPart = connectionPart,
+                anchorMs = effectiveWarmupAnchorMs(),
+                nowMs = now,
+                lastGlucoseTimeMs = lastGlucoseTimeMs,
+                warmupDurationMs = WARMUP_DURATION_MS,
+                firstValidReadingWaitMaxMs = FIRST_VALID_READING_WAIT_MAX_MS,
+                firstValidReadingWaitActive = firstValidReadingAnchorMs > 0L,
+            )
         }
 
         return when (phase) {
@@ -3540,9 +3533,8 @@ class AiDexBleManager(
 
         val now = System.currentTimeMillis()
 
-        // Parse LinX broadcast format
         val offsetMinutes = u32LE(data, 0) and 0xFFFF_FFFFL
-        val trend = data[4].toInt()  // signed
+        val trend = data[4].toInt()
         val lo = data[5].toInt() and 0xFF
         val carry = data[6].toInt() and 0xFF
         val glucoseMgDlInt = lo or ((carry and 0x03) shl 8)
