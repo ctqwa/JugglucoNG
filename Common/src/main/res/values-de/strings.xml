@@ -542,6 +542,12 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="turbo_desc">Fordert hohe Verbindungspriorität an</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Verwendet passive Hintergrundverbindung</string>
+    <string name="graph_smoothing_title">Diagrammglättung</string>
+    <string name="graph_smoothing_desc">Glättet die Dashboard-Linie, ohne gespeicherte Messwerte zu ändern</string>
+    <string name="graph_smoothing_none">Keine (Standard)</string>
+    <string name="graph_smoothing_1_minute">1 Minute</string>
+    <string name="graph_smoothing_2_minutes">2 Minuten</string>
+    <string name="graph_smoothing_5_minutes">5 Minuten</string>
     <string name="debug_logs_desc">Trace.log und Logcat anzeigen</string>
     <string name="data_management">Datenverwaltung</string>
     <string name="export_data">Verlauf exportieren</string>

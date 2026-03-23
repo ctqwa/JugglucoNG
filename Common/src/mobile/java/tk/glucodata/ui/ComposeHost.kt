@@ -869,6 +869,7 @@ fun DashboardScreen(
     val unit by viewModel.unit.collectAsStateWithLifecycle()
     val targetLow by viewModel.targetLow.collectAsStateWithLifecycle()
     val targetHigh by viewModel.targetHigh.collectAsStateWithLifecycle()
+    val chartSmoothingMinutes by viewModel.chartSmoothingMinutes.collectAsStateWithLifecycle()
     val sensorStatus by viewModel.sensorStatus.collectAsStateWithLifecycle()
     val sensorProgress by viewModel.sensorProgress.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
@@ -1366,6 +1367,7 @@ fun DashboardScreen(
                     DashboardChartSection(
                         modifier = Modifier.weight(1f).fillMaxSize(),
                         glucoseHistory = glucoseHistory,
+                        graphSmoothingMinutes = chartSmoothingMinutes,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
                         unit = unit,
@@ -1463,6 +1465,7 @@ fun DashboardScreen(
                                 .padding(bottom = 0.dp),
 
                             glucoseHistory = glucoseHistory,
+                            graphSmoothingMinutes = chartSmoothingMinutes,
                             targetLow = targetLow,
                             targetHigh = targetHigh,
                             unit = unit,

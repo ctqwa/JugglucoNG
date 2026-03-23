@@ -473,6 +473,12 @@
     <string name="turbo_desc">请求高连接优先级</string>
     <string name="autoconnect_title">Android (自动连接)</string>
     <string name="autoconnect_desc">使用被动后台连接</string>
+    <string name="graph_smoothing_title">图表平滑</string>
+    <string name="graph_smoothing_desc">平滑仪表板图表线条而不改变已保存读数</string>
+    <string name="graph_smoothing_none">无（默认）</string>
+    <string name="graph_smoothing_1_minute">1 分钟</string>
+    <string name="graph_smoothing_2_minutes">2 分钟</string>
+    <string name="graph_smoothing_5_minutes">5 分钟</string>
     <string name="debug_logs_desc">查看 trace.log 和 logcat</string>
     <string name="data_management">数据管理</string>
     <string name="export_data">导出历史记录</string>

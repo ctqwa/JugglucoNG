@@ -541,6 +541,12 @@
     <string name="turbo_desc">Żąda wysokiego priorytetu połączenia</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Używa pasywnego połączenia w tle</string>
+    <string name="graph_smoothing_title">Wygładzanie wykresu</string>
+    <string name="graph_smoothing_desc">Wygładza linię wykresu na pulpicie bez zmiany zapisanych odczytów</string>
+    <string name="graph_smoothing_none">Brak (domyślnie)</string>
+    <string name="graph_smoothing_1_minute">1 minuta</string>
+    <string name="graph_smoothing_2_minutes">2 minuty</string>
+    <string name="graph_smoothing_5_minutes">5 minut</string>
     <string name="debug_logs_desc">Zobacz trace.log i logcat</string>
     <string name="data_management">Zarządzanie Danymi</string>
     <string name="export_data">Eksportuj Historię</string>

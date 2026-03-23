@@ -127,10 +127,85 @@ import kotlin.math.abs
 import androidx.compose.foundation.layout.Arrangement
 import tk.glucodata.ui.getDisplayValues
 
+private fun smoothChartSeries(
+    points: List<GlucosePoint>,
+    halfWindowMs: Long,
+    selector: (GlucosePoint) -> Float
+): FloatArray {
+    val size = points.size
+    val prefixSums = DoubleArray(size + 1)
+    val prefixCounts = IntArray(size + 1)
+
+    for (index in 0 until size) {
+        val value = selector(points[index])
+        val valid = value.isFinite() && value >= 0.1f
+        prefixSums[index + 1] = prefixSums[index] + if (valid) value.toDouble() else 0.0
+        prefixCounts[index + 1] = prefixCounts[index] + if (valid) 1 else 0
+    }
+
+    val result = FloatArray(size)
+    var windowStart = 0
+    var windowEndExclusive = 0
+
+    for (index in 0 until size) {
+        val original = selector(points[index])
+        if (!original.isFinite() || original < 0.1f) {
+            result[index] = original
+            continue
+        }
+
+        val timestamp = points[index].timestamp
+        val minTime = timestamp - halfWindowMs
+        val maxTime = timestamp + halfWindowMs
+
+        while (windowStart < size && points[windowStart].timestamp < minTime) {
+            windowStart++
+        }
+        while (windowEndExclusive < size && points[windowEndExclusive].timestamp <= maxTime) {
+            windowEndExclusive++
+        }
+
+        val count = prefixCounts[windowEndExclusive] - prefixCounts[windowStart]
+        result[index] = if (count > 0) {
+            ((prefixSums[windowEndExclusive] - prefixSums[windowStart]) / count).toFloat()
+        } else {
+            original
+        }
+    }
+
+    return result
+}
+
+private fun buildSmoothedChartData(
+    points: List<GlucosePoint>,
+    smoothingMinutes: Int
+): List<GlucosePoint> {
+    if (smoothingMinutes <= 0 || points.size < 3) return points
+
+    val halfWindowMs = (smoothingMinutes * 60_000L) / 2L
+    if (halfWindowMs <= 0L) return points
+
+    val smoothedAuto = smoothChartSeries(points, halfWindowMs) { it.value }
+    val smoothedRaw = smoothChartSeries(points, halfWindowMs) { it.rawValue }
+
+    return ArrayList<GlucosePoint>(points.size).apply {
+        points.indices.forEach { index ->
+            val point = points[index]
+            add(
+                point.copy(
+                    value = smoothedAuto[index],
+                    rawValue = smoothedRaw[index]
+                )
+            )
+        }
+    }
+}
+
 @Composable
 fun DashboardChartSection(
     modifier: Modifier,
     glucoseHistory: List<GlucosePoint>,
+    graphSmoothingMinutes: Int = 0,
     targetLow: Float,
     targetHigh: Float,
     unit: String,
@@ -152,6 +227,7 @@ fun DashboardChartSection(
                 if (glucoseHistory.isNotEmpty()) {
                     InteractiveGlucoseChart(
                         fullData = glucoseHistory,
+                        graphSmoothingMinutes = graphSmoothingMinutes,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
                         unit = unit,
@@ -196,6 +272,7 @@ fun DashboardChartSection(
 @Composable
 fun InteractiveGlucoseChart(
     fullData: List<GlucosePoint>,
+    graphSmoothingMinutes: Int = 0,
     targetLow: Float,
     targetHigh: Float,
     unit: String,
@@ -323,6 +400,9 @@ fun InteractiveGlucoseChart(
     // Ensure Fast Random Access for the drawing loop (critical for performance)
     val safeData = remember(fullData) {
         if (fullData is java.util.RandomAccess) fullData else ArrayList(fullData)
+    }
+    val renderData = remember(safeData, graphSmoothingMinutes) {
+        buildSmoothedChartData(safeData, graphSmoothingMinutes)
     }
 
     // --- FORMATTERS & TOOLS (Hoisted for Performance) ---
@@ -1255,6 +1335,7 @@ fun InteractiveGlucoseChart(
 
                     for (i in startIdx until endIdx) {
                         val p = safeData[i]
+                        val renderPoint = renderData[i]
                         // X is shared for all lines at this timestamp
                         val px = (p.timestamp - viewportStart) * timeScale
                         
@@ -1265,14 +1346,14 @@ fun InteractiveGlucoseChart(
                             // FAST PATH DECIMATION: Check X proximity first
                             if (!rawFirst && kotlin.math.abs(px - rawLastX) < 0.8f) {
                                 // If horizontally close, check vertical spike using CHEAP value (raw/auto)
-                                val rawV = p.rawValue
+                                val rawV = renderPoint.rawValue
                                 val rawY = chartHeight - ((rawV - cYMin) * yScale)
                                 if (kotlin.math.abs(rawY - rawLastY) < 1.0f) {
                                     continue // SKIP drawing this point
                                 }
                             }
 
-                            val v = p.rawValue
+                            val v = renderPoint.rawValue
                             if (v.isNaN() || v < 0.1f) {
                                 rawFirst = true
                             } else {
@@ -1302,14 +1383,14 @@ fun InteractiveGlucoseChart(
                         // --- AUTO LINE ---
                         if (drawAuto) {
                             if (!autoFirst && kotlin.math.abs(px - autoLastX) < 0.8f) {
-                                val autoV = p.value
+                                val autoV = renderPoint.value
                                 val autoY = chartHeight - ((autoV - cYMin) * yScale)
                                 if (kotlin.math.abs(autoY - autoLastY) < 1.0f) {
                                     continue
                                 }
                             }
 
-                            val v = p.value
+                            val v = renderPoint.value
                             if (v.isNaN() || v < 0.1f) {
                                 autoFirst = true
                             } else {
@@ -1338,7 +1419,7 @@ fun InteractiveGlucoseChart(
                         
                         // --- CALIBRATION LINE ---
                         if (hasCalibration) {
-                            val baseV = if (isRawModeChart) p.rawValue else p.value
+                            val baseV = if (isRawModeChart) renderPoint.rawValue else renderPoint.value
                             if (!baseV.isFinite() || baseV <= 0.1f) {
                                 calFirst = true
                                 continue

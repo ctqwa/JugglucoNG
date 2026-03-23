@@ -558,6 +558,12 @@
     <string name="turbo_desc">Запрашивает высокий приоритет соединения</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Использует пассивное фоновое соединение</string>
+    <string name="graph_smoothing_title">Сглаживание графика</string>
+    <string name="graph_smoothing_desc">Сглаживает линию графика на главном экране без изменения сохранённых показаний</string>
+    <string name="graph_smoothing_none">Нет (по умолчанию)</string>
+    <string name="graph_smoothing_1_minute">1 минута</string>
+    <string name="graph_smoothing_2_minutes">2 минуты</string>
+    <string name="graph_smoothing_5_minutes">5 минут</string>
     <string name="debug_logs_desc">Просмотр trace.log и logcat</string>
     <string name="data_management">Управление данными</string>
     <string name="export_data">Экспорт истории</string>

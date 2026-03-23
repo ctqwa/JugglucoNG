@@ -91,6 +91,7 @@ fun ExpressiveSettingsScreen(
     val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit)
     val patchedLibreEnabled by viewModel.patchedLibreBroadcastEnabled.collectAsState()
     val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsState()
+    val chartSmoothingMinutes by viewModel.chartSmoothingMinutes.collectAsState()
     val alertsSummary by viewModel.alertsSummary.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
     val isRawCalibrationMode = viewMode == 1 || viewMode == 3
@@ -127,6 +128,7 @@ fun ExpressiveSettingsScreen(
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showFactoryResetDialog by remember { mutableStateOf(false) }
+    var showGraphSmoothingDialog by remember { mutableStateOf(false) }
     var isClearing by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var targetRangeExpanded by rememberSaveable { mutableStateOf(false) }
@@ -144,6 +146,12 @@ fun ExpressiveSettingsScreen(
         ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
         ThemeMode.LIGHT -> stringResource(R.string.theme_light)
         ThemeMode.DARK -> stringResource(R.string.theme_dark)
+    }
+    val graphSmoothingLabel = when (chartSmoothingMinutes) {
+        1 -> stringResource(R.string.graph_smoothing_1_minute)
+        2 -> stringResource(R.string.graph_smoothing_2_minutes)
+        5 -> stringResource(R.string.graph_smoothing_5_minutes)
+        else -> stringResource(R.string.graph_smoothing_none)
     }
 
     LazyColumn(
@@ -386,6 +394,15 @@ fun ExpressiveSettingsScreen(
                     onCheckedChange = { SensorBluetooth.setAutoconnect(it); autoConnect = it }
                 )
                 SettingsItem(
+                    title = stringResource(R.string.graph_smoothing_title),
+                    subtitle = graphSmoothingLabel,
+                    showArrow = true,
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    iconTint = advColor,
+                    position = CardPosition.MIDDLE,
+                    onClick = { showGraphSmoothingDialog = true }
+                )
+                SettingsItem(
                     title = stringResource(R.string.debug_logs),
                     subtitle = stringResource(R.string.debug_logs_desc),
                     showArrow = true,
@@ -509,6 +526,14 @@ fun ExpressiveSettingsScreen(
         context.findActivity()?.hardRestart() 
     }, { showUnitDialog = false })
     if (showThemeDialog) ThemePickerDialog(themeMode, { onThemeChanged(it); showThemeDialog = false }, { showThemeDialog = false })
+    if (showGraphSmoothingDialog) GraphSmoothingPickerDialog(
+        currentMinutes = chartSmoothingMinutes,
+        onSelect = {
+            viewModel.setChartSmoothingMinutes(it)
+            showGraphSmoothingDialog = false
+        },
+        onDismiss = { showGraphSmoothingDialog = false }
+    )
     if (showLanguageDialog) LanguagePickerDialog { showLanguageDialog = false }
     if (showClearHistoryDialog) ConfirmActionDialog(stringResource(R.string.clean_history_confirm), stringResource(R.string.clear_history_desc_long), Icons.Filled.History, { scope.launch { tk.glucodata.data.DataManagement.clearHistory() }; showClearHistoryDialog = false }, { showClearHistoryDialog = false })
     if (showClearDataDialog) ConfirmActionDialog(
@@ -1249,6 +1274,63 @@ private fun ThemePickerDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit,
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GraphSmoothingPickerDialog(
+    currentMinutes: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(
+        stringResource(R.string.graph_smoothing_none) to 0,
+        stringResource(R.string.graph_smoothing_1_minute) to 1,
+        stringResource(R.string.graph_smoothing_2_minutes) to 2,
+        stringResource(R.string.graph_smoothing_5_minutes) to 5
+    )
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                Text(
+                    text = stringResource(R.string.graph_smoothing_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+                Text(
+                    text = stringResource(R.string.graph_smoothing_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                )
+                options.forEach { (label, value) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .clickable { onSelect(value) }
+                            .padding(horizontal = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = currentMinutes == value, onClick = null)
+                        Spacer(Modifier.width(16.dp))
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }

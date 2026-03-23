@@ -419,6 +419,12 @@
     <string name="turbo_desc">Запытвае высокі прыярытэт злучэння</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Выкарыстоўвае пасіўнае фонавае злучэнне</string>
+    <string name="graph_smoothing_title">Згладжванне графіка</string>
+    <string name="graph_smoothing_desc">Згладжвае лінію графіка на панэлі без змены захаваных паказанняў</string>
+    <string name="graph_smoothing_none">Няма (па змаўчанні)</string>
+    <string name="graph_smoothing_1_minute">1 хвіліна</string>
+    <string name="graph_smoothing_2_minutes">2 хвіліны</string>
+    <string name="graph_smoothing_5_minutes">5 хвілін</string>
     <string name="debug_logs_desc">Прагляд trace.log і logcat</string>
     <string name="data_management">Кіраванне Дадзенымі</string>
     <string name="export_data">Экспарт Гісторыі</string>

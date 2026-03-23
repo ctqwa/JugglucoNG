@@ -413,6 +413,12 @@
     <string name="turbo_desc">Demande une haute priorité de connexion</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Utilise une connexion passive en arrière-plan</string>
+    <string name="graph_smoothing_title">Lissage du graphique</string>
+    <string name="graph_smoothing_desc">Lisse la courbe du tableau de bord sans modifier les mesures enregistrées</string>
+    <string name="graph_smoothing_none">Aucun (par défaut)</string>
+    <string name="graph_smoothing_1_minute">1 minute</string>
+    <string name="graph_smoothing_2_minutes">2 minutes</string>
+    <string name="graph_smoothing_5_minutes">5 minutes</string>
     <string name="debug_logs_desc">Voir traces et logcat</string>
     <string name="data_management">Gestion des Données</string>
     <string name="export_data">Exporter Historique</string>

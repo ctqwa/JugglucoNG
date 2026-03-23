@@ -544,6 +544,12 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="turbo_desc">Vraagt hoge verbindingsprioriteit</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Gebruikt passieve achtergrondverbinding</string>
+    <string name="graph_smoothing_title">Grafiekafvlakking</string>
+    <string name="graph_smoothing_desc">Vlakt de dashboardlijn af zonder opgeslagen metingen te wijzigen</string>
+    <string name="graph_smoothing_none">Geen (standaard)</string>
+    <string name="graph_smoothing_1_minute">1 minuut</string>
+    <string name="graph_smoothing_2_minutes">2 minuten</string>
+    <string name="graph_smoothing_5_minutes">5 minuten</string>
     <string name="debug_logs_desc">Bekijk trace.log en logcat</string>
     <string name="data_management">Gegevensbeheer</string>
     <string name="export_data">Geschiedenis exporteren</string>

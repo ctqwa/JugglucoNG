@@ -339,6 +339,12 @@
     <string name="turbo_desc">Richiede alta priorità connessione</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Usa connessione passiva in background</string>
+    <string name="graph_smoothing_title">Smussamento grafico</string>
+    <string name="graph_smoothing_desc">Smussa la linea del dashboard senza modificare le letture salvate</string>
+    <string name="graph_smoothing_none">Nessuno (predefinito)</string>
+    <string name="graph_smoothing_1_minute">1 minuto</string>
+    <string name="graph_smoothing_2_minutes">2 minuti</string>
+    <string name="graph_smoothing_5_minutes">5 minuti</string>
     <string name="debug_logs_desc">Vedi trace.log e logcat</string>
     <string name="data_management">Gestione Dati</string>
     <string name="export_data">Esporta Cronologia</string>

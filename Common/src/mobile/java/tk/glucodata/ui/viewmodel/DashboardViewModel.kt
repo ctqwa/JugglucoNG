@@ -107,6 +107,9 @@ class DashboardViewModel(
     private val _notificationChartEnabled = MutableStateFlow(true)
     val notificationChartEnabled = _notificationChartEnabled.asStateFlow()
 
+    private val _chartSmoothingMinutes = MutableStateFlow(0)
+    val chartSmoothingMinutes = _chartSmoothingMinutes.asStateFlow()
+
     private val _lowAlarmSoundMode = MutableStateFlow(0)
     val lowAlarmSoundMode = _lowAlarmSoundMode.asStateFlow()
 
@@ -224,6 +227,7 @@ class DashboardViewModel(
             val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
             migrateTargetRangeDefaultsIfNeeded(prefs, isMmol)
             _notificationChartEnabled.value = prefs.getBoolean("notification_chart_enabled", true)
+            _chartSmoothingMinutes.value = prefs.getInt("dashboard_chart_smoothing_minutes", 0)
             
             _targetLow.value = Natives.targetlow()
             _targetHigh.value = Natives.targethigh()
@@ -512,6 +516,19 @@ class DashboardViewModel(
         
         // Force update notification to reflect change immediately
         tk.glucodata.Notify.showoldglucose()
+    }
+
+    fun setChartSmoothingMinutes(minutes: Int) {
+        val sanitized = minutes.coerceIn(0, 5).let {
+            when (it) {
+                1, 2, 5 -> it
+                else -> 0
+            }
+        }
+        val context = tk.glucodata.Applic.app
+        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putInt("dashboard_chart_smoothing_minutes", sanitized).apply()
+        _chartSmoothingMinutes.value = sanitized
     }
 
     // Floating Glucose Logic

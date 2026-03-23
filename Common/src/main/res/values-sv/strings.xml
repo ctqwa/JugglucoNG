@@ -467,6 +467,12 @@
     <string name="turbo_desc">Begär hög anslutningsprioritet</string>
     <string name="autoconnect_title">Android (AutoConnect)</string>
     <string name="autoconnect_desc">Använder passiv bakgrundsanslutning</string>
+    <string name="graph_smoothing_title">Diagramutjämning</string>
+    <string name="graph_smoothing_desc">Jämnar ut dashboardlinjen utan att ändra sparade avläsningar</string>
+    <string name="graph_smoothing_none">Ingen (standard)</string>
+    <string name="graph_smoothing_1_minute">1 minut</string>
+    <string name="graph_smoothing_2_minutes">2 minuter</string>
+    <string name="graph_smoothing_5_minutes">5 minuter</string>
     <string name="debug_logs_desc">Se trace.log och logcat</string>
     <string name="data_management">Datahantering</string>
     <string name="export_data">Exportera Historik</string>

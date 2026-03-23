@@ -718,6 +718,12 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="turbo_desc">Requests high connection priority</string>
     <string name="autoconnect_title">AutoConnect</string>
     <string name="autoconnect_desc">Uses passive background connection</string>
+    <string name="graph_smoothing_title">Graph smoothing</string>
+    <string name="graph_smoothing_desc">Smooth the dashboard chart line without changing stored readings</string>
+    <string name="graph_smoothing_none">None (default)</string>
+    <string name="graph_smoothing_1_minute">1 minute</string>
+    <string name="graph_smoothing_2_minutes">2 minutes</string>
+    <string name="graph_smoothing_5_minutes">5 minutes</string>
     <string name="debug_logs_desc">View trace.log and logcat</string>
 
     

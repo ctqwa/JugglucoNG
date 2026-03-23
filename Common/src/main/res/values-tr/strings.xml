@@ -518,6 +518,12 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="turbo_desc">Yüksek bağlantı önceliği ister</string>
     <string name="autoconnect_title">Android (Otomatik Bağlan)</string>
     <string name="autoconnect_desc">Pasif arka plan bağlantısı kullanır</string>
+    <string name="graph_smoothing_title">Grafik yumuşatma</string>
+    <string name="graph_smoothing_desc">Kaydedilen ölçümleri değiştirmeden pano çizgisini yumuşatır</string>
+    <string name="graph_smoothing_none">Yok (varsayılan)</string>
+    <string name="graph_smoothing_1_minute">1 dakika</string>
+    <string name="graph_smoothing_2_minutes">2 dakika</string>
+    <string name="graph_smoothing_5_minutes">5 dakika</string>
     <string name="debug_logs_desc">trace.log ve logcat\'i görüntüle</string>
     <string name="data_management">Veri Yönetimi</string>
     <string name="export_data">Geçmişi Dışa Aktar</string>
