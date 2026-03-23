@@ -419,7 +419,7 @@ class HistoryRepository(context: Context = Applic.app) {
     }
 
     private fun mapReadings(readings: List<HistoryReading>): List<GlucosePoint> {
-        return HistoryDisplayPolicy.coalesceDisplayReadings(readings).map { reading ->
+        return readings.map { reading ->
             GlucosePoint(
                 value = reading.value,
                 time = formatTime(reading.timestamp),
@@ -427,7 +427,7 @@ class HistoryRepository(context: Context = Applic.app) {
                 rawValue = reading.rawValue,
                 rate = reading.rate
             )
-        }
+        }.distinctBy { it.timestamp }
     }
 
     private fun formatTime(timestamp: Long): String =
