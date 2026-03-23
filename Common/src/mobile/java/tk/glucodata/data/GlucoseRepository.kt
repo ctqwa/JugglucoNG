@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import android.util.Log
+import android.os.SystemClock
 import tk.glucodata.Applic
 import tk.glucodata.BatteryTrace
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,7 +53,11 @@ class GlucoseRepository {
     
     companion object {
         private const val TAG = "GlucoseRepo"
+        private const val ONE_SHOT_SYNC_MIN_INTERVAL_MS = 5_000L
     }
+
+    @Volatile
+    private var lastOneShotSyncStartedAtMs = 0L
 
     /**
      * Get the current reading for the main sensor.
@@ -100,6 +105,14 @@ class GlucoseRepository {
     }
 
     suspend fun syncLatestNativeReadingOnce() {
+        val nowMs = SystemClock.elapsedRealtime()
+        synchronized(this) {
+            if ((nowMs - lastOneShotSyncStartedAtMs) < ONE_SHOT_SYNC_MIN_INTERVAL_MS) {
+                Log.d(TAG, "syncLatestNativeReadingOnce skipped — last run was ${(nowMs - lastOneShotSyncStartedAtMs)}ms ago")
+                return
+            }
+            lastOneShotSyncStartedAtMs = nowMs
+        }
         BatteryTrace.bump("glucose.native.one_shot_sync", logEvery = 20L)
         pollNativeAndStore()
     }

@@ -2,7 +2,7 @@ package tk.glucodata.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import android.os.SystemClock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +24,7 @@ class DashboardViewModel(
     private companion object {
         const val TARGET_RANGE_DEFAULTS_MIGRATION_KEY = "target_range_defaults_v2"
         const val DASHBOARD_HISTORY_WINDOW_MS = 72L * 60L * 60L * 1000L
+        const val UI_RECOVERY_SYNC_MIN_INTERVAL_MS = 30_000L
     }
 
     enum class CollectionMode {
@@ -34,6 +35,9 @@ class DashboardViewModel(
 
     private val _currentGlucose = MutableStateFlow("---")
     val currentGlucose = _currentGlucose.asStateFlow()
+
+    @Volatile
+    private var lastUiRecoverySyncAtMs = 0L
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading = _isLoading.asStateFlow()
@@ -119,14 +123,9 @@ class DashboardViewModel(
     private var activeHistoryStartTimeMs: Long? = null
 
     init {
-        // Keep initial UI boot light; do heavy history sync right after initial render window.
+        // Keep initial UI boot light. Room backfill/targeted sensor sync now cover cold start,
+        // so do not force a full native history rebuild during app startup.
         refreshData(syncHistory = false)
-        viewModelScope.launch {
-            delay(1200L)
-            if (collectionMode != CollectionMode.INACTIVE) {
-                HistorySync.syncFromNative()
-            }
-        }
     }
     
     /**
@@ -143,8 +142,7 @@ class DashboardViewModel(
             ensureCurrentReadingCollection()
             startHistoryCollectionForMode(collectionMode)
             viewModelScope.launch {
-                glucoseRepository.syncLatestNativeReadingOnce()
-                HistorySync.syncFromNative()
+                requestUiRecoverySync()
             }
         }
     }
@@ -161,10 +159,25 @@ class DashboardViewModel(
                 ensureCurrentReadingCollection()
                 startHistoryCollectionForMode(mode)
                 viewModelScope.launch {
-                    glucoseRepository.syncLatestNativeReadingOnce()
+                    requestUiRecoverySync()
                 }
             }
         }
+    }
+
+    private suspend fun requestUiRecoverySync() {
+        val nowMs = SystemClock.elapsedRealtime()
+        synchronized(this) {
+            if ((nowMs - lastUiRecoverySyncAtMs) < UI_RECOVERY_SYNC_MIN_INTERVAL_MS) {
+                android.util.Log.d(
+                    "DashboardVM",
+                    "requestUiRecoverySync skipped — last run was ${(nowMs - lastUiRecoverySyncAtMs)}ms ago"
+                )
+                return
+            }
+            lastUiRecoverySyncAtMs = nowMs
+        }
+        glucoseRepository.syncLatestNativeReadingOnce()
     }
 
     private fun ensureUiRefreshCollection() {
