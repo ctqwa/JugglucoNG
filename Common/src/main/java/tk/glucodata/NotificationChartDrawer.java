@@ -15,95 +15,8 @@ import java.util.Calendar;
 import java.util.List;
 
 public class NotificationChartDrawer {
-    private static final String PREFS_NAME = "tk.glucodata_preferences";
-    private static final String CHART_SMOOTHING_KEY = "dashboard_chart_smoothing_minutes";
     private static final int DASHBOARD_LOW_COLOR = 0xFFE7C85A;
     private static final int DASHBOARD_HIGH_COLOR = 0xFFC56F33;
-
-    private static int getChartSmoothingMinutes(Context context) {
-        try {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            int smoothing = prefs.getInt(CHART_SMOOTHING_KEY, 0);
-            switch (smoothing) {
-                case 2:
-                case 3:
-                case 5:
-                case 7:
-                    return smoothing;
-                default:
-                    return 0;
-            }
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    private static float[] smoothChartSeries(List<GlucosePoint> points, long halfWindowMs, boolean useRawValue) {
-        int size = points.size();
-        double[] prefixSums = new double[size + 1];
-        int[] prefixCounts = new int[size + 1];
-
-        for (int index = 0; index < size; index++) {
-            GlucosePoint point = points.get(index);
-            float value = useRawValue ? point.rawValue : point.value;
-            boolean valid = Float.isFinite(value) && value >= 0.1f;
-            prefixSums[index + 1] = prefixSums[index] + (valid ? value : 0.0);
-            prefixCounts[index + 1] = prefixCounts[index] + (valid ? 1 : 0);
-        }
-
-        float[] result = new float[size];
-        int windowStart = 0;
-        int windowEndExclusive = 0;
-
-        for (int index = 0; index < size; index++) {
-            GlucosePoint point = points.get(index);
-            float original = useRawValue ? point.rawValue : point.value;
-            if (!Float.isFinite(original) || original < 0.1f) {
-                result[index] = original;
-                continue;
-            }
-
-            long timestamp = point.timestamp;
-            long minTime = timestamp - halfWindowMs;
-            long maxTime = timestamp + halfWindowMs;
-
-            while (windowStart < size && points.get(windowStart).timestamp < minTime) {
-                windowStart++;
-            }
-            while (windowEndExclusive < size && points.get(windowEndExclusive).timestamp <= maxTime) {
-                windowEndExclusive++;
-            }
-
-            int count = prefixCounts[windowEndExclusive] - prefixCounts[windowStart];
-            result[index] = count > 0
-                    ? (float) ((prefixSums[windowEndExclusive] - prefixSums[windowStart]) / count)
-                    : original;
-        }
-
-        return result;
-    }
-
-    private static List<GlucosePoint> buildSmoothedChartData(List<GlucosePoint> points, int smoothingMinutes) {
-        if (smoothingMinutes <= 0 || points == null || points.size() < 3) {
-            return points;
-        }
-
-        long halfWindowMs = (smoothingMinutes * 60_000L) / 2L;
-        if (halfWindowMs <= 0L) {
-            return points;
-        }
-
-        float[] smoothedAuto = smoothChartSeries(points, halfWindowMs, false);
-        float[] smoothedRaw = smoothChartSeries(points, halfWindowMs, true);
-        ArrayList<GlucosePoint> result = new ArrayList<>(points.size());
-        for (int index = 0; index < points.size(); index++) {
-            GlucosePoint point = points.get(index);
-            GlucosePoint smoothedPoint = new GlucosePoint(point.timestamp, smoothedAuto[index], smoothedRaw[index]);
-            smoothedPoint.color = point.color;
-            result.add(smoothedPoint);
-        }
-        return result;
-    }
 
     private static int resolveThresholdSegmentColor(float startValue, float endValue, float targetLow, float targetHigh,
             int inRangeColor) {
@@ -617,22 +530,27 @@ public class NotificationChartDrawer {
         long duration = 3 * 60 * 60 * 1000L;
         long startTime = now - duration;
 
-        int smoothingMinutes = getChartSmoothingMinutes(context);
-        List<GlucosePoint> renderSource = buildSmoothedChartData(data, smoothingMinutes);
+        int smoothingMinutes = DataSmoothing.getMinutes(context);
+        List<GlucosePoint> renderSource = DataSmoothing.smoothNativePoints(
+                data,
+                smoothingMinutes,
+                DataSmoothing.collapseChunks(context)
+        );
 
         // Filter data to visible range
         List<GlucosePoint> visiblePoints = new ArrayList<>();
         List<GlucosePoint> visibleRenderPoints = new ArrayList<>();
         if (data != null) {
-            for (int index = 0; index < data.size(); index++) {
-                GlucosePoint p = data.get(index);
+            for (GlucosePoint p : data) {
                 if (p.timestamp >= startTime) {
                     visiblePoints.add(p);
-                    if (renderSource != null && index < renderSource.size()) {
-                        visibleRenderPoints.add(renderSource.get(index));
-                    } else {
-                        visibleRenderPoints.add(p);
-                    }
+                }
+            }
+        }
+        if (renderSource != null) {
+            for (GlucosePoint p : renderSource) {
+                if (p.timestamp >= startTime) {
+                    visibleRenderPoints.add(p);
                 }
             }
         }

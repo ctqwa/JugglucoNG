@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import tk.glucodata.Natives
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.BatteryTrace
+import tk.glucodata.CurrentDisplaySource
+import tk.glucodata.DataSmoothing
+import tk.glucodata.Notify
 import tk.glucodata.data.GlucoseRepository
 import tk.glucodata.data.HistorySync
 import tk.glucodata.alerts.AlertRepository
@@ -110,6 +113,12 @@ class DashboardViewModel(
     private val _chartSmoothingMinutes = MutableStateFlow(0)
     val chartSmoothingMinutes = _chartSmoothingMinutes.asStateFlow()
 
+    private val _dataSmoothingGraphOnly = MutableStateFlow(true)
+    val dataSmoothingGraphOnly = _dataSmoothingGraphOnly.asStateFlow()
+
+    private val _dataSmoothingCollapseChunks = MutableStateFlow(false)
+    val dataSmoothingCollapseChunks = _dataSmoothingCollapseChunks.asStateFlow()
+
     private val _previewWindowMode = MutableStateFlow(0)
     val previewWindowMode = _previewWindowMode.asStateFlow()
 
@@ -203,6 +212,14 @@ class DashboardViewModel(
         currentReadingJob = viewModelScope.launch {
             glucoseRepository.getCurrentReading().collect { point ->
                 if (point != null) {
+                    if (_chartSmoothingMinutes.value > 0) {
+                        val resolved = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)
+                        if (resolved != null) {
+                            _currentGlucose.value = resolved.primaryStr
+                            _currentRate.value = resolved.rate.takeIf { it.isFinite() } ?: 0f
+                            return@collect
+                        }
+                    }
                     val valueToDisplay = if (viewMode.value == 1 || viewMode.value == 3) point.rawValue else point.value
                     _currentGlucose.value = if (valueToDisplay < 30) String.format("%.1f", valueToDisplay) else valueToDisplay.toInt().toString()
                     _currentRate.value = point.rate ?: 0f
@@ -230,7 +247,9 @@ class DashboardViewModel(
             val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
             migrateTargetRangeDefaultsIfNeeded(prefs, isMmol)
             _notificationChartEnabled.value = prefs.getBoolean("notification_chart_enabled", true)
-            _chartSmoothingMinutes.value = prefs.getInt("dashboard_chart_smoothing_minutes", 0)
+            _chartSmoothingMinutes.value = DataSmoothing.getMinutes(context)
+            _dataSmoothingGraphOnly.value = DataSmoothing.isGraphOnly(context)
+            _dataSmoothingCollapseChunks.value = DataSmoothing.collapseChunks(context)
             _previewWindowMode.value = prefs.getInt("dashboard_chart_preview_window_mode", 0)
             
             _targetLow.value = Natives.targetlow()
@@ -523,16 +542,25 @@ class DashboardViewModel(
     }
 
     fun setChartSmoothingMinutes(minutes: Int) {
-        val sanitized = minutes.coerceIn(0, 7).let {
-            when (it) {
-                2, 3, 5, 7 -> it
-                else -> 0
-            }
-        }
         val context = tk.glucodata.Applic.app
-        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putInt("dashboard_chart_smoothing_minutes", sanitized).apply()
+        val sanitized = DataSmoothing.sanitizeMinutes(minutes)
+        DataSmoothing.setMinutes(context, sanitized)
         _chartSmoothingMinutes.value = sanitized
+        refreshSmoothedCurrentDisplayIfNeeded()
+    }
+
+    fun setDataSmoothingGraphOnly(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        DataSmoothing.setGraphOnly(context, enabled)
+        _dataSmoothingGraphOnly.value = enabled
+        refreshSmoothedCurrentDisplayIfNeeded()
+    }
+
+    fun setDataSmoothingCollapseChunks(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        DataSmoothing.setCollapseChunks(context, enabled)
+        _dataSmoothingCollapseChunks.value = enabled
+        refreshSmoothedCurrentDisplayIfNeeded()
     }
 
     fun setPreviewWindowMode(mode: Int) {
@@ -587,5 +615,14 @@ class DashboardViewModel(
         }
 
         prefs.edit().putBoolean(TARGET_RANGE_DEFAULTS_MIGRATION_KEY, true).apply()
+    }
+
+    private fun refreshSmoothedCurrentDisplayIfNeeded() {
+        if (_chartSmoothingMinutes.value > 0) {
+            CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout)?.let { resolved ->
+                _currentGlucose.value = resolved.primaryStr
+                _currentRate.value = resolved.rate.takeIf { it.isFinite() } ?: 0f
+            }
+        }
     }
 }

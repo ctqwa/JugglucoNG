@@ -186,7 +186,8 @@ private fun smoothChartSeries(
 
 private fun buildSmoothedChartData(
     points: List<GlucosePoint>,
-    smoothingMinutes: Int
+    smoothingMinutes: Int,
+    collapseIntoChunks: Boolean
 ): List<GlucosePoint> {
     if (smoothingMinutes <= 0 || points.size < 3) return points
 
@@ -196,7 +197,7 @@ private fun buildSmoothedChartData(
     val smoothedAuto = smoothChartSeries(points, halfWindowMs) { it.value }
     val smoothedRaw = smoothChartSeries(points, halfWindowMs) { it.rawValue }
 
-    return ArrayList<GlucosePoint>(points.size).apply {
+    val smoothed = ArrayList<GlucosePoint>(points.size).apply {
         points.indices.forEach { index ->
             val point = points[index]
             add(
@@ -207,12 +208,40 @@ private fun buildSmoothedChartData(
             )
         }
     }
+    return if (collapseIntoChunks) {
+        collapseSmoothedChartData(smoothed, smoothingMinutes)
+    } else {
+        smoothed
+    }
+}
+
+private fun collapseSmoothedChartData(
+    points: List<GlucosePoint>,
+    smoothingMinutes: Int
+): List<GlucosePoint> {
+    if (points.size < 3 || smoothingMinutes <= 0) return points
+    val bucketDurationMs = smoothingMinutes * 60_000L
+    val firstTimestamp = points.firstOrNull()?.timestamp ?: return points
+    val collapsed = ArrayList<GlucosePoint>()
+    var activeBucket = Long.MIN_VALUE
+    var pending: GlucosePoint? = null
+
+    points.forEach { point ->
+        val bucket = ((point.timestamp - firstTimestamp).coerceAtLeast(0L)) / bucketDurationMs
+        if (bucket != activeBucket) {
+            pending?.let(collapsed::add)
+            activeBucket = bucket
+        }
+        pending = point
+    }
+
+    pending?.let(collapsed::add)
+    return if (collapsed.isEmpty()) points else collapsed
 }
 
 @Composable
 private fun PreviewWindowNavigator(
     modifier: Modifier = Modifier,
-    data: List<GlucosePoint>,
     renderData: List<GlucosePoint>,
     previewCenterTime: Long,
     viewMode: Int,
@@ -236,14 +265,13 @@ private fun PreviewWindowNavigator(
     val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(viewMode == 1 || viewMode == 3)
 
     fun activeValue(index: Int): Float {
-        val sourcePoint = data[index]
         val renderPoint = renderData[index]
         val isRawMode = viewMode == 1 || viewMode == 3
         val baseValue = if (isRawMode) renderPoint.rawValue else renderPoint.value
         return if (hasCalibration && baseValue.isFinite() && baseValue > 0.1f) {
             tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(
                 baseValue,
-                sourcePoint.timestamp,
+                renderPoint.timestamp,
                 isRawMode
             )
         } else {
@@ -277,14 +305,14 @@ private fun PreviewWindowNavigator(
                     .fillMaxSize()
                     .padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
-                if (data.isEmpty()) return@Canvas
+                if (renderData.isEmpty()) return@Canvas
 
-                val startIdx = data.binarySearchBy(previewStart) { it.timestamp }
+                val startIdx = renderData.binarySearchBy(previewStart) { it.timestamp }
                     .let { if (it < 0) -it - 2 else it }
-                    .coerceIn(0, data.lastIndex)
-                val endExclusive = data.binarySearchBy(previewEnd) { it.timestamp }
+                    .coerceIn(0, renderData.lastIndex)
+                val endExclusive = renderData.binarySearchBy(previewEnd) { it.timestamp }
                     .let { if (it < 0) -it else it + 1 }
-                    .coerceIn(startIdx + 1, data.size)
+                    .coerceIn(startIdx + 1, renderData.size)
 
                 var minValue = targetLow
                 var maxValue = targetHigh
@@ -332,7 +360,7 @@ private fun PreviewWindowNavigator(
                         started = false
                         continue
                     }
-                    val timestamp = data[index].timestamp
+                    val timestamp = renderData[index].timestamp
                     val x = timeToX(timestamp)
                     val y = valueToY(value).coerceIn(-64f, heightPx + 64f)
                     if (!started || (timestamp - lastTimestamp) > gapThreshold) {
@@ -395,6 +423,7 @@ fun DashboardChartSection(
     modifier: Modifier,
     glucoseHistory: List<GlucosePoint>,
     graphSmoothingMinutes: Int = 0,
+    collapseSmoothedData: Boolean = false,
     previewWindowMode: Int = 0,
     targetLow: Float,
     targetHigh: Float,
@@ -418,6 +447,7 @@ fun DashboardChartSection(
                     InteractiveGlucoseChart(
                         fullData = glucoseHistory,
                         graphSmoothingMinutes = graphSmoothingMinutes,
+                        collapseSmoothedData = collapseSmoothedData,
                         previewWindowMode = previewWindowMode,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
@@ -464,6 +494,7 @@ fun DashboardChartSection(
 fun InteractiveGlucoseChart(
     fullData: List<GlucosePoint>,
     graphSmoothingMinutes: Int = 0,
+    collapseSmoothedData: Boolean = false,
     previewWindowMode: Int = 0,
     targetLow: Float,
     targetHigh: Float,
@@ -601,8 +632,11 @@ fun InteractiveGlucoseChart(
     val safeData = remember(fullData) {
         if (fullData is java.util.RandomAccess) fullData else ArrayList(fullData)
     }
-    val renderData = remember(safeData, graphSmoothingMinutes) {
-        buildSmoothedChartData(safeData, graphSmoothingMinutes)
+    val renderData = remember(safeData, graphSmoothingMinutes, collapseSmoothedData) {
+        buildSmoothedChartData(safeData, graphSmoothingMinutes, collapseSmoothedData)
+    }
+    val interactionData = remember(safeData, renderData, graphSmoothingMinutes) {
+        if (graphSmoothingMinutes > 0) renderData else safeData
     }
 
     // --- FORMATTERS & TOOLS (Hoisted for Performance) ---
@@ -902,11 +936,12 @@ fun InteractiveGlucoseChart(
     // --- DATA CAPTURE FOR GESTURES ---
     // Use rememberUpdatedState to ensure the running gesture coroutine always sees the latest data
     val currentSafeData by rememberUpdatedState(safeData)
+    val currentInteractionData by rememberUpdatedState(interactionData)
     val currentViewMode by rememberUpdatedState(viewMode)
 
     // --- DATA HELPER (Fixed Interpolation) ---
     fun getPointAt(timeAtTapRaw: Double): GlucosePoint? {
-        val data = currentSafeData // Always use fresh data
+        val data = currentInteractionData
         val minuteInMillis = 60000.0
         val snappedTime = (kotlin.math.round(timeAtTapRaw / minuteInMillis) * minuteInMillis).toLong()
 
@@ -933,6 +968,25 @@ fun InteractiveGlucoseChart(
         val p1 = data[insPoint - 1]
         val p2 = data[insPoint]
         return if (kotlin.math.abs(p1.timestamp - snappedTime) < kotlin.math.abs(p2.timestamp - snappedTime)) p1 else p2
+    }
+
+    fun getSourcePointAt(timestamp: Long): GlucosePoint? {
+        val data = currentSafeData
+        if (data.isEmpty()) return null
+        val index = data.binarySearchBy(timestamp) { it.timestamp }
+        if (index >= 0) {
+            return data[index]
+        }
+        val insertionPoint = -index - 1
+        if (insertionPoint >= data.size) return data.lastOrNull()
+        if (insertionPoint <= 0) return data.firstOrNull()
+        val before = data[insertionPoint - 1]
+        val after = data[insertionPoint]
+        return if (kotlin.math.abs(before.timestamp - timestamp) <= kotlin.math.abs(after.timestamp - timestamp)) {
+            before
+        } else {
+            after
+        }
     }
 
     fun performScrubHaptic(point: GlucosePoint?) {
@@ -1448,7 +1502,7 @@ fun InteractiveGlucoseChart(
                 val viewportEnd = centerTime + currentDur / 2
                 
                 // Data Access (Strict Guards)
-                if (safeData.isEmpty()) return@Canvas
+                if (renderData.isEmpty()) return@Canvas
 
                 // 2. SEARCH RANGE (With ample padding to prevent popping)
                 val padding = currentDur / 2 // 50% padding on each side
@@ -1459,14 +1513,14 @@ fun InteractiveGlucoseChart(
                 // binarySearchBy returns: index if found, or -(insertion point) - 1
                 // Calculate visible range indices with padding for connecting lines
                 // startIdx: Include point just BEFORE viewport start
-                val startIdx = safeData.binarySearchBy(searchStart) { it.timestamp }
+                val startIdx = renderData.binarySearchBy(searchStart) { it.timestamp }
                     .let { if (it < 0) -it - 2 else it } // if not found, insertion point - 1
-                    .coerceIn(0, safeData.size)
+                    .coerceIn(0, renderData.size)
                 
                 // endIdx: Include point just AFTER viewport end (for exclusive loop)
-                val endIdx = safeData.binarySearchBy(searchEnd) { it.timestamp }
+                val endIdx = renderData.binarySearchBy(searchEnd) { it.timestamp }
                     .let { if (it < 0) -it else it + 1 } // if not found, insertion point + 1
-                    .coerceIn(startIdx, safeData.size)
+                    .coerceIn(startIdx, renderData.size)
 
                 // 4. COORDINATE MAPPING (Inline for performance)
                 // Maps timestamp to X relative to CURRENT viewport
@@ -1654,10 +1708,9 @@ fun InteractiveGlucoseChart(
                     val strokeJoin = StrokeJoin.Round
 
                     for (i in startIdx until endIdx) {
-                        val p = safeData[i]
                         val renderPoint = renderData[i]
                         // X is shared for all lines at this timestamp
-                        val px = (p.timestamp - viewportStart) * timeScale
+                        val px = (renderPoint.timestamp - viewportStart) * timeScale
                         
                         if (!px.isFinite()) continue
 
@@ -1683,7 +1736,7 @@ fun InteractiveGlucoseChart(
                                 if (!py.isFinite()) {
                                     rawFirst = true
                                 } else {
-                                    if (!rawFirst && (p.timestamp - rawLastTimestamp) > gapThreshold) {
+                                    if (!rawFirst && (renderPoint.timestamp - rawLastTimestamp) > gapThreshold) {
                                         rawFirst = true
                                     }
                                     
@@ -1695,7 +1748,7 @@ fun InteractiveGlucoseChart(
                                     }
                                     rawLastX = px
                                     rawLastY = py
-                                    rawLastTimestamp = p.timestamp
+                                    rawLastTimestamp = renderPoint.timestamp
                                 }
                             }
                         }
@@ -1720,7 +1773,7 @@ fun InteractiveGlucoseChart(
                                 if (!py.isFinite()) {
                                     autoFirst = true
                                 } else {
-                                    if (!autoFirst && (p.timestamp - autoLastTimestamp) > gapThreshold) {
+                                    if (!autoFirst && (renderPoint.timestamp - autoLastTimestamp) > gapThreshold) {
                                         autoFirst = true
                                     }
                                     
@@ -1732,7 +1785,7 @@ fun InteractiveGlucoseChart(
                                     }
                                     autoLastX = px
                                     autoLastY = py
-                                    autoLastTimestamp = p.timestamp
+                                    autoLastTimestamp = renderPoint.timestamp
                                 }
                             }
                         }
@@ -1751,7 +1804,11 @@ fun InteractiveGlucoseChart(
                                 }
                             }
 
-                            val v = tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(baseV, p.timestamp, isRawModeChart)
+                            val v = tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(
+                                baseV,
+                                renderPoint.timestamp,
+                                isRawModeChart
+                            )
                             
                             if (v.isNaN() || v < 0.1f) {
                                 calFirst = true
@@ -1762,7 +1819,7 @@ fun InteractiveGlucoseChart(
                                 if (!py.isFinite()) {
                                     calFirst = true
                                 } else {
-                                    if (!calFirst && (p.timestamp - calLastTimestamp) > gapThreshold) {
+                                    if (!calFirst && (renderPoint.timestamp - calLastTimestamp) > gapThreshold) {
                                         calFirst = true
                                     }
                                     
@@ -1774,7 +1831,7 @@ fun InteractiveGlucoseChart(
                                     }
                                     calLastX = px
                                     calLastY = py
-                                    calLastTimestamp = p.timestamp
+                                    calLastTimestamp = renderPoint.timestamp
                                 }
                             }
                         }
@@ -1808,14 +1865,14 @@ fun InteractiveGlucoseChart(
 
                 // --- 4. MIN/MAX INDICATORS (Restored & Optimized) ---
                 if (endIdx > startIdx) {
-                    var minPoint = safeData[startIdx]
-                    var maxPoint = safeData[startIdx]
+                    var minPoint = renderData[startIdx]
+                    var maxPoint = renderData[startIdx]
                     var minVal = Float.MAX_VALUE
                     var maxVal = Float.MIN_VALUE
 
                     // Single fast pass for min/max
                     for (i in startIdx until endIdx) {
-                        val p = safeData[i]
+                        val p = renderData[i]
                         // Determine value based on mode commonality
                         // If showing Raw (Mode 1) or Raw-Primary (Mode 3), prioritize Raw
                         val useRaw = viewMode == 1 || viewMode == 3
@@ -2038,7 +2095,7 @@ fun InteractiveGlucoseChart(
                                 onDragCancel = { isAdjustingScrubLabel = false }
                             )
                         }
-                        .clickable { onPointClick?.invoke(point) },
+                        .clickable { onPointClick?.invoke(getSourcePointAt(point.timestamp) ?: point) },
                     shape = cardShape,
                     color = statusCardColor.copy(alpha = 1f),
                     contentColor = statusContentColor.copy(alpha = 1f),
@@ -2337,7 +2394,6 @@ fun InteractiveGlucoseChart(
             ) {
                 PreviewWindowNavigator(
                     modifier = Modifier.fillMaxWidth(),
-                    data = safeData,
                     renderData = renderData,
                     previewCenterTime = previewCenterTime,
                     viewMode = viewMode,

@@ -714,6 +714,9 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     composable("settings/notification-display") {
                         NotificationSettingsScreen(navController, dashboardViewModel)
                     }
+                    composable("settings/data-smoothing") {
+                        DataSmoothingSettingsScreen(navController, dashboardViewModel)
+                    }
                     composable("settings/floating-display") {
                         FloatingGlucoseSettingsScreen(navController, dashboardViewModel)
                     }
@@ -806,6 +809,9 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("settings/notification-display") {
                     NotificationSettingsScreen(navController, dashboardViewModel)
                 }
+                composable("settings/data-smoothing") {
+                    DataSmoothingSettingsScreen(navController, dashboardViewModel)
+                }
                 composable("settings/floating-display") {
                     FloatingGlucoseSettingsScreen(navController, dashboardViewModel)
                 }
@@ -874,6 +880,7 @@ fun DashboardScreen(
     val targetLow by viewModel.targetLow.collectAsStateWithLifecycle()
     val targetHigh by viewModel.targetHigh.collectAsStateWithLifecycle()
     val chartSmoothingMinutes by viewModel.chartSmoothingMinutes.collectAsStateWithLifecycle()
+    val dataSmoothingCollapseChunks by viewModel.dataSmoothingCollapseChunks.collectAsStateWithLifecycle()
     val sensorStatus by viewModel.sensorStatus.collectAsStateWithLifecycle()
     val sensorProgress by viewModel.sensorProgress.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
@@ -1403,6 +1410,7 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f).fillMaxSize(),
                         glucoseHistory = glucoseHistory,
                         graphSmoothingMinutes = chartSmoothingMinutes,
+                        collapseSmoothedData = dataSmoothingCollapseChunks,
                         targetLow = targetLow,
                         targetHigh = targetHigh,
                         unit = unit,
@@ -1501,6 +1509,7 @@ fun DashboardScreen(
 
                             glucoseHistory = glucoseHistory,
                             graphSmoothingMinutes = chartSmoothingMinutes,
+                            collapseSmoothedData = dataSmoothingCollapseChunks,
                             targetLow = targetLow,
                             targetHigh = targetHigh,
                             unit = unit,
@@ -4925,11 +4934,11 @@ fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            LibreViewSummaryCard(
-                accountId = accountId,
-                isActive = isActive,
-                statusText = statusText
-            )
+//            LibreViewSummaryCard(
+//                accountId = accountId,
+//                isActive = isActive,
+//                statusText = statusText
+//            )
 
             MasterSwitchCard(
                 title = stringResource(R.string.libreview_active),
@@ -4938,20 +4947,14 @@ fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
                 onCheckedChange = { isActive = it },
                 icon = Icons.Default.Cloud
             )
-
-            Card(
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.libreview_email),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
+            SectionLabel(
+                text = stringResource(R.string.libreview_account_id),
+                topPadding = 0.dp
+            )
+            LibreViewStatusCard(
+                accountId = accountId,
+                statusText = statusText
+            )
 
                     OutlinedTextField(
                         value = email,
@@ -4989,19 +4992,40 @@ fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
                             }
                         }
                     )
-                }
+
+
+
+            Button(
+                onClick = {
+                    saveLibreViewSettings()
+                    Natives.wakelibreview(0)
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.sending_now),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        statusText = tk.glucodata.Libreview.getStatus()
+                    }, 3000)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.libreview_send_now))
             }
 
-            SectionLabel(
-                text = stringResource(R.string.libreview_account_id),
-                topPadding = 0.dp
-            )
-
-            LibreViewStatusCard(
-                accountId = accountId,
-                statusText = statusText
-            )
-
+            OutlinedButton(
+                onClick = {
+                    Natives.clearlibreFromMSec(0L)
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.resend_triggered),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.libreview_resend))
+            }
             FilledTonalButton(
                 onClick = {
                     saveLibreViewSettings()
@@ -5024,10 +5048,10 @@ fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
                 Text(stringResource(R.string.libreview_get_account_id))
             }
 
-            SectionLabel(
-                text = stringResource(R.string.libreview_active),
-                topPadding = 0.dp
-            )
+//            SectionLabel(
+//                text = stringResource(R.string.libreview_active),
+//                topPadding = 0.dp
+//            )
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsSwitchItem(
@@ -5064,130 +5088,86 @@ fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
                 )
             }
 
-            SectionLabel(
-                text = stringResource(R.string.advanced_title),
-                topPadding = 0.dp
-            )
-
-            LibreViewNfcModeCard(
-                selectedMode = nfcCommandMode,
-                onModeSelected = {
-                    nfcCommandMode = it
-                    Libre3NfcSettings.setMode(it)
-                }
-            )
-
-            Button(
-                onClick = {
-                    saveLibreViewSettings()
-                    Natives.wakelibreview(0)
-                    android.widget.Toast.makeText(
-                        context,
-                        context.getString(R.string.sending_now),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        statusText = tk.glucodata.Libreview.getStatus()
-                    }, 3000)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.libreview_send_now))
-            }
-
-            OutlinedButton(
-                onClick = {
-                    Natives.clearlibreFromMSec(0L)
-                    android.widget.Toast.makeText(
-                        context,
-                        context.getString(R.string.resend_triggered),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.libreview_resend))
-            }
         }
     }
 }
 
-@Composable
-private fun LibreViewSummaryCard(
-    accountId: Long,
-    isActive: Boolean,
-    statusText: String
-) {
-    val badgeText = when {
-        accountId > 0L -> stringResource(R.string.libreview_account_ready)
-        isActive -> stringResource(R.string.libreview_account_missing)
-        else -> stringResource(R.string.off)
-    }
-
-    Card(
-        shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Cloud,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f)
-                ) {
-                    Text(
-                        text = badgeText,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
-                }
-            }
-
-            Text(
-                text = stringResource(R.string.libreview_settings_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = stringResource(R.string.getaccountidmessage),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f)
-            )
-            if (statusText.isNotEmpty()) {
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
-                )
-            }
-        }
-    }
-}
+//@Composable
+//private fun LibreViewSummaryCard(
+//    accountId: Long,
+//    isActive: Boolean,
+//    statusText: String
+//) {
+//    val badgeText = when {
+//        accountId > 0L -> stringResource(R.string.libreview_account_ready)
+//        isActive -> stringResource(R.string.libreview_account_missing)
+//        else -> stringResource(R.string.off)
+//    }
+//
+//    Card(
+//        shape = RoundedCornerShape(32.dp),
+//        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+//    ) {
+//        Column(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(22.dp),
+//            verticalArrangement = Arrangement.spacedBy(14.dp)
+//        ) {
+//            Row(
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.SpaceBetween,
+//                verticalAlignment = Alignment.Top
+//            ) {
+//                Surface(
+//                    shape = RoundedCornerShape(20.dp),
+//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
+//                    modifier = Modifier.size(56.dp)
+//                ) {
+//                    Box(contentAlignment = Alignment.Center) {
+//                        Icon(
+//                            imageVector = Icons.Default.Cloud,
+//                            contentDescription = null,
+//                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+//                            modifier = Modifier.size(28.dp)
+//                        )
+//                    }
+//                }
+//
+//                Surface(
+//                    shape = RoundedCornerShape(999.dp),
+//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f)
+//                ) {
+//                    Text(
+//                        text = badgeText,
+//                        style = MaterialTheme.typography.labelLarge,
+//                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+//                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+//                    )
+//                }
+//            }
+//
+//            Text(
+//                text = stringResource(R.string.libreview_settings_title),
+//                style = MaterialTheme.typography.headlineSmall,
+//                color = MaterialTheme.colorScheme.onPrimaryContainer,
+//                fontWeight = FontWeight.SemiBold
+//            )
+//            Text(
+//                text = stringResource(R.string.getaccountidmessage),
+//                style = MaterialTheme.typography.bodyLarge,
+//                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f)
+//            )
+//            if (statusText.isNotEmpty()) {
+//                Text(
+//                    text = statusText,
+//                    style = MaterialTheme.typography.bodySmall,
+//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+//                )
+//            }
+//        }
+//    }
+//}
 
 @Composable
 private fun LibreViewStatusCard(
@@ -5232,83 +5212,6 @@ private fun LibreViewStatusCard(
         }
     }
 }
-
-@Composable
-private fun LibreViewNfcModeCard(
-    selectedMode: Int,
-    onModeSelected: (Int) -> Unit
-) {
-    val nfcAutoLabel = stringResource(R.string.libre3_nfc_command_auto)
-    val nfcActivateLabel = stringResource(R.string.libre3_nfc_command_activate)
-    val nfcSwitchReceiverLabel = stringResource(R.string.libre3_nfc_command_switch_receiver)
-    val commandOptions = remember {
-        listOf(
-            Libre3NfcSettings.MODE_AUTOMATIC,
-            Libre3NfcSettings.MODE_ACTIVATE_A0,
-            Libre3NfcSettings.MODE_SWITCH_RECEIVER_A8
-        )
-    }
-
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.size(42.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.libre3_nfc_command_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = stringResource(R.string.libre3_nfc_command_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            ConnectedButtonGroup(
-                options = commandOptions,
-                selectedOption = selectedMode,
-                onOptionSelected = onModeSelected,
-                labelText = { mode ->
-                    when (mode) {
-                        Libre3NfcSettings.MODE_ACTIVATE_A0 -> nfcActivateLabel
-                        Libre3NfcSettings.MODE_SWITCH_RECEIVER_A8 -> nfcSwitchReceiverLabel
-                        else -> nfcAutoLabel
-                    }
-                },
-                label = { _ -> },
-                itemHeight = 46.dp,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

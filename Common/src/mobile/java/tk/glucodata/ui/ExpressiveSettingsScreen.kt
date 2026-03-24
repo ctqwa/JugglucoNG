@@ -92,6 +92,8 @@ fun ExpressiveSettingsScreen(
     val patchedLibreEnabled by viewModel.patchedLibreBroadcastEnabled.collectAsState()
     val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsState()
     val chartSmoothingMinutes by viewModel.chartSmoothingMinutes.collectAsState()
+    val dataSmoothingGraphOnly by viewModel.dataSmoothingGraphOnly.collectAsState()
+    val dataSmoothingCollapseChunks by viewModel.dataSmoothingCollapseChunks.collectAsState()
     val previewWindowMode by viewModel.previewWindowMode.collectAsState()
     val alertsSummary by viewModel.alertsSummary.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
@@ -129,7 +131,6 @@ fun ExpressiveSettingsScreen(
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showFactoryResetDialog by remember { mutableStateOf(false) }
-    var showGraphSmoothingDialog by remember { mutableStateOf(false) }
     var showPreviewWindowDialog by remember { mutableStateOf(false) }
     var isClearing by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
@@ -149,12 +150,18 @@ fun ExpressiveSettingsScreen(
         ThemeMode.LIGHT -> stringResource(R.string.theme_light)
         ThemeMode.DARK -> stringResource(R.string.theme_dark)
     }
-    val graphSmoothingLabel = when (chartSmoothingMinutes) {
-        2 -> stringResource(R.string.graph_smoothing_2_minutes)
-        3 -> stringResource(R.string.graph_smoothing_3_minutes)
-        5 -> stringResource(R.string.graph_smoothing_5_minutes)
-        7 -> stringResource(R.string.graph_smoothing_7_minutes)
-        else -> stringResource(R.string.graph_smoothing_none)
+    val graphSmoothingLabel = if (chartSmoothingMinutes <= 0) {
+        stringResource(R.string.graph_smoothing_none)
+    } else {
+        buildList {
+            add(stringResource(R.string.minutes_short_format, chartSmoothingMinutes))
+            if (dataSmoothingGraphOnly) {
+                add(stringResource(R.string.data_smoothing_graph_only_title))
+            }
+            if (dataSmoothingCollapseChunks) {
+                add(stringResource(R.string.data_smoothing_collapse_title))
+            }
+        }.joinToString(" · ")
     }
     val previewWindowLabel = when (previewWindowMode) {
         1 -> stringResource(R.string.preview_window_always)
@@ -408,7 +415,7 @@ fun ExpressiveSettingsScreen(
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
                     iconTint = advColor,
                     position = CardPosition.MIDDLE,
-                    onClick = { showGraphSmoothingDialog = true }
+                    onClick = { navController.navigate("settings/data-smoothing") }
                 )
                 SettingsItem(
                     title = stringResource(R.string.preview_window_title),
@@ -543,14 +550,6 @@ fun ExpressiveSettingsScreen(
         context.findActivity()?.hardRestart() 
     }, { showUnitDialog = false })
     if (showThemeDialog) ThemePickerDialog(themeMode, { onThemeChanged(it); showThemeDialog = false }, { showThemeDialog = false })
-    if (showGraphSmoothingDialog) GraphSmoothingPickerDialog(
-        currentMinutes = chartSmoothingMinutes,
-        onSelect = {
-            viewModel.setChartSmoothingMinutes(it)
-            showGraphSmoothingDialog = false
-        },
-        onDismiss = { showGraphSmoothingDialog = false }
-    )
     if (showPreviewWindowDialog) PreviewWindowPickerDialog(
         currentMode = previewWindowMode,
         onSelect = {
@@ -1299,64 +1298,6 @@ private fun ThemePickerDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit,
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GraphSmoothingPickerDialog(
-    currentMinutes: Int,
-    onSelect: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val options = listOf(
-        stringResource(R.string.graph_smoothing_none) to 0,
-        stringResource(R.string.graph_smoothing_2_minutes) to 2,
-        stringResource(R.string.graph_smoothing_3_minutes) to 3,
-        stringResource(R.string.graph_smoothing_5_minutes) to 5,
-        stringResource(R.string.graph_smoothing_7_minutes) to 7
-    )
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            tonalElevation = 6.dp,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
-        ) {
-            Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-                Text(
-                    text = stringResource(R.string.graph_smoothing_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-                Text(
-                    text = stringResource(R.string.graph_smoothing_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-                )
-                options.forEach { (label, value) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 56.dp)
-                            .clickable { onSelect(value) }
-                            .padding(horizontal = 24.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = currentMinutes == value, onClick = null)
-                        Spacer(Modifier.width(16.dp))
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }

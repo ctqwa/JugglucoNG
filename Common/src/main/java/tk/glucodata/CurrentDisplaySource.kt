@@ -47,16 +47,32 @@ object CurrentDisplaySource {
             emptyList()
         }
         val viewMode = resolveSensorViewMode(resolvedSensorId)
+        val smoothingMinutes = DataSmoothing.getMinutes(Applic.app)
+        val smoothAllData = smoothingMinutes > 0 && !DataSmoothing.isGraphOnly(Applic.app)
+        val processedPoints = if (smoothAllData) {
+            DataSmoothing.smoothNativePoints(
+                recentPoints,
+                smoothingMinutes,
+                DataSmoothing.collapseChunks(Applic.app)
+            )
+        } else {
+            recentPoints
+        }
+        val resolvedRate = if (smoothAllData && processedPoints.size >= 2) {
+            TrendAccess.calculateVelocity(processedPoints, useRaw = isRawPrimary(viewMode), isMmol = isMmol)
+        } else {
+            current?.rate ?: Float.NaN
+        }
         return resolveFromLive(
             liveValueText = current?.valueText,
             liveNumericValue = current?.numericValue ?: Float.NaN,
-            rate = current?.rate ?: Float.NaN,
-            targetTimeMillis = current?.timeMillis ?: recentPoints.lastOrNull()?.timestamp ?: 0L,
+            rate = resolvedRate,
+            targetTimeMillis = current?.timeMillis ?: processedPoints.lastOrNull()?.timestamp ?: 0L,
             sensorId = resolvedSensorId,
             sensorGen = current?.sensorGen ?: 0,
             index = current?.index ?: 0,
-            source = current?.source ?: if (recentPoints.isNotEmpty()) "history" else "none",
-            recentPoints = recentPoints,
+            source = current?.source ?: if (processedPoints.isNotEmpty()) "history" else "none",
+            recentPoints = processedPoints,
             viewMode = viewMode,
             isMmol = isMmol
         )
