@@ -1249,6 +1249,13 @@ extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
           }
           hist->savepollallIDs<60>(timestamp, lifeCount, mgVal, 0, 0.0f,
                                    preservedRaw, preservedTemp);
+          if (backup) {
+            // Kotlin calibration rewrites touch historical stream points. Rewind
+            // both stream and history mirror cursors so followers receive the
+            // updated minute range and can replace existing Room rows.
+            hist->backstream(lifeCount);
+            hist->backhistory(lifeCount);
+          }
         }
 
         setstreaming(hist);
@@ -1318,6 +1325,12 @@ fromjava(addRawGlucoseStream)(JNIEnv *env, jclass cl, jlong timestamp,
           }
           hist->savepollallIDs<60>(timestamp, lifeCount, preservedAuto, 0, 0.0f,
                                    rawVal, preservedTemp);
+          if (backup) {
+            // See addGlucoseStream(): raw-lane rewrites need the same mirror
+            // resend range so follower Room data can be corrected too.
+            hist->backstream(lifeCount);
+            hist->backhistory(lifeCount);
+          }
           setstreaming(hist);
         }
       }

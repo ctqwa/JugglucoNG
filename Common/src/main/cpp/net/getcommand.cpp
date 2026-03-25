@@ -21,8 +21,11 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <algorithm>
 #include <string.h>
-       #include <unistd.h>
+#include <string>
+#include <string_view>
+#include <unistd.h>
 #include "comtypes.hpp"
 #include "receive.hpp"
 #include "passhost.hpp"
@@ -41,6 +44,8 @@
 
 extern Backup *backup;
 extern void        processglucosevalue(int sendindex,int newstart=-1);
+extern void javaMirrorSyncSensor(const char *serial, bool forceFull);
+extern void javaImportMirrorCalibrationProfile(const char *serial, const char *json);
 
 //getdata filedata("/data/local/tmp/testdir");
 getdata filedata;
@@ -107,6 +112,52 @@ int alignadd(int was,int bij) {
 extern bool receivelastpos(const lastpos_t *data) ;
 
 static            bool savefileonce(const struct fileonce_t *gegs);
+
+static void mirrorSyncSensor(int sendindex, bool forceFull) {
+    if(sendindex < 0 || !sensors) {
+        return;
+    }
+    if(SensorGlucoseData *hist = sensors->getSensorData(sendindex)) {
+        if(const auto *serial = hist->shortsensorname(); serial && serial->data()[0]) {
+            javaMirrorSyncSensor(serial->data(), forceFull);
+        }
+    }
+}
+
+static constexpr std::string_view mirrorCalibrationPrefix = "mirror/calibration/";
+static constexpr std::string_view mirrorCalibrationSuffix = ".json";
+
+static bool isMirrorCalibrationProfilePath(std::string_view name) {
+    return name.size() >= (mirrorCalibrationPrefix.size() + mirrorCalibrationSuffix.size()) &&
+           name.substr(0, mirrorCalibrationPrefix.size()) == mirrorCalibrationPrefix &&
+           name.substr(name.size() - mirrorCalibrationSuffix.size()) == mirrorCalibrationSuffix;
+}
+
+static std::string extractMirrorCalibrationSerial(std::string_view name) {
+    if (!isMirrorCalibrationProfilePath(name)) {
+        return {};
+    }
+    const auto start = mirrorCalibrationPrefix.size();
+    const auto len = name.size() - start - mirrorCalibrationSuffix.size();
+    return std::string(name.substr(start, len));
+}
+
+static std::string collectFileOncePayload(const struct fileonce_t *gegs,
+                                          const uint8_t *payloadStart) {
+    size_t total = 0;
+    for (int i = 0; i < gegs->nr; ++i) {
+        total = std::max(total,
+                         static_cast<size_t>(gegs->gegs[i].off) +
+                             static_cast<size_t>(gegs->gegs[i].len));
+    }
+    std::string payload(total, '\0');
+    const uint8_t *ptr = payloadStart;
+    for (int i = 0; i < gegs->nr; ++i) {
+        memcpy(payload.data() + gegs->gegs[i].off, ptr, gegs->gegs[i].len);
+        ptr += gegs->gegs[i].len;
+    }
+    return payload;
+}
 
 
 
@@ -740,12 +791,14 @@ static bool savefileonce(const struct fileonce_t *gegs) {
     const int nr=gegs->nr;
     const uint8_t *start=reinterpret_cast<const uint8_t*>(&gegs->gegs[nr]);
     const char *name=reinterpret_cast<const char *>(start);
+    const std::string_view namesv{name};
     int fp=filedata.open(name);
     LOGGERTAG("savefileonce %s %d show=%d\n",name,nr, (gegs->dowith&startcalibratedupdate));
     if(fp<0)
         return false;
     destruct des([fp](){filedata.close(fp);});
     start+=(gegs->namelen);
+    const uint8_t *payloadStart = start;
     for(int i=0;i<nr;i++) {
         if(!filedata.savedata(fp,gegs->gegs[i].off,gegs->gegs[i].len,start)) {
             LOGARTAG("savedata failed");
@@ -756,20 +809,32 @@ static bool savefileonce(const struct fileonce_t *gegs) {
         if((gegs->dowith&startcalibratedupdate)==startcalibratedupdate) {
             const auto [sendindex,startpos]=getstartinfo(gegs,start);
             setcalibratedstart(sendindex,startpos);
+            mirrorSyncSensor(sendindex, true);
             }
          else {
             if((gegs->dowith&streamupdatebit)==streamupdatebit) {
                     const auto [sendindex,startpos]=getstartinfo(gegs,start);
                     processglucosevalue(sendindex,startpos);
+                    mirrorSyncSensor(sendindex, false);
 
                     }
             else {
                     if((gegs->dowith&starthistoryupdate)==starthistoryupdate) {
                             const auto [sendindex,startpos]=getstartinfo(gegs,start);
                             sethistorystart(sendindex,startpos);
+                            mirrorSyncSensor(sendindex, true);
                             }
                  }
             }
+    if (isMirrorCalibrationProfilePath(namesv)) {
+        std::string serial = extractMirrorCalibrationSerial(namesv);
+        std::string json = collectFileOncePayload(gegs, payloadStart);
+        if (!json.empty()) {
+            javaImportMirrorCalibrationProfile(
+                serial.empty() ? nullptr : serial.c_str(),
+                json.c_str());
+        }
+    }
     LOGARTAG("savedata success");
 #ifdef WEAROS
    static const bool res=startedreceiving();

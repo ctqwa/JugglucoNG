@@ -2,7 +2,7 @@
 #include <math.h>
 #include "SensorGlucoseData.hpp"
 #include "fromjava.h"
-//#include "streamdata.hpp"
+#include "streamdata.hpp"
 
 
 extern "C" JNIEXPORT jint JNICALL   fromjava(calibrateNR)(JNIEnv *env, jclass cl,jlong sensorptr) {
@@ -52,3 +52,22 @@ extern bool shouldexclude(const uint32_t time);
         return should;
         }
 
+extern "C" JNIEXPORT void JNICALL fromjava(requestMirrorCalibrationSync)(JNIEnv *env,
+                                                                         jclass cl,
+                                                                         jstring jsensorId) {
+    if(!jsensorId || !sensors) {
+        return;
+    }
+    const char *sensorId = env->GetStringUTFChars(jsensorId, nullptr);
+    if(!sensorId) {
+        return;
+    }
+    int sensorindex = sensors->sensorindexshort(sensorId);
+    if(sensorindex < 0) {
+        sensorindex = sensors->sensorindex(sensorId);
+    }
+    env->ReleaseStringUTFChars(jsensorId, sensorId);
+    if(sensorindex >= 0) {
+        setCalibrates(sensorindex);
+    }
+}

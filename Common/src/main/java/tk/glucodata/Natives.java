@@ -1400,6 +1400,8 @@ public class Natives {
         public static native boolean getCalibrator(long sensorptr, int pos, CaliPara calip);
 
         public static native boolean removeCalibrator(long sensorptr, int pos);
+
+        public static native void requestMirrorCalibrationSync(String sensorId);
         // public static native float calibrateNow(long dataptr,float mgdL);
 
         public static native void setDoCalibrate(boolean val);

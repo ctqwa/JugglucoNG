@@ -102,6 +102,12 @@ static jmethodID showsensorinfo = nullptr;
 jmethodID jdoglucose = nullptr, jupdateDevices = nullptr,
           jbluetoothEnabled = nullptr, jspeak = nullptr, jresetWearOS = nullptr,
           jbluePermission = nullptr;
+static jclass JNIHistorySyncAccess = nullptr;
+static jmethodID jhistorySyncSensor = nullptr,
+                 jhistoryForceFullSyncSensor = nullptr;
+static jclass JNICalibrationProfileAccess = nullptr;
+static jmethodID jexportCalibrationProfile = nullptr,
+                 jimportMirrorCalibrationProfile = nullptr;
 // New declarations for MainActivity static methods
 jmethodID jopenSettingsPanel = nullptr, jopenSensorListPanel = nullptr,
           jlaunchQrScan = nullptr;
@@ -275,6 +281,57 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
   }
 
   {
+    const static jclass cl = env->FindClass("tk/glucodata/HistorySyncAccess");
+    if (cl) {
+      JNIHistorySyncAccess = (jclass)env->NewGlobalRef(cl);
+      env->DeleteLocalRef(cl);
+      if (!(jhistorySyncSensor = env->GetStaticMethodID(
+                JNIHistorySyncAccess, "syncSensorFromNative",
+                "(Ljava/lang/String;Z)V"))) {
+        LOGAR(
+            R"(GetStaticMethodID(JNIHistorySyncAccess,"syncSensorFromNative","(Ljava/lang/String;Z)V") failed)"
+            "");
+      }
+      if (!(jhistoryForceFullSyncSensor = env->GetStaticMethodID(
+                JNIHistorySyncAccess, "forceFullSyncForSensor",
+                "(Ljava/lang/String;)V"))) {
+        LOGAR(
+            R"(GetStaticMethodID(JNIHistorySyncAccess,"forceFullSyncForSensor","(Ljava/lang/String;)V") failed)"
+            "");
+      }
+    } else {
+      LOGAR(R"(FindClass("tk/glucodata/HistorySyncAccess") failed)"
+            "");
+      env->ExceptionClear();
+    }
+  }
+
+  {
+    const static jclass cl = env->FindClass("tk/glucodata/CalibrationProfileAccess");
+    if (cl) {
+      JNICalibrationProfileAccess = (jclass)env->NewGlobalRef(cl);
+      env->DeleteLocalRef(cl);
+      if (!(jexportCalibrationProfile = env->GetStaticMethodID(
+                JNICalibrationProfileAccess, "exportProfileForSensorAsJson",
+                "(Ljava/lang/String;)Ljava/lang/String;"))) {
+        LOGAR(
+            R"(GetStaticMethodID(JNICalibrationProfileAccess,"exportProfileForSensorAsJson","(Ljava/lang/String;)Ljava/lang/String;") failed)"
+            "");
+      }
+      if (!(jimportMirrorCalibrationProfile = env->GetStaticMethodID(
+                JNICalibrationProfileAccess, "importMirrorProfileFromJson",
+                "(Ljava/lang/String;Ljava/lang/String;)Z"))) {
+        LOGAR(
+            R"(GetStaticMethodID(JNICalibrationProfileAccess,"importMirrorProfileFromJson","(Ljava/lang/String;Ljava/lang/String;)Z") failed)"
+            "");
+      }
+    } else {
+      LOGAR(R"(FindClass("tk/glucodata/CalibrationProfileAccess") failed)");
+      env->ExceptionClear();
+    }
+  }
+
+  {
     const static jclass cl = env->FindClass("tk/glucodata/NightscoutCalibration");
     if (cl) {
       JNINightscoutCalibration = (jclass)env->NewGlobalRef(cl);
@@ -386,6 +443,87 @@ bool bluetoothEnabled() {
 }
 int bluePermission() {
   return getenv()->CallStaticIntMethod(JNIApplic, jbluePermission);
+}
+void javaMirrorSyncSensor(const char *serial, bool forceFull) {
+  if (!serial || !*serial) {
+    return;
+  }
+  if (!JNIHistorySyncAccess) {
+    LOGAR("JNIHistorySyncAccess==null");
+    return;
+  }
+  JNIEnv *env = getenv();
+  jstring jserial = env->NewStringUTF(serial);
+  if (forceFull) {
+    if (jhistoryForceFullSyncSensor) {
+      env->CallStaticVoidMethod(JNIHistorySyncAccess, jhistoryForceFullSyncSensor,
+                                jserial);
+    } else if (jhistorySyncSensor) {
+      env->CallStaticVoidMethod(JNIHistorySyncAccess, jhistorySyncSensor, jserial,
+                                JNI_TRUE);
+    } else {
+      LOGAR("mirror full sync methods unavailable");
+    }
+  } else {
+    if (!jhistorySyncSensor) {
+      LOGAR("jhistorySyncSensor==null");
+    } else {
+      env->CallStaticVoidMethod(JNIHistorySyncAccess, jhistorySyncSensor, jserial,
+                                JNI_FALSE);
+    }
+  }
+  env->DeleteLocalRef(jserial);
+  if (env->ExceptionCheck()) {
+    LOGAR("javaMirrorSyncSensor exception");
+    env->ExceptionClear();
+  }
+}
+
+std::string javaExportCalibrationProfile(const char *serial) {
+  if (!serial || !*serial || !JNICalibrationProfileAccess || !jexportCalibrationProfile) {
+    return {};
+  }
+  JNIEnv *env = getenv();
+  jstring jserial = env->NewStringUTF(serial);
+  jstring jjson = (jstring)env->CallStaticObjectMethod(
+      JNICalibrationProfileAccess, jexportCalibrationProfile, jserial);
+  env->DeleteLocalRef(jserial);
+  if (env->ExceptionCheck()) {
+    LOGAR("javaExportCalibrationProfile exception");
+    env->ExceptionClear();
+    return {};
+  }
+  if (!jjson) {
+    return {};
+  }
+  const char *chars = env->GetStringUTFChars(jjson, nullptr);
+  std::string out = chars ? std::string(chars) : std::string();
+  if (chars) {
+    env->ReleaseStringUTFChars(jjson, chars);
+  }
+  env->DeleteLocalRef(jjson);
+  return out;
+}
+
+void javaImportMirrorCalibrationProfile(const char *serial, const char *json) {
+  if (!json || !*json || !JNICalibrationProfileAccess ||
+      !jimportMirrorCalibrationProfile) {
+    return;
+  }
+  JNIEnv *env = getenv();
+  jstring jjson = env->NewStringUTF(json);
+  jstring jserial = serial && *serial ? env->NewStringUTF(serial) : nullptr;
+  env->CallStaticBooleanMethod(JNICalibrationProfileAccess,
+                               jimportMirrorCalibrationProfile, jjson,
+                               jserial);
+  if (jserial) {
+    env->DeleteLocalRef(jserial);
+  }
+  env->DeleteLocalRef(jjson);
+  if (env->ExceptionCheck()) {
+    LOGAR("javaImportMirrorCalibrationProfile exception");
+    env->ExceptionClear();
+  }
 }
 void telldoglucose(const char *name, int32_t mgdl, float glu, float rate,
                    int alarm, int64_t mmsec, bool wasnoblue, int64_t startmsec,

@@ -876,6 +876,20 @@ bool javaUpdateDevices() {
     LOGAR("javaUpdateDevices() called");
     return true;
     }
+extern void javaMirrorSyncSensor(const char *serial, bool forceFull);
+void javaMirrorSyncSensor(const char *serial, bool forceFull) {
+    LOGGER("javaMirrorSyncSensor(%s,%d)\n", serial ? serial : "(null)", forceFull);
+}
+extern std::string javaExportCalibrationProfile(const char *serial);
+std::string javaExportCalibrationProfile(const char *serial) {
+    LOGGER("javaExportCalibrationProfile(%s)\n", serial ? serial : "(null)");
+    return {};
+}
+extern void javaImportMirrorCalibrationProfile(const char *serial, const char *json);
+void javaImportMirrorCalibrationProfile(const char *serial, const char *json) {
+    LOGGER("javaImportMirrorCalibrationProfile(%s,%zu)\n",
+           serial ? serial : "(null)", json ? strlen(json) : 0U);
+}
     /*
 extern bool hour24clock;
 bool hour24clock=true;
@@ -904,4 +918,3 @@ extern std::string_view dMODEL;
 std::string_view dMANUFACTURER="MANUFACTURER";
  std::string_view dMODEL="MODEL";
  */
-

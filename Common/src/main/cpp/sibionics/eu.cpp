@@ -410,11 +410,9 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
       }
       auto trend = (int)basear[6];
 
-      // Default to the raw sensor value. process2()/process3() only emit a
-      // calibrated value every few polls, and pollinterval may not be usable
-      // yet during startup/history replay. Leaving newvalue unset here drops
-      // otherwise valid history/current samples.
-      double newvalue = value;
+      // Initialize deterministically. Later branches still decide whether the
+      // sample is usable; do not silently substitute raw as a calibrated value.
+      double newvalue = 0.0;
       if (algcontext) {
         // Original Juggluco logic - process2 result goes directly into newvalue
         // check

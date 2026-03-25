@@ -60,7 +60,12 @@
     public final float getCalibratedValue(float,long,boolean,boolean,java.lang.String);
     public final boolean shouldHideInitialWhenCalibrated();
     public final boolean shouldOverwriteSensorValues();
+    public final java.lang.String exportProfileForSensorAsJson(java.lang.String);
+    public final *** importProfileFromJsonBlocking(java.lang.String,boolean,java.lang.String);
+    public final *** importMirrorProfileFromJsonBlocking(java.lang.String,java.lang.String);
 }
+
+-keep class tk.glucodata.CalibrationProfileAccess { *; }
 
 #-keep class tk.glucodata.watchface.WatchFaceService
 #-keep class tk.glucodata.watchface.WatchFaceService.editor.WatchFaceConfigActivity

@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import tk.glucodata.Applic
 import tk.glucodata.BatteryTrace
 import tk.glucodata.Natives
+import tk.glucodata.UiRefreshBus
 import java.util.concurrent.ConcurrentHashMap
 import java.util.LinkedHashSet
 
@@ -270,6 +271,7 @@ object HistorySync {
 
             if (readings.isNotEmpty()) {
                 historyRepository.storeReadings(readings)
+                UiRefreshBus.requestStatusRefresh()
                 if (isFullSync) {
                     Log.i(TAG, "Full sync [$serial]: ${readings.size} readings (lastCount=$lastCount, stable=$stableCount)")
                 } else if (readings.size > 10) {

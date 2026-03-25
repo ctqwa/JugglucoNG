@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -163,6 +164,8 @@ object CalibrationManager {
 
     @Volatile
     private var calibrationRevision = 0L
+    @Volatile
+    private var suppressMirrorSyncCount = 0
     private val calibrationCache = object : LinkedHashMap<CalibrationCacheKey, Float>(512, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CalibrationCacheKey, Float>?): Boolean {
             return size > 4096
@@ -201,20 +204,43 @@ object CalibrationManager {
         return sensorId?.trim()?.takeIf { it.isNotEmpty() } ?: ""
     }
 
+    private inline fun <T> withoutMirrorSync(block: () -> T): T {
+        suppressMirrorSyncCount++
+        return try {
+            block()
+        } finally {
+            suppressMirrorSyncCount--
+        }
+    }
+
+    private fun shouldMirrorSync(): Boolean = suppressMirrorSyncCount <= 0
+
+    private fun requestMirrorCalibrationSync(sensorId: String?) {
+        if (!shouldMirrorSync()) return
+        val normalized = normalizeSensorId(sensorId)
+        if (normalized.isBlank()) return
+        runCatching { Natives.requestMirrorCalibrationSync(normalized) }
+            .onFailure { Log.w(TAG, "Failed requesting mirror calibration sync for $normalized", it) }
+    }
+
+    private fun requestMirrorCalibrationSyncForSensors(sensorIds: Iterable<String?>) {
+        if (!shouldMirrorSync()) return
+        val targets = linkedSetOf<String>()
+        sensorIds.forEach { candidate ->
+            normalizeSensorId(candidate).takeIf { it.isNotBlank() }?.let(targets::add)
+        }
+        normalizeSensorId(Natives.lastsensorname()).takeIf { it.isNotBlank() }?.let(targets::add)
+        targets.forEach(::requestMirrorCalibrationSync)
+    }
+
+    private fun requestMirrorCalibrationSyncForCurrentOrKnownSensors() {
+        requestMirrorCalibrationSyncForSensors(_calibrations.value.map { it.sensorId })
+    }
+
     private fun sensorMatches(calibrationSensorId: String, sensorId: String): Boolean {
         if (calibrationSensorId.isBlank()) return true
         if (sensorId.isBlank()) return false
         return calibrationSensorId.trim().equals(sensorId, ignoreCase = true)
-    }
-
-    private fun sensorCandidates(sensorIdOverride: String?): List<String> {
-        val requested = normalizeSensorId(sensorIdOverride)
-        val current = normalizeSensorId(Natives.lastsensorname())
-        return buildList {
-            if (requested.isNotEmpty()) add(requested)
-            if (current.isNotEmpty() && current != requested) add(current)
-            if (isEmpty()) add("")
-        }
     }
 
     private fun getValidPoints(isRawMode: Boolean, sensorId: String): List<CalPoint> {
@@ -236,15 +262,9 @@ object CalibrationManager {
             .toList()
     }
 
-    private fun getValidPointsWithFallback(isRawMode: Boolean, sensorIdOverride: String?): List<CalPoint> {
-        val candidates = sensorCandidates(sensorIdOverride)
-        candidates.forEach { candidate ->
-            val points = getValidPoints(isRawMode = isRawMode, sensorId = candidate)
-            if (points.isNotEmpty()) {
-                return points
-            }
-        }
-        return emptyList()
+    private fun getValidPointsForSensor(isRawMode: Boolean, sensorIdOverride: String?): List<CalPoint> {
+        val sensorId = normalizeSensorId(sensorIdOverride ?: Natives.lastsensorname())
+        return getValidPoints(isRawMode = isRawMode, sensorId = sensorId)
     }
     
     fun setEnabledForMode(isRawMode: Boolean, enabled: Boolean) {
@@ -263,6 +283,7 @@ object CalibrationManager {
         }
         invalidateComputationCache("setEnabledForMode(${if (isRawMode) "raw" else "auto"})")
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Calibration enabled for ${if (isRawMode) "Raw" else "Auto"}: $enabled")
     }
     
@@ -277,6 +298,7 @@ object CalibrationManager {
             prefs.edit().putBoolean(KEY_HIDE_INITIAL_WHEN_CALIBRATED, enabled).apply()
         }
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Hide initial when calibrated: $enabled")
     }
 
@@ -291,6 +313,7 @@ object CalibrationManager {
         runCatching { Natives.setCalibratePast(enabled) }
         invalidateComputationCache("setApplyToPast")
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Apply calibration to past: $enabled")
     }
 
@@ -304,6 +327,7 @@ object CalibrationManager {
         }
         invalidateComputationCache("setLockPastHistory")
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Lock past history calibration rewrite: $enabled")
     }
 
@@ -316,6 +340,7 @@ object CalibrationManager {
             prefs.edit().putBoolean(KEY_OVERWRITE_SENSOR_VALUES, enabled).apply()
         }
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Overwrite sensor values in history DB: $enabled")
     }
 
@@ -328,6 +353,7 @@ object CalibrationManager {
             prefs.edit().putBoolean(KEY_VISUAL_CONTINUITY, enabled).apply()
         }
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Visual continuity mode: $enabled")
     }
 
@@ -350,6 +376,7 @@ object CalibrationManager {
         invalidateComputationCache("setAlgorithmForMode(${if (isRawMode) "raw" else "auto"})")
         refreshDiagnosticsPreview(isRawMode = isRawMode, force = true)
         UiRefreshBus.requestStatusRefresh()
+        requestMirrorCalibrationSyncForCurrentOrKnownSensors()
         Log.i(TAG, "Calibration algorithm for ${if (isRawMode) "Raw" else "Auto"}: ${algorithm.title}")
     }
 
@@ -378,6 +405,11 @@ object CalibrationManager {
         root.put("createdAt", System.currentTimeMillis())
         root.put("rawEnabled", _isEnabledForRaw.value)
         root.put("autoEnabled", _isEnabledForAuto.value)
+        root.put("hideInitialWhenCalibrated", _hideInitialWhenCalibrated.value)
+        root.put("applyToPast", _applyToPast.value)
+        root.put("lockPastHistory", _lockPastHistory.value)
+        root.put("overwriteSensorValues", _overwriteSensorValues.value)
+        root.put("visualContinuity", _visualContinuity.value)
         root.put("rawAlgorithm", _algorithmForRaw.value.storageValue)
         root.put("autoAlgorithm", _algorithmForAuto.value.storageValue)
 
@@ -418,6 +450,17 @@ object CalibrationManager {
 
         val rawEnabled = root.optBoolean("rawEnabled", _isEnabledForRaw.value)
         val autoEnabled = root.optBoolean("autoEnabled", _isEnabledForAuto.value)
+        val hideInitialWhenCalibrated = root.optBoolean(
+            "hideInitialWhenCalibrated",
+            _hideInitialWhenCalibrated.value
+        )
+        val applyToPast = root.optBoolean("applyToPast", _applyToPast.value)
+        val lockPastHistory = root.optBoolean("lockPastHistory", _lockPastHistory.value)
+        val overwriteSensorValues = root.optBoolean(
+            "overwriteSensorValues",
+            _overwriteSensorValues.value
+        )
+        val visualContinuity = root.optBoolean("visualContinuity", _visualContinuity.value)
         val rawAlgorithm = CalibrationAlgorithm.fromStorage(root.optString("rawAlgorithm", ""))
         val autoAlgorithm = CalibrationAlgorithm.fromStorage(root.optString("autoAlgorithm", ""))
 
@@ -475,10 +518,17 @@ object CalibrationManager {
 
         setEnabledForMode(isRawMode = true, enabled = rawEnabled)
         setEnabledForMode(isRawMode = false, enabled = autoEnabled)
+        setHideInitialWhenCalibrated(hideInitialWhenCalibrated)
+        setApplyToPast(applyToPast)
+        setLockPastHistory(lockPastHistory)
+        setOverwriteSensorValues(overwriteSensorValues)
+        setVisualContinuity(visualContinuity)
         setAlgorithmForMode(isRawMode = true, algorithm = rawAlgorithm)
         setAlgorithmForMode(isRawMode = false, algorithm = autoAlgorithm)
 
         loadCalibrations()
+
+        requestMirrorCalibrationSync(targetSensorId)
 
         return CalibrationProfileImportResult(
             sensorId = targetSensorId,
@@ -510,6 +560,7 @@ object CalibrationManager {
         withContext(Dispatchers.IO) { dao.insert(entity) }
         loadCalibrations()
         refreshDiagnosticsPreview(isRawMode = isRawMode, force = true)
+        requestMirrorCalibrationSync(entity.sensorId)
         Log.i(TAG, "Added calibration: auto=$sensorValue raw=$sensorValueRaw user=$userValue isRaw=$isRawMode at $timestamp")
     }
 
@@ -517,6 +568,7 @@ object CalibrationManager {
         withContext(Dispatchers.IO) { dao.insert(entity) }
         loadCalibrations()
         refreshDiagnosticsPreview(isRawMode = entity.isRawMode, force = true)
+        requestMirrorCalibrationSync(entity.sensorId)
         Log.i(TAG, "Restored calibration: id=${entity.id}")
     }
 
@@ -524,6 +576,7 @@ object CalibrationManager {
         withContext(Dispatchers.IO) { dao.delete(entity) }
         loadCalibrations()
         refreshDiagnosticsPreview(isRawMode = entity.isRawMode, force = true)
+        requestMirrorCalibrationSync(entity.sensorId)
         Log.i(TAG, "Deleted calibration: id=${entity.id}")
     }
     
@@ -531,13 +584,16 @@ object CalibrationManager {
         withContext(Dispatchers.IO) { dao.update(entity) }
         loadCalibrations()
         refreshDiagnosticsPreview(isRawMode = entity.isRawMode, force = true)
+        requestMirrorCalibrationSync(entity.sensorId)
     }
     
     suspend fun clearAll() {
+        val affectedSensors = _calibrations.value.map { it.sensorId }
         withContext(Dispatchers.IO) { dao.deleteAll() }
         loadCalibrations()
         refreshDiagnosticsPreview(isRawMode = true, force = true)
         refreshDiagnosticsPreview(isRawMode = false, force = true)
+        requestMirrorCalibrationSyncForSensors(affectedSensors)
         Log.i(TAG, "Cleared all calibrations")
     }
 
@@ -546,7 +602,25 @@ object CalibrationManager {
         loadCalibrations()
         refreshDiagnosticsPreview(isRawMode = true, force = true)
         refreshDiagnosticsPreview(isRawMode = false, force = true)
+        requestMirrorCalibrationSyncForSensors(calibrations.map { it.sensorId })
         Log.i(TAG, "Restored ${calibrations.size} calibrations")
+    }
+
+    fun importProfileFromJsonBlocking(
+        json: String,
+        replaceExisting: Boolean,
+        overrideSensorId: String? = null
+    ): CalibrationProfileImportResult = runBlocking {
+        importProfileFromJson(json, replaceExisting, overrideSensorId)
+    }
+
+    fun importMirrorProfileFromJsonBlocking(
+        json: String,
+        overrideSensorId: String? = null
+    ): CalibrationProfileImportResult = withoutMirrorSync {
+        runBlocking {
+            importProfileFromJson(json, replaceExisting = true, overrideSensorId = overrideSensorId)
+        }
     }
 
     /**
@@ -596,7 +670,7 @@ object CalibrationManager {
             return cached
         }
 
-        val allPoints = getValidPointsWithFallback(isRawMode = isRawMode, sensorIdOverride = currentSensor)
+        val allPoints = getValidPointsForSensor(isRawMode = isRawMode, sensorIdOverride = currentSensor)
         if (allPoints.isEmpty()) {
             return value
         }
@@ -1178,7 +1252,7 @@ object CalibrationManager {
     fun hasActiveCalibration(isRawMode: Boolean, sensorIdOverride: String? = null): Boolean {
         if (!isEnabledForMode(isRawMode)) return false
 
-        return getValidPointsWithFallback(isRawMode, sensorIdOverride).isNotEmpty()
+        return getValidPointsForSensor(isRawMode, sensorIdOverride).isNotEmpty()
     }
 
     /** Check if an enabled calibration was added at this timestamp (±30s tolerance) for given mode */

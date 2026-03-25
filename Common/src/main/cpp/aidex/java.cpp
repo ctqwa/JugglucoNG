@@ -1,4 +1,5 @@
 #include "SensorGlucoseData.hpp"
+#include "datbackup.hpp"
 #include "fromjava.h"
 #include "glucose.hpp"
 #include "jniclass.hpp"
@@ -31,9 +32,6 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(aidexProcessData)(
   }
 
   const uint32_t timsec = mmsec / 1000L;
-  const CritAr data(env, value);
-  const uint8_t *decrypted = reinterpret_cast<const uint8_t *>(data.data());
-
   // Use the glucose value passed from Kotlin directly.
   // This ensures consistency between the UI/Notification and the background
   // sync.
@@ -67,6 +65,17 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(aidexProcessData)(
 
   // Trigger UI and Notification sync
   jlong res = glucoseback(timsec, internalVal, change, sens);
+  if (res) {
+    sensor *sensor = sensors->getsensor(sdata->sensorindex);
+    sens->sensorerror = false;
+    if (sensor && sensor->finished) {
+      sensor->finished = 0;
+      backup->resensordata(sdata->sensorindex);
+    }
+    if (backup) {
+      backup->wakebackup(Backup::wakestream);
+    }
+  }
   wakewithcurrent();
 
   return res;

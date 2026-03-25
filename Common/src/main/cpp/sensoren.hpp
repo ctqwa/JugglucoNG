@@ -1233,12 +1233,31 @@ public:
       return 2;
     extern std::mutex caliMutex;
     std::lock_guard<std::mutex> lock(caliMutex);
+    extern std::string javaExportCalibrationProfile(const char *serial);
     int did = 0;
     for (int sindex = first; sindex <= lastsens; ++sindex) {
-      int res = getSensorData(sindex)->updateCali(pass, sock, ind, sindex);
+      SensorGlucoseData *sens = getSensorData(sindex);
+      int res = sens->updateCali(pass, sock, ind, sindex);
       if (!res)
         return 0;
       did |= res;
+      if (const auto *serial = sens->shortsensorname();
+          serial && serial->data()[0]) {
+        if (std::string json = javaExportCalibrationProfile(serial->data());
+            !json.empty()) {
+          std::string relpath = "mirror/calibration/";
+          relpath += serial->data();
+          relpath += ".json";
+          if (!senddata(pass, sock, 0,
+                        reinterpret_cast<const senddata_t *>(json.data()),
+                        static_cast<int>(json.size()), relpath)) {
+            LOGGER("sendCalibrates: failed sending Kotlin profile for %s\n",
+                   serial->data());
+            return 0;
+          }
+          did |= 1;
+        }
+      }
     }
     startSendCalibrate = lastsens;
     return did;

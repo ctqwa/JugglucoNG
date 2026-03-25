@@ -1,7 +1,9 @@
 package tk.glucodata
 
 import android.util.Log
+import androidx.annotation.Keep
 
+@Keep
 object HistorySyncAccess {
     private const val TAG = "HistorySyncAccess"
     private const val SYNC_CLASS_NAME = "tk.glucodata.data.HistorySync"
