@@ -41,6 +41,8 @@ object HistorySync {
     private val sensorStability = ConcurrentHashMap<String, Pair<Int, Int>>()
     private val sensorLastSyncTimeMs = ConcurrentHashMap<String, Long>()
     private val sensorSyncInProgress = ConcurrentHashMap.newKeySet<String>()
+    private val sensorRecentSyncInProgress = ConcurrentHashMap.newKeySet<String>()
+    private val sensorLastRecentSyncBucketMs = ConcurrentHashMap<String, Long>()
     private const val STABLE_THRESHOLD = 2
     private const val STABLE_GROWTH_TOLERANCE = 2
 
@@ -61,6 +63,9 @@ object HistorySync {
     // Incremental overlap: keep a generous window so reconnect/vendor repair work
     // does not leave permanent holes, while still avoiding all-history rescans.
     private const val INCREMENTAL_OVERLAP_MS = 6 * 60 * 60 * 1000L
+    private const val RECENT_SYNC_BUCKET_MS = 60_000L
+    private const val RECENT_SYNC_DEFAULT_LOOKBACK_MS = 5 * 60 * 1000L
+    private const val RECENT_SYNC_MAX_LOOKBACK_MS = 30 * 60 * 1000L
 
     /**
      * Sync data from native layer to Room for ALL active sensors.
@@ -121,6 +126,50 @@ object HistorySync {
                 sensorSyncInProgress.remove(serial)
             }
         }
+    }
+
+    @JvmStatic
+    fun syncRecentSensorFromNative(serial: String, anchorTimeMs: Long) {
+        if (serial.isBlank() || anchorTimeMs <= 0L) return
+
+        val currentBucket = (anchorTimeMs / RECENT_SYNC_BUCKET_MS) * RECENT_SYNC_BUCKET_MS
+        val previousBucket = sensorLastRecentSyncBucketMs[serial]
+        if (previousBucket != null && previousBucket >= currentBucket) {
+            return
+        }
+        if (!sensorRecentSyncInProgress.add(serial)) {
+            return
+        }
+
+        BatteryTrace.bump(
+            key = "history.sync.sensor.live.request",
+            logEvery = 20L,
+            detail = "serial=$serial bucket=$currentBucket"
+        )
+
+        scope.launch {
+            try {
+                syncGate.withLock {
+                    val startMs = resolveRecentSyncStartMs(currentBucket, previousBucket)
+                    val readings = doSyncSensorWindow(serial, startMs / 1000L)
+                    if (readings > 0) {
+                        sensorLastRecentSyncBucketMs[serial] = currentBucket
+                    }
+                }
+            } finally {
+                sensorRecentSyncInProgress.remove(serial)
+            }
+        }
+    }
+
+    private fun resolveRecentSyncStartMs(currentBucket: Long, previousBucket: Long?): Long {
+        val defaultStart = (currentBucket - RECENT_SYNC_DEFAULT_LOOKBACK_MS).coerceAtLeast(0L)
+        if (previousBucket == null || previousBucket <= 0L) {
+            return defaultStart
+        }
+        val earliestNeeded = (previousBucket - RECENT_SYNC_BUCKET_MS).coerceAtLeast(0L)
+        val boundedEarliest = earliestNeeded.coerceAtLeast((currentBucket - RECENT_SYNC_MAX_LOOKBACK_MS).coerceAtLeast(0L))
+        return minOf(defaultStart, boundedEarliest)
     }
 
     private fun queueSync(forceFull: Boolean, bypassThrottle: Boolean) {
@@ -237,51 +286,17 @@ object HistorySync {
                 isFullSync = false
             }
 
-            val rawHistory = loadNativeHistory(serial, startSec)
-            if (rawHistory == null) {
-                // Sensor not found or no data yet — skip, don't reset state
-                Log.d(TAG, "getGlucoseHistoryForSensor($serial, $startSec) returned null — skipping")
-                return
-            }
-
-            val readings = mutableListOf<HistoryReading>()
-
-            for (i in rawHistory.indices step 3) {
-                if (i + 2 >= rawHistory.size) break
-
-                val timeSec = rawHistory[i]
-                val timeMs = timeSec * 1000L
-
-                val valueAutoRaw = rawHistory[i + 1]
-                val valueRawRaw = rawHistory[i + 2]
-
-                val value = valueAutoRaw / 10f
-                val rawValue = valueRawRaw / 10f
-
-                if (value > 0 || rawValue > 0) {
-                    readings.add(HistoryReading(
-                        timestamp = timeMs,
-                        sensorSerial = serial,
-                        value = value,
-                        rawValue = rawValue,
-                        rate = null
-                    ))
-                }
-            }
-
-            if (readings.isNotEmpty()) {
-                historyRepository.storeReadings(readings)
-                UiRefreshBus.requestStatusRefresh()
+            val currentCount = doSyncSensorWindow(serial, startSec)
+            if (currentCount > 0) {
                 if (isFullSync) {
-                    Log.i(TAG, "Full sync [$serial]: ${readings.size} readings (lastCount=$lastCount, stable=$stableCount)")
-                } else if (readings.size > 10) {
-                    Log.i(TAG, "Incremental sync [$serial]: ${readings.size} readings")
+                    Log.i(TAG, "Full sync [$serial]: ${currentCount} readings (lastCount=$lastCount, stable=$stableCount)")
+                } else if (currentCount > 10) {
+                    Log.i(TAG, "Incremental sync [$serial]: ${currentCount} readings")
                 }
             }
 
             // Track backfill progress per sensor
             if (isFullSync) {
-                val currentCount = readings.size
                 val growth = if (lastCount >= 0) currentCount - lastCount else Int.MAX_VALUE
                 if (growth in 0..STABLE_GROWTH_TOLERANCE) {
                     val newStable = stableCount + 1
@@ -298,6 +313,47 @@ object HistorySync {
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing sensor $serial: ${e.message}")
         }
+    }
+
+    private suspend fun doSyncSensorWindow(serial: String, startSec: Long): Int {
+        val rawHistory = loadNativeHistory(serial, startSec)
+        if (rawHistory == null) {
+            Log.d(TAG, "getGlucoseHistoryForSensor($serial, $startSec) returned null — skipping")
+            return 0
+        }
+
+        val readings = mutableListOf<HistoryReading>()
+
+        for (i in rawHistory.indices step 3) {
+            if (i + 2 >= rawHistory.size) break
+
+            val timeSec = rawHistory[i]
+            val timeMs = timeSec * 1000L
+
+            val valueAutoRaw = rawHistory[i + 1]
+            val valueRawRaw = rawHistory[i + 2]
+
+            val value = valueAutoRaw / 10f
+            val rawValue = valueRawRaw / 10f
+
+            if (value > 0 || rawValue > 0) {
+                readings.add(
+                    HistoryReading(
+                        timestamp = timeMs,
+                        sensorSerial = serial,
+                        value = value,
+                        rawValue = rawValue,
+                        rate = null
+                    )
+                )
+            }
+        }
+
+        if (readings.isNotEmpty()) {
+            historyRepository.storeReadings(readings)
+            UiRefreshBus.requestStatusRefresh()
+        }
+        return readings.size
     }
 
     private fun loadNativeHistory(serial: String, startSec: Long): LongArray? {

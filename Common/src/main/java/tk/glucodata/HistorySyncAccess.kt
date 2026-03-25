@@ -17,6 +17,11 @@ object HistorySyncAccess {
             syncHolder?.getMethod("syncSensorFromNative", String::class.java, Boolean::class.javaPrimitiveType)
         }.getOrNull()
     }
+    private val syncRecentSensorMethod by lazy {
+        runCatching {
+            syncHolder?.getMethod("syncRecentSensorFromNative", String::class.java, Long::class.javaPrimitiveType)
+        }.getOrNull()
+    }
     private val forceFullSensorMethod by lazy {
         runCatching { syncHolder?.getMethod("forceFullSyncForSensor", String::class.java) }.getOrNull()
     }
@@ -32,18 +37,6 @@ object HistorySyncAccess {
                 Long::class.javaPrimitiveType,
                 Float::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType
-            )
-        }.getOrNull()
-    }
-    private val storeReadingWithSerialMethod by lazy {
-        runCatching {
-            repositoryHolder?.getMethod(
-                "storeReadingAsync",
-                Long::class.javaPrimitiveType,
-                Float::class.javaPrimitiveType,
-                Float::class.javaPrimitiveType,
-                Float::class.javaPrimitiveType,
-                String::class.java
             )
         }.getOrNull()
     }
@@ -65,6 +58,19 @@ object HistorySyncAccess {
         }
         runCatching { method.invoke(instance, serial, forceFull) }
             .onFailure { Log.w(TAG, "syncSensorFromNative failed for serial=$serial forceFull=$forceFull", it) }
+    }
+
+    @JvmStatic
+    fun syncRecentSensorFromNative(serial: String?, anchorTimeMs: Long) {
+        if (serial.isNullOrBlank() || anchorTimeMs <= 0L) return
+        val method = syncRecentSensorMethod
+        val instance = syncInstance
+        if (method == null || instance == null) {
+            Log.w(TAG, "syncRecentSensorFromNative unavailable for serial=$serial anchor=$anchorTimeMs")
+            return
+        }
+        runCatching { method.invoke(instance, serial, anchorTimeMs) }
+            .onFailure { Log.w(TAG, "syncRecentSensorFromNative failed for serial=$serial anchor=$anchorTimeMs", it) }
     }
 
     @JvmStatic
@@ -109,36 +115,4 @@ object HistorySyncAccess {
             .onFailure { Log.w(TAG, "storeAidexReadingAsync failed for timestamp=$timestamp", it) }
     }
 
-    @JvmStatic
-    fun storeCurrentReadingAsync(
-        timestamp: Long,
-        valueMgdl: Float,
-        rawValueMgdl: Float,
-        rate: Float,
-        sensorSerial: String?
-    ) {
-        if (timestamp <= 0L || sensorSerial.isNullOrBlank()) return
-        val method = storeReadingWithSerialMethod
-        if (method == null) {
-            Log.w(TAG, "storeCurrentReadingAsync unavailable for serial=$sensorSerial timestamp=$timestamp")
-            return
-        }
-        runCatching {
-            method.invoke(
-                null,
-                timestamp,
-                valueMgdl,
-                rawValueMgdl,
-                rate,
-                sensorSerial
-            )
-        }
-            .onFailure {
-                Log.w(
-                    TAG,
-                    "storeCurrentReadingAsync failed for serial=$sensorSerial timestamp=$timestamp",
-                    it
-                )
-            }
-    }
 }

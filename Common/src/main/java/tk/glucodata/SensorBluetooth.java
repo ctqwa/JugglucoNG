@@ -589,13 +589,16 @@ public class SensorBluetooth {
                         }
                         Log.i(LOG_ID, "scanRunnable: Scanner STARTED");
                     } else {
+                        scanstart = false;
                         Log.w(LOG_ID, "scanRunnable: Scanner START FAILED");
                         return;
                     }
                 } else {
+                    scanstart = false;
                     Log.i(LOG_ID, "scanRunnable: nothing to scan (BT off or no callbacks)");
                 }
             } catch (Exception e) {
+                scanstart = false;
                 Log.stack(LOG_ID, "scanRunnable EXCEPTION", e);
             }
         }
@@ -605,7 +608,7 @@ public class SensorBluetooth {
     static private final boolean scanOnUI = false;
     ScheduledFuture<?> scanFuture = null, timeoutFuture = null;
 
-    public boolean scanStarter(long delayMillis) {
+    public synchronized boolean scanStarter(long delayMillis) {
         {
             if (doLog) {
                 Log.i(LOG_ID, "scanStarter(" + delayMillis + ")");
@@ -622,6 +625,12 @@ public class SensorBluetooth {
 
         if (!bluetoothIsEnabled()) {
             Applic.Toaster(R.string.bluetooth_is_turned_off);
+            return false;
+        }
+        if (mScanning || scanstart) {
+            if (doLog) {
+                Log.i(LOG_ID, "scanStarter skipped, scan already active/pending");
+            }
             return false;
         }
         for (SuperGattCallback cb : gattcallbacks) {
@@ -703,6 +712,45 @@ public class SensorBluetooth {
         }
     }
 
+    private void adoptCurrentSensorIfBlank(String serial) {
+        if (serial == null || serial.isEmpty()) {
+            return;
+        }
+        final String current = Natives.lastsensorname();
+        if (current == null || current.isEmpty()) {
+            Natives.setcurrentsensor(serial);
+            if (doLog) {
+                Log.i(LOG_ID, "adoptCurrentSensorIfBlank -> " + serial);
+            }
+        }
+    }
+
+    private String firstRemainingCallbackSerial(String removedSerial) {
+        for (SuperGattCallback cb : gattcallbacks) {
+            final String serial = cb.SerialNumber;
+            if (serial != null && !serial.isEmpty() && !SensorIdentity.matches(serial, removedSerial)) {
+                return serial;
+            }
+        }
+        return null;
+    }
+
+    private void rehomeCurrentSensorAfterRemoval(String removedSerial) {
+        if (removedSerial == null || removedSerial.isEmpty()) {
+            return;
+        }
+        final String current = Natives.lastsensorname();
+        if (!SensorIdentity.matches(current, removedSerial)) {
+            return;
+        }
+        final String replacement = firstRemainingCallbackSerial(removedSerial);
+        Natives.setcurrentsensor(replacement != null ? replacement : "");
+        if (doLog) {
+            Log.i(LOG_ID, "rehomeCurrentSensorAfterRemoval " + removedSerial + " -> "
+                    + (replacement != null ? replacement : "<cleared>"));
+        }
+    }
+
     private void removeDevice(String str) {
         for (int i = 0; i < gattcallbacks.size(); i++) {
             var gatt = gattcallbacks.get(i);
@@ -716,6 +764,7 @@ public class SensorBluetooth {
                 ;
                 gatt.free();
                 gattcallbacks.remove(i);
+                rehomeCurrentSensorAfterRemoval(str);
                 Natives.setmaxsensors(gattcallbacks.size());
                 // AiDex sensors live in SharedPrefs — remove so updateDevicers() can't resurrect
                 if (str.startsWith("X-")) {
@@ -821,6 +870,7 @@ public class SensorBluetooth {
                 long dataptr = Natives.getdataptr(name);
                 if (dataptr != 0) {
                     gattcallbacks.add(getGattCallback(name, dataptr));
+                    adoptCurrentSensorIfBlank(name);
                 }
                 increasedwait = startincreasedwait;
             }
@@ -891,6 +941,7 @@ public class SensorBluetooth {
                 }
                 cb.mActiveDeviceAddress = address;
                 blueone.gattcallbacks.add(cb);
+                blueone.adoptCurrentSensorIfBlank(serial);
                 cb.connectDevice(0);
             }
         } catch (Throwable t) {
@@ -1072,15 +1123,17 @@ public class SensorBluetooth {
 
         for (int el = rem.size() - 1; el >= 0; el--) {
             int weg = rem.get(el);
+            final String removedSerial = gattcallbacks.get(weg).SerialNumber;
             {
                 if (doLog) {
-                    Log.i(LOG_ID, "remove " + gattcallbacks.get(weg).SerialNumber);
+                    Log.i(LOG_ID, "remove " + removedSerial);
                 }
                 ;
             }
             ;
             gattcallbacks.get(weg).free();
             gattcallbacks.remove(weg);
+            rehomeCurrentSensorAfterRemoval(removedSerial);
         }
         int index = gattcallbacks.size();
         if (devs != null) {
@@ -1102,11 +1155,8 @@ public class SensorBluetooth {
                     long dataptr = 0L;
                     dataptr = Natives.getdataptr(dev);
                     if (dataptr != 0L || dev.startsWith("X-")) {
-                        // Clear finished flag so sensor appears in activeSensors
-                        if (dataptr != 0L) {
-                            Natives.unfinishSensor(dataptr);
-                        }
                         gattcallbacks.add(getGattCallback(dev, dataptr));
+                        adoptCurrentSensorIfBlank(dev);
                         increasedwait = startincreasedwait;
                         index++;
                     }
@@ -1217,6 +1267,19 @@ public class SensorBluetooth {
         return new Libre2GattCallback(name, dataptr);
     }
 
+    private int findGattCallbackIndex(String serial) {
+        if (serial == null) {
+            return -1;
+        }
+        for (int i = 0; i < gattcallbacks.size(); i++) {
+            SuperGattCallback cb = gattcallbacks.get(i);
+            if (serial.equals(cb.SerialNumber)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private boolean addDevice(String str, long dataptr) {
         {
             if (doLog) {
@@ -1225,11 +1288,23 @@ public class SensorBluetooth {
             ;
         }
         ;
+        final int existingIndex = findGattCallbackIndex(str);
+        if (existingIndex >= 0) {
+            SuperGattCallback existing = gattcallbacks.get(existingIndex);
+            if (doLog) {
+                Log.w(LOG_ID, "addDevice dedupe existing callback for " + str);
+            }
+            if (dataptr != 0L) {
+                existing.dataptr = dataptr;
+            }
+            return checkandconnect(existing, 0);
+        }
         int index = gattcallbacks.size();
         if (dataptr != 0L) {
             SuperGattCallback cb = getGattCallback(str, dataptr);
             // nullKAuth=false;
             gattcallbacks.add(cb);
+            adoptCurrentSensorIfBlank(str);
             Natives.setmaxsensors(gattcallbacks.size());
             increasedwait = startincreasedwait;
             if (mBluetoothManager == null) {

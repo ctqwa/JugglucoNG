@@ -31,6 +31,7 @@ import android.os.Build;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import static android.bluetooth.BluetoothDevice.BOND_BONDED;
@@ -96,6 +97,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     public BluetoothDevice mActiveBluetoothDevice;
     long foundtime = 0L;
     protected BluetoothGatt mBluetoothGatt;
+    private volatile boolean connectPending = false;
+    private volatile ScheduledFuture<?> pendingConnectFuture = null;
     boolean superseded = false;
     public final int sensorgen;
     public int readrssi = 9999;
@@ -118,6 +121,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     }
 
     public void disconnect() {
+        clearPendingConnect();
         final var thegatt = mBluetoothGatt;
         if (thegatt != null) {
             {
@@ -141,6 +145,9 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     public void setPause(boolean pause) {
         this.stop = pause;
+        if (pause) {
+            clearPendingConnect();
+        }
         if (doLog)
             Log.i(LOG_ID, "setPause " + pause);
     }
@@ -233,10 +240,6 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     public static notGlucose previousglucose = null;
     static float previousglucosevalue = 0.0f;
     public static String previousglucosesensorid = null;
-    private static final long LIVE_HISTORY_CONTINUITY_BUCKET_MS = 60_000L;
-    private static final int LIVE_HISTORY_CONTINUITY_MAX_MISSING_BUCKETS = 10;
-    private static final ConcurrentHashMap<String, Long> lastLiveReadingTimeMs = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, Long> lastHistoryContinuitySyncBucket = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Long> lastCollapsedExchangeTimeMs = new ConcurrentHashMap<>();
 
     private static boolean shouldEmitExchangeUpdate(String sensorId, long payloadTimeMs, boolean collapseChunks) {
@@ -463,69 +466,15 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         return viewMode == 1 || viewMode == 3;
     }
 
-    private static void storeLiveReadingInRoom(String sensorSerial, long timmsec, float autoMgdl, float rawMgdl, float rate) {
-        if (sensorSerial == null || sensorSerial.isEmpty() || timmsec <= 0L) {
-            return;
-        }
-        if ((!Float.isFinite(autoMgdl) || autoMgdl <= 0f) && (!Float.isFinite(rawMgdl) || rawMgdl <= 0f)) {
-            return;
-        }
-        final SensorHistoryMatch match = findSensorHistoryMatchNear(sensorSerial, timmsec / 1000L);
-        final long storedTimestamp = match != null && match.timestampMs > 0L
-                ? match.timestampMs
-                : (timmsec / 1000L) * 1000L;
-        final float storedAuto = (Float.isFinite(autoMgdl) && autoMgdl > 0f) ? autoMgdl : 0f;
-        final float matchedRaw = match != null ? match.rawMgdl : Float.NaN;
-        final float storedRaw = (Float.isFinite(rawMgdl) && rawMgdl > 0f)
-                ? rawMgdl
-                : ((Float.isFinite(matchedRaw) && matchedRaw > 0f) ? matchedRaw : 0f);
-        HistorySyncAccess.storeCurrentReadingAsync(storedTimestamp, storedAuto, storedRaw, rate, sensorSerial);
-    }
-
     private static boolean isAiDexSerial(String sensorSerial) {
         return sensorSerial != null && sensorSerial.startsWith("X-");
     }
 
-    private static void maybeRequestHistoryContinuitySyncAfterLive(String sensorSerial, long timmsec) {
+    private static void syncLegacyRoomHistoryAfterLive(String sensorSerial, long timmsec) {
         if (sensorSerial == null || sensorSerial.isEmpty() || timmsec <= 0L || isAiDexSerial(sensorSerial)) {
             return;
         }
-
-        final Long previousReadingMs = lastLiveReadingTimeMs.put(sensorSerial, timmsec);
-        if (previousReadingMs == null) {
-            return;
-        }
-
-        final LiveContinuityPolicy.ContinuitySyncDecision continuityDecision = LiveContinuityPolicy.decideContinuitySync(
-                previousReadingMs,
-                timmsec,
-                LIVE_HISTORY_CONTINUITY_BUCKET_MS,
-                LIVE_HISTORY_CONTINUITY_MAX_MISSING_BUCKETS);
-        if (!continuityDecision.getShouldRequestContinuitySync()) {
-            return;
-        }
-
-        final long currentBucket = continuityDecision.getCurrentBucket();
-        final Long lastRequestedBucket = lastHistoryContinuitySyncBucket.get(sensorSerial);
-        if (lastRequestedBucket != null && lastRequestedBucket >= currentBucket) {
-            return;
-        }
-        lastHistoryContinuitySyncBucket.put(sensorSerial, currentBucket);
-
-        if (doLog) {
-            Log.i(
-                LOG_ID,
-                sensorSerial
-                    + " continuity gap: missing "
-                    + continuityDecision.getMissingBuckets()
-                    + " minute bucket(s) between "
-                    + continuityDecision.getPreviousBucket()
-                    + " and "
-                    + continuityDecision.getCurrentBucket()
-                    + " — requesting incremental history continuity sync"
-            );
-        }
-        HistorySyncAccess.syncSensorFromNative(sensorSerial);
+        HistorySyncAccess.syncRecentSensorFromNative(sensorSerial, timmsec);
     }
 
     static void dowithglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,
@@ -544,7 +493,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         // only reflect the main sensor's values to avoid confusing switching behavior.
         boolean isMainSensor = true;
         try {
-            String mainName = SensorIdentity.resolveMainSensor();
+            String mainName = SensorIdentity.resolveLiveMainSensor(SerialNumber);
             if (mainName != null && !mainName.isEmpty() && SerialNumber != null) {
                 isMainSensor = SensorIdentity.matches(SerialNumber, mainName);
             }
@@ -557,7 +506,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         if (!isMainSensor) {
             if (doLog) {
                 Log.i(LOG_ID, "Multi-sensor: Skipping notifications/broadcasts for non-main sensor "
-                        + SerialNumber + " (main=" + Natives.lastsensorname() + ")");
+                        + SerialNumber + " (liveMain=" + SensorIdentity.resolveLiveMainSensor(SerialNumber)
+                        + ", selectedMain=" + Natives.lastsensorname() + ")");
             }
             // Still update the screen so charts/history reflect all sensors
             Applic.updatescreen();
@@ -773,9 +723,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 if (Applic.unit == 1) {
                     glucoseToUse = glucoseToUse / (float) mgdLmult;
                 }
-                // Keep Room current from the real live packet; calibration overwrite is applied in the repository.
-                storeLiveReadingInRoom(SerialNumber, timmsec, 0f, rawMgdl, rate);
-                maybeRequestHistoryContinuitySyncAfterLive(SerialNumber, timmsec);
+                syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
                 // Apply calibration
                 glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, true);
                 mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
@@ -851,8 +799,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 }
             }
 
-            storeLiveReadingInRoom(SerialNumber, timmsec, autoMgdl, rawMgdl, rate);
-            maybeRequestHistoryContinuitySyncAfterLive(SerialNumber, timmsec);
+            syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
 
             // Apply Kotlin calibration if enabled
             glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, isRawMode);
@@ -982,6 +929,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     }
 
     public void close() {
+        clearPendingConnect();
         {
             if (doLog) {
                 Log.i(LOG_ID, "close " + SerialNumber);
@@ -1041,6 +989,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             return null;
         }
         return () -> {
+            markConnectRunnableStarted();
+            try {
             {
                 if (doLog) {
                     Log.i(LOG_ID, "getConnectDevice Runnable " + SerialNumber);
@@ -1048,6 +998,12 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 ;
             }
             ;
+            if (stop || dataptr == 0L) {
+                if (doLog) {
+                    Log.i(LOG_ID, SerialNumber + " getConnectDevice: cancelled (stop=" + stop + ", dataptr=" + dataptr + ")");
+                }
+                return;
+            }
             var device = cb.mActiveBluetoothDevice;
             var sensorbluetooth = blueone;
             if (sensorbluetooth == null) {
@@ -1122,18 +1078,43 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 Log.stack(LOG_ID, SerialNumber + " " + "connectGatt", e);
 
             }
+            } finally {
+                clearPendingConnect();
+            }
         };
     }
 
-    public boolean connectDevice(long delayMillis) {
+    private synchronized void markConnectRunnableStarted() {
+        pendingConnectFuture = null;
+    }
+
+    private synchronized void clearPendingConnect() {
+        connectPending = false;
+        if (pendingConnectFuture != null) {
+            pendingConnectFuture.cancel(false);
+            pendingConnectFuture = null;
+        }
+    }
+
+    public synchronized boolean connectDevice(long delayMillis) {
         if (doLog) {
             Log.i(LOG_ID, "connectDevice(" + delayMillis + ") " + SerialNumber);
         }
         ;
+        if (stop || dataptr == 0L) {
+            return false;
+        }
+        if (connectPending) {
+            if (doLog) {
+                Log.i(LOG_ID, "connectDevice skipped, connect already pending for " + SerialNumber);
+            }
+            return true;
+        }
         Runnable connect = getConnectDevice();
         if (connect == null)
             return false;
-        Applic.scheduler.schedule(connect, delayMillis, TimeUnit.MILLISECONDS);
+        connectPending = true;
+        pendingConnectFuture = Applic.scheduler.schedule(connect, delayMillis, TimeUnit.MILLISECONDS);
         /*
          * if(delayMillis>0)
          * Applic.app.getHandler().postDelayed(connect, delayMillis);

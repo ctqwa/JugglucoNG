@@ -156,7 +156,6 @@ class DashboardViewModel(
      * re-subscribe to the correct sensor's data.
      */
     fun onResume() {
-        glucoseRepository.refreshSensorSerial()
         refreshData()
         if (collectionMode != CollectionMode.INACTIVE) {
             ensureUiRefreshCollection()
@@ -255,10 +254,6 @@ class DashboardViewModel(
 
     fun refreshData() {
         viewModelScope.launch {
-            // Update the sensor serial in GlucoseRepository — if it changed,
-            // all flatMapLatest flows will automatically re-subscribe
-            glucoseRepository.refreshSensorSerial()
-            
             val unitVal = Natives.getunit()
             val isMmol = unitVal == 1
             _unit.value = if (isMmol) "mmol/L" else "mg/dL"
@@ -307,8 +302,8 @@ class DashboardViewModel(
                 _activeSensorList.value = emptyList()
             }
 
-            val fallbackSerial = glucoseRepository.currentSerial.value.takeIf { it.isNotBlank() }
-                ?: _sensorName.value.takeIf { it.isNotBlank() }
+            val fallbackSerial = _sensorName.value.takeIf { it.isNotBlank() }
+                ?: glucoseRepository.currentSerial.value.takeIf { it.isNotBlank() }
                 ?: activeSensors?.firstOrNull { !it.isNullOrBlank() }
 
             if (sName.isNullOrBlank()) {
@@ -396,29 +391,30 @@ class DashboardViewModel(
     }
 
     private fun startHistoryCollectionForMode(mode: CollectionMode) {
-        val startTimeMs = when (mode) {
+        val recoveryStartTimeMs = when (mode) {
             CollectionMode.INACTIVE -> return
             CollectionMode.DASHBOARD -> System.currentTimeMillis() - DASHBOARD_HISTORY_WINDOW_MS
             CollectionMode.FULL_HISTORY -> 0L
         }
+        val queryStartTimeMs = 0L
 
-        if (historyJob?.isActive == true && activeHistoryStartTimeMs == startTimeMs) return
+        if (historyJob?.isActive == true && activeHistoryStartTimeMs == recoveryStartTimeMs) return
 
         historyJob?.cancel()
-        activeHistoryStartTimeMs = startTimeMs
+        activeHistoryStartTimeMs = recoveryStartTimeMs
         _isLoading.value = true
 
         historyJob = viewModelScope.launch {
             var lastRecoveryRequestSerial: String? = null
             combine(
                 _unit,
-                glucoseRepository.getHistoryFlowRaw(startTimeMs).distinctUntilChanged()
+                glucoseRepository.getHistoryFlowRaw(queryStartTimeMs).distinctUntilChanged()
             ) { unitStr, rawHistory ->
                 unitStr to rawHistory
             }.collect { (unitStr, rawHistory) ->
                 val preferredSerial = preferredDashboardSensorId()?.takeIf { it.isNotBlank() }
                 if (preferredSerial != null &&
-                    shouldRequestHistoryRecovery(startTimeMs, rawHistory) &&
+                    shouldRequestHistoryRecovery(recoveryStartTimeMs, rawHistory) &&
                     lastRecoveryRequestSerial != preferredSerial
                 ) {
                     lastRecoveryRequestSerial = preferredSerial
@@ -692,8 +688,8 @@ class DashboardViewModel(
     }
 
     private fun preferredDashboardSensorId(): String? {
-        return glucoseRepository.currentSerial.value.takeIf { it.isNotBlank() }
-            ?: _sensorName.value.takeIf { it.isNotBlank() }
+        return _sensorName.value.takeIf { it.isNotBlank() }
+            ?: glucoseRepository.currentSerial.value.takeIf { it.isNotBlank() }
             ?: SensorIdentity.resolveMainSensor()
     }
 }

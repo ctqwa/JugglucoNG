@@ -103,8 +103,8 @@ public class SiGattCallback extends SuperGattCallback {
          pendingHistoryUiRefresh = false;
          if (stop || dataptr == 0)
             return;
-         final String mainSensor = Natives.lastsensorname();
-         if (mainSensor != null && !mainSensor.isEmpty() && !mainSensor.equals(SerialNumber))
+         final String liveMainSensor = SensorIdentity.resolveLiveMainSensor(SerialNumber);
+         if (liveMainSensor != null && !liveMainSensor.isEmpty() && !SensorIdentity.matches(SerialNumber, liveMainSensor))
             return;
          long[] lastGlucose = Natives.getlastGlucose();
          if (lastGlucose == null || lastGlucose.length < 2 || lastGlucose[0] <= historyReplayBaselineSec) {

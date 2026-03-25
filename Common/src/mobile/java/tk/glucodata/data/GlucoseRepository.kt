@@ -38,9 +38,7 @@ class GlucoseRepository {
      * re-subscribe when the main sensor changes.
      */
     private val _currentSerial = MutableStateFlow(
-        Natives.lastsensorname()?.takeIf { it.isNotBlank() }
-            ?: Natives.activeSensors()?.firstOrNull { !it.isNullOrBlank() }
-            ?: ""
+        Natives.lastsensorname()?.takeIf { it.isNotBlank() } ?: ""
     )
     val currentSerial = _currentSerial.asStateFlow()
     
@@ -52,8 +50,8 @@ class GlucoseRepository {
         val current = _currentSerial.value
         val resolved = preferredSerial?.takeIf { it.isNotBlank() }
             ?: Natives.lastsensorname()?.takeIf { it.isNotBlank() }
-            ?: Natives.activeSensors()?.firstOrNull { !it.isNullOrBlank() }
             ?: current.takeIf { it.isNotBlank() }
+            ?: Natives.activeSensors()?.firstOrNull { !it.isNullOrBlank() }
             ?: ""
 
         if (resolved != current) {

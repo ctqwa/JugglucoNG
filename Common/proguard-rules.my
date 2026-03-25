@@ -48,6 +48,7 @@
 -keepclassmembers class tk.glucodata.data.HistorySync {
     public static final tk.glucodata.data.HistorySync INSTANCE;
     public final void syncSensorFromNative(java.lang.String,boolean);
+    public final void syncRecentSensorFromNative(java.lang.String,long);
     public final void forceFullSyncForSensor(java.lang.String);
 }
 

@@ -471,7 +471,10 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
         // Good value - reset streak
         badValueStreak = 0;
       }
-      const int mgdL = std::round(newvalue * convfactordL);
+      const bool rawFallbackUsable = !(newvalue > 1 && newvalue < 30) &&
+                                     value > 1.0 && value < 30.0;
+      const double persistedValue = rawFallbackUsable ? value : newvalue;
+      const int mgdL = std::round(persistedValue * convfactordL);
       const int trend2 = algcontext ? algcontext->ig_trend : trend;
       const float change = sitrend2RateOfChange(trend2);
       const int abbottrend = sitrend2abbott(trend2);
@@ -485,7 +488,12 @@ jlong SiContext::processData2(SensorGlucoseData *sens, time_t nowsecs,
       // Valid range check: 0.5-40 mmol/L. Values outside trigger sensorerror.
       // Aligned with sanity check above which auto-resets for same
       // thresholds.
-      if (newvalue > 1 && newvalue < 30) {
+      if (persistedValue > 1 && persistedValue < 30) {
+        if (rawFallbackUsable) {
+          LOGGER("SIprocess raw fallback: index=%d temp=%f value=%f "
+                 "reindex=%d\n",
+                 index, temp, value, reindex);
+        }
         sens->savestream(eventTime, totalIndex, mgdL, abbottrend, change,
                          (int)current, (uint16_t)basear[1]);
         sens->setSiIndex(index + 1);

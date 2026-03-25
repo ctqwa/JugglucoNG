@@ -224,7 +224,10 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
     const long electric = std::byteswap(one[2]);
     const int status = std::byteswap(one[4]);
 #endif
-    const int mgdL = std::round(newvalue * convfactordL);
+    const bool rawFallbackUsable = !(newvalue > 1 && newvalue < 30) &&
+                                   value > 1.0 && value < 30.0;
+    const double persistedValue = rawFallbackUsable ? value : newvalue;
+    const int mgdL = std::round(persistedValue * convfactordL);
     const int trend = algcontext->ig_trend;
     const float change = sitrend2RateOfChange(trend);
     const int abbotttrend = sitrend2abbott(trend);
@@ -235,7 +238,12 @@ jlong SiContext::processData(SensorGlucoseData *sens, time_t nowsecs,
 
     //             if(infuture) sens->setSiIndex(index+1);
     // Valid range check aligned with sanity check thresholds (0.5-40)
-    if (newvalue > 1 && newvalue < 30) {
+    if (persistedValue > 1 && persistedValue < 30) {
+      if (rawFallbackUsable) {
+        LOGGER("SIprocess raw fallback: index=%d temp=%f value=%f "
+               "numOfUnreceived=%d\n",
+               index, temp, value, numOfUnreceived);
+      }
       sens->savestream(eventTime, index, mgdL, abbotttrend, change, rawCurrent, rawTemp);
       sens->setSiIndex(index + 1);
       sens->retried = 0;

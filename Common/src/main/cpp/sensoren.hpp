@@ -712,6 +712,10 @@ public:
   }
 
   void setCurrentSensor(const char *name) {
+    if (!name || !*name) {
+      infoblockptr()->current = -1;
+      return;
+    }
     if (int ind = sensorindex(name); ind >= 0) {
       infoblockptr()->current = ind;
     } else {
@@ -1053,7 +1057,6 @@ public:
           setindices();
         prev = sensor.prev;
         if (sensor.finished) {
-          LOGGER("%s finished\n", showsensorname(i));
           continue;
         }
         if (sensor.endtime < newsecs) {
