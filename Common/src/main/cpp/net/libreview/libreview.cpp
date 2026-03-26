@@ -1430,10 +1430,10 @@ extern "C" JNIEXPORT void JNICALL fromjava(askServerforAccountID)(JNIEnv *env,
   settings->data()->haslibre3 = true;
   settings->data()->uselibre = true;
   settings->data()->libreinit3 = false;
-  // settings->data()->libreinit=false;
-  //    librecondition.dobackup=Backup::wakeall;
   startlibrethread();
-  wakeaftermin(0);
+  // Account ID lookup must wake immediately even when background LibreView
+  // upload is currently disabled.
+  librecondition.wakebackup(Backup::wakeall);
 }
 // std::string_view dRELEASE{};
 int SDK_INT = 30;

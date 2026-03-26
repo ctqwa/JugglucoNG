@@ -46,10 +46,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,13 +97,18 @@ fun LibreSetupWizard(
     var isRussia by remember { mutableStateOf(Natives.getLibreCountry() == 4) }
     var showPassword by remember { mutableStateOf(false) }
     var accountIdValue by remember { mutableLongStateOf(Natives.getlibreAccountIDnumber()) }
-    var statusText by remember { mutableStateOf("") }
+    var statusText by remember { mutableStateOf(tk.glucodata.Libreview.getStatus()) }
+    var isSendingNow by remember { mutableStateOf(false) }
     var isFetchingAccountId by remember { mutableStateOf(false) }
+    var isResendingData by remember { mutableStateOf(false) }
     var nfcCommandMode by remember { mutableIntStateOf(Libre3NfcSettings.getMode()) }
     var showAdvancedNfc by remember { mutableStateOf(false) }
 
     val requestingAccountIdText = stringResource(R.string.requesting_account_id)
+    val sendingNowText = stringResource(R.string.sending_now)
     val accountIdTimeoutText = stringResource(R.string.libre_setup_account_id_timeout)
+    val accountIdObtainedText = stringResource(R.string.libre_setup_account_id_obtained)
+    val resendTriggeredText = stringResource(R.string.resend_triggered)
     val nfcAutoLabel = stringResource(R.string.libre3_nfc_command_auto)
     val nfcActivateLabel = stringResource(R.string.libre3_nfc_command_activate)
     val nfcSwitchReceiverLabel = stringResource(R.string.libre3_nfc_command_switch_receiver)
@@ -116,17 +123,31 @@ fun LibreSetupWizard(
         )
     }
 
-    fun saveSettings() {
+    fun saveSettings(includeUploadPreference: Boolean = true) {
         Natives.setlibreemail(email)
         Natives.setlibrepass(password)
-        Natives.setuselibreview(isActive)
+        if (includeUploadPreference) {
+            Natives.setuselibreview(isActive)
+        }
         Natives.setLibreCountry(if (isRussia) 4 else 0)
         Libre3NfcSettings.setMode(nfcCommandMode)
     }
 
-    fun finishLibreViewStep() {
+    fun leaveLibreViewStep() {
         saveSettings()
+        accountIdValue = Natives.getlibreAccountIDnumber()
+        statusText = tk.glucodata.Libreview.getStatus()
         currentStep = 0
+    }
+
+    fun isTerminalStatus(currentStatus: String): Boolean {
+        return currentStatus.contains("failed", ignoreCase = true) ||
+            currentStatus.contains("error", ignoreCase = true) ||
+            currentStatus.contains("locked", ignoreCase = true) ||
+            currentStatus.contains("no credentials", ignoreCase = true) ||
+            currentStatus.contains("ResponseCode", ignoreCase = true) ||
+            currentStatus.contains("success", ignoreCase = true) ||
+            currentStatus.contains("успеш", ignoreCase = true)
     }
 
     DisposableEffect(Unit) {
@@ -146,6 +167,16 @@ fun LibreSetupWizard(
                         if (currentStep > 0) currentStep-- else onDismiss()
                     }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cancel))
+                    }
+                },
+                actions = {
+                    if (currentStep == 1) {
+                        TextButton(
+                            onClick = ::leaveLibreViewStep,
+                            enabled = !isSendingNow && !isFetchingAccountId && !isResendingData
+                        ) {
+                            Text(stringResource(R.string.libre_setup_done))
+                        }
                     }
                 }
             )
@@ -167,7 +198,7 @@ fun LibreSetupWizard(
 
             when (currentStep) {
                 0 -> {
-                    val accountReady = isActive && accountIdValue > 0L
+                    val accountReady = accountIdValue > 0L
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -265,6 +296,8 @@ fun LibreSetupWizard(
 
                 1 -> {
                     val hasCredentials = email.isNotBlank() && password.isNotBlank()
+                    val isBusy = isSendingNow || isFetchingAccountId || isResendingData
+                    val canSendData = isActive && !isBusy
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -352,35 +385,114 @@ fun LibreSetupWizard(
                             )
                         }
 
-                        FilledTonalButton(
+                        Button(
                             onClick = {
                                 saveSettings()
+                                tk.glucodata.Libreview.clearStatus()
+                                val initialStatus = tk.glucodata.Libreview.getStatus()
+                                statusText = sendingNowText
+                                isSendingNow = true
+                                Natives.wakelibreview(0)
+                                coroutineScope.launch {
+                                    var elapsed = 0
+                                    var latestStatus = initialStatus
+                                    while (elapsed < 30_000) {
+                                        delay(500)
+                                        elapsed += 500
+                                        latestStatus = tk.glucodata.Libreview.getStatus()
+                                        accountIdValue = Natives.getlibreAccountIDnumber()
+                                        if (latestStatus.isNotEmpty() && latestStatus != initialStatus) {
+                                            statusText = latestStatus
+                                            break
+                                        }
+                                    }
+                                    if (statusText == sendingNowText && latestStatus.isNotEmpty()) {
+                                        statusText = latestStatus
+                                    }
+                                    isSendingNow = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = canSendData
+                        ) {
+                            if (isSendingNow) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            } else {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Text(stringResource(R.string.save))
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                saveSettings()
+                                tk.glucodata.Libreview.clearStatus()
+                                val initialStatus = tk.glucodata.Libreview.getStatus()
+                                statusText = resendTriggeredText
+                                isResendingData = true
+                                Natives.clearlibreFromMSec(0L)
+                                Natives.wakelibreview(0)
+                                coroutineScope.launch {
+                                    var elapsed = 0
+                                    var latestStatus = initialStatus
+                                    while (elapsed < 30_000) {
+                                        delay(500)
+                                        elapsed += 500
+                                        latestStatus = tk.glucodata.Libreview.getStatus()
+                                        accountIdValue = Natives.getlibreAccountIDnumber()
+                                        if (latestStatus.isNotEmpty() && latestStatus != initialStatus) {
+                                            statusText = latestStatus
+                                            break
+                                        }
+                                    }
+                                    if (statusText == resendTriggeredText && latestStatus.isNotEmpty()) {
+                                        statusText = latestStatus
+                                    }
+                                    isResendingData = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = canSendData
+                        ) {
+                            if (isResendingData) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            }
+                            Spacer(modifier = Modifier.width(if (isResendingData) 8.dp else 0.dp))
+                            Text(stringResource(R.string.libreview_resend))
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                saveSettings(includeUploadPreference = false)
+                                Natives.setlibreAccountIDnumber(-1L)
+                                tk.glucodata.Libreview.clearStatus()
+                                val initialStatus = tk.glucodata.Libreview.getStatus()
                                 Natives.askServerforAccountID()
                                 statusText = requestingAccountIdText
                                 isFetchingAccountId = true
                                 coroutineScope.launch {
                                     var elapsed = 0
+                                    var receivedAccountId = false
                                     while (elapsed < 30_000) {
                                         delay(500)
                                         elapsed += 500
                                         val currentStatus = tk.glucodata.Libreview.getStatus()
                                         val fetchedAccountId = Natives.getlibreAccountIDnumber()
-                                        if (fetchedAccountId > 0L) {
-                                            accountIdValue = fetchedAccountId
-                                            statusText = currentStatus
+                                        accountIdValue = fetchedAccountId
+                                        if (currentStatus.contains("AccountID", ignoreCase = true)) {
+                                            statusText = if (currentStatus != initialStatus) currentStatus else accountIdObtainedText
+                                            receivedAccountId = true
                                             break
                                         }
                                         if (currentStatus.isNotEmpty()) {
                                             statusText = currentStatus
                                         }
-                                        val isTerminal = currentStatus.contains("failed", ignoreCase = true) ||
-                                            currentStatus.contains("error", ignoreCase = true) ||
-                                            currentStatus.contains("locked", ignoreCase = true) ||
-                                            currentStatus.contains("no credentials", ignoreCase = true) ||
-                                            currentStatus.contains("ResponseCode", ignoreCase = true)
+                                        val isTerminal = isTerminalStatus(currentStatus)
                                         if (isTerminal) break
                                     }
-                                    if (accountIdValue <= 0L) {
+                                    if (!receivedAccountId) {
                                         val finalStatus = tk.glucodata.Libreview.getStatus()
                                         statusText = if (finalStatus.isNotEmpty()) finalStatus else accountIdTimeoutText
                                     }
@@ -388,7 +500,7 @@ fun LibreSetupWizard(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = hasCredentials && !isFetchingAccountId
+                            enabled = hasCredentials && !isBusy
                         ) {
                             if (isFetchingAccountId) {
                                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -399,14 +511,6 @@ fun LibreSetupWizard(
                             Text(stringResource(R.string.libreview_get_account_id))
                         }
 
-                        Button(
-                            onClick = ::finishLibreViewStep,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(stringResource(R.string.libre_setup_done))
-                        }
                     }
                 }
             }

@@ -961,6 +961,11 @@ public static void  config(MainActivity act, View settingsview,CheckBox sendto,b
     }
 
     // Edit 48f: Accessors for Compose LibreViewSettingsScreen
+    public static void clearStatus() {
+        librestatus = "";
+        posttime = null;
+    }
+
     public static String getStatus() {
         String s = librestatus;
         if (s == success && posttime != null) return posttime + ": " + s;
@@ -973,7 +978,6 @@ public static void  config(MainActivity act, View settingsview,CheckBox sendto,b
 
 
 }
-
 
 
 
