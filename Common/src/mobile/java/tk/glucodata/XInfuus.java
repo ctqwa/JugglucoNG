@@ -30,6 +30,9 @@ import android.os.Bundle;
 public class XInfuus {
 private static final String LOG_ID="XInfuus";
 private static String[] librenames;
+private static final Object activationLock = new Object();
+private static String lastActivatedSerial;
+private static long lastActivatedStartSec;
     private static void sendIntent(Context context,Intent intent) {
 	intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 	for(var name:librenames) {
@@ -66,7 +69,7 @@ public static final String glucoseaction="com.librelink.app.ThirdPartyIntegratio
 public static void sendGlucoseBroadcast(String serial, double currentGlucose,float rate,long mmsec,long sensorStartmsec) {
 	final Context context=Applic.app;
         if(sensorStartmsec>0L) {
-            sendSensorActivateBroadcast(context, serial, sensorStartmsec/1000L);
+            maybeSendSensorActivateBroadcast(context, serial, sensorStartmsec/1000L);
         }
         Intent intent = new Intent(glucoseaction);
         intent.putExtra("glucose", currentGlucose);
@@ -83,6 +86,20 @@ public static void sendGlucoseBroadcast(String serial, double currentGlucose,flo
         Bundle bundle = new Bundle();
         bundle.putLong("sensorStartTime", startmmsec);
         return bundle;
+    }
+
+    private static void maybeSendSensorActivateBroadcast(Context context,String serial,long startsec) {
+        if(serial==null||serial.isEmpty()||startsec<=0L) {
+            return;
+        }
+        synchronized (activationLock) {
+            if(serial.equals(lastActivatedSerial) && lastActivatedStartSec == startsec) {
+                return;
+            }
+            lastActivatedSerial = serial;
+            lastActivatedStartSec = startsec;
+        }
+        sendSensorActivateBroadcast(context, serial, startsec);
     }
 
     public static void sendSensorActivateBroadcast(Context context,String serial,long startsec) {

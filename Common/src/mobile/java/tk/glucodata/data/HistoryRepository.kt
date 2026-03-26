@@ -355,6 +355,28 @@ class HistoryRepository(context: Context = Applic.app) {
         }
     }
 
+    suspend fun getOldestTimestampForSensor(serial: String): Long {
+        return withContext(Dispatchers.IO) {
+            try {
+                dao.getOldestTimestampForSensor(serial) ?: 0L
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting oldest timestamp for sensor $serial", e)
+                0L
+            }
+        }
+    }
+
+    suspend fun getReadingCountForSensor(serial: String): Int {
+        return withContext(Dispatchers.IO) {
+            try {
+                dao.getCountForSensor(serial)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting count for sensor $serial", e)
+                0
+            }
+        }
+    }
+
     // ── All-sensor query methods (for export, legacy compatibility) ──
     
     /**

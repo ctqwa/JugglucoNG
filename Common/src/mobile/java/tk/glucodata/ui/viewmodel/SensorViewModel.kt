@@ -689,6 +689,7 @@ class SensorViewModel : ViewModel() {
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
         if (gatt != null && gatt.dataptr != 0L) {
+            try { tk.glucodata.data.HistorySync.markSensorReset(serial) } catch (_: Throwable) {}
             try { Natives.siClearAll(gatt.dataptr) } catch (_: Throwable) {}
         }
     }

@@ -635,6 +635,71 @@ public class Notify {
         }
     }
 
+    private static java.util.List<GlucosePoint> augmentNotificationChartPoints(
+            java.util.List<GlucosePoint> historyPoints,
+            CurrentDisplaySource.Snapshot current,
+            String activeSensorSerial,
+            long startTimeMs) {
+        if (current == null || current.getTimeMillis() < startTimeMs) {
+            return historyPoints;
+        }
+        if (activeSensorSerial != null && current.getSensorId() != null
+                && !SensorIdentity.matches(current.getSensorId(), activeSensorSerial)) {
+            return historyPoints;
+        }
+
+        float autoValue = current.getAutoValue();
+        float rawValue = current.getRawValue();
+        if (!Float.isFinite(autoValue) || autoValue <= 0.1f) {
+            autoValue = 0f;
+        }
+        if (!Float.isFinite(rawValue) || rawValue <= 0.1f) {
+            rawValue = 0f;
+        }
+        if (autoValue <= 0f && rawValue <= 0f) {
+            return historyPoints;
+        }
+
+        final GlucosePoint candidate = new GlucosePoint(current.getTimeMillis(), autoValue, rawValue);
+        if (historyPoints == null || historyPoints.isEmpty()) {
+            final java.util.ArrayList<GlucosePoint> only = new java.util.ArrayList<>(1);
+            only.add(candidate);
+            return only;
+        }
+
+        final java.util.ArrayList<GlucosePoint> merged = new java.util.ArrayList<>(historyPoints.size() + 1);
+        boolean inserted = false;
+        for (GlucosePoint point : historyPoints) {
+            if (!inserted && candidate.timestamp <= point.timestamp) {
+                if (candidate.timestamp == point.timestamp) {
+                    merged.add(notificationChartPointScore(candidate) >= notificationChartPointScore(point)
+                            ? candidate
+                            : point);
+                    inserted = true;
+                    continue;
+                }
+                merged.add(candidate);
+                inserted = true;
+            }
+            merged.add(point);
+        }
+        if (!inserted) {
+            merged.add(candidate);
+        }
+        return merged;
+    }
+
+    private static int notificationChartPointScore(GlucosePoint point) {
+        int score = 0;
+        if (point.value > 0f) {
+            score += 1;
+        }
+        if (point.rawValue > 0f) {
+            score += 2;
+        }
+        return score;
+    }
+
     private static notGlucose toLegacyGlucose(CurrentDisplaySource.Snapshot snapshot) {
         if (snapshot == null) {
             return null;
@@ -1919,7 +1984,6 @@ public class Notify {
     // private int wasdraw=-1;
     private float wasvalue = 0.0f;
     private String wasmessage = null, wastype;
-
     void overwriteglucose(int kind) {
         // if(wasdraw==-1) return;
         if (wasvalue < 0.1f)
@@ -2676,12 +2740,17 @@ public class Notify {
         boolean isMmol = Applic.unit == 1; // Check user unit preference
         final String activeSensorSerial = NotificationHistorySource.resolveSensorSerial(resolvePrimarySensorName());
 
+        final CurrentDisplaySource.Snapshot resolvedDisplay = GLUCOSENOTIFICATION.equals(type)
+                ? resolveNotificationCurrentSnapshot(activeSensorSerial)
+                : null;
+
         java.util.List<GlucosePoint> chartPoints;
         try {
             chartPoints = NotificationHistorySource.getDisplayHistory(startT, isMmol, activeSensorSerial);
         } catch (Exception e) {
             chartPoints = new java.util.ArrayList<>();
         }
+        chartPoints = augmentNotificationChartPoints(chartPoints, resolvedDisplay, activeSensorSerial, startT);
 
         BatteryTrace.bump(
                 "notify.glucose.render",
@@ -2728,9 +2797,6 @@ public class Notify {
         boolean isRawMode = (viewMode == 1 || viewMode == 3);
         boolean hasCalibration = NightscoutCalibration.hasCalibrationForViewMode(activeSensorSerial, viewMode);
 
-        final CurrentDisplaySource.Snapshot resolvedDisplay = GLUCOSENOTIFICATION.equals(type)
-                ? resolveNotificationCurrentSnapshot(activeSensorSerial)
-                : null;
         final CurrentDisplaySource.Snapshot fallbackDisplay = resolvedDisplay != null
                 ? resolvedDisplay
                 : CurrentDisplaySource.resolveFromLive(
@@ -2997,12 +3063,15 @@ public class Notify {
         boolean isMmol = Applic.unit == 1;
         final String activeSensorSerial = NotificationHistorySource.resolveSensorSerial(resolvePrimarySensorName());
 
+        final CurrentDisplaySource.Snapshot current = resolveNotificationCurrentSnapshot(activeSensorSerial);
+
         java.util.List<GlucosePoint> chartPoints;
         try {
             chartPoints = NotificationHistorySource.getDisplayHistory(startT, isMmol, activeSensorSerial);
         } catch (Exception e) {
             chartPoints = new java.util.ArrayList<>();
         }
+        chartPoints = augmentNotificationChartPoints(chartPoints, current, activeSensorSerial, startT);
 
         long recentStartT = endT - 15 * 60 * 1000L; // Last 15 minutes
         java.util.List<GlucosePoint> nativePoints = new java.util.ArrayList<>();
@@ -3036,7 +3105,6 @@ public class Notify {
 
         // Startup Text using the shared current-value resolver.
         CharSequence startupValue = "---";
-        CurrentDisplaySource.Snapshot current = resolveNotificationCurrentSnapshot(activeSensorSerial);
         if (current != null) {
             startupValue = current.getFullFormatted();
         } else if (!chartPoints.isEmpty()) {

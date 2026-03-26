@@ -511,12 +511,11 @@ public class NotificationChartDrawer {
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
 
-        // margins
-        // User requested removing ALL margins/paddings to fill available space always.
-        float leftMargin = 0;
-        float bottomMargin = 0;
-        float topMargin = 0;
-        float rightMargin = 0;
+        // Keep notification sparkline visually inside the RemoteViews crop.
+        float leftMargin = compactMode ? 1.5f * dm.density : 0f;
+        float bottomMargin = compactMode ? 2.5f * dm.density : 0f;
+        float topMargin = compactMode ? 1.5f * dm.density : 0f;
+        float rightMargin = compactMode ? 2.5f * dm.density : 0f;
 
         float chartLeft = leftMargin;
         float chartRight = width - rightMargin;

@@ -43,6 +43,7 @@ object HistorySync {
     private val sensorSyncInProgress = ConcurrentHashMap.newKeySet<String>()
     private val sensorRecentSyncInProgress = ConcurrentHashMap.newKeySet<String>()
     private val sensorLastRecentSyncBucketMs = ConcurrentHashMap<String, Long>()
+    private val sensorResetPreserveUntilMs = ConcurrentHashMap<String, Long>()
     private const val STABLE_THRESHOLD = 2
     private const val STABLE_GROWTH_TOLERANCE = 2
 
@@ -66,6 +67,8 @@ object HistorySync {
     private const val RECENT_SYNC_BUCKET_MS = 60_000L
     private const val RECENT_SYNC_DEFAULT_LOOKBACK_MS = 5 * 60 * 1000L
     private const val RECENT_SYNC_MAX_LOOKBACK_MS = 30 * 60 * 1000L
+    private const val DESTRUCTIVE_RESYNC_RESET_GAP_MS = 60 * 60 * 1000L
+    private const val RESET_PRESERVE_WINDOW_MS = 10 * 60 * 1000L
 
     /**
      * Sync data from native layer to Room for ALL active sensors.
@@ -405,7 +408,7 @@ object HistorySync {
      * This triggers Room's Flow observers so the chart redraws instantly.
      */
     fun forceFullSyncForSensor(serial: String) {
-        Log.i(TAG, "forceFullSyncForSensor($serial) — deleting Room data then re-syncing")
+        Log.i(TAG, "forceFullSyncForSensor($serial) — full Room/native resync requested")
         sensorStability.remove(serial)
         sensorLastSyncTimeMs.remove(serial)
         val legacyAlias = if (serial.startsWith("X-") && serial.length > 2) serial.substring(2) else null
@@ -416,18 +419,94 @@ object HistorySync {
         lastSyncTimeMs = 0L  // Allow immediate sync
         scope.launch {
             syncGate.withLock {
-                // Step 1: Delete existing Room data for this sensor
-                try {
-                    historyRepository.deleteForSensor(serial)
-                    if (legacyAlias != null) {
-                        historyRepository.deleteForSensor(legacyAlias)
+                val preserveExistingHistory = shouldPreserveExistingHistoryOnFullResync(serial, legacyAlias)
+                if (!preserveExistingHistory) {
+                    try {
+                        historyRepository.deleteForSensor(serial)
+                        if (legacyAlias != null) {
+                            historyRepository.deleteForSensor(legacyAlias)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error deleting Room data for $serial before resync: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error deleting Room data for $serial before resync: ${e.message}")
                 }
-                // Step 2: Re-sync from native (all data for this sensor)
                 doSyncSensor(serial, forceFull = true)
             }
+        }
+    }
+
+    fun markSensorReset(serial: String) {
+        if (serial.isBlank()) return
+        val deadline = System.currentTimeMillis() + RESET_PRESERVE_WINDOW_MS
+        sensorResetPreserveUntilMs[serial] = deadline
+        if (serial.startsWith("X-") && serial.length > 2) {
+            sensorResetPreserveUntilMs[serial.substring(2)] = deadline
+        }
+    }
+
+    private suspend fun shouldPreserveExistingHistoryOnFullResync(
+        serial: String,
+        legacyAlias: String?
+    ): Boolean {
+        val candidateSerials = linkedSetOf(serial, legacyAlias).filterNotNull()
+        val now = System.currentTimeMillis()
+        val resetMarked = candidateSerials.any { candidate ->
+            val deadline = sensorResetPreserveUntilMs[candidate] ?: return@any false
+            deadline >= now
+        }
+        if (!resetMarked) {
+            return false
+        }
+        var roomOldest = Long.MAX_VALUE
+        var roomNewest = 0L
+        var roomCount = 0
+
+        for (candidate in candidateSerials) {
+            val count = historyRepository.getReadingCountForSensor(candidate)
+            if (count <= 0) continue
+            roomCount += count
+            val oldest = historyRepository.getOldestTimestampForSensor(candidate)
+            if (oldest > 0L) {
+                roomOldest = minOf(roomOldest, oldest)
+            }
+            val latest = historyRepository.getLatestTimestampForSensor(candidate)
+            if (latest > 0L) {
+                roomNewest = maxOf(roomNewest, latest)
+            }
+        }
+
+        if (roomCount <= 0 || roomOldest == Long.MAX_VALUE) {
+            return false
+        }
+
+        val nativeHistory = loadNativeHistory(serial, 0L)
+        if (nativeHistory == null || nativeHistory.size < 3) {
+            clearResetPreserveMarkers(candidateSerials)
+            Log.w(
+                TAG,
+                "forceFullSyncForSensor($serial): preserving Room history because native history is empty/truncated"
+            )
+            return true
+        }
+
+        val nativeOldest = nativeHistory.first() * 1000L
+        val nativeNewest = nativeHistory[nativeHistory.size - 3] * 1000L
+        val nativeLooksReset = nativeOldest > (roomOldest + DESTRUCTIVE_RESYNC_RESET_GAP_MS) &&
+            nativeNewest < roomNewest
+        if (nativeLooksReset) {
+            clearResetPreserveMarkers(candidateSerials)
+            Log.w(
+                TAG,
+                "forceFullSyncForSensor($serial): preserving Room history because native history appears reset " +
+                    "(roomOldest=$roomOldest nativeOldest=$nativeOldest roomNewest=$roomNewest nativeNewest=$nativeNewest roomCount=$roomCount nativeCount=${nativeHistory.size / 3})"
+            )
+        }
+        return nativeLooksReset
+    }
+
+    private fun clearResetPreserveMarkers(candidateSerials: Collection<String>) {
+        for (candidate in candidateSerials) {
+            sensorResetPreserveUntilMs.remove(candidate)
         }
     }
 }
