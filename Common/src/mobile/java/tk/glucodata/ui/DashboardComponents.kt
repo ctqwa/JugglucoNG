@@ -242,7 +242,7 @@ fun DashboardCombinedHeader(
 
     // 1. Resolve Values using shared logic (with calibration if active)
     val refreshRevision by UiRefreshBus.revision.collectAsState(initial = 0L)
-    val currentSnapshot = remember(refreshRevision, sensorName, currentGlucose, currentRate, latestPoint?.timestamp, history.size, viewMode) {
+    val currentSnapshot = remember(refreshRevision, sensorName, currentGlucose, currentRate, latestPoint?.timestamp, viewMode) {
         CurrentDisplaySource.resolveCurrent(
             maxAgeMillis = Notify.glucosetimeout,
             preferredSensorId = sensorName.ifBlank { null }

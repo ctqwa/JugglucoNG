@@ -754,6 +754,7 @@ public class Notify {
 
     private void postForegroundGlucoseNotification(int kind, float glvalue, String message, notGlucose glucose) {
         hasvalue = true;
+        glucoseRefreshHandler.removeCallbacks(glucoseRefreshRunnable);
         fornotify(makearrownotification(kind, glvalue, message, glucose, GLUCOSENOTIFICATION, true));
     }
 
@@ -1998,7 +1999,6 @@ public class Notify {
     private void updateForegroundGlucoseNotification(int kind, float glvalue, notGlucose glucose) {
         final String currentMessage = format(usedlocale, glucoseformat, glvalue);
         postForegroundGlucoseNotification(kind, glvalue, currentMessage, glucose);
-        scheduleInteractiveNotificationRefresh();
     }
 
     private void arrowsoundalarm(int kind, float glvalue, String message, notGlucose sglucose, String type,
@@ -3369,12 +3369,10 @@ public class Notify {
         if (isWearable) {
             notificationManager.notify(glucosealarmid, notif);
         } else {
-            {
-                notificationManager.cancel(glucosenotificationid);
-                if (keeprunning.theservice != null) {
-                    keeprunning.theservice.startForeground(glucosenotificationid, notif);
-                } else
-                    notificationManager.notify(glucosenotificationid, notif);
+            if (keeprunning.theservice != null) {
+                keeprunning.theservice.startForeground(glucosenotificationid, notif);
+            } else {
+                notificationManager.notify(glucosenotificationid, notif);
             }
         }
     }
@@ -3548,9 +3546,6 @@ public class Notify {
             boolean once) {
         hasvalue = true;
         fornotify(makearrownotification(kind, glvalue, message, glucose, type, once));
-        if (once && GLUCOSENOTIFICATION.equals(type)) {
-            scheduleInteractiveNotificationRefresh();
-        }
 
     }
 
@@ -3575,9 +3570,6 @@ public class Notify {
         }
         ;
         fornotify(makearrownotification(kind, glvalue, message, glucose, type, once));
-        if (once && GLUCOSENOTIFICATION.equals(type)) {
-            scheduleInteractiveNotificationRefresh();
-        }
     }
 
     final private int numalarmid = 81432;

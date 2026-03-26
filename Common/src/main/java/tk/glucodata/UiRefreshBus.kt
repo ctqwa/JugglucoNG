@@ -34,9 +34,7 @@ object UiRefreshBus {
 
     @JvmStatic
     fun requestStatusRefresh() {
-        bumpRevision()
         _events.tryEmit(Event.StatusOnly)
         runCatching { Floating.invalidatefloat() }
-        runCatching { Notify.showoldglucose() }
     }
 }

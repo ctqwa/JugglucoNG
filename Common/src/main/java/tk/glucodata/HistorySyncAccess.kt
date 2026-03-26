@@ -40,6 +40,18 @@ object HistorySyncAccess {
             )
         }.getOrNull()
     }
+    private val storeReadingWithSerialMethod by lazy {
+        runCatching {
+            repositoryHolder?.getMethod(
+                "storeReadingAsync",
+                Long::class.javaPrimitiveType,
+                Float::class.javaPrimitiveType,
+                Float::class.javaPrimitiveType,
+                Float::class.javaPrimitiveType,
+                String::class.java
+            )
+        }.getOrNull()
+    }
     private val aidexSourceValue by lazy {
         runCatching {
             repositoryHolder?.getField("GLUCODATA_SOURCE_AIDEX")?.getInt(null)
@@ -113,6 +125,38 @@ object HistorySyncAccess {
         }
         runCatching { method.invoke(null, timestamp, valueMmol, aidexSourceValue) }
             .onFailure { Log.w(TAG, "storeAidexReadingAsync failed for timestamp=$timestamp", it) }
+    }
+
+    @JvmStatic
+    fun storeCurrentReadingAsync(
+        timestamp: Long,
+        valueMgdl: Float,
+        rawValueMgdl: Float,
+        rate: Float,
+        sensorSerial: String?
+    ) {
+        if (timestamp <= 0L || sensorSerial.isNullOrBlank()) return
+        val method = storeReadingWithSerialMethod
+        if (method == null) {
+            Log.w(TAG, "storeCurrentReadingAsync unavailable for serial=$sensorSerial timestamp=$timestamp")
+            return
+        }
+        runCatching {
+            method.invoke(
+                null,
+                timestamp,
+                valueMgdl,
+                rawValueMgdl,
+                rate,
+                sensorSerial
+            )
+        }.onFailure {
+            Log.w(
+                TAG,
+                "storeCurrentReadingAsync failed for serial=$sensorSerial timestamp=$timestamp",
+                it
+            )
+        }
     }
 
 }

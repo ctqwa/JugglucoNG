@@ -99,10 +99,10 @@ public static void sendGlucoseBroadcast(String serial, double currentGlucose,flo
             lastActivatedSerial = serial;
             lastActivatedStartSec = startsec;
         }
-        sendSensorActivateBroadcast(context, serial, startsec);
+        sendSensorActivateBroadcastInternal(context, serial, startsec);
     }
 
-    public static void sendSensorActivateBroadcast(Context context,String serial,long startsec) {
+    private static void sendSensorActivateBroadcastInternal(Context context,String serial,long startsec) {
         if(serial==null||serial.isEmpty()||startsec<=0L) {
             return;
         }
@@ -110,5 +110,9 @@ public static void sendGlucoseBroadcast(String serial, double currentGlucose,flo
         intent.putExtra("sensor", getSensorFields(startsec*1000L));
         intent.putExtra("bleManager", setSerial(serial));
         sendIntent(context, intent);
+    }
+
+    public static void sendSensorActivateBroadcast(Context context,String serial,long startsec) {
+        maybeSendSensorActivateBroadcast(context, serial, startsec);
     } 
 }

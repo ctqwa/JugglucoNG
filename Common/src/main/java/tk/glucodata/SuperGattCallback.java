@@ -466,6 +466,26 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         return viewMode == 1 || viewMode == 3;
     }
 
+    private static void storeLiveReadingInRoom(String sensorSerial, long timmsec, float autoMgdl, float rawMgdl,
+            float rate) {
+        if (sensorSerial == null || sensorSerial.isEmpty() || timmsec <= 0L) {
+            return;
+        }
+        if ((!Float.isFinite(autoMgdl) || autoMgdl <= 0f) && (!Float.isFinite(rawMgdl) || rawMgdl <= 0f)) {
+            return;
+        }
+        final SensorHistoryMatch match = findSensorHistoryMatchNear(sensorSerial, timmsec / 1000L);
+        final long storedTimestamp = match != null && match.timestampMs > 0L
+                ? match.timestampMs
+                : (timmsec / 1000L) * 1000L;
+        final float storedAuto = (Float.isFinite(autoMgdl) && autoMgdl > 0f) ? autoMgdl : 0f;
+        final float matchedRaw = match != null ? match.rawMgdl : Float.NaN;
+        final float storedRaw = (Float.isFinite(rawMgdl) && rawMgdl > 0f)
+                ? rawMgdl
+                : ((Float.isFinite(matchedRaw) && matchedRaw > 0f) ? matchedRaw : 0f);
+        HistorySyncAccess.storeCurrentReadingAsync(storedTimestamp, storedAuto, storedRaw, rate, sensorSerial);
+    }
+
     private static boolean isAiDexSerial(String sensorSerial) {
         return sensorSerial != null && sensorSerial.startsWith("X-");
     }
@@ -723,7 +743,11 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 if (Applic.unit == 1) {
                     glucoseToUse = glucoseToUse / (float) mgdLmult;
                 }
-                syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
+                if (isAiDexSerial(SerialNumber)) {
+                    storeLiveReadingInRoom(SerialNumber, timmsec, 0f, rawMgdl, rate);
+                } else {
+                    syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
+                }
                 // Apply calibration
                 glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, true);
                 mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
@@ -799,7 +823,11 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 }
             }
 
-            syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
+            if (isAiDexSerial(SerialNumber)) {
+                storeLiveReadingInRoom(SerialNumber, timmsec, autoMgdl, rawMgdl, rate);
+            } else {
+                syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
+            }
 
             // Apply Kotlin calibration if enabled
             glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, isRawMode);

@@ -36,11 +36,11 @@ object NotificationHistorySource {
 
         val startSec = startTimeMs / 1000L
         val resolvedSerial = resolveSensorSerial(sensorSerial)
+        if (resolvedSerial.isNullOrBlank()) {
+            return emptyList()
+        }
         val history = try {
-            when {
-                !resolvedSerial.isNullOrBlank() -> Natives.getGlucoseHistoryForSensor(resolvedSerial, startSec)
-                else -> Natives.getGlucoseHistory(startSec)
-            }
+            Natives.getGlucoseHistoryForSensor(resolvedSerial, startSec)
         } catch (t: Throwable) {
             Log.w(TAG, "loadHistory(${resolvedSerial ?: "main"}, $startSec) failed", t)
             null

@@ -570,7 +570,15 @@ class AiDexBleManager(
     private fun effectiveWarmupAnchorMs(): Long {
         if (hasAuthoritativeSessionStart && sensorstartmsec > 0L) return sensorstartmsec
         if (firstValidReadingAnchorMs > 0L) return firstValidReadingAnchorMs
-        return sensorstartmsec.takeIf { it > 0L } ?: 0L
+        // A freshly added existing sensor often starts with a placeholder local
+        // sensorstartmsec until 2AAA/history arrives. Treating that placeholder
+        // as authoritative produces a bogus "Warmup 7m" on clean installs.
+        // Only fall back to the local start time when this connection actually
+        // initiated a new/reset sensor flow.
+        if (autoActivationAttemptedThisConnection || postResetWarmupExtensionActive) {
+            return sensorstartmsec.takeIf { it > 0L } ?: 0L
+        }
+        return 0L
     }
 
     private fun hasRecentBroadcastData(now: Long = System.currentTimeMillis()): Boolean {
@@ -1174,6 +1182,17 @@ class AiDexBleManager(
             // Update expiry
             val expiryMs = startMs + (_wearDays.toLong() * 24 * 3600_000L)
             _sensorExpired = System.currentTimeMillis() > expiryMs
+            if (pendingInitialHistoryRequest &&
+                !historyDownloading &&
+                !autoActivationAttemptedThisConnection &&
+                streamingStartedAtMs > 0L &&
+                lastF003FrameTimeMs < streamingStartedAtMs
+            ) {
+                pendingInitialHistoryRequest = false
+                handler.removeCallbacks(delayedInitialHistoryRequest)
+                Log.i(TAG, "CGM Session Start confirmed an existing session — starting history before first live frame")
+                requestHistoryRange()
+            }
         }
     }
 
@@ -1514,6 +1533,7 @@ class AiDexBleManager(
 
         if (requestHistory) {
             pendingInitialHistoryRequest = true
+            readCGMSessionCharacteristics()
             handler.postDelayed(delayedInitialHistoryRequest, INITIAL_HISTORY_REQUEST_DELAY_MS)
         }
     }

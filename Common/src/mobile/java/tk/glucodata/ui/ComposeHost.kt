@@ -617,9 +617,13 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
     val currentRoute = currentBackStackEntry?.destination?.route
 
     fun collectionModeForRoute(route: String?): DashboardViewModel.CollectionMode = when (route) {
-        "dashboard" -> DashboardViewModel.CollectionMode.DASHBOARD
+        "dashboard", "stats", "sensors", "settings" -> DashboardViewModel.CollectionMode.DASHBOARD
         "history", "calibrations", "settings/calibrations" -> DashboardViewModel.CollectionMode.FULL_HISTORY
-        else -> DashboardViewModel.CollectionMode.INACTIVE
+        else -> when {
+            route?.startsWith("sensors/") == true -> DashboardViewModel.CollectionMode.DASHBOARD
+            route?.startsWith("settings/") == true -> DashboardViewModel.CollectionMode.DASHBOARD
+            else -> DashboardViewModel.CollectionMode.INACTIVE
+        }
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
@@ -935,7 +939,6 @@ fun DashboardScreen(
         tk.glucodata.data.calibration.CalibrationManager.init(context)
         tk.glucodata.data.calibration.CalibrationManager.loadCalibrations()
     }
-
     // State for wizards (matching SensorScreen pattern)
     var showSibionicsWizard by remember { mutableStateOf(false) }
     var showLibreWizard by remember { mutableStateOf(false) }
@@ -988,6 +991,7 @@ fun DashboardScreen(
         tk.glucodata.ui.setup.LibreSetupWizard(
             onDismiss = { showLibreWizard = false },
             onScanNfc = {
+                showLibreWizard = false
                 tk.glucodata.MainActivity.launchLibreNfcScan()
             }
         )
@@ -1051,7 +1055,15 @@ fun DashboardScreen(
         // FAB removed - empty state now has inline cards
     ) { padding ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val latestPoint = remember(glucoseHistory) { glucoseHistory.maxByOrNull { it.timestamp } }
+            val latestPoint = remember(glucoseHistory) {
+                val tail = glucoseHistory.lastOrNull()
+                if (tail == null || glucoseHistory.size < 2) {
+                    tail
+                } else {
+                    val previous = glucoseHistory[glucoseHistory.lastIndex - 1]
+                    if (tail.timestamp >= previous.timestamp) tail else glucoseHistory.maxByOrNull { it.timestamp }
+                }
+            }
             val adaptiveMetrics = rememberAdaptiveWindowMetrics()
             val isLandscape = adaptiveMetrics.isLandscape
             val topContentInset = padding.calculateTopPadding()
@@ -3028,7 +3040,7 @@ fun SensorScreen(viewModel: tk.glucodata.ui.viewmodel.SensorViewModel = viewMode
         tk.glucodata.ui.setup.LibreSetupWizard(
             onDismiss = { showLibreWizard = false },
             onScanNfc = {
-                // Launch existing NFC/Libre flow
+                showLibreWizard = false
                 tk.glucodata.MainActivity.launchLibreNfcScan()
             }
         )
@@ -4956,342 +4968,6 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
         }
     }
 }
-}
-
-// Edit 48f: LibreView Settings Screen — bridges to legacy Libreview.java via Natives JNI
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LibreViewSettingsScreen(navController: androidx.navigation.NavController) {
-    val context = LocalContext.current
-
-    var email by remember { mutableStateOf(Natives.getlibreemail() ?: "") }
-    var password by remember { mutableStateOf(Natives.getlibrepass() ?: "") }
-    var isActive by remember { mutableStateOf(Natives.getuselibreview()) }
-    var isRussia by remember { mutableStateOf(Natives.getLibreCountry() == 4) }
-    var libreCurrent by remember { mutableStateOf(Natives.getLibreCurrent()) }
-    var libreIsViewed by remember { mutableStateOf(Natives.getLibreIsViewed()) }
-    var sendNumbers by remember { mutableStateOf(Natives.getSendNumbers()) }
-    var showPassword by remember { mutableStateOf(false) }
-    var statusText by remember { mutableStateOf(tk.glucodata.Libreview.getStatus()) }
-    var accountId by remember { mutableLongStateOf(Natives.getlibreAccountIDnumber()) }
-    var nfcCommandMode by remember { mutableIntStateOf(Libre3NfcSettings.getMode()) }
-    val hasCredentials = email.isNotBlank() && password.isNotBlank()
-
-    fun saveLibreViewSettings() {
-        Natives.setlibreemail(email)
-        Natives.setlibrepass(password)
-        Natives.setuselibreview(isActive)
-        Natives.setLibreCountry(if (isRussia) 4 else 0)
-        Natives.setLibreCurrent(libreCurrent)
-        Natives.setLibreIsViewed(libreIsViewed)
-        Natives.setSendNumbers(sendNumbers)
-        Libre3NfcSettings.setMode(nfcCommandMode)
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            saveLibreViewSettings()
-        }
-    }
-
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.libreview_settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = stringResource(R.string.cancel))
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-//            LibreViewSummaryCard(
-//                accountId = accountId,
-//                isActive = isActive,
-//                statusText = statusText
-//            )
-
-            MasterSwitchCard(
-                title = stringResource(R.string.libreview_active),
-                subtitle = stringResource(R.string.libreview_active_desc),
-                checked = isActive,
-                onCheckedChange = { isActive = it },
-                icon = Icons.Default.Cloud
-            )
-            SectionLabel(
-                text = stringResource(R.string.libreview_account_id),
-                topPadding = 0.dp
-            )
-            LibreViewStatusCard(
-                accountId = accountId,
-                statusText = statusText
-            )
-
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text(stringResource(R.string.libreview_email)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Email
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text(stringResource(R.string.libreview_password)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        visualTransformation = if (showPassword) {
-                            androidx.compose.ui.text.input.VisualTransformation.None
-                        } else {
-                            androidx.compose.ui.text.input.PasswordVisualTransformation()
-                        },
-                        trailingIcon = {
-                            val image = if (showPassword) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { showPassword = !showPassword }) {
-                                Icon(
-                                    imageVector = image,
-                                    contentDescription = if (showPassword) {
-                                        stringResource(R.string.hide_password)
-                                    } else {
-                                        stringResource(R.string.show_password)
-                                    }
-                                )
-                            }
-                        }
-                    )
-
-
-
-            Button(
-                onClick = {
-                    saveLibreViewSettings()
-                    Natives.wakelibreview(0)
-                    android.widget.Toast.makeText(
-                        context,
-                        context.getString(R.string.sending_now),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        statusText = tk.glucodata.Libreview.getStatus()
-                    }, 3000)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.libreview_send_now))
-            }
-
-            OutlinedButton(
-                onClick = {
-                    Natives.clearlibreFromMSec(0L)
-                    android.widget.Toast.makeText(
-                        context,
-                        context.getString(R.string.resend_triggered),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.libreview_resend))
-            }
-            FilledTonalButton(
-                onClick = {
-                    saveLibreViewSettings()
-                    Natives.askServerforAccountID()
-                    android.widget.Toast.makeText(
-                        context,
-                        context.getString(R.string.requesting_account_id),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        statusText = tk.glucodata.Libreview.getStatus()
-                        accountId = Natives.getlibreAccountIDnumber()
-                    }, 5000)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = hasCredentials
-            ) {
-                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.libreview_get_account_id))
-            }
-
-//            SectionLabel(
-//                text = stringResource(R.string.libreview_active),
-//                topPadding = 0.dp
-//            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SettingsSwitchItem(
-                    title = stringResource(R.string.libreview_russia),
-                    checked = isRussia,
-                    onCheckedChange = { isRussia = it },
-                    icon = Icons.Default.Public,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    position = CardPosition.TOP
-                )
-                SettingsSwitchItem(
-                    title = stringResource(R.string.libreview_current),
-                    checked = libreCurrent,
-                    onCheckedChange = { libreCurrent = it },
-                    icon = Icons.Default.ShowChart,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    position = CardPosition.MIDDLE
-                )
-                SettingsSwitchItem(
-                    title = stringResource(R.string.libreview_is_viewed),
-                    checked = libreIsViewed,
-                    onCheckedChange = { libreIsViewed = it },
-                    icon = Icons.Default.Visibility,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    position = CardPosition.MIDDLE
-                )
-                SettingsSwitchItem(
-                    title = stringResource(R.string.libreview_send_numbers),
-                    checked = sendNumbers,
-                    onCheckedChange = { sendNumbers = it },
-                    icon = Icons.Default.Insights,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    position = CardPosition.BOTTOM
-                )
-            }
-
-        }
-    }
-}
-
-//@Composable
-//private fun LibreViewSummaryCard(
-//    accountId: Long,
-//    isActive: Boolean,
-//    statusText: String
-//) {
-//    val badgeText = when {
-//        accountId > 0L -> stringResource(R.string.libreview_account_ready)
-//        isActive -> stringResource(R.string.libreview_account_missing)
-//        else -> stringResource(R.string.off)
-//    }
-//
-//    Card(
-//        shape = RoundedCornerShape(32.dp),
-//        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-//    ) {
-//        Column(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(22.dp),
-//            verticalArrangement = Arrangement.spacedBy(14.dp)
-//        ) {
-//            Row(
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.SpaceBetween,
-//                verticalAlignment = Alignment.Top
-//            ) {
-//                Surface(
-//                    shape = RoundedCornerShape(20.dp),
-//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
-//                    modifier = Modifier.size(56.dp)
-//                ) {
-//                    Box(contentAlignment = Alignment.Center) {
-//                        Icon(
-//                            imageVector = Icons.Default.Cloud,
-//                            contentDescription = null,
-//                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-//                            modifier = Modifier.size(28.dp)
-//                        )
-//                    }
-//                }
-//
-//                Surface(
-//                    shape = RoundedCornerShape(999.dp),
-//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f)
-//                ) {
-//                    Text(
-//                        text = badgeText,
-//                        style = MaterialTheme.typography.labelLarge,
-//                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-//                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-//                    )
-//                }
-//            }
-//
-//            Text(
-//                text = stringResource(R.string.libreview_settings_title),
-//                style = MaterialTheme.typography.headlineSmall,
-//                color = MaterialTheme.colorScheme.onPrimaryContainer,
-//                fontWeight = FontWeight.SemiBold
-//            )
-//            Text(
-//                text = stringResource(R.string.getaccountidmessage),
-//                style = MaterialTheme.typography.bodyLarge,
-//                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f)
-//            )
-//            if (statusText.isNotEmpty()) {
-//                Text(
-//                    text = statusText,
-//                    style = MaterialTheme.typography.bodySmall,
-//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
-//                )
-//            }
-//        }
-//    }
-//}
-
-@Composable
-private fun LibreViewStatusCard(
-    accountId: Long,
-    statusText: String
-) {
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = if (accountId > 0L) {
-                    stringResource(R.string.libreview_account_ready)
-                } else {
-                    stringResource(R.string.libreview_account_missing_desc)
-                },
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            if (accountId > 0L) {
-                Text(
-                    text = "${stringResource(R.string.libreview_account_id)}: $accountId",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (statusText.isNotEmpty()) {
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
