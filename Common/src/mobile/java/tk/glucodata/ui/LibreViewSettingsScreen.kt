@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.delay
@@ -62,6 +63,8 @@ import tk.glucodata.ui.components.SettingsSwitchItem
 @Composable
 fun LibreViewSettingsScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
+    val initialAccountId = remember { Natives.getlibreAccountIDnumber() }
+    val initialManualAccountId = remember { Natives.manualLibreAccountIDnumber() }
 
     var email by remember { mutableStateOf(Natives.getlibreemail() ?: "") }
     var password by remember { mutableStateOf(Natives.getlibrepass() ?: "") }
@@ -72,7 +75,18 @@ fun LibreViewSettingsScreen(navController: NavController) {
     var sendNumbers by remember { mutableStateOf(Natives.getSendNumbers()) }
     var showPassword by remember { mutableStateOf(false) }
     var statusText by remember { mutableStateOf(tk.glucodata.Libreview.getStatus()) }
-    var accountId by remember { mutableLongStateOf(Natives.getlibreAccountIDnumber()) }
+    var accountId by remember { mutableLongStateOf(initialAccountId) }
+    var isManualAccountId by remember { mutableStateOf(initialManualAccountId != -1L) }
+    var manualAccountIdInput by remember {
+        mutableStateOf(
+            when {
+                initialManualAccountId > 0L -> initialManualAccountId.toString()
+                initialAccountId > 0L -> initialAccountId.toString()
+                else -> ""
+            }
+        )
+    }
+    var manualAccountIdError by remember { mutableStateOf<String?>(null) }
     var nfcCommandMode by remember { mutableIntStateOf(Libre3NfcSettings.getMode()) }
     var isSendingNow by remember { mutableStateOf(false) }
     var isResendingData by remember { mutableStateOf(false) }
@@ -83,6 +97,10 @@ fun LibreViewSettingsScreen(navController: NavController) {
     val resendTriggeredText = stringResource(R.string.resend_triggered)
     val accountIdTimeoutText = stringResource(R.string.libre_setup_account_id_timeout)
     val accountIdObtainedText = stringResource(R.string.libre_setup_account_id_obtained)
+    val manualText = stringResource(R.string.manual)
+    val saveText = stringResource(R.string.save)
+    val noAccountIdSpecifiedText = stringResource(R.string.noaccountidspecified).replace("\"", "").trim()
+    val wrongFormatText = stringResource(R.string.wrongformat).replace("\"", "").trim()
 
     fun saveLibreViewSettings(includeUploadPreference: Boolean = true) {
         Natives.setlibreemail(email)
@@ -95,6 +113,41 @@ fun LibreViewSettingsScreen(navController: NavController) {
         Natives.setLibreIsViewed(libreIsViewed)
         Natives.setSendNumbers(sendNumbers)
         Libre3NfcSettings.setMode(nfcCommandMode)
+    }
+
+    fun refreshAccountIdState() {
+        val resolvedAccountId = Natives.getlibreAccountIDnumber()
+        accountId = resolvedAccountId
+        if (!isManualAccountId) {
+            manualAccountIdInput = if (resolvedAccountId > 0L) resolvedAccountId.toString() else ""
+        }
+    }
+
+    fun clearManualAccountIdOverride() {
+        isManualAccountId = false
+        manualAccountIdError = null
+        Natives.setlibreAccountIDnumber(-1L)
+        refreshAccountIdState()
+    }
+
+    fun saveManualAccountId(): Boolean {
+        val rawValue = manualAccountIdInput.trim()
+        if (rawValue.isEmpty()) {
+            manualAccountIdError = noAccountIdSpecifiedText
+            return false
+        }
+        val parsedValue = rawValue.toLongOrNull()
+        if (parsedValue == null || parsedValue <= 0L) {
+            manualAccountIdError = listOf(wrongFormatText, rawValue).filter { it.isNotEmpty() }.joinToString(" ")
+            return false
+        }
+        isManualAccountId = true
+        manualAccountIdError = null
+        manualAccountIdInput = parsedValue.toString()
+        Natives.setlibreAccountIDnumber(parsedValue)
+        refreshAccountIdState()
+        statusText = ""
+        return true
     }
 
     fun isTerminalStatus(currentStatus: String): Boolean {
@@ -150,6 +203,68 @@ fun LibreViewSettingsScreen(navController: NavController) {
                 statusText = statusText
             )
 
+            SettingsSwitchItem(
+                title = manualText,
+                checked = isManualAccountId,
+                onCheckedChange = { enabled ->
+                    if (enabled) {
+                        isManualAccountId = true
+                        manualAccountIdError = null
+                        if (manualAccountIdInput.isBlank() && accountId > 0L) {
+                            manualAccountIdInput = accountId.toString()
+                        }
+                    } else {
+                        clearManualAccountIdOverride()
+                    }
+                },
+                icon = Icons.Default.Key,
+                iconTint = MaterialTheme.colorScheme.secondary,
+                position = CardPosition.SINGLE,
+                enabled = !isBusy
+            )
+
+            if (isManualAccountId) {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = manualAccountIdInput,
+                            onValueChange = {
+                                manualAccountIdInput = it
+                                manualAccountIdError = null
+                            },
+                            label = { Text(stringResource(R.string.libreview_account_id)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = manualAccountIdError != null,
+                            supportingText = {
+                                manualAccountIdError?.let { error ->
+                                    Text(error)
+                                }
+                            },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Number
+                            )
+                        )
+
+                        OutlinedButton(
+                            onClick = { saveManualAccountId() },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isBusy
+                        ) {
+                            Text(saveText)
+                        }
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -202,7 +317,7 @@ fun LibreViewSettingsScreen(navController: NavController) {
                             delay(500)
                             elapsed += 500
                             latestStatus = tk.glucodata.Libreview.getStatus()
-                            accountId = Natives.getlibreAccountIDnumber()
+                            refreshAccountIdState()
                             if (latestStatus.isNotEmpty() && latestStatus != initialStatus) {
                                 statusText = latestStatus
                                 break
@@ -240,7 +355,7 @@ fun LibreViewSettingsScreen(navController: NavController) {
                             delay(500)
                             elapsed += 500
                             latestStatus = tk.glucodata.Libreview.getStatus()
-                            accountId = Natives.getlibreAccountIDnumber()
+                            refreshAccountIdState()
                             if (latestStatus.isNotEmpty() && latestStatus != initialStatus) {
                                 statusText = latestStatus
                                 break
@@ -265,7 +380,7 @@ fun LibreViewSettingsScreen(navController: NavController) {
             FilledTonalButton(
                 onClick = {
                     saveLibreViewSettings(includeUploadPreference = false)
-                    Natives.setlibreAccountIDnumber(-1L)
+                    clearManualAccountIdOverride()
                     tk.glucodata.Libreview.clearStatus()
                     val initialStatus = tk.glucodata.Libreview.getStatus()
                     statusText = requestingAccountIdText
@@ -278,8 +393,7 @@ fun LibreViewSettingsScreen(navController: NavController) {
                             delay(500)
                             elapsed += 500
                             val currentStatus = tk.glucodata.Libreview.getStatus()
-                            val fetchedAccountId = Natives.getlibreAccountIDnumber()
-                            accountId = fetchedAccountId
+                            refreshAccountIdState()
                             if (currentStatus.contains("AccountID", ignoreCase = true)) {
                                 statusText = if (currentStatus != initialStatus) currentStatus else accountIdObtainedText
                                 receivedAccountId = true

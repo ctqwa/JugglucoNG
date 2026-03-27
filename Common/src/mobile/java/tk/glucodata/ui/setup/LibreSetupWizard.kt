@@ -90,6 +90,8 @@ fun LibreSetupWizard(
 ) {
     val ui = rememberWizardUiMetrics()
     val coroutineScope = rememberCoroutineScope()
+    val initialAccountId = remember { Natives.getlibreAccountIDnumber() }
+    val initialManualAccountId = remember { Natives.manualLibreAccountIDnumber() }
     var currentStep by remember { mutableIntStateOf(0) }
 
     var email by remember { mutableStateOf(Natives.getlibreemail() ?: "") }
@@ -97,7 +99,18 @@ fun LibreSetupWizard(
     var isActive by remember { mutableStateOf(Natives.getuselibreview()) }
     var isRussia by remember { mutableStateOf(Natives.getLibreCountry() == 4) }
     var showPassword by remember { mutableStateOf(false) }
-    var accountIdValue by remember { mutableLongStateOf(Natives.getlibreAccountIDnumber()) }
+    var accountIdValue by remember { mutableLongStateOf(initialAccountId) }
+    var isManualAccountId by remember { mutableStateOf(initialManualAccountId != -1L) }
+    var manualAccountIdInput by remember {
+        mutableStateOf(
+            when {
+                initialManualAccountId > 0L -> initialManualAccountId.toString()
+                initialAccountId > 0L -> initialAccountId.toString()
+                else -> ""
+            }
+        )
+    }
+    var manualAccountIdError by remember { mutableStateOf<String?>(null) }
     var statusText by remember { mutableStateOf(tk.glucodata.Libreview.getStatus()) }
     var isSendingNow by remember { mutableStateOf(false) }
     var isFetchingAccountId by remember { mutableStateOf(false) }
@@ -116,6 +129,10 @@ fun LibreSetupWizard(
     val nfcAutoDescription = stringResource(R.string.libre3_nfc_command_auto_desc)
     val nfcActivateDescription = stringResource(R.string.libre3_nfc_command_activate_desc)
     val nfcSwitchReceiverDescription = stringResource(R.string.libre3_nfc_command_switch_receiver_desc)
+    val manualText = stringResource(R.string.manual)
+    val saveText = stringResource(R.string.save)
+    val noAccountIdSpecifiedText = stringResource(R.string.noaccountidspecified).replace("\"", "").trim()
+    val wrongFormatText = stringResource(R.string.wrongformat).replace("\"", "").trim()
     val nfcModes = remember {
         listOf(
             Libre3NfcSettings.MODE_AUTOMATIC,
@@ -134,9 +151,44 @@ fun LibreSetupWizard(
         Libre3NfcSettings.setMode(nfcCommandMode)
     }
 
+    fun refreshAccountIdState() {
+        val resolvedAccountId = Natives.getlibreAccountIDnumber()
+        accountIdValue = resolvedAccountId
+        if (!isManualAccountId) {
+            manualAccountIdInput = if (resolvedAccountId > 0L) resolvedAccountId.toString() else ""
+        }
+    }
+
+    fun clearManualAccountIdOverride() {
+        isManualAccountId = false
+        manualAccountIdError = null
+        Natives.setlibreAccountIDnumber(-1L)
+        refreshAccountIdState()
+    }
+
+    fun saveManualAccountId(): Boolean {
+        val rawValue = manualAccountIdInput.trim()
+        if (rawValue.isEmpty()) {
+            manualAccountIdError = noAccountIdSpecifiedText
+            return false
+        }
+        val parsedValue = rawValue.toLongOrNull()
+        if (parsedValue == null || parsedValue <= 0L) {
+            manualAccountIdError = listOf(wrongFormatText, rawValue).filter { it.isNotEmpty() }.joinToString(" ")
+            return false
+        }
+        isManualAccountId = true
+        manualAccountIdError = null
+        manualAccountIdInput = parsedValue.toString()
+        Natives.setlibreAccountIDnumber(parsedValue)
+        refreshAccountIdState()
+        statusText = ""
+        return true
+    }
+
     fun leaveLibreViewStep() {
         saveSettings()
-        accountIdValue = Natives.getlibreAccountIDnumber()
+        refreshAccountIdState()
         statusText = tk.glucodata.Libreview.getStatus()
         currentStep = 0
     }
@@ -347,6 +399,68 @@ fun LibreSetupWizard(
                             position = CardPosition.SINGLE
                         )
 
+                        SettingsSwitchItem(
+                            title = manualText,
+                            checked = isManualAccountId,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    isManualAccountId = true
+                                    manualAccountIdError = null
+                                    if (manualAccountIdInput.isBlank() && accountIdValue > 0L) {
+                                        manualAccountIdInput = accountIdValue.toString()
+                                    }
+                                } else {
+                                    clearManualAccountIdOverride()
+                                }
+                            },
+                            icon = Icons.Default.Key,
+                            iconTint = MaterialTheme.colorScheme.secondary,
+                            position = CardPosition.SINGLE,
+                            enabled = !isBusy
+                        )
+
+                        if (isManualAccountId) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = manualAccountIdInput,
+                                        onValueChange = {
+                                            manualAccountIdInput = it
+                                            manualAccountIdError = null
+                                        },
+                                        label = { Text(stringResource(R.string.libreview_account_id)) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        isError = manualAccountIdError != null,
+                                        supportingText = {
+                                            manualAccountIdError?.let { error ->
+                                                Text(error)
+                                            }
+                                        },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                    )
+
+                                    OutlinedButton(
+                                        onClick = { saveManualAccountId() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !isBusy
+                                    ) {
+                                        Text(saveText)
+                                    }
+                                }
+                            }
+                        }
+
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -398,7 +512,7 @@ fun LibreSetupWizard(
                                         delay(500)
                                         elapsed += 500
                                         latestStatus = tk.glucodata.Libreview.getStatus()
-                                        accountIdValue = Natives.getlibreAccountIDnumber()
+                                        refreshAccountIdState()
                                         if (latestStatus.isNotEmpty() && latestStatus != initialStatus) {
                                             statusText = latestStatus
                                             break
@@ -439,7 +553,7 @@ fun LibreSetupWizard(
                                         delay(500)
                                         elapsed += 500
                                         latestStatus = tk.glucodata.Libreview.getStatus()
-                                        accountIdValue = Natives.getlibreAccountIDnumber()
+                                        refreshAccountIdState()
                                         if (latestStatus.isNotEmpty() && latestStatus != initialStatus) {
                                             statusText = latestStatus
                                             break
@@ -464,7 +578,7 @@ fun LibreSetupWizard(
                         FilledTonalButton(
                             onClick = {
                                 saveSettings(includeUploadPreference = false)
-                                Natives.setlibreAccountIDnumber(-1L)
+                                clearManualAccountIdOverride()
                                 tk.glucodata.Libreview.clearStatus()
                                 val initialStatus = tk.glucodata.Libreview.getStatus()
                                 Natives.askServerforAccountID()
@@ -477,8 +591,7 @@ fun LibreSetupWizard(
                                         delay(500)
                                         elapsed += 500
                                         val currentStatus = tk.glucodata.Libreview.getStatus()
-                                        val fetchedAccountId = Natives.getlibreAccountIDnumber()
-                                        accountIdValue = fetchedAccountId
+                                        refreshAccountIdState()
                                         if (currentStatus.contains("AccountID", ignoreCase = true)) {
                                             statusText = if (currentStatus != initialStatus) currentStatus else accountIdObtainedText
                                             receivedAccountId = true
