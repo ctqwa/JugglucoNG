@@ -1,6 +1,6 @@
 ![Logo-icon](Common/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp)
 # JugglucoNG
-  ![Screenshot](alpha0.3.1.png)
+  ![Screenshot](https://github.com/ctqwa/JugglucoNG/blob/primary/alpha0.3.1.png?raw=true)
 ## 0.8.3-Alpha
 
 <…>
