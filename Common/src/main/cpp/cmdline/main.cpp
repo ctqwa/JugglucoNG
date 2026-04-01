@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 #include <signal.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -805,7 +806,9 @@ int main(int argc,char **argv) {
     while(true) {
         wakeup();
         pause();
-        perror("Got signal");
+        if(errno != EINTR) {
+            perror("pause");
+        }
         }
     }
 
