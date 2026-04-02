@@ -87,4 +87,17 @@ interface HistoryDao {
         WHERE sensorSerial = :oldSerial
     """)
     suspend fun retagSensor(oldSerial: String, newSerial: String)
+
+    @Query("""
+        DELETE FROM history_readings
+        WHERE sensorSerial = :sensorSerial
+          AND (timestamp / :bucketDurationMs) IN (:bucketIds)
+          AND timestamp NOT IN (:protectedTimestamps)
+    """)
+    suspend fun deleteConflictingSensorRowsForBuckets(
+        sensorSerial: String,
+        bucketDurationMs: Long,
+        bucketIds: List<Long>,
+        protectedTimestamps: List<Long>
+    ): Int
 }

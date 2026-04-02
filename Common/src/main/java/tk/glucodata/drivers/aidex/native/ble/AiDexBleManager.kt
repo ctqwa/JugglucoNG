@@ -1995,7 +1995,6 @@ class AiDexBleManager(
             historyDownloading = historyDownloading,
         )
         disableNoDirectLiveBroadcastFallbackMode("first-live-$source")
-        noteValidReadingAvailable(now, "valid-$source")
         if (shouldStartHistoryNow) {
             pendingInitialHistoryRequest = false
             handler.removeCallbacks(delayedInitialHistoryRequest)
@@ -2009,9 +2008,17 @@ class AiDexBleManager(
             stopBroadcastScan("live-reading", found = true)
         }
 
+        ensureSensorStartTime(now, trustedTimeOffsetMinutes)
+        val sampleTimestampMs = AiDexHistoryPolicy.resolveOffsetBackedTimestampMs(
+            observedAtMs = now,
+            sensorStartMs = sensorstartmsec,
+            offsetMinutes = trustedTimeOffsetMinutes,
+        )
+        noteValidReadingAvailable(sampleTimestampMs, "valid-$source")
+
         val bareSerial = tk.glucodata.drivers.aidex.native.crypto.SerialCrypto.stripPrefix(SerialNumber)
         val reading = GlucoseReading(
-            timestamp = now,
+            timestamp = sampleTimestampMs,
             sensorSerial = bareSerial,
             autoValue = autoValue,
             rawValue = rawValue,
@@ -2022,39 +2029,37 @@ class AiDexBleManager(
         )
         onGlucoseReading?.invoke(reading)
 
-        ensureSensorStartTime(now, trustedTimeOffsetMinutes)
-
         if (dataptr != 0L) {
             try {
                 val res = Natives.aidexProcessData(
                     dataptr,
                     byteArrayOf(0),
-                    now,
+                    sampleTimestampMs,
                     autoValue,
                     rawValue ?: 0f,
                     1.0f
                 )
-                handleGlucoseResult(res, now, rawValue ?: Float.NaN)
+                handleGlucoseResult(res, sampleTimestampMs, rawValue ?: Float.NaN)
                 if (constatstatusstr == "Connected") {
                     constatstatusstr = ""
                 }
-                maybeRequestHistoryContinuitySyncAfterLive(now, source)
+                maybeRequestHistoryContinuitySyncAfterLive(sampleTimestampMs, source)
             } catch (e: UnsatisfiedLinkError) {
                 Log.e(TAG, "F003($source): Native library mismatch: $e")
                 val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
-                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now, rawValue ?: Float.NaN)
-                maybeRequestHistoryContinuitySyncAfterLive(now, "$source-fallback")
+                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, sampleTimestampMs, rawValue ?: Float.NaN)
+                maybeRequestHistoryContinuitySyncAfterLive(sampleTimestampMs, "$source-fallback")
             } catch (e: Throwable) {
                 Log.e(TAG, "F003($source): aidexProcessData failed: $e")
                 val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
-                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now, rawValue ?: Float.NaN)
-                maybeRequestHistoryContinuitySyncAfterLive(now, "$source-fallback")
+                handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, sampleTimestampMs, rawValue ?: Float.NaN)
+                maybeRequestHistoryContinuitySyncAfterLive(sampleTimestampMs, "$source-fallback")
             }
         } else {
             Log.w(TAG, "F003($source): dataptr is 0 — cannot store reading")
             val mgdlInt = autoValue.toInt().coerceIn(0, 0xFFFF) * 10
-            handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, now, rawValue ?: Float.NaN)
-            maybeRequestHistoryContinuitySyncAfterLive(now, "$source-no-dataptr")
+            handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, sampleTimestampMs, rawValue ?: Float.NaN)
+            maybeRequestHistoryContinuitySyncAfterLive(sampleTimestampMs, "$source-no-dataptr")
         }
     }
 
@@ -4354,15 +4359,11 @@ class AiDexBleManager(
     }
 
     private fun resolveBroadcastSampleTimestampMs(observedAtMs: Long, offsetMinutes: Int): Long {
-        if (offsetMinutes <= 0) return observedAtMs
-        val startMs = sensorstartmsec.takeIf { it > 0L } ?: return observedAtMs
-        val sampleTimeMs = startMs + (offsetMinutes.toLong() * 60_000L)
-        val futureSlackMs = 5L * 60_000L
-        return if (sampleTimeMs > 0L && sampleTimeMs <= observedAtMs + futureSlackMs) {
-            sampleTimeMs
-        } else {
-            observedAtMs
-        }
+        return AiDexHistoryPolicy.resolveOffsetBackedTimestampMs(
+            observedAtMs = observedAtMs,
+            sensorStartMs = sensorstartmsec,
+            offsetMinutes = offsetMinutes,
+        )
     }
 
     private fun maybePromoteFallbackReadingToHistory(now: Long, source: String) {

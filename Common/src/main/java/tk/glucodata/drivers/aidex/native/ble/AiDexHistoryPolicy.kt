@@ -1,6 +1,7 @@
 package tk.glucodata.drivers.aidex.native.ble
 
 internal object AiDexHistoryPolicy {
+    private const val OFFSET_TIMESTAMP_FUTURE_SLACK_MS = 5L * 60_000L
 
     enum class InitialAction {
         COMPLETE_EMPTY,
@@ -90,6 +91,22 @@ internal object AiDexHistoryPolicy {
         // were not yet emitted as direct F003, so skipping >= cutoff drops
         // real backfill rows. Only skip the exact live-backed offset.
         return entryOffsetMinutes == liveOffsetCutoff
+    }
+
+    fun resolveOffsetBackedTimestampMs(
+        observedAtMs: Long,
+        sensorStartMs: Long,
+        offsetMinutes: Int?,
+    ): Long {
+        if (offsetMinutes == null || offsetMinutes <= 0 || sensorStartMs <= 0L) {
+            return observedAtMs
+        }
+        val sampleTimeMs = sensorStartMs + (offsetMinutes.toLong() * 60_000L)
+        return if (sampleTimeMs > 0L && sampleTimeMs <= observedAtMs + OFFSET_TIMESTAMP_FUTURE_SLACK_MS) {
+            sampleTimeMs
+        } else {
+            observedAtMs
+        }
     }
 
     private fun normalizePersistedIndex(

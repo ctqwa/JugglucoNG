@@ -106,4 +106,26 @@ class AiDexHistoryPolicyTests {
             )
         )
     }
+
+    @Test
+    fun resolveOffsetBackedTimestampMs_prefersAlignedTimestampWhenStartAndOffsetAreKnown() {
+        val resolved = AiDexHistoryPolicy.resolveOffsetBackedTimestampMs(
+            observedAtMs = 1_000_000L,
+            sensorStartMs = 100_000L,
+            offsetMinutes = 15,
+        )
+
+        assertEquals(1_000_000L, resolved)
+    }
+
+    @Test
+    fun resolveOffsetBackedTimestampMs_fallsBackWhenOffsetTimestampWouldBeTooFarInFuture() {
+        val resolved = AiDexHistoryPolicy.resolveOffsetBackedTimestampMs(
+            observedAtMs = 1_000_000L,
+            sensorStartMs = 900_000L,
+            offsetMinutes = 10,
+        )
+
+        assertEquals(1_000_000L, resolved)
+    }
 }

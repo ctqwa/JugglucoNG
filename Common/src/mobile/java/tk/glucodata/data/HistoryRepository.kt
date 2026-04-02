@@ -2,6 +2,7 @@ package tk.glucodata.data
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.map
@@ -29,10 +30,12 @@ import kotlin.concurrent.withLock
  */
 class HistoryRepository(context: Context = Applic.app) {
     
-    private val dao = HistoryDatabase.getInstance(context).historyDao()
+    private val database = HistoryDatabase.getInstance(context)
+    private val dao = database.historyDao()
     
     companion object {
         private const val TAG = "HistoryRepo"
+        private const val SENSOR_MINUTE_BUCKET_MS = 60_000L
         private val TIME_FORMATTER = object : ThreadLocal<SimpleDateFormat>() {
             override fun initialValue(): SimpleDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         }
@@ -224,7 +227,11 @@ class HistoryRepository(context: Context = Applic.app) {
                             )
                         )
                     }
-                    HistoryRepository().storeReadings(readings)
+                    HistoryRepository().storeReadingsReplacingSensorBuckets(
+                        sensorSerial = sensorSerial,
+                        readings = readings,
+                        bucketDurationMs = SENSOR_MINUTE_BUCKET_MS,
+                    )
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed storing history batch for $sensorSerial", e)
                 }
@@ -315,6 +322,44 @@ class HistoryRepository(context: Context = Applic.app) {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error storing readings batch", e)
+            }
+        }
+    }
+
+    /**
+     * Some history imports provide a canonical timestamp for a coarse sensor bucket
+     * after an earlier provisional row was already stored for that same bucket.
+     * Replace older rows in those buckets before inserting the canonical batch.
+     */
+    suspend fun storeReadingsReplacingSensorBuckets(
+        sensorSerial: String,
+        readings: List<HistoryReading>,
+        bucketDurationMs: Long,
+    ) {
+        if (sensorSerial.isBlank() || readings.isEmpty()) return
+        val plan = HistoryBucketReplacement.plan(
+            readings = readings,
+            bucketDurationMs = bucketDurationMs,
+        ) ?: return
+
+        withContext(Dispatchers.IO) {
+            try {
+                database.withTransaction {
+                    dao.deleteConflictingSensorRowsForBuckets(
+                        sensorSerial = sensorSerial,
+                        bucketDurationMs = bucketDurationMs,
+                        bucketIds = plan.bucketIds,
+                        protectedTimestamps = plan.protectedTimestamps
+                    )
+                    dao.insertAll(readings)
+                }
+                BatteryTrace.bump(
+                    "room.history.replace_bucket_batch",
+                    logEvery = 20L,
+                    detail = "serial=$sensorSerial size=${readings.size} bucket=${bucketDurationMs}"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error replacing bucket history batch for $sensorSerial", e)
             }
         }
     }
