@@ -97,6 +97,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -302,7 +303,7 @@ fun StatsScreen(
 
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                RangeSelectorCard(
+                StatsRangeSelectorControl(
                     selectedRange = uiState.selectedRange,
                     activeRange = uiState.activeRange,
                     isLoading = uiState.isLoading,
@@ -583,7 +584,7 @@ fun StatsScreen(
 
         if (showDateRangePicker) {
             val availableRange = uiState.availableRange
-            val initialRange = clampStatsRangeToAvailable(uiState.activeRange, availableRange) ?: availableRange
+            val initialRange = clampStatsDateRangeToAvailable(uiState.activeRange, availableRange) ?: availableRange
             val availableStartDateMillis = availableRange?.startMillis?.let(::toPickerUtcDateMillis)
             val availableEndDateMillis = availableRange?.endMillis?.let(::toPickerUtcDateMillis)
             val dateRangePickerState = rememberDateRangePickerState(
@@ -631,7 +632,7 @@ fun StatsScreen(
                     modifier = Modifier.heightIn(max = 448.dp),
                     title = {},
                     headline = {
-                        CompactDateRangePickerHeadline(dateRangePickerState)
+                        StatsDateRangePickerHeadline(dateRangePickerState)
                     },
                     showModeToggle = true
                 )
@@ -793,210 +794,6 @@ private fun HeaderBlock(
                 tint = MaterialTheme.colorScheme.primary
             )
         }
-    }
-}
-
-private fun formatStatsDateRange(range: StatsDateRange?): String? {
-    if (range == null) return null
-    val formatter = SimpleDateFormat("MMM d", Locale.getDefault())
-    return "${formatter.format(Date(range.startMillis))} - ${formatter.format(Date(range.endMillis))}"
-}
-
-private fun formatPickerHeadline(
-    startUtcMillis: Long?,
-    endUtcMillis: Long?
-): String? {
-    if (startUtcMillis == null && endUtcMillis == null) return null
-    val monthDayFormatter = SimpleDateFormat("d MMM", Locale.getDefault()).apply {
-        timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }
-    val monthDayYearFormatter = SimpleDateFormat("d MMM yyyy", Locale.getDefault()).apply {
-        timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }
-    val yearFormatter = SimpleDateFormat("yyyy", Locale.getDefault()).apply {
-        timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }
-
-    return when {
-        startUtcMillis != null && endUtcMillis != null &&
-            yearFormatter.format(Date(startUtcMillis)) == yearFormatter.format(Date(endUtcMillis)) ->
-            "${monthDayFormatter.format(Date(startUtcMillis))} - ${monthDayYearFormatter.format(Date(endUtcMillis))}"
-        startUtcMillis != null && endUtcMillis != null ->
-            "${monthDayYearFormatter.format(Date(startUtcMillis))} - ${monthDayYearFormatter.format(Date(endUtcMillis))}"
-        startUtcMillis != null -> monthDayYearFormatter.format(Date(startUtcMillis))
-        else -> monthDayYearFormatter.format(Date(endUtcMillis!!))
-    }
-}
-
-@Composable
-private fun CompactDateRangePickerHeadline(
-    state: DateRangePickerState
-) {
-    val headline = remember(state.selectedStartDateMillis, state.selectedEndDateMillis) {
-        formatPickerHeadline(state.selectedStartDateMillis, state.selectedEndDateMillis)
-    }
-    if (!headline.isNullOrBlank()) {
-        Text(
-            text = headline,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 2.dp),
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Medium,
-                lineHeight = 24.sp
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-private fun clampStatsRangeToAvailable(range: StatsDateRange?, availableRange: StatsDateRange?): StatsDateRange? {
-    if (range == null) return availableRange
-    if (availableRange == null) return range
-    val startMillis = maxOf(range.startMillis, availableRange.startMillis)
-    val endMillis = minOf(range.endMillis, availableRange.endMillis)
-    return if (endMillis >= startMillis) {
-        StatsDateRange(startMillis = startMillis, endMillis = endMillis)
-    } else {
-        availableRange
-    }
-}
-
-private fun toPickerUtcDateMillis(timestampMillis: Long): Long {
-    val localDate = Instant.ofEpochMilli(timestampMillis)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-    return localDate
-        .atStartOfDay(ZoneOffset.UTC)
-        .toInstant()
-        .toEpochMilli()
-}
-
-private fun pickerUtcDateMillisToLocalStart(utcDateMillis: Long): Long {
-    val localDate = Instant.ofEpochMilli(utcDateMillis)
-        .atZone(ZoneOffset.UTC)
-        .toLocalDate()
-    return localDate
-        .atStartOfDay(ZoneId.systemDefault())
-        .toInstant()
-        .toEpochMilli()
-}
-
-private fun pickerUtcDateMillisToLocalEnd(utcDateMillis: Long): Long {
-    val localDate = Instant.ofEpochMilli(utcDateMillis)
-        .atZone(ZoneOffset.UTC)
-        .toLocalDate()
-    return localDate
-        .plusDays(1)
-        .atStartOfDay(ZoneId.systemDefault())
-        .toInstant()
-        .toEpochMilli() - 1L
-}
-
-@Composable
-private fun RangeSelectorCard(
-    selectedRange: StatsTimeRange?,
-    activeRange: StatsDateRange?,
-    isLoading: Boolean,
-    hasData: Boolean,
-    readingCount: Int,
-    onRangeSelected: (StatsTimeRange) -> Unit,
-    onCustomRangeClick: () -> Unit
-) {
-    val view = LocalView.current
-    var lastRangeHapticAt by remember { mutableLongStateOf(0L) }
-    val subtitle = when {
-        isLoading -> stringResource(R.string.loading_data)
-        activeRange != null -> formatStatsDateRange(activeRange)
-        else -> stringResource(R.string.statistics_subtitle)
-    }
-    val ranges = StatsTimeRange.entries.toList()
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (hasData && readingCount > 0) {
-                Text(
-                    text = "$readingCount ${stringResource(R.string.points)}",
-                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 16.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-            Surface(
-                modifier = Modifier.heightIn(min = 36.dp),
-                onClick = onCustomRangeClick,
-                shape = RoundedCornerShape(18.dp),
-                color = if (selectedRange == null) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
-                },
-                contentColor = if (selectedRange == null) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .heightIn(min = 36.dp)
-                        .padding(horizontal = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = subtitle ?: stringResource(R.string.statistics_subtitle),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-
-        val context = LocalContext.current
-        ConnectedButtonGroup(
-            options = ranges,
-            selectedOption = selectedRange,
-            onOptionSelected = { range ->
-                if (range != selectedRange) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastRangeHapticAt >= 90L) {
-                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        lastRangeHapticAt = now
-                    }
-                    onRangeSelected(range)
-                }
-            },
-            labelText = { option -> context.getString(option.labelResId) },
-            label = { option -> Text(
-                text = stringResource(option.labelResId),
-                style = MaterialTheme.typography.labelLarge
-            ) },
-            itemHeight = 40.dp,
-            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            selectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -1427,14 +1224,21 @@ private fun KeyMetricTile(
 ) {
     var expanded by remember(label, infoText) { mutableStateOf(false) }
     val expandable = !infoText.isNullOrBlank()
-    Surface(
+    val tileShape = RoundedCornerShape(topStart = 16.dp, topEnd = 10.dp, bottomStart = 10.dp, bottomEnd = 16.dp)
+    Box(
         modifier = modifier
             .animateContentSize()
+            .graphicsLayer {
+                shape = tileShape
+                clip = true
+            }
+            .background(
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = tileShape
+            )
             .then(
                 if (expandable) Modifier.clickable { expanded = !expanded } else Modifier
-            ),
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 10.dp, bottomStart = 10.dp, bottomEnd = 16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
     ) {
         Row(
             modifier = Modifier
@@ -1529,14 +1333,21 @@ private fun SecondaryMetricTile(
 ) {
     var expanded by remember(label, infoText) { mutableStateOf(false) }
     val expandable = !infoText.isNullOrBlank()
-    Surface(
+    val tileShape = RoundedCornerShape(topStart = 12.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 12.dp)
+    Box(
         modifier = modifier
             .animateContentSize()
+            .graphicsLayer {
+                shape = tileShape
+                clip = true
+            }
+            .background(
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = tileShape
+            )
             .then(
                 if (expandable) Modifier.clickable { expanded = !expanded } else Modifier
-            ),
-        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
     ) {
         Row(
             modifier = Modifier
@@ -1708,7 +1519,8 @@ private fun MetricsScoreSection(
         title = stringResource(R.string.psg),
         value = formatMgDl(summary.psg.baselineMgDl, unit),
         status = stringResource(summary.psg.labelResId),
-        meta = "${stringResource(R.string.confidence)} ${String.format(Locale.getDefault(), "%.0f%%", summary.psg.confidence)} · ${stringResource(R.string.stats_trend)} ${if (summary.psg.trend >= 0f) "+" else ""}${String.format(Locale.getDefault(), "%.0f%%", summary.psg.trend * 100f)}",
+//        meta = "${stringResource(R.string.confidence)} ${String.format(Locale.getDefault(), "%.0f%%", summary.psg.confidence)} · ${stringResource(R.string.stats_trend)} ${if (summary.psg.trend >= 0f) "+" else ""}${String.format(Locale.getDefault(), "%.0f%%", summary.psg.trend * 100f)}",
+        meta = "${String.format(Locale.getDefault(), "%.0f%%", summary.psg.confidence)} · ${stringResource(R.string.stats_trend)} ${if (summary.psg.trend >= 0f) "+" else ""}${String.format(Locale.getDefault(), "%.0f%%", summary.psg.trend * 100f)}",
         tone = psgTone(summary.psg.labelResId),
         infoText = stringResource(R.string.psg_description)
     )
@@ -1811,15 +1623,20 @@ private fun ScoreTile(
     val titleStyle = MaterialTheme.typography.titleMedium.copy(lineHeight = 22.sp)
     val statusStyle = MaterialTheme.typography.titleSmall.copy(lineHeight = 20.sp)
     val valueStyle = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum")
-    Surface(
+    Box(
         modifier = modifier
-            .clip(tileShape)
             .animateContentSize()
+            .graphicsLayer {
+                shape = tileShape
+                clip = true
+            }
+            .background(
+                color = tileColor,
+                shape = tileShape
+            )
             .then(
                 if (expandable) Modifier.clickable { expanded = !expanded } else Modifier
-            ),
-        shape = tileShape,
-        color = tileColor
+            )
     ) {
         Column(
             modifier = Modifier
