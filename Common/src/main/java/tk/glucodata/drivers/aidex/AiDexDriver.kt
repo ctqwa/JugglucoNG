@@ -71,13 +71,13 @@ interface AiDexDriver {
     /** Hours since sensor activation (-1 = unknown). */
     fun getSensorAgeHours(): Int
 
-    /** Firmware version string from GET_DEVICE_INFO (e.g. "1.2.3"). */
+    /** Firmware version string from startup metadata / vendor device-info. */
     val vendorFirmwareVersion: String
 
-    /** Hardware version string from GET_DEVICE_INFO. */
+    /** Hardware version string from startup metadata / vendor device-info. */
     val vendorHardwareVersion: String
 
-    /** Model name from GET_DEVICE_INFO (e.g. "GX-01S"). */
+    /** Model name from startup metadata / vendor device-info (e.g. "GX-01S"). */
     val vendorModelName: String
 
     // ── Lifecycle ───────────────────────────────────────────────────────

@@ -23,18 +23,17 @@ class AiDexCommandBuilder(private val keyExchange: AiDexKeyExchange) {
 
     // -- Convenience Methods --
 
-    /**
-     * Current native driver still uses the legacy `0x21` metadata request.
-     *
-     * Static RE proves official `getDeviceInfo()` is raw `0x10`, but the local
-     * manager/parser path still expects the `0x21` response shape. Keep the
-     * existing runtime behavior until that path is reconciled cleanly.
-     */
-    fun getDeviceInfo() = buildEncrypted(AiDexOpcodes.GET_DEVICE_INFO)
+    fun getStartupDeviceInfo() = buildEncrypted(AiDexOpcodes.GET_STARTUP_DEVICE_INFO)
 
-    fun getOfficialDeviceInfo() = buildEncrypted(AiDexOpcodes.GET_DEVICE_INFO_OFFICIAL)
+    @Deprecated("Use getStartupDeviceInfo()")
+    fun getOfficialDeviceInfo() = getStartupDeviceInfo()
 
-    fun getStartTime() = buildEncrypted(AiDexOpcodes.GET_START_TIME)
+    fun getLegacyStartTime() = buildEncrypted(AiDexOpcodes.GET_LOCAL_START_TIME)
+
+    @Deprecated("Use getStartupDeviceInfo()")
+    fun getDeviceInfo() = getStartupDeviceInfo()
+
+    fun getStartTime() = getLegacyStartTime()
 
     fun getBroadcastData() = buildEncrypted(AiDexOpcodes.GET_BROADCAST_DATA)
 

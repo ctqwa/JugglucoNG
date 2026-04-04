@@ -170,6 +170,10 @@ class AiDexBleManager(
         private const val DEFERRED_BOND_CHECK_MAX_ATTEMPTS = 4
         private const val STARTUP_CONTROL_ACK_TIMEOUT_MS = 3_000L
         private const val STREAMING_METADATA_REQUEST_DELAY_MS = 400L
+        private const val STARTUP_DEVICE_INFO_REQUEST_DELAY_MS = 2_000L
+        private const val START_TIME_REPAIR_REQUERY_DELAY_MS = 1_000L
+        private const val START_TIME_REPAIR_MAX_ATTEMPTS = 1
+        private const val START_TIME_REPAIR_RESPONSE_MAX_BYTES = 12
 
         // -- History Storage --
         private const val MIN_VALID_GLUCOSE_MGDL = 20
@@ -301,6 +305,11 @@ class AiDexBleManager(
     private var lastF002FrameTimeMs: Long = 0L
     private var defaultParamProbeTotalWords = 0
     private var defaultParamProbeRawBuffer: ByteArray? = null
+    private var startupDeviceInfoRequested = false
+    private var legacyStartTimeRequested = false
+    private var startTimeRepairProbePending = false
+    private var startTimeRepairWritePending = false
+    private var startTimeRepairAttempts = 0
 
     /** Watchdog: force-disconnect if key exchange doesn't complete within timeout. */
     private val keyExchangeWatchdog = Runnable {
@@ -603,11 +612,11 @@ class AiDexBleManager(
     /** Whether a calibration download is in progress. */
     private var calibrationDownloading: Boolean = false
 
-    // -- Device Info (0x21) --
-    // 0x21 always fails with status=0x01 on tested sensors.
-    // All info comes from DIS (0x180A) + CGM Session Start Time (0x2AAA) instead.
-    // Kept as single-shot attempt (no retries) for future sensors that may support it.
-    @Volatile private var deviceInfoComplete = false
+    // -- Startup Metadata / Legacy Start Time (0x10 / 0x21) --
+    // The vendor/original stack treats raw `0x10` as startup device-info and
+    // raw `0x21` as a follow-up local start-time query. Keep both bounded and
+    // optional; DIS + 2AAA remain the primary metadata source.
+    @Volatile private var startupMetadataComplete = false
 
     // -- Reconnection Prevention Flags --
     // Matches vendor driver's layered defense against unwanted reconnection.
@@ -1202,7 +1211,12 @@ class AiDexBleManager(
             cccdQueue.clear()
             cccdWriteInProgress = false
             cccdRetryCount = 0
-            deviceInfoComplete = false
+            startupMetadataComplete = false
+            startupDeviceInfoRequested = false
+            legacyStartTimeRequested = false
+            startTimeRepairProbePending = false
+            startTimeRepairWritePending = false
+            startTimeRepairAttempts = 0
             autoActivationAttemptedThisConnection = false
             hasAuthoritativeSessionStart = false
             streamingStartedAtMs = 0L
@@ -1311,7 +1325,7 @@ class AiDexBleManager(
             liveOffsetCutoff = 0
             lastHistoryNewestGlucose = 0f
             lastHistoryNewestOffset = 0
-            deviceInfoComplete = false
+            startupMetadataComplete = false
 
             if (pendingInvalidSetupRecovery != PendingInvalidSetupRecovery.NONE) {
                 Log.w(TAG, "Disconnect is owned by invalid-setup recovery (${pendingInvalidSetupRecovery.name})")
@@ -1692,104 +1706,120 @@ class AiDexBleManager(
         }
     }
 
+    private fun applyParsedSessionStartTime(
+        parsed: AiDexParser.LocalStartTime,
+        source: String,
+        allowActivation: Boolean,
+        allowRepairProbe: Boolean,
+    ) {
+        val tzOffsetSeconds = (parsed.tzQuarters * 15 * 60) +
+            if (parsed.dstQuarters == 4) 3600 else 0
+        if (parsed.tzQuarters != 0 || parsed.dstQuarters != 0) {
+            Log.i(
+                TAG,
+                "$source start time: ${parsed.year}-${parsed.month}-${parsed.day} " +
+                    "${parsed.hour}:${parsed.minute}:${parsed.second} " +
+                    "TZ=${parsed.tzQuarters * 15}min DST=${parsed.dstQuarters}"
+            )
+        } else {
+            Log.i(
+                TAG,
+                "$source start time: ${parsed.year}-${parsed.month}-${parsed.day} " +
+                    "${parsed.hour}:${parsed.minute}:${parsed.second} (no TZ)"
+            )
+        }
+
+        if (parsed.isAllZeros) {
+            Log.i(TAG, "$source start time: all zeros")
+            hasAuthoritativeSessionStart = false
+            armFirstValidReadingWait(System.currentTimeMillis(), "$source-zero-session-start")
+            if (allowActivation) {
+                if (!autoActivationAttemptedThisConnection) {
+                    autoActivationAttemptedThisConnection = true
+                    if (needsPostResetActivation) {
+                        needsPostResetActivation = false
+                        writeBoolPref("needsPostResetActivation", false)
+                        Log.i(TAG, "$source start time: post-reset auto-activating sensor with SET_NEW_SENSOR (0x20)")
+                    } else {
+                        Log.i(TAG, "$source start time: fresh sensor auto-activating with SET_NEW_SENSOR (0x20)")
+                    }
+                    startNewSensor()
+                    handler.postDelayed({ readCGMSessionCharacteristics() }, 2_000L)
+                } else {
+                    Log.w(TAG, "$source start time still zero after activation attempt — waiting for first valid reading")
+                }
+                return
+            }
+
+            if (allowRepairProbe) {
+                maybeRequestStartTimeRepairProbe("$source-zero-start")
+            }
+            return
+        }
+
+        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        cal.set(parsed.year, parsed.month - 1, parsed.day, parsed.hour, parsed.minute, parsed.second)
+        cal.set(Calendar.MILLISECOND, 0)
+        val startMs = cal.timeInMillis - (tzOffsetSeconds * 1000L)
+        if (startMs <= 0L || startMs >= System.currentTimeMillis() + 86400_000L) {
+            Log.w(TAG, "$source start time parse produced out-of-range epoch: $startMs")
+            return
+        }
+
+        hasAuthoritativeSessionStart = true
+        val ageMs = System.currentTimeMillis() - startMs
+        val ageDays = ageMs.toDouble() / 86400_000.0
+        val remainDays = _wearDays - ageDays
+        Log.i(
+            TAG,
+            "$source start time parsed: startMs=$startMs, age=${String.format("%.1f", ageDays)} days, " +
+                "remaining=${String.format("%.1f", remainDays)} days"
+        )
+
+        try {
+            Natives.aidexSetWearDays(dataptr, _wearDays)
+            Log.i(TAG, "aidexSetWearDays: days=$_wearDays (from $source)")
+        } catch (_: Throwable) {}
+
+        if (sensorstartmsec <= 0L || kotlin.math.abs(sensorstartmsec - startMs) > 60_000L) {
+            Log.i(TAG, "Updating sensorstartmsec from $source: $sensorstartmsec → $startMs")
+            sensorstartmsec = startMs
+            Natives.aidexSetStartTime(dataptr, startMs)
+        }
+        if (lastGlucoseTimeMs < startMs) {
+            armFirstValidReadingWait(startMs, "$source-authoritative-start")
+        }
+
+        val expiryMs = startMs + (_wearDays.toLong() * 24 * 3600_000L)
+        _sensorExpired = System.currentTimeMillis() > expiryMs
+        if (
+            pendingInitialHistoryRequest &&
+            !historyDownloading &&
+            !autoActivationAttemptedThisConnection &&
+            streamingStartedAtMs > 0L &&
+            lastF003FrameTimeMs < streamingStartedAtMs
+        ) {
+            Log.i(TAG, "$source start time confirmed an existing session — keeping delayed history fallback; still waiting for first live frame")
+        }
+    }
+
     /**
      * Parse CGM Session Start Time (0x2AAA):
      * Bytes: year(u16LE), month, day, hour, minute, second, timezone(s8), DST(u8)
      * Sets sensorstartmsec and computes actual wear days from the sensor.
      */
     private fun handleCGMSessionStartTime(data: ByteArray) {
-        if (data.size < 7) {
-            Log.w(TAG, "CGM Session Start Time: too short (${data.size} bytes)")
+        val parsed = AiDexParser.parseLocalStartTimePayload(data)
+        if (parsed == null) {
+            Log.w(TAG, "CGM Session Start Time: invalid payload (${data.size} bytes)")
             return
         }
-        val year = (data[0].toInt() and 0xFF) or ((data[1].toInt() and 0xFF) shl 8)
-        val month = data[2].toInt() and 0xFF
-        val day = data[3].toInt() and 0xFF
-        val hour = data[4].toInt() and 0xFF
-        val minute = data[5].toInt() and 0xFF
-        val second = data[6].toInt() and 0xFF
-
-        var tzOffsetSeconds = 0
-        if (data.size >= 9) {
-            val tz = data[7].toInt()  // signed, 15-minute increments
-            val dst = data[8].toInt() and 0xFF
-            tzOffsetSeconds = tz * 15 * 60
-            if (dst == 4) tzOffsetSeconds += 3600  // DST=4 means +1h
-            Log.i(TAG, "CGM Session Start: $year-$month-$day $hour:$minute:$second TZ=${tz * 15}min DST=$dst")
-        } else {
-            Log.i(TAG, "CGM Session Start: $year-$month-$day $hour:$minute:$second (no TZ)")
-        }
-
-        // Detect uninitialized sensor (all-zeros start time after reset)
-        if (year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0) {
-            Log.i(TAG, "CGM Session Start: all zeros — sensor is uninitialized")
-            hasAuthoritativeSessionStart = false
-            armFirstValidReadingWait(System.currentTimeMillis(), "zero-session-start")
-            if (!autoActivationAttemptedThisConnection) {
-                autoActivationAttemptedThisConnection = true
-                if (needsPostResetActivation) {
-                    needsPostResetActivation = false
-                    writeBoolPref("needsPostResetActivation", false)
-                    Log.i(TAG, "Post-reset: auto-activating sensor with SET_NEW_SENSOR (0x20)")
-                } else {
-                    Log.i(TAG, "Fresh sensor: auto-activating sensor with SET_NEW_SENSOR (0x20)")
-                }
-                startNewSensor()
-                // Re-read session start time after a delay so we pick up the new activation time
-                handler.postDelayed({ readCGMSessionCharacteristics() }, 2_000L)
-            } else {
-                Log.w(TAG, "CGM Session Start still zero after activation attempt — waiting for first valid reading")
-            }
-            return
-        }
-
-        // Construct timestamp
-        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
-        cal.set(year, month - 1, day, hour, minute, second)
-        cal.set(java.util.Calendar.MILLISECOND, 0)
-        // The time in the characteristic is in the sensor's local timezone
-        val startMs = cal.timeInMillis - (tzOffsetSeconds * 1000L)
-
-        if (startMs > 0 && startMs < System.currentTimeMillis() + 86400_000L) {
-            hasAuthoritativeSessionStart = true
-            val ageMs = System.currentTimeMillis() - startMs
-            val ageDays = ageMs.toDouble() / 86400_000.0
-            val remainDays = _wearDays - ageDays
-            Log.i(TAG, "CGM Session Start parsed: startMs=$startMs, age=${String.format("%.1f", ageDays)} days, remaining=${String.format("%.1f", remainDays)} days")
-
-            // Push wear days to C++ layer BEFORE start time — aidexSetStartTime
-            // uses info->days to compute wearduration2, so days must be set first
-            try {
-                Natives.aidexSetWearDays(dataptr, _wearDays)
-                Log.i(TAG, "aidexSetWearDays: days=$_wearDays (from CGM Session Start)")
-            } catch (_: Throwable) {}
-
-            // Update sensorstartmsec if not already set or if this is more accurate
-            if (sensorstartmsec <= 0L || kotlin.math.abs(sensorstartmsec - startMs) > 60_000L) {
-                Log.i(TAG, "Updating sensorstartmsec from CGM Session Start: $sensorstartmsec → $startMs")
-                sensorstartmsec = startMs
-                Natives.aidexSetStartTime(dataptr, startMs)
-            }
-            if (lastGlucoseTimeMs < startMs) {
-                armFirstValidReadingWait(startMs, "authoritative-session-start")
-            }
-
-            // Update expiry
-            val expiryMs = startMs + (_wearDays.toLong() * 24 * 3600_000L)
-            _sensorExpired = System.currentTimeMillis() > expiryMs
-            if (pendingInitialHistoryRequest &&
-                !historyDownloading &&
-                !autoActivationAttemptedThisConnection &&
-                streamingStartedAtMs > 0L &&
-                lastF003FrameTimeMs < streamingStartedAtMs
-            ) {
-                // Do not treat 2AAA confirmation as permission to front-load history.
-                // Clean 1.8.1 traces and later no-F003 field logs both fit a quieter
-                // startup better: keep waiting for the first live frame, and let the
-                // existing delayed history fallback fire if live never shows up.
-                Log.i(TAG, "CGM Session Start confirmed an existing session — keeping delayed history fallback; still waiting for first live frame")
-            }
-        }
+        applyParsedSessionStartTime(
+            parsed = parsed,
+            source = "CGM session",
+            allowActivation = true,
+            allowRepairProbe = false,
+        )
     }
 
     override fun bonded() {
@@ -2372,6 +2402,9 @@ class AiDexBleManager(
         // already flowing.
         readDeviceInformationService()
         readCGMSessionCharacteristics()
+        handler.postDelayed({
+            maybeRequestStartupDeviceInfo("streaming-metadata-$reason")
+        }, STARTUP_DEVICE_INFO_REQUEST_DELAY_MS)
     }
 
     private fun scheduleStreamingMetadataRead(reason: String) {
@@ -2411,12 +2444,80 @@ class AiDexBleManager(
         enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
     }
 
+    private fun maybeRequestStartupDeviceInfo(reason: String) {
+        if (startupMetadataComplete || startupDeviceInfoRequested) return
+        if (!keyExchange.isComplete) return
+        if (_modelName.isNotBlank() && _firmwareVersion.isNotBlank() && hasAuthoritativeSessionStart) {
+            startupMetadataComplete = true
+            return
+        }
+
+        val cmd = commandBuilder.getStartupDeviceInfo() ?: run {
+            Log.w(TAG, "maybeRequestStartupDeviceInfo($reason): session key not ready")
+            return
+        }
+        startupDeviceInfoRequested = true
+        Log.i(TAG, "Requesting startup device info (0x10, $reason)")
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+    }
+
+    private fun requestLegacyStartTime(reason: String) {
+        if (legacyStartTimeRequested || hasAuthoritativeSessionStart) return
+        val cmd = commandBuilder.getLegacyStartTime() ?: run {
+            Log.w(TAG, "requestLegacyStartTime($reason): session key not ready")
+            return
+        }
+        legacyStartTimeRequested = true
+        Log.i(TAG, "Requesting legacy local start time (0x21, $reason)")
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+    }
+
     private fun requestDefaultParamProbe(startIndex: Int, reason: String) {
         val cmd = commandBuilder.getDefaultParam(startIndex) ?: run {
             Log.w(TAG, "requestDefaultParamProbe($reason): session key not ready")
             return
         }
         Log.i(TAG, "Requesting read-only default params (0x31, start=$startIndex, $reason)")
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+    }
+
+    private fun maybeRequestStartTimeRepairProbe(reason: String) {
+        if (hasAuthoritativeSessionStart) return
+        if (autoActivationAttemptedThisConnection) return
+        if (startTimeRepairProbePending || startTimeRepairWritePending) return
+        if (startTimeRepairAttempts >= START_TIME_REPAIR_MAX_ATTEMPTS) return
+
+        val cmd = commandBuilder.getDefaultParam(0x01) ?: run {
+            Log.w(TAG, "maybeRequestStartTimeRepairProbe($reason): session key not ready")
+            return
+        }
+        startTimeRepairAttempts++
+        startTimeRepairProbePending = true
+        Log.i(TAG, "Requesting bounded zero-start-time repair probe (0x31, $reason)")
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
+    }
+
+    private fun writeLocalStartTimeRepair(reason: String) {
+        if (startTimeRepairWritePending || hasAuthoritativeSessionStart) return
+
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        val timeZone = aiDexActivationTimeZone(cal, TimeZone.getDefault())
+        val cmd = commandBuilder.setNewSensor(
+            year = cal.get(Calendar.YEAR),
+            month = cal.get(Calendar.MONTH) + 1,
+            day = cal.get(Calendar.DAY_OF_MONTH),
+            hour = cal.get(Calendar.HOUR_OF_DAY),
+            minute = cal.get(Calendar.MINUTE),
+            second = cal.get(Calendar.SECOND),
+            tzQuarters = timeZone.tzQuarters,
+            dstQuarters = timeZone.dstQuarters,
+        ) ?: run {
+            Log.w(TAG, "writeLocalStartTimeRepair($reason): session key not ready")
+            return
+        }
+
+        startTimeRepairWritePending = true
+        Log.i(TAG, "Writing bounded local start-time repair (0x20, $reason)")
         enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
     }
 
@@ -2622,7 +2723,8 @@ class AiDexBleManager(
         }
 
         when (opcode) {
-            0x21 -> handleDeviceInfoResponse(plaintext)
+            0x10 -> handleStartupDeviceInfoResponse(plaintext)
+            0x21 -> handleLegacyStartTimeResponse(plaintext)
             0x22 -> handleHistoryRangeResponse(plaintext)
             0x23 -> handleHistoryRawResponse(plaintext)
             0x24 -> handleHistoryBriefResponse(plaintext)
@@ -2655,44 +2757,80 @@ class AiDexBleManager(
 
     // -- Response Handlers --
 
-    private fun handleDeviceInfoResponse(data: ByteArray) {
-        // Wire opcode 0x21 returns combined device info + start time.
-        // Real capture format (26 bytes total):
-        //   data[0]     = 0x21 (opcode)
-        //   data[1..2]  = status (2 bytes, e.g. 00 00)
-        //   data[3]     = fw_major
-        //   data[4]     = fw_minor
-        //   data[5]     = hw_major
-        //   data[6]     = hw_minor
-        //   data[7..8]  = sensor_type (u16 LE)
-        //   data[9..16] = model name (8 bytes ASCII, null-terminated)
-        //   data[17..18]= year (u16 LE)
-        //   data[19]    = month (1-12)
-        //   data[20]    = day
-        //   data[21]    = hour
-        //   data[22]    = minute
-        //   data[23]    = second
-        //   data[24]    = timezone (signed, 15-min quarters)
-        //   data[25]    = DST offset (15-min quarters)
-        //
-        // Confirmed from real sensor X-2222267V4E capture:
-        //   DeviceInfo: 00 00 01 07 01 03 0F 00 47 58 2D 30 31 53 00 00
-        //   StartTime:  EA 07 02 1C 13 25 05 14 00
+    private fun handleStartupDeviceInfoResponse(data: ByteArray) {
+        val payloadEndExclusive = if (data.size >= 4 && Crc16CcittFalse.validateResponse(data)) {
+            data.size - 2
+        } else {
+            data.size
+        }
+        if (payloadEndExclusive <= 2) {
+            Log.d(TAG, "Startup device info 0x10: too short (${data.size} bytes)")
+            return
+        }
 
+        val payload = data.copyOfRange(2, payloadEndExclusive)
+        val parsed = AiDexParser.parseStartupDeviceInfoPayload(payload)
+        if (parsed == null) {
+            Log.d(TAG, "Startup device info 0x10: unsupported payload len=${payload.size} — keeping DIS/2AAA as source of truth")
+            return
+        }
+
+        startupMetadataComplete = true
+        _firmwareVersion = parsed.firmwareVersion
+        _hardwareVersion = parsed.hardwareVersion
+        _wearDays = parsed.wearDays
+        _modelName = parsed.modelName
+        applyWearProfileFromModel(_modelName)
+        Log.i(
+            TAG,
+            "Startup device info 0x10: fw=$_firmwareVersion hw=$_hardwareVersion " +
+                "days=$_wearDays model=$_modelName"
+        )
+
+        if (!hasAuthoritativeSessionStart) {
+            requestLegacyStartTime("post-0x10")
+        }
+    }
+
+    private fun handleLegacyStartTimeResponse(data: ByteArray) {
+        val payloadEndExclusive = if (data.size >= 4 && Crc16CcittFalse.validateResponse(data)) {
+            data.size - 2
+        } else {
+            data.size
+        }
+        if (payloadEndExclusive <= 2) {
+            Log.d(TAG, "Legacy start time 0x21: too short (${data.size} bytes)")
+            return
+        }
+
+        val payload = data.copyOfRange(2, payloadEndExclusive)
+        val parsedStartTime = AiDexParser.parseLocalStartTimePayload(payload)
+        if (parsedStartTime != null) {
+            applyParsedSessionStartTime(
+                parsed = parsedStartTime,
+                source = "Legacy 0x21",
+                allowActivation = false,
+                allowRepairProbe = true,
+            )
+            startupMetadataComplete = startupMetadataComplete || hasAuthoritativeSessionStart
+            return
+        }
+
+        handleLegacyCombinedMetadataResponse(data)
+    }
+
+    private fun handleLegacyCombinedMetadataResponse(data: ByteArray) {
         if (data.size < 3) {
-            Log.d(TAG, "Device info 0x21: too short (${data.size} bytes) — ignoring, using DIS+2AAA")
+            Log.d(TAG, "Legacy combined metadata 0x21: too short (${data.size} bytes)")
             return
         }
         val statusByte = data[1].toInt() and 0xFF
-        Log.i(TAG, "Device info response: status=0x${"%02X".format(statusByte)}, len=${data.size}")
-
-        // If status != 0 or too short — not supported by this sensor, no retries.
+        Log.i(TAG, "Legacy combined metadata 0x21: status=0x${"%02X".format(statusByte)}, len=${data.size}")
         if (data.size < 17 || statusByte != 0) {
-            Log.d(TAG, "Device info 0x21: status=0x${"%02X".format(statusByte)}, len=${data.size} — not supported, using DIS+2AAA")
+            Log.d(TAG, "Legacy combined metadata 0x21 not supported on this sensor — using DIS + 2AAA")
             return
         }
 
-        // Parse device metadata (bytes 3-16)
         try {
             val fwMajor = data[3].toInt() and 0xFF
             val fwMinor = data[4].toInt() and 0xFF
@@ -2701,7 +2839,6 @@ class AiDexBleManager(
             _firmwareVersion = "$fwMajor.$fwMinor"
             _hardwareVersion = "$hwMajor.$hwMinor"
 
-            // Model string: bytes 9..16, null-terminated ASCII
             val modelBytes = data.copyOfRange(9, 17)
             val nullIdx = modelBytes.indexOf(0.toByte())
             val modelStr = if (nullIdx >= 0) String(modelBytes, 0, nullIdx, Charsets.US_ASCII)
@@ -2710,72 +2847,26 @@ class AiDexBleManager(
                 _modelName = modelStr.trim()
                 applyWearProfileFromModel(_modelName)
             }
-            Log.i(TAG, "Device info: fw=$_firmwareVersion hw=$_hardwareVersion model=$_modelName")
+            Log.i(TAG, "Legacy combined metadata 0x21: fw=$_firmwareVersion hw=$_hardwareVersion model=$_modelName")
         } catch (t: Throwable) {
-            Log.e(TAG, "Device info parse failed: ${t.message}")
+            Log.e(TAG, "Legacy combined metadata 0x21 parse failed: ${t.message}")
         }
 
-        // Parse start time (bytes 17-25)
-        if (data.size >= 24) {
-            try {
-                val year = u16LE(data, 17)
-                val month = data[19].toInt() and 0xFF
-                val day = data[20].toInt() and 0xFF
-                val hour = data[21].toInt() and 0xFF
-                val minute = data[22].toInt() and 0xFF
-                val second = data[23].toInt() and 0xFF
-                val tzQuarters = if (data.size >= 25) data[24].toInt() else 0  // signed
-                val dstQuarters = if (data.size >= 26) data[25].toInt() and 0xFF else 0
-
-                val isAllZeros = (year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0)
-                if (isAllZeros) {
-                    Log.w(TAG, "Start time: all zeros — sensor not activated")
-                } else if (year in 2020..2040 && month in 1..12 && day in 1..31) {
-                    val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-                    cal.set(year, month - 1, day, hour, minute, second)
-                    cal.set(Calendar.MILLISECOND, 0)
-                    val tzOffsetMs = (tzQuarters + dstQuarters) * 15L * 60_000L
-                    val startUtcMs = cal.timeInMillis - tzOffsetMs
-
-                    hasAuthoritativeSessionStart = true
-                    sensorstartmsec = startUtcMs
-                    val now = System.currentTimeMillis()
-                    lastOffsetMinutes = ((now - startUtcMs) / 60_000L).toInt()
-
-                    // Persist wear days BEFORE start time — aidexSetStartTime
-                    // uses info->days to compute wearduration2
-                    if (dataptr != 0L) {
-                        try {
-                            Natives.aidexSetWearDays(dataptr, _wearDays)
-                        } catch (_: Throwable) {}
-                        try {
-                            Natives.aidexSetStartTime(dataptr, startUtcMs)
-                        } catch (_: Throwable) {}
-                    }
-
-                    // Compute expiry
-                    val expiryMs = startUtcMs + (_wearDays.toLong() * 24 * 3600_000L)
-                    _sensorExpired = now > expiryMs
-
-                    Log.i(TAG, "Start time: $year-${"%02d".format(month)}-${"%02d".format(day)} " +
-                            "${"%02d".format(hour)}:${"%02d".format(minute)}:${"%02d".format(second)} " +
-                            "tz=${tzQuarters}q dst=${dstQuarters}q → startMs=$startUtcMs offset=${lastOffsetMinutes}min")
-                    if (lastGlucoseTimeMs < startUtcMs) {
-                        armFirstValidReadingWait(startUtcMs, "device-info-start-time")
-                    }
-                } else {
-                    Log.w(TAG, "Start time: date out of range $year-$month-$day")
-                }
-            } catch (t: Throwable) {
-                Log.e(TAG, "Start time parse failed: ${t.message}")
+        if (data.size >= 26) {
+            val maybeStartTime = AiDexParser.parseLocalStartTimePayload(data.copyOfRange(17, data.size))
+            if (maybeStartTime != null) {
+                applyParsedSessionStartTime(
+                    parsed = maybeStartTime,
+                    source = "Legacy combined 0x21",
+                    allowActivation = false,
+                    allowRepairProbe = true,
+                )
+            } else {
+                Log.d(TAG, "Legacy combined metadata 0x21: start-time tail was not plausible — using 2AAA/history instead")
             }
-        } else {
-            // Got metadata but no start time — will use 2AAA or infer from offset
-            Log.d(TAG, "Device info 0x21: metadata OK but no start time (len=${data.size}) — using 2AAA")
         }
 
-        // If we got here, we have everything
-        deviceInfoComplete = true
+        startupMetadataComplete = startupMetadataComplete || (_modelName.isNotBlank() && _firmwareVersion.isNotBlank())
     }
 
     private fun handleBroadcastDataResponse(data: ByteArray) {
@@ -2851,6 +2942,22 @@ class AiDexBleManager(
 
         val payload = data.copyOfRange(1, payloadEndExclusive)
         val chunk = AiDexParser.parseDefaultParamChunk(payload)
+        if (startTimeRepairProbePending) {
+            startTimeRepairProbePending = false
+            if (chunk == null && data.size <= START_TIME_REPAIR_RESPONSE_MAX_BYTES) {
+                Log.i(TAG, "Bounded zero-start-time repair probe acknowledged — writing local time")
+                writeLocalStartTimeRepair("0x31-repair-ack")
+            } else {
+                Log.i(
+                    TAG,
+                    "Zero-start-time repair probe resolved to default-param payload (len=${data.size}) — " +
+                        "skipping local time rewrite"
+                )
+                defaultParamProbeRawBuffer = null
+                defaultParamProbeTotalWords = 0
+            }
+            return
+        }
         if (chunk == null) {
             Log.w(
                 TAG,
@@ -3206,6 +3313,20 @@ class AiDexBleManager(
         if (data.size < 2) return
         val statusByte = data[1].toInt() and 0xFF
         Log.i(TAG, "New sensor ACK: status=0x${"%02X".format(statusByte)}")
+        if (startTimeRepairWritePending) {
+            startTimeRepairWritePending = false
+            if (statusByte == 0x00) {
+                legacyStartTimeRequested = false
+                Log.i(TAG, "Local start-time repair ACK received — re-querying legacy start time")
+                handler.postDelayed(
+                    { requestLegacyStartTime("post-0x20-start-time-repair") },
+                    START_TIME_REPAIR_REQUERY_DELAY_MS
+                )
+            } else {
+                Log.w(TAG, "Local start-time repair failed with status=0x${"%02X".format(statusByte)}")
+            }
+            return
+        }
         if (statusByte == 0x00) {
             armFirstValidReadingWait(System.currentTimeMillis(), "new-sensor-ack")
             handler.postDelayed({ readCGMSessionCharacteristics() }, 1_000L)
@@ -3285,11 +3406,6 @@ class AiDexBleManager(
     // =========================================================================
     // F002 Command Sending
     // =========================================================================
-
-    private fun requestDeviceInfo() {
-        val cmd = commandBuilder.getDeviceInfo() ?: return
-        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
-    }
 
     private fun requestHistoryRange() {
         val cmd = commandBuilder.getHistoryRange() ?: return

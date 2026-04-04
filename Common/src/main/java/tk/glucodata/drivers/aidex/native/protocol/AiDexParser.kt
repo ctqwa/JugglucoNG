@@ -9,6 +9,27 @@ import tk.glucodata.drivers.aidex.native.data.*
 
 object AiDexParser {
 
+    data class StartupDeviceInfo(
+        val firmwareVersion: String,
+        val hardwareVersion: String,
+        val wearDays: Int,
+        val modelName: String,
+    )
+
+    data class LocalStartTime(
+        val year: Int,
+        val month: Int,
+        val day: Int,
+        val hour: Int,
+        val minute: Int,
+        val second: Int,
+        val tzQuarters: Int,
+        val dstQuarters: Int,
+    ) {
+        val isAllZeros: Boolean =
+            year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0
+    }
+
     data class DefaultParamChunk(
         val leadByte: Int,
         val totalWords: Int,
@@ -219,6 +240,72 @@ object AiDexParser {
     }
 
     // -- Default Param Parsing (0x31) --
+
+    /**
+     * Parse the payload returned by raw `0x10` startup/device-info.
+     *
+     * Vendor wrapper traces expose this as 16 bytes after the response header:
+     *   [status_lo, status_hi, fw_major, fw_minor, hw_major, hw_minor,
+     *    wear_days, model_code, model_ascii...]
+     */
+    fun parseStartupDeviceInfoPayload(payload: ByteArray): StartupDeviceInfo? {
+        if (payload.size < 16) return null
+        if (u16LE(payload, 0) != 0) return null
+
+        val fwMajor = payload[2].toInt() and 0xFF
+        val fwMinor = payload[3].toInt() and 0xFF
+        val hwMajor = payload[4].toInt() and 0xFF
+        val hwMinor = payload[5].toInt() and 0xFF
+        val wearDays = payload[6].toInt() and 0xFF
+        val modelBytes = payload.copyOfRange(8, payload.size)
+        val nullIdx = modelBytes.indexOf(0.toByte())
+        val modelName = (
+            if (nullIdx >= 0) String(modelBytes, 0, nullIdx, Charsets.US_ASCII)
+            else String(modelBytes, Charsets.US_ASCII)
+        ).trim()
+
+        if (modelName.isBlank()) return null
+
+        return StartupDeviceInfo(
+            firmwareVersion = "$fwMajor.$fwMinor",
+            hardwareVersion = "$hwMajor.$hwMinor",
+            wearDays = wearDays,
+            modelName = modelName,
+        )
+    }
+
+    /**
+     * Parse a local/session start-time payload.
+     *
+     * Shared by standard CGM `2AAA`, legacy raw `0x21`, and the upstream
+     * zero-start-time recovery branch. Returns null unless the payload is
+     * either all zeros or a plausible timestamp.
+     */
+    fun parseLocalStartTimePayload(payload: ByteArray): LocalStartTime? {
+        if (payload.size < 7) return null
+
+        val parsed = LocalStartTime(
+            year = u16LE(payload, 0),
+            month = payload[2].toInt() and 0xFF,
+            day = payload[3].toInt() and 0xFF,
+            hour = payload[4].toInt() and 0xFF,
+            minute = payload[5].toInt() and 0xFF,
+            second = payload[6].toInt() and 0xFF,
+            tzQuarters = if (payload.size >= 8) payload[7].toInt() else 0,
+            dstQuarters = if (payload.size >= 9) payload[8].toInt() and 0xFF else 0,
+        )
+
+        if (parsed.isAllZeros) return parsed
+
+        val plausibleDate = parsed.year in 2020..2040 &&
+            parsed.month in 1..12 &&
+            parsed.day in 1..31 &&
+            parsed.hour in 0..23 &&
+            parsed.minute in 0..59 &&
+            parsed.second in 0..59
+
+        return parsed.takeIf { plausibleDate }
+    }
 
     /**
      * Parse a GET_DEFAULT_PARAM payload after stripping the opcode byte and any CRC.

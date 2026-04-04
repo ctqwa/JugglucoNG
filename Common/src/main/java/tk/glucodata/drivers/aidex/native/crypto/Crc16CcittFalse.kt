@@ -5,9 +5,9 @@
 // Used as 2-byte LE trailer on all F002 commands and responses.
 //
 // Verified against ALL observed F002 commands in HCI traces:
-//   10 C1 F3 (POST_BOND_CONFIG): CRC-16(0x10) = 0xF3C1
+//   10 C1 F3 (STARTUP_DEVICE_INFO / post-bond 0x10): CRC-16(0x10) = 0xF3C1
 //   11 E0 E3 (GET_BROADCAST_DATA): CRC-16(0x11) = 0xE3E0
-//   21 B3 D5 (GET_DEVICE_INFO):  CRC-16(0x21) = 0xD5B3
+//   21 B3 D5 (GET_LOCAL_START_TIME): CRC-16(0x21) = 0xD5B3
 //   F2 AD 2E (DELETE_BOND):      CRC-16(0xF2) = 0x2EAD
 
 package tk.glucodata.drivers.aidex.native.crypto

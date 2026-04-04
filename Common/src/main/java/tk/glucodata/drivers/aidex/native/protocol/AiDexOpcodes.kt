@@ -11,19 +11,17 @@ object AiDexOpcodes {
     // -- F002 Wire Opcodes --
 
     /**
-     * Get device info.
+     * Official startup/device-info query.
      *
-     * Confirmed from official native `AidexXController.getDeviceInfo()`.
+
      */
-    const val GET_DEVICE_INFO_OFFICIAL: Int = 0x10
+    const val GET_STARTUP_DEVICE_INFO: Int = 0x10
 
     /**
-     * Legacy alias kept until manager/device-info parsing is reconciled.
-     *
-     * Older local notes treated `0x10` as a generic post-bond config step, but
-     * native RE shows the official wrapper names it as `getDeviceInfo()`.
+     * Back-compat alias for older notes/tests that still call raw `0x10`
+     * "post-bond config".
      */
-    const val POST_BOND_CONFIG: Int = GET_DEVICE_INFO_OFFICIAL
+    const val POST_BOND_CONFIG: Int = GET_STARTUP_DEVICE_INFO
 
     /** Get broadcast data (live glucose from advertisement-style query) */
     const val GET_BROADCAST_DATA: Int = 0x11
@@ -32,19 +30,18 @@ object AiDexOpcodes {
     const val SET_NEW_SENSOR: Int = 0x20
 
     /**
-     * Legacy combined metadata query used by the current native driver.
+     * Legacy follow-up query for sensor-local start time.
      *
-     * Local parsing/runtime still expects `0x21` here. Static RE says the
-     * official native wrapper names raw `0x21` as `getStartTime()`, so this
-     * alias remains intentionally unresolved until the manager/parser path is
-     * reconciled against fresh traces.
+     * Static RE says the official native wrapper names raw `0x21` as
+     * `getStartTime()`. Older local code treated it as a combined metadata
+     * query; keep only the start-time naming going forward.
      */
-    const val GET_DEVICE_INFO: Int = 0x21
+    const val GET_LOCAL_START_TIME: Int = 0x21
 
     /**
      * Official native wrapper name for raw `0x21`.
      */
-    const val GET_START_TIME: Int = GET_DEVICE_INFO
+    const val GET_START_TIME: Int = GET_LOCAL_START_TIME
 
     /** Get history range (briefStart, rawStart, newest offset) */
     const val GET_HISTORY_RANGE: Int = 0x22

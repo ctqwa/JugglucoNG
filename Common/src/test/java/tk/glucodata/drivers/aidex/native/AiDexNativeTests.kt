@@ -901,7 +901,7 @@ class CommandBuilderTests {
         val ke = AiDexKeyExchange("2222267V4E")
         val builder = AiDexCommandBuilder(ke)
 
-        assertNull(builder.getDeviceInfo())
+        assertNull(builder.getStartupDeviceInfo())
         assertNull(builder.getBroadcastData())
         assertNull(builder.getHistoryRange())
         assertNull(builder.getHistoriesRaw(14400))
@@ -926,6 +926,68 @@ class CommandBuilderTests {
         assertEquals(AiDexOpcodes.GET_DEFAULT_PARAM, plaintext!![0].toInt() and 0xFF)
         assertEquals(0x0A, plaintext[1].toInt() and 0xFF)
         assertTrue(Crc16CcittFalse.validateResponse(plaintext))
+    }
+}
+
+class StartupMetadataParsingTests {
+
+    @Test
+    fun testParseStartupDeviceInfoPayload_vendorShape() {
+        val payload = AiDexParser.dataFromHex("0000010701030F0047582D3031530000")
+
+        val parsed = AiDexParser.parseStartupDeviceInfoPayload(payload)
+
+        assertNotNull(parsed)
+        assertEquals("1.7", parsed!!.firmwareVersion)
+        assertEquals("1.3", parsed.hardwareVersion)
+        assertEquals(15, parsed.wearDays)
+        assertEquals("GX-01S", parsed.modelName)
+    }
+
+    @Test
+    fun testParseLocalStartTimePayload_acceptsPlausibleDate() {
+        val payload = byteArrayOf(
+            0xEA.toByte(), 0x07,
+            0x02,
+            0x1C,
+            0x13,
+            0x25,
+            0x05,
+            0x14,
+            0x00,
+        )
+
+        val parsed = AiDexParser.parseLocalStartTimePayload(payload)
+
+        assertNotNull(parsed)
+        assertEquals(2026, parsed!!.year)
+        assertEquals(2, parsed.month)
+        assertEquals(28, parsed.day)
+        assertEquals(19, parsed.hour)
+        assertEquals(37, parsed.minute)
+        assertEquals(5, parsed.second)
+        assertEquals(20, parsed.tzQuarters)
+        assertEquals(0, parsed.dstQuarters)
+        assertFalse(parsed.isAllZeros)
+    }
+
+    @Test
+    fun testParseLocalStartTimePayload_acceptsAllZeros() {
+        val payload = ByteArray(9)
+
+        val parsed = AiDexParser.parseLocalStartTimePayload(payload)
+
+        assertNotNull(parsed)
+        assertTrue(parsed!!.isAllZeros)
+    }
+
+    @Test
+    fun testParseLocalStartTimePayload_rejectsLegacyMetadataHead() {
+        val payload = AiDexParser.dataFromHex("0000010701030F0047582D3031530000")
+
+        val parsed = AiDexParser.parseLocalStartTimePayload(payload)
+
+        assertNull(parsed)
     }
 }
 
