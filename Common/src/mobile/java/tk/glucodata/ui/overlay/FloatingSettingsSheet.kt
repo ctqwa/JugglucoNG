@@ -48,7 +48,7 @@ fun FloatingSettingsSheet(
     val isTransparent by repository.isTransparent.collectAsState(initial = false)
     val showSecondary by repository.showSecondary.collectAsState(initial = false)
     val fontSource by repository.fontSource.collectAsState(initial = "APP")
-    val fontSize by repository.fontSize.collectAsState(initial = 16f)
+    val fontSize by repository.fontSize.collectAsState(initial = FloatingSettingsRepository.DEFAULT_FONT_SIZE)
     val fontWeight by repository.fontWeight.collectAsState(initial = "REGULAR")
     val showArrow by repository.showArrow.collectAsState(initial = true)
 
@@ -147,7 +147,7 @@ fun FloatingSettingsSheet(
             if (!isTransparent) {
                 Spacer(modifier = Modifier.height(8.dp))
                 val cornerRadius by repository.cornerRadius.collectAsState(initial = 28f)
-                val opacity by repository.backgroundOpacity.collectAsState(initial = 0.6f)
+                val opacity by repository.backgroundOpacity.collectAsState(initial = FloatingSettingsRepository.DEFAULT_BACKGROUND_OPACITY)
                 
                 Text(stringResource(R.string.corner_radius_dp, cornerRadius.toInt()), style = MaterialTheme.typography.bodyMedium)
                 Slider(
@@ -182,9 +182,10 @@ fun FloatingSettingsSheet(
 
             if (isDynamicIsland) {
                 Spacer(modifier = Modifier.height(8.dp))
-                val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = 0f)
+                val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = FloatingSettingsRepository.DEFAULT_ISLAND_VERTICAL_OFFSET)
+                val offsetLabel = "${stringResource(R.string.offset)}: ${stringResource(R.string.dp_value, verticalOffset.toInt())}"
                 
-                Text(stringResource(R.string.vertical_offset_dp, verticalOffset.toInt()), style = MaterialTheme.typography.bodyMedium)
+                Text(offsetLabel, style = MaterialTheme.typography.bodyMedium)
                 Slider(
                     value = verticalOffset,
                     onValueChange = { repository.setIslandVerticalOffset(it) },

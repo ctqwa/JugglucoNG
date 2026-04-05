@@ -22,13 +22,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.unit.Constraints
 import tk.glucodata.service.FloatingGlucoseService.CutoutData
+import tk.glucodata.service.FloatingGlucoseService.CutoutEdge
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,8 +56,7 @@ fun FloatingGlucoseOverlay(
     repository: FloatingSettingsRepository,
     historyFlow: Flow<List<GlucosePoint>>,
     onUpdatePosition: (Int, Int) -> Unit,
-    cutoutDataFlow: Flow<tk.glucodata.service.FloatingGlucoseService.CutoutData>,
-    statusBarHeightFlow: Flow<androidx.compose.ui.unit.Dp>
+    cutoutDataFlow: Flow<tk.glucodata.service.FloatingGlucoseService.CutoutData>
 ) {
     val context = LocalContext.current
 
@@ -62,21 +64,20 @@ fun FloatingGlucoseOverlay(
     val isTransparent by repository.isTransparent.collectAsState(initial = false)
     val showSecondary by repository.showSecondary.collectAsState(initial = false)
     val fontSource by repository.fontSource.collectAsState(initial = "APP")
-    val fontSize by repository.fontSize.collectAsState(initial = 16f)
+    val fontSize by repository.fontSize.collectAsState(initial = FloatingSettingsRepository.DEFAULT_FONT_SIZE)
     val fontWeightSetting by repository.fontWeight.collectAsState(initial = "REGULAR")
     val showArrow by repository.showArrow.collectAsState(initial = true)
     val cornerRadius by repository.cornerRadius.collectAsState(initial = 28f)
-    val opacity by repository.backgroundOpacity.collectAsState(initial = 0.6f)
+    val opacity by repository.backgroundOpacity.collectAsState(initial = FloatingSettingsRepository.DEFAULT_BACKGROUND_OPACITY)
     val isDynamicIsland by repository.isDynamicIslandEnabled.collectAsState(initial = false)
-    val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = 0f)
+    val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = FloatingSettingsRepository.DEFAULT_ISLAND_VERTICAL_OFFSET)
     val manualGap by repository.islandGap.collectAsState(initial = 0f)
     val useSubtleOutline by repository.useSubtleOutline.collectAsState(initial = false)
 
     // Metrics State (from Service WindowInsets)
-    val cutoutData by cutoutDataFlow.collectAsState(initial = tk.glucodata.service.FloatingGlucoseService.CutoutData(0.dp, 0.dp))
-    val cutoutWidth = cutoutData.width
-    val cutoutBottom = cutoutData.bottom
-    val statusBarHeight by statusBarHeightFlow.collectAsState(initial = 0.dp)
+    val cutoutData by cutoutDataFlow.collectAsState(initial = CutoutData(0.dp, CutoutEdge.NONE))
+    val cutoutEdge = cutoutData.edge
+    val cutoutSize = cutoutData.size
 
     // Data State: History List
     val history by historyFlow.collectAsState(initial = emptyList())
@@ -115,11 +116,14 @@ fun FloatingGlucoseOverlay(
     
     // Gap Calculation
     // Use manual gap if > 0, otherwise detected width. Default 70dp if all else fails.
-    val finalGap = if (manualGap > 0f) manualGap.dp else if (cutoutWidth > 0.dp) cutoutWidth else 70.dp 
-    // Height: Ensure we cover at least the Cutout Bottom or Status Bar height, whichever is larger
-    val detectedHeight = if (cutoutBottom > 0.dp) cutoutBottom else if (statusBarHeight > 0.dp) statusBarHeight else 0.dp
-    val finalHeight = detectedHeight
-    
+    val isVerticalIsland = cutoutEdge == CutoutEdge.LEFT || cutoutEdge == CutoutEdge.RIGHT
+    val finalGap = if (manualGap > 0f) {
+        manualGap.dp
+    } else if (cutoutSize > 0.dp) {
+        cutoutSize
+    } else {
+        70.dp
+    }
     // Styles
     val finalBgColor = if (isTransparent) Color.Transparent else Color.Black.copy(alpha = opacity)
     val finalShape = RoundedCornerShape(cornerRadius.dp)
@@ -167,9 +171,120 @@ fun FloatingGlucoseOverlay(
         }
     }
     val fontWeight = FontWeight(weightVal)
+    val inlineSpacing = (fontSize * 0.35f).coerceIn(4f, 10f).dp
+    val pillHorizontalPadding = (fontSize * 0.85f).coerceIn(10f, 24f).dp
+    val pillVerticalPadding = (fontSize * 0.45f).coerceIn(4f, 12f).dp
+    val splitPadding = (fontSize * 0.28f).coerceIn(3f, 8f).dp
+    val arrowSize = (fontSize * 0.9f).coerceIn(12f, 42f).dp
+    val sideIslandHorizontalPadding = (fontSize * 0.55f).coerceIn(6f, 16f).dp
+    val sideIslandVerticalPadding = (fontSize * 0.32f).coerceIn(3f, 8f).dp
+    val sideIslandSplitPadding = (fontSize * 0.18f).coerceIn(2f, 6f).dp
+    val sideIslandArrowSize = (fontSize * 0.78f).coerceIn(10f, 34f).dp
+    val sideSecondarySpacing = (fontSize * 0.08f).coerceIn(1f, 4f).dp
+    val sideSecondaryFontSize = fontSize * 0.58f
 
     val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+    }
+
+    val valueContent: @Composable () -> Unit = {
+        if (glucosePoint != null) {
+            val point = glucosePoint!!
+            val unit = if (unitInt == 1) "mmol/L" else "mg/dL"
+            val dvs = currentSnapshot?.displayValues ?: run {
+                val isRawModeForCal = viewMode == 1 || viewMode == 3
+                val hasCalibration = CalibrationManager.hasActiveCalibration(isRawModeForCal)
+                val calibratedValue = if (hasCalibration) {
+                    val baseValue = if (isRawModeForCal) point.rawValue else point.value
+                    if (baseValue.isFinite() && baseValue > 0.1f) {
+                        CalibrationManager.getCalibratedValue(baseValue, point.timestamp, isRawModeForCal)
+                    } else {
+                        null
+                    }
+                } else null
+                getDisplayValues(point, viewMode, unit, calibratedValue)
+            }
+
+            if (isDynamicIsland && isVerticalIsland) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FloatingStyledText(
+                        text = dvs.primaryStr,
+                        fontSize = fontSize,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight,
+                        textColor = finalTextColor,
+                        outlineColor = textOutlineColor,
+                        shadow = textShadow,
+                        useOutline = useSubtleOutline,
+                        textAlign = TextAlign.Center
+                    )
+                    if (showSecondary && !dvs.secondaryStr.isNullOrEmpty()) {
+                        Spacer(Modifier.height(sideSecondarySpacing))
+                        FloatingStyledText(
+                            text = dvs.secondaryStr!!,
+                            fontSize = sideSecondaryFontSize,
+                            fontFamily = fontFamily,
+                            fontWeight = fontWeight,
+                            textColor = finalTextColor.copy(alpha = 0.7f),
+                            outlineColor = textOutlineColor,
+                            shadow = textShadow,
+                            useOutline = useSubtleOutline,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FloatingStyledText(
+                        text = dvs.primaryStr,
+                        fontSize = fontSize,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight,
+                        textColor = finalTextColor,
+                        outlineColor = textOutlineColor,
+                        shadow = textShadow,
+                        useOutline = useSubtleOutline,
+                        textAlign = TextAlign.End
+                    )
+                    if (showSecondary && !dvs.secondaryStr.isNullOrEmpty()) {
+                        Spacer(Modifier.width(inlineSpacing))
+                        FloatingStyledText(
+                            text = dvs.secondaryStr!!,
+                            fontSize = fontSize * 0.7f,
+                            fontFamily = fontFamily,
+                            fontWeight = fontWeight,
+                            textColor = finalTextColor.copy(alpha = 0.7f),
+                            outlineColor = textOutlineColor,
+                            shadow = textShadow,
+                            useOutline = useSubtleOutline
+                        )
+                    }
+                }
+            }
+        } else {
+            FloatingStyledText(
+                text = "---",
+                fontSize = fontSize,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                textColor = finalTextColor,
+                outlineColor = textOutlineColor,
+                shadow = textShadow,
+                useOutline = useSubtleOutline
+            )
+        }
+    }
+
+    val arrowContent: @Composable () -> Unit = {
+        if (showArrow && glucosePoint != null) {
+            TrendIndicator(
+                trendResult = trendResult,
+                modifier = Modifier.size(if (isDynamicIsland && isVerticalIsland) sideIslandArrowSize else arrowSize),
+                color = finalTextColor
+            )
+        } else {
+            Spacer(Modifier.size(1.dp))
+        }
     }
     
     // ROOT LAYOUT CHANGE: Use Column just for Vertical Offset Spacer if Island
@@ -177,103 +292,79 @@ fun FloatingGlucoseOverlay(
     
     // ROOT LAYOUT: Column for vertical offset spacer
     if (isDynamicIsland) {
-        Column(
+        CutoutOffsetLayout(
+            edge = cutoutEdge,
+            offset = verticalOffset.dp,
             modifier = Modifier
                 .wrapContentSize()
                 .then(dragModifier)
                 .clickable { launchIntent?.let { context.startActivity(it) } }
         ) {
-             if (verticalOffset > 0f) {
-                 Spacer(modifier = Modifier.height(verticalOffset.dp))
-             }
-             
-             // ISLAND LAYOUT - Unified Pill, Asymmetrically Centered
-             // We use custom layout to report a Symmetric Size (for Window alignment)
-             // but draw the Background Pill tightly around asymmetric content.
-             
-             AsymmetricCenteringRow(
-                 gap = finalGap,
-                 verticalAlignment = Alignment.CenterVertically,
-                 backgroundContent = {
-                     Surface(
-                           color = finalBgColor,
-                           shape = finalShape,
-                           modifier = Modifier.fillMaxSize()
-                       ) {}
-                   }
-             ) {
-                 // LEFT: Values
-                 Box(modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp)) {
-                     if (glucosePoint != null) {
-                            val point = glucosePoint!!
-                            val unit = if (unitInt == 1) "mmol/L" else "mg/dL"
-                            val dvs = currentSnapshot?.displayValues ?: run {
-                                val isRawModeForCal = viewMode == 1 || viewMode == 3
-                                val hasCalibration = CalibrationManager.hasActiveCalibration(isRawModeForCal)
-                                val calibratedValue = if (hasCalibration) {
-                                    val baseValue = if (isRawModeForCal) point.rawValue else point.value
-                                    if (baseValue.isFinite() && baseValue > 0.1f) {
-                                        CalibrationManager.getCalibratedValue(baseValue, point.timestamp, isRawModeForCal)
-                                    } else {
-                                        null
-                                    }
-                                } else null
-                                getDisplayValues(point, viewMode, unit, calibratedValue)
-                            }
-                              
-                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                 FloatingStyledText(
-                                     text = dvs.primaryStr,
-                                     fontSize = fontSize,
-                                     fontFamily = fontFamily,
-                                     fontWeight = fontWeight,
-                                     textColor = finalTextColor,
-                                     outlineColor = textOutlineColor,
-                                     shadow = textShadow,
-                                     useOutline = useSubtleOutline,
-                                     textAlign = TextAlign.End
-                                 )
-                                 if (showSecondary && !dvs.secondaryStr.isNullOrEmpty()) {
-                                     Spacer(Modifier.width(8.dp))
-                                     FloatingStyledText(
-                                         text = dvs.secondaryStr!!,
-                                         fontSize = fontSize * 0.7f,
-                                         fontFamily = fontFamily,
-                                         fontWeight = fontWeight,
-                                         textColor = finalTextColor.copy(alpha = 0.7f),
-                                         outlineColor = textOutlineColor,
-                                         shadow = textShadow,
-                                         useOutline = useSubtleOutline
-                                     )
-                                 }
-                             }
-                      } else {
-                          FloatingStyledText(
-                              text = "---",
-                              fontSize = fontSize,
-                              fontFamily = fontFamily,
-                              fontWeight = fontWeight,
-                              textColor = finalTextColor,
-                              outlineColor = textOutlineColor,
-                              shadow = textShadow,
-                              useOutline = useSubtleOutline
-                          )
-                      }
-                  }
-                
-                // RIGHT: Arrow
-                Box(modifier = Modifier.padding(end = 12.dp, top = 6.dp, bottom = 6.dp)) {
-                     if (showArrow && glucosePoint != null) {
-                        TrendIndicator(
-                            trendResult = trendResult,
-                            modifier = Modifier.size((fontSize * 0.85f).dp),
-                            color = finalTextColor
+            if (isVerticalIsland) {
+                AsymmetricCenteringColumn(
+                    gap = finalGap,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    backgroundContent = {
+                        Surface(
+                            color = finalBgColor,
+                            shape = finalShape,
+                            modifier = Modifier.fillMaxSize()
+                        ) {}
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier.padding(
+                            start = sideIslandHorizontalPadding,
+                            end = sideIslandHorizontalPadding,
+                            top = sideIslandVerticalPadding + sideIslandSplitPadding,
+                            bottom = sideIslandSplitPadding
                         )
-                    } else {
-                         Spacer(Modifier.size(1.dp)) 
+                    ) {
+                        valueContent()
+                    }
+                    Box(
+                        modifier = Modifier.padding(
+                            start = sideIslandHorizontalPadding,
+                            end = sideIslandHorizontalPadding,
+                            top = sideIslandSplitPadding,
+                            bottom = sideIslandVerticalPadding + sideIslandSplitPadding
+                        )
+                    ) {
+                        arrowContent()
                     }
                 }
-             }
+            } else {
+                AsymmetricCenteringRow(
+                    gap = finalGap,
+                    verticalAlignment = Alignment.CenterVertically,
+                    backgroundContent = {
+                        Surface(
+                            color = finalBgColor,
+                            shape = finalShape,
+                            modifier = Modifier.fillMaxSize()
+                        ) {}
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier.padding(
+                            start = pillHorizontalPadding,
+                            top = pillVerticalPadding,
+                            bottom = pillVerticalPadding
+                        )
+                    ) {
+                        valueContent()
+                    }
+                    Box(
+                        modifier = Modifier.padding(
+                            end = pillHorizontalPadding,
+                            top = pillVerticalPadding,
+                            bottom = pillVerticalPadding
+                        )
+                    ) {
+                        arrowContent()
+                    }
+                }
+            }
         }
     } else {
         // ORIGINAL FLOATING LAYOUT (Unified Pill)
@@ -286,68 +377,15 @@ fun FloatingGlucoseOverlay(
                 .clickable { launchIntent?.let { context.startActivity(it) } }
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(inlineSpacing)
             ) {
-                 if (glucosePoint != null) {
-                    val point = glucosePoint!!
-                    val unit = if (unitInt == 1) "mmol/L" else "mg/dL"
-                    val dvs = currentSnapshot?.displayValues ?: run {
-                        val isRawModeForCal = viewMode == 1 || viewMode == 3
-                        val hasCalibration = CalibrationManager.hasActiveCalibration(isRawModeForCal)
-                        val calibratedValue = if (hasCalibration) {
-                            val baseValue = if (isRawModeForCal) point.rawValue else point.value
-                            if (baseValue.isFinite() && baseValue > 0.1f) {
-                                CalibrationManager.getCalibratedValue(baseValue, point.timestamp, isRawModeForCal)
-                            } else {
-                                null
-                            }
-                        } else null
-                        getDisplayValues(point, viewMode, unit, calibratedValue)
-                    }
-
-                    FloatingStyledText(
-                        text = dvs.primaryStr,
-                        fontSize = fontSize,
-                        fontFamily = fontFamily,
-                        fontWeight = fontWeight,
-                        textColor = finalTextColor,
-                        outlineColor = textOutlineColor,
-                        shadow = textShadow,
-                        useOutline = useSubtleOutline
-                    )
-                     
-                    val secondaryText = if (showSecondary) dvs.secondaryStr else null
-                    if (!secondaryText.isNullOrEmpty()) {
-                        FloatingStyledText(
-                            text = secondaryText,
-                            fontSize = fontSize * 0.7f,
-                            fontFamily = fontFamily,
-                            fontWeight = fontWeight,
-                            textColor = finalTextColor.copy(alpha = 0.7f),
-                            outlineColor = textOutlineColor,
-                            shadow = textShadow,
-                            useOutline = useSubtleOutline
-                        )
-                    }
-
-                    if (showArrow) {
-                        TrendIndicator(trendResult, Modifier.size((fontSize * 0.85f).dp), finalTextColor)
-                    }
-                 } else {
-                     FloatingStyledText(
-                         text = "---",
-                         fontSize = fontSize,
-                         fontFamily = fontFamily,
-                         fontWeight = fontWeight,
-                         textColor = finalTextColor,
-                         outlineColor = textOutlineColor,
-                         shadow = textShadow,
-                         useOutline = useSubtleOutline
-                     )
-                  }
-             }
+                valueContent()
+                if (showArrow && glucosePoint != null) {
+                    TrendIndicator(trendResult, Modifier.size(arrowSize), finalTextColor)
+                }
+            }
         }
     }
 }
@@ -434,7 +472,7 @@ fun AsymmetricCenteringRow(
     //   RightX = max(L, R) + Gap.
     //   BgX = LeftX. BgWidth = L + Gap + R.
     
-    androidx.compose.ui.layout.Layout(
+    Layout(
         contents = listOf(backgroundContent, content),
         modifier = modifier
     ) { (bgMeasurables, contentMeasurables), constraints ->
@@ -458,9 +496,7 @@ fun AsymmetricCenteringRow(
         
         // Measure Background to fit TIGHTLY around content (L + G + R)
         val bgWidth = leftW + gapPx + rightW
-        val bgPlaceable = bgMeasurables.firstOrNull()?.measure(
-            androidx.compose.ui.unit.Constraints.fixed(bgWidth, totalHeight)
-        )
+        val bgPlaceable = bgMeasurables.firstOrNull()?.measure(Constraints.fixed(bgWidth, totalHeight))
         
         fun getY(height: Int): Int {
              return when (verticalAlignment) {
@@ -481,6 +517,89 @@ fun AsymmetricCenteringRow(
             
             // Place Right
             right?.place(x = maxSideWidth + gapPx, y = getY(rightH))
+        }
+    }
+}
+
+@Composable
+private fun CutoutOffsetLayout(
+    edge: CutoutEdge,
+    offset: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    when (edge) {
+        CutoutEdge.LEFT -> Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+            if (offset > 0.dp) {
+                Spacer(modifier = Modifier.width(offset))
+            }
+            content()
+        }
+        CutoutEdge.RIGHT -> Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+            content()
+            if (offset > 0.dp) {
+                Spacer(modifier = Modifier.width(offset))
+            }
+        }
+        CutoutEdge.BOTTOM -> Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+            content()
+            if (offset > 0.dp) {
+                Spacer(modifier = Modifier.height(offset))
+            }
+        }
+        else -> Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+            if (offset > 0.dp) {
+                Spacer(modifier = Modifier.height(offset))
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun AsymmetricCenteringColumn(
+    modifier: Modifier = Modifier,
+    gap: androidx.compose.ui.unit.Dp,
+    horizontalAlignment: Alignment.Horizontal,
+    backgroundContent: @Composable () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Layout(
+        contents = listOf(backgroundContent, content),
+        modifier = modifier
+    ) { (bgMeasurables, contentMeasurables), constraints ->
+        val contentPlaceables = contentMeasurables.take(2).map { it.measure(constraints.copy(minHeight = 0)) }
+        val top = contentPlaceables.getOrNull(0)
+        val bottom = contentPlaceables.getOrNull(1)
+
+        val topW = top?.width ?: 0
+        val bottomW = bottom?.width ?: 0
+        val topH = top?.height ?: 0
+        val bottomH = bottom?.height ?: 0
+
+        val gapPx = gap.roundToPx()
+        val maxSideHeight = maxOf(topH, bottomH)
+
+        val totalWidth = maxOf(topW, bottomW)
+        val totalHeight = maxSideHeight * 2 + gapPx
+
+        val bgHeight = topH + gapPx + bottomH
+        val bgPlaceable = bgMeasurables.firstOrNull()?.measure(Constraints.fixed(totalWidth, bgHeight))
+
+        fun getX(width: Int): Int {
+            return when (horizontalAlignment) {
+                Alignment.CenterHorizontally -> (totalWidth - width) / 2
+                Alignment.End -> totalWidth - width
+                else -> 0
+            }
+        }
+
+        layout(totalWidth, totalHeight) {
+            val startY = maxSideHeight - topH
+
+            bgPlaceable?.place(x = 0, y = startY)
+            top?.place(x = getX(topW), y = startY)
+            bottom?.place(x = getX(bottomW), y = maxSideHeight + gapPx)
         }
     }
 }

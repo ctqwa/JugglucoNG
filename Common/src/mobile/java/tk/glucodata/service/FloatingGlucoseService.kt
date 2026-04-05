@@ -3,9 +3,12 @@ package tk.glucodata.service
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.Gravity
+import android.view.Surface
+import android.view.View
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
@@ -35,6 +38,14 @@ import tk.glucodata.Natives
 class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
     private companion object {
         private const val FLOATING_HISTORY_WINDOW_MS = 6L * 60L * 60L * 1000L
+    }
+
+    enum class CutoutEdge {
+        NONE,
+        TOP,
+        BOTTOM,
+        LEFT,
+        RIGHT
     }
 
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -113,9 +124,12 @@ class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, S
     override fun onBind(intent: Intent?): IBinder? = null
 
     // State for Dynamic Island
-    data class CutoutData(val width: androidx.compose.ui.unit.Dp, val bottom: androidx.compose.ui.unit.Dp)
-    private val cutoutData = kotlinx.coroutines.flow.MutableStateFlow(CutoutData(0.dp, 0.dp))
-    private val statusBarHeight = kotlinx.coroutines.flow.MutableStateFlow(0.dp)
+    data class CutoutData(
+        val size: androidx.compose.ui.unit.Dp,
+        val edge: CutoutEdge
+    )
+    private val cutoutData = kotlinx.coroutines.flow.MutableStateFlow(CutoutData(0.dp, CutoutEdge.NONE))
+    private var dynamicIslandEnabled = false
     
     // ...
 
@@ -130,29 +144,8 @@ class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, S
             // Listen for Insets to detect Cutout reliably
             setOnApplyWindowInsetsListener { v, insets ->
                 if (android.os.Build.VERSION.SDK_INT >= 28) {
-                    val cutout = insets.displayCutout
-                    val density = resources.displayMetrics.density
-                    
-                    // Gap (Width of Cutout + Buffer)
-                    val widthPx = if (cutout != null && !cutout.boundingRects.isEmpty()) {
-                        cutout.boundingRects[0].width()
-                    } else {
-                        0
-                    }
-                    
-                    // Height: Use systemWindowInsetTop (Status Bar Height)
-                    // The user wants it to fit in the status bar, not the deep safe area.
-                    val sbHeightPx = insets.systemWindowInsetTop
-                    val cutoutBottomPx = if (cutout != null && !cutout.boundingRects.isEmpty()) {
-                        cutout.boundingRects[0].bottom
-                    } else 0
-                    
-                    // Emit
-                    cutoutData.value = CutoutData(
-                        if (widthPx > 0) (widthPx / density).dp else 0.dp,
-                        (cutoutBottomPx / density).dp
-                    )
-                    statusBarHeight.value = (sbHeightPx / density).dp
+                    cutoutData.value = resolveCutoutData(v, insets.displayCutout)
+                    applyOverlayPlacement()
                 }
                 insets
             }
@@ -165,8 +158,7 @@ class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, S
                         Natives.getunit() == 1
                     ),
                     onUpdatePosition = { x, y -> updateViewPosition(x, y) },
-                    cutoutDataFlow = cutoutData,
-                    statusBarHeightFlow = statusBarHeight
+                    cutoutDataFlow = cutoutData
                 )
             }
         }
@@ -195,6 +187,7 @@ class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, S
 
         try {
             windowManager?.addView(composeView, layoutParams)
+            composeView?.requestApplyInsets()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -234,22 +227,96 @@ class FloatingGlucoseService : Service(), LifecycleOwner, ViewModelStoreOwner, S
         
         serviceScope.launch {
             settingsRepository.isDynamicIslandEnabled.collectLatest { isIsland ->
-                if (composeView != null && windowManager != null) {
-                    if (isIsland) {
-                        layoutParams.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                        layoutParams.x = 0
-                        layoutParams.y = 0
-                    } else {
-                        val (x, y) = settingsRepository.getPosition()
-                        layoutParams.gravity = Gravity.TOP or Gravity.START
-                        layoutParams.x = x
-                        layoutParams.y = y
-                    }
-                    try {
-                        windowManager?.updateViewLayout(composeView, layoutParams)
-                    } catch (e: Exception) { e.printStackTrace() }
+                dynamicIslandEnabled = isIsland
+                applyOverlayPlacement()
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolveCutoutData(
+        anchorView: View?,
+        cutout: android.view.DisplayCutout?
+    ): CutoutData {
+        val density = resources.displayMetrics.density
+        val edge = resolveIslandEdge(anchorView)
+        val cutoutRect = when (edge) {
+            CutoutEdge.LEFT -> cutout?.boundingRects?.minByOrNull { it.left }
+            CutoutEdge.RIGHT -> cutout?.boundingRects?.maxByOrNull { it.right }
+            CutoutEdge.BOTTOM -> cutout?.boundingRects?.maxByOrNull { it.bottom }
+            else -> cutout?.boundingRects?.minByOrNull { it.top }
+        }
+        val gapPx = cutoutRect?.width()?.takeIf { it > 0 }
+            ?: cutoutRect?.height()?.takeIf { it > 0 }
+            ?: 0
+        return CutoutData(
+            size = if (gapPx > 0) (gapPx / density).dp else 0.dp,
+            edge = edge
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolveIslandEdge(anchorView: View? = composeView): CutoutEdge {
+        val rotation = anchorView?.display?.rotation
+            ?: windowManager?.defaultDisplay?.rotation
+            ?: Surface.ROTATION_0
+        return when (rotation) {
+            // Android ROTATION_90/270 are mirrored relative to the user's
+            // landscape left/right expectation on the Pixel punch-hole case.
+            Surface.ROTATION_90 -> CutoutEdge.LEFT
+            Surface.ROTATION_180 -> CutoutEdge.BOTTOM
+            Surface.ROTATION_270 -> CutoutEdge.RIGHT
+            else -> CutoutEdge.TOP
+        }
+    }
+
+    private fun applyOverlayPlacement() {
+        if (composeView == null || windowManager == null) return
+
+        if (dynamicIslandEnabled) {
+            val islandEdge = cutoutData.value.edge.takeIf { it != CutoutEdge.NONE }
+                ?: resolveIslandEdge()
+            when (islandEdge) {
+                CutoutEdge.LEFT -> {
+                    layoutParams.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    layoutParams.x = 0
+                    layoutParams.y = 0
+                }
+                CutoutEdge.RIGHT -> {
+                    layoutParams.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                    layoutParams.x = 0
+                    layoutParams.y = 0
+                }
+                CutoutEdge.BOTTOM -> {
+                    layoutParams.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                    layoutParams.x = 0
+                    layoutParams.y = 0
+                }
+                else -> {
+                    layoutParams.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                    layoutParams.x = 0
+                    layoutParams.y = 0
                 }
             }
+        } else {
+            val (x, y) = settingsRepository.getPosition()
+            layoutParams.gravity = Gravity.TOP or Gravity.START
+            layoutParams.x = x
+            layoutParams.y = y
+        }
+
+        try {
+            windowManager?.updateViewLayout(composeView, layoutParams)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        composeView?.post {
+            composeView?.requestApplyInsets()
+            applyOverlayPlacement()
         }
     }
 

@@ -63,6 +63,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.navigation.NavController
 import tk.glucodata.R
+import tk.glucodata.data.settings.FloatingSettingsRepository
 import tk.glucodata.ui.components.CardPosition
 import tk.glucodata.ui.components.MasterSwitchCard
 import tk.glucodata.ui.components.SectionLabel
@@ -224,13 +225,13 @@ fun FloatingGlucoseSettingsScreen(
     val isTransparent by repository.isTransparent.collectAsState(initial = false)
     val showSecondary by repository.showSecondary.collectAsState(initial = false)
     val fontSource by repository.fontSource.collectAsState(initial = "APP")
-    val fontSize by repository.fontSize.collectAsState(initial = 16f)
+    val fontSize by repository.fontSize.collectAsState(initial = FloatingSettingsRepository.DEFAULT_FONT_SIZE)
     val fontWeight by repository.fontWeight.collectAsState(initial = "REGULAR")
     val showArrow by repository.showArrow.collectAsState(initial = true)
     val cornerRadius by repository.cornerRadius.collectAsState(initial = 28f)
-    val opacity by repository.backgroundOpacity.collectAsState(initial = 0.6f)
+    val opacity by repository.backgroundOpacity.collectAsState(initial = FloatingSettingsRepository.DEFAULT_BACKGROUND_OPACITY)
     val isDynamicIsland by repository.isDynamicIslandEnabled.collectAsState(initial = false)
-    val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = 0f)
+    val verticalOffset by repository.islandVerticalOffset.collectAsState(initial = FloatingSettingsRepository.DEFAULT_ISLAND_VERTICAL_OFFSET)
     val manualGap by repository.islandGap.collectAsState(initial = 0f)
     val useSubtleOutline by repository.useSubtleOutline.collectAsState(initial = false)
     var hasPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
@@ -339,8 +340,9 @@ fun FloatingGlucoseSettingsScreen(
 
         if (isDynamicIsland) {
             Spacer(modifier = Modifier.height(8.dp))
+            val offsetLabel = "${stringResource(R.string.offset)}: ${stringResource(R.string.dp_value, verticalOffset.toInt())}"
             LegacySliderControl(
-                label = stringResource(R.string.vertical_offset_dp, verticalOffset.toInt()),
+                label = offsetLabel,
                 value = verticalOffset,
                 onValueChange = { repository.setIslandVerticalOffset(it) },
                 range = 0f..50f,
