@@ -113,6 +113,37 @@ internal object AiDexRuntimePolicy {
         historyDownloading: Boolean,
     ): Boolean = pendingInitialHistoryRequest && !historyDownloading
 
+    fun shouldRequestRoutineStreamingMetadata(
+        startupMetadataComplete: Boolean,
+        hasModelMetadata: Boolean,
+        hasAuthoritativeSessionStart: Boolean,
+    ): Boolean {
+        if (startupMetadataComplete && hasModelMetadata && hasAuthoritativeSessionStart) return false
+        return !hasModelMetadata || !hasAuthoritativeSessionStart
+    }
+
+    fun shouldRequestRoutineCalibrationRefresh(
+        hasCachedCalibrationRecords: Boolean,
+        calibrationDownloading: Boolean,
+    ): Boolean = !hasCachedCalibrationRecords && !calibrationDownloading
+
+    fun shouldRunOptionalStreamingSync(
+        phase: AiDexBleManager.Phase,
+        hasGatt: Boolean,
+        historyDownloading: Boolean,
+        pendingInitialHistoryRequest: Boolean,
+        noDirectLiveBroadcastFallbackMode: Boolean,
+        hasDirectLiveThisConnection: Boolean,
+        hasRecentLiveData: Boolean,
+    ): Boolean {
+        if (phase != AiDexBleManager.Phase.STREAMING) return false
+        if (!hasGatt) return false
+        if (historyDownloading || pendingInitialHistoryRequest) return false
+        if (noDirectLiveBroadcastFallbackMode) return false
+        if (!hasDirectLiveThisConnection) return false
+        return hasRecentLiveData
+    }
+
     fun shouldRecoverFromSetupStall(
         phase: AiDexBleManager.Phase,
         phaseAgeMs: Long,

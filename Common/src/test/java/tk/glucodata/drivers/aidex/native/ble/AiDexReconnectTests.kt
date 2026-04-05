@@ -86,6 +86,26 @@ class AiDexReconnectTests {
         assertEquals(2_500L, reconnect.adaptiveDelayMs())
     }
 
+    @Test
+    fun testConnectAttemptTimeoutTracksSlowConnectStreak() {
+        assertEquals(55_000L, reconnect.currentConnectAttemptTimeoutMs())
+
+        reconnect.recordSlowExecuteConnect()
+        assertEquals(65_000L, reconnect.currentConnectAttemptTimeoutMs())
+
+        repeat(10) { reconnect.recordSlowExecuteConnect() }
+        assertEquals(75_000L, reconnect.currentConnectAttemptTimeoutMs())
+    }
+
+    @Test
+    fun testConnectCallbackAgeMarksSlowAndFastCallbacks() {
+        reconnect.recordConnectCallbackAgeMs(20_000L)
+        assertEquals(1, reconnect.slowExecuteStreak)
+
+        reconnect.recordConnectCallbackAgeMs(5_000L)
+        assertEquals(0, reconnect.slowExecuteStreak)
+    }
+
     // ========================================================================
     // Auth Failure Backoff
     // ========================================================================

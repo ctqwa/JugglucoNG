@@ -185,6 +185,90 @@ class AiDexRuntimePolicyTests {
     }
 
     @Test
+    fun shouldRequestRoutineStreamingMetadata_onlyWhenMetadataIsStillMissing() {
+        assertFalse(
+            AiDexRuntimePolicy.shouldRequestRoutineStreamingMetadata(
+                startupMetadataComplete = true,
+                hasModelMetadata = true,
+                hasAuthoritativeSessionStart = true,
+            )
+        )
+        assertTrue(
+            AiDexRuntimePolicy.shouldRequestRoutineStreamingMetadata(
+                startupMetadataComplete = true,
+                hasModelMetadata = true,
+                hasAuthoritativeSessionStart = false,
+            )
+        )
+        assertTrue(
+            AiDexRuntimePolicy.shouldRequestRoutineStreamingMetadata(
+                startupMetadataComplete = false,
+                hasModelMetadata = false,
+                hasAuthoritativeSessionStart = false,
+            )
+        )
+    }
+
+    @Test
+    fun shouldRequestRoutineCalibrationRefresh_onlyWithoutCachedRecords() {
+        assertTrue(
+            AiDexRuntimePolicy.shouldRequestRoutineCalibrationRefresh(
+                hasCachedCalibrationRecords = false,
+                calibrationDownloading = false,
+            )
+        )
+        assertFalse(
+            AiDexRuntimePolicy.shouldRequestRoutineCalibrationRefresh(
+                hasCachedCalibrationRecords = true,
+                calibrationDownloading = false,
+            )
+        )
+        assertFalse(
+            AiDexRuntimePolicy.shouldRequestRoutineCalibrationRefresh(
+                hasCachedCalibrationRecords = false,
+                calibrationDownloading = true,
+            )
+        )
+    }
+
+    @Test
+    fun shouldRunOptionalStreamingSync_onlyAfterDirectLiveIsStable() {
+        assertTrue(
+            AiDexRuntimePolicy.shouldRunOptionalStreamingSync(
+                phase = AiDexBleManager.Phase.STREAMING,
+                hasGatt = true,
+                historyDownloading = false,
+                pendingInitialHistoryRequest = false,
+                noDirectLiveBroadcastFallbackMode = false,
+                hasDirectLiveThisConnection = true,
+                hasRecentLiveData = true,
+            )
+        )
+        assertFalse(
+            AiDexRuntimePolicy.shouldRunOptionalStreamingSync(
+                phase = AiDexBleManager.Phase.STREAMING,
+                hasGatt = true,
+                historyDownloading = false,
+                pendingInitialHistoryRequest = false,
+                noDirectLiveBroadcastFallbackMode = true,
+                hasDirectLiveThisConnection = true,
+                hasRecentLiveData = true,
+            )
+        )
+        assertFalse(
+            AiDexRuntimePolicy.shouldRunOptionalStreamingSync(
+                phase = AiDexBleManager.Phase.STREAMING,
+                hasGatt = true,
+                historyDownloading = false,
+                pendingInitialHistoryRequest = false,
+                noDirectLiveBroadcastFallbackMode = false,
+                hasDirectLiveThisConnection = false,
+                hasRecentLiveData = true,
+            )
+        )
+    }
+
+    @Test
     fun shouldAcceptBroadcastFallback_trueWhileWaitingForFirstDirectLive() {
         assertTrue(
             AiDexRuntimePolicy.shouldAcceptBroadcastFallback(

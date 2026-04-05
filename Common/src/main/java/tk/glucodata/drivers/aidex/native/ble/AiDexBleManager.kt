@@ -160,7 +160,6 @@ class AiDexBleManager(
         private const val INVALID_SETUP_BOND_RESET_THRESHOLD = 2
         private const val GATT_OP_TIMEOUT_MS = 15_000L    // Watchdog for stuck GATT operations
         private const val GATT_OP_WATCHDOG_RETRIES = 2  // Max retries on watchdog timeout before dropping op
-        private const val CONNECT_ATTEMPT_TIMEOUT_MS = 20_000L
         private const val STALE_CONNECTION_RECOVERY_FALLBACK_MS = 3_000L
         private const val EXPECTED_LIVE_INTERVAL_MS = 60_000L
         private const val EXPECTED_LIVE_GRACE_MS = 20_000L
@@ -171,7 +170,8 @@ class AiDexBleManager(
         private const val DEFERRED_BOND_CHECK_DELAY_MS = 2_500L
         private const val DEFERRED_BOND_CHECK_MAX_ATTEMPTS = 4
         private const val STARTUP_CONTROL_ACK_TIMEOUT_MS = 3_000L
-        private const val STREAMING_METADATA_REQUEST_DELAY_MS = 400L
+        private const val OPTIONAL_STREAMING_METADATA_DELAY_MS = 5_000L
+        private const val OPTIONAL_CALIBRATION_REFRESH_DELAY_MS = EXPECTED_LIVE_INTERVAL_MS + 5_000L
         private const val STARTUP_DEVICE_INFO_REQUEST_DELAY_MS = 2_000L
         private const val START_TIME_REPAIR_REQUERY_DELAY_MS = 1_000L
         private const val START_TIME_REPAIR_MAX_ATTEMPTS = 1
@@ -306,6 +306,8 @@ class AiDexBleManager(
     private var pendingInitialHistoryRequest = false
     private var pendingStreamingMetadataRead = false
     private var pendingStreamingMetadataReason: String? = null
+    private var pendingCalibrationRefresh = false
+    private var pendingCalibrationRefreshReason: String? = null
     private var lastF002FrameTimeMs: Long = 0L
     private var defaultParamProbeTotalWords = 0
     private var defaultParamProbeRawBuffer: ByteArray? = null
@@ -327,14 +329,17 @@ class AiDexBleManager(
     private val connectAttemptWatchdog = Runnable {
         val now = System.currentTimeMillis()
         val phaseAgeMs = (now - phaseStartedAtMs).coerceAtLeast(0L)
+        val connectTimeoutMs = reconnect.currentConnectAttemptTimeoutMs()
         if (
             AiDexRuntimePolicy.shouldRecoverFromConnectAttemptStall(
                 phase = phase,
                 phaseAgeMs = phaseAgeMs,
-                connectTimeoutMs = CONNECT_ATTEMPT_TIMEOUT_MS,
+                connectTimeoutMs = connectTimeoutMs,
             )
         ) {
-            recoverFromStaleConnectionState("connect-attempt-timeout age=${phaseAgeMs}ms gatt=${mBluetoothGatt != null}")
+            recoverFromStaleConnectionState(
+                "connect-attempt-timeout age=${phaseAgeMs}ms timeout=${connectTimeoutMs}ms gatt=${mBluetoothGatt != null}"
+            )
         }
     }
 
@@ -484,6 +489,12 @@ class AiDexBleManager(
         val reason = pendingStreamingMetadataReason ?: "scheduled"
         pendingStreamingMetadataReason = null
         requestStreamingMetadataIfNeeded(reason)
+    }
+
+    private val delayedCalibrationRefreshRequest = Runnable {
+        val reason = pendingCalibrationRefreshReason ?: "scheduled"
+        pendingCalibrationRefreshReason = null
+        requestRoutineCalibrationRefreshIfNeeded(reason)
     }
 
     // -- SharedPreferences for per-sensor state persistence --
@@ -1024,6 +1035,8 @@ class AiDexBleManager(
         pendingInitialHistoryRequest = false
         pendingStreamingMetadataRead = false
         pendingStreamingMetadataReason = null
+        pendingCalibrationRefresh = false
+        pendingCalibrationRefreshReason = null
         startupControlStage = StartupControlStage.IDLE
         lastF002FrameTimeMs = 0L
         noDirectLiveBroadcastFallbackMode = false
@@ -1046,7 +1059,8 @@ class AiDexBleManager(
         liveOffsetCutoff = 0
         lastHistoryNewestGlucose = 0f
         lastHistoryNewestOffset = 0
-        startupMetadataComplete = false
+        startupMetadataComplete =
+            _modelName.isNotBlank() && _firmwareVersion.isNotBlank() && hasAuthoritativeSessionStart && sensorstartmsec > 0L
     }
 
     private fun shouldRecoverBlockedReconnectNow(now: Long = System.currentTimeMillis()): Boolean {
@@ -1382,6 +1396,19 @@ class AiDexBleManager(
 
         if (newState == BluetoothProfile.STATE_CONNECTED) {
             val now = System.currentTimeMillis()
+            val connectCallbackAgeMs = if (phase == Phase.GATT_CONNECTING && phaseStartedAtMs > 0L) {
+                (now - phaseStartedAtMs).coerceAtLeast(0L)
+            } else {
+                -1L
+            }
+            if (connectCallbackAgeMs >= 0L) {
+                reconnect.recordConnectCallbackAgeMs(connectCallbackAgeMs)
+                Log.i(
+                    TAG,
+                    "Connect callback after ${connectCallbackAgeMs}ms " +
+                        "(slowStreak=${reconnect.slowExecuteStreak} timeout=${reconnect.currentConnectAttemptTimeoutMs()}ms)"
+                )
+            }
             connectTime = now
             constatstatusstr = "Connected"
             _isPaused = false  // Clear paused flag — connection is active
@@ -1406,14 +1433,14 @@ class AiDexBleManager(
             cccdQueue.clear()
             cccdWriteInProgress = false
             cccdRetryCount = 0
-            startupMetadataComplete = false
+            startupMetadataComplete =
+                _modelName.isNotBlank() && _firmwareVersion.isNotBlank() && hasAuthoritativeSessionStart && sensorstartmsec > 0L
             startupDeviceInfoRequested = false
             legacyStartTimeRequested = false
             startTimeRepairProbePending = false
             startTimeRepairWritePending = false
             startTimeRepairAttempts = 0
             autoActivationAttemptedThisConnection = false
-            hasAuthoritativeSessionStart = false
             streamingStartedAtMs = 0L
             lastF003FrameTimeMs = 0L
             lastLiveReadingObservedTimeMs = 0L
@@ -1426,6 +1453,8 @@ class AiDexBleManager(
             pendingInitialHistoryRequest = false
             pendingStreamingMetadataRead = false
             pendingStreamingMetadataReason = null
+            pendingCalibrationRefresh = false
+            pendingCalibrationRefreshReason = null
             startupControlStage = StartupControlStage.IDLE
             lastF002FrameTimeMs = 0L
             noDirectLiveBroadcastFallbackMode = false
@@ -1433,6 +1462,7 @@ class AiDexBleManager(
             handler.removeCallbacks(noStreamWatchdog)
             handler.removeCallbacks(delayedInitialHistoryRequest)
             handler.removeCallbacks(delayedStreamingMetadataRequest)
+            handler.removeCallbacks(delayedCalibrationRefreshRequest)
             handler.removeCallbacks(startupControlAckTimeout)
             pendingInvalidSetupRecovery = PendingInvalidSetupRecovery.NONE
             pendingStaleConnectionRecovery = false
@@ -2300,12 +2330,17 @@ class AiDexBleManager(
         noStreamRecoveryAttempted = false
         scheduleNoStreamWatchdog()
         pendingInitialHistoryRequest = false
-        pendingStreamingMetadataRead = true
+        pendingStreamingMetadataRead = shouldRequestRoutineStreamingMetadata()
+        pendingStreamingMetadataReason = if (pendingStreamingMetadataRead) "streaming-start" else null
+        pendingCalibrationRefresh = shouldRequestRoutineCalibrationRefresh()
+        pendingCalibrationRefreshReason = if (pendingCalibrationRefresh) "streaming-start" else null
         startupControlStage = StartupControlStage.IDLE
         defaultParamProbeTotalWords = 0
         defaultParamProbeRawBuffer = null
         handler.removeCallbacks(startupControlAckTimeout)
         handler.removeCallbacks(delayedInitialHistoryRequest)
+        handler.removeCallbacks(delayedStreamingMetadataRequest)
+        handler.removeCallbacks(delayedCalibrationRefreshRequest)
         Log.i(
             TAG,
             "Streaming phase entered." +
@@ -2395,7 +2430,7 @@ class AiDexBleManager(
             Log.i(TAG, "First live reading arrived from $source — starting history now")
             requestHistoryRange()
         } else if (!historyDownloading) {
-            scheduleStreamingMetadataRead("first-live-$source")
+            scheduleOptionalStreamingSync("first-live-$source")
         }
 
         if (broadcastScanActive && !broadcastScanContinuousMode) {
@@ -2547,27 +2582,118 @@ class AiDexBleManager(
         return derived.takeIf { it > 0 && it.toLong() <= (MAX_OFFSET_DAYS * 24L * 60L) }
     }
 
+    private fun hasDirectLiveThisConnection(): Boolean {
+        return lastF003FrameTimeMs > 0L &&
+            (streamingStartedAtMs <= 0L || lastF003FrameTimeMs >= streamingStartedAtMs)
+    }
+
+    private fun shouldRequestRoutineStreamingMetadata(): Boolean {
+        return AiDexRuntimePolicy.shouldRequestRoutineStreamingMetadata(
+            startupMetadataComplete = startupMetadataComplete,
+            hasModelMetadata = _modelName.isNotBlank() && _firmwareVersion.isNotBlank(),
+            hasAuthoritativeSessionStart = hasAuthoritativeSessionStart,
+        )
+    }
+
+    private fun shouldRequestRoutineCalibrationRefresh(): Boolean {
+        return AiDexRuntimePolicy.shouldRequestRoutineCalibrationRefresh(
+            hasCachedCalibrationRecords = _calibrationRecords.isNotEmpty(),
+            calibrationDownloading = calibrationDownloading,
+        )
+    }
+
+    private fun shouldRunOptionalStreamingSync(now: Long = System.currentTimeMillis()): Boolean {
+        return AiDexRuntimePolicy.shouldRunOptionalStreamingSync(
+            phase = phase,
+            hasGatt = mBluetoothGatt != null,
+            historyDownloading = historyDownloading,
+            pendingInitialHistoryRequest = pendingInitialHistoryRequest,
+            noDirectLiveBroadcastFallbackMode = noDirectLiveBroadcastFallbackMode,
+            hasDirectLiveThisConnection = hasDirectLiveThisConnection(),
+            hasRecentLiveData = hasRecentLiveData(now),
+        )
+    }
+
+    private fun scheduleOptionalStreamingSync(reason: String) {
+        if (shouldRequestRoutineStreamingMetadata()) {
+            pendingStreamingMetadataRead = true
+            pendingStreamingMetadataReason = reason
+        }
+        if (shouldRequestRoutineCalibrationRefresh()) {
+            pendingCalibrationRefresh = true
+            pendingCalibrationRefreshReason = reason
+        }
+        if (!pendingStreamingMetadataRead && !pendingCalibrationRefresh) {
+            return
+        }
+        if (!shouldRunOptionalStreamingSync()) {
+            Log.i(
+                TAG,
+                "Optional streaming sync armed ($reason): waiting for stable direct live " +
+                    "(phase=$phase hasDirectLive=${hasDirectLiveThisConnection()} historyDownloading=$historyDownloading)"
+            )
+            return
+        }
+        if (pendingStreamingMetadataRead) {
+            handler.removeCallbacks(delayedStreamingMetadataRequest)
+            handler.postDelayed(delayedStreamingMetadataRequest, OPTIONAL_STREAMING_METADATA_DELAY_MS)
+        }
+        if (pendingCalibrationRefresh) {
+            handler.removeCallbacks(delayedCalibrationRefreshRequest)
+            handler.postDelayed(delayedCalibrationRefreshRequest, OPTIONAL_CALIBRATION_REFRESH_DELAY_MS)
+        }
+    }
+
     private fun requestStreamingMetadataIfNeeded(reason: String) {
         if (!pendingStreamingMetadataRead) return
+        if (!shouldRunOptionalStreamingSync()) {
+            pendingStreamingMetadataReason = reason
+            return
+        }
+        val needsModelMetadata = _modelName.isBlank() || _firmwareVersion.isBlank()
+        val needsSessionMetadata = !hasAuthoritativeSessionStart
+        if (!needsModelMetadata && !needsSessionMetadata) {
+            pendingStreamingMetadataRead = false
+            pendingStreamingMetadataReason = null
+            startupMetadataComplete = true
+            Log.i(TAG, "Skipping routine streaming metadata ($reason): metadata already known")
+            return
+        }
         pendingStreamingMetadataRead = false
         pendingStreamingMetadataReason = null
         Log.i(TAG, "Requesting streaming metadata ($reason)")
-        // Keep these reads out of the first live-arm window. The clean 1.8.1
-        // trace reaches F003 without front-loading DIS/2AAA reads here, and
-        // our driver only needs this metadata after live data or history is
-        // already flowing.
-        readDeviceInformationService()
-        readCGMSessionCharacteristics()
-        handler.postDelayed({
-            maybeRequestStartupDeviceInfo("streaming-metadata-$reason")
-        }, STARTUP_DEVICE_INFO_REQUEST_DELAY_MS)
+        // Keep non-essential reads out of the reconnect/bootstrap critical path.
+        // Only request the specific metadata still missing for this sensor.
+        if (needsModelMetadata) {
+            readDeviceInformationService()
+        }
+        if (needsSessionMetadata) {
+            readCGMSessionCharacteristics()
+        }
+        if (!startupMetadataComplete || needsModelMetadata) {
+            handler.postDelayed({
+                maybeRequestStartupDeviceInfo("streaming-metadata-$reason")
+            }, STARTUP_DEVICE_INFO_REQUEST_DELAY_MS)
+        }
     }
 
-    private fun scheduleStreamingMetadataRead(reason: String) {
-        if (!pendingStreamingMetadataRead) return
-        pendingStreamingMetadataReason = reason
-        handler.removeCallbacks(delayedStreamingMetadataRequest)
-        handler.postDelayed(delayedStreamingMetadataRequest, STREAMING_METADATA_REQUEST_DELAY_MS)
+    private fun requestRoutineCalibrationRefreshIfNeeded(reason: String) {
+        if (!pendingCalibrationRefresh) return
+        if (!shouldRunOptionalStreamingSync()) {
+            pendingCalibrationRefreshReason = reason
+            return
+        }
+        if (!shouldRequestRoutineCalibrationRefresh()) {
+            pendingCalibrationRefresh = false
+            pendingCalibrationRefreshReason = null
+            Log.i(TAG, "Skipping routine calibration refresh ($reason): calibration data already available")
+            return
+        }
+        pendingCalibrationRefresh = false
+        pendingCalibrationRefreshReason = null
+        val cmd = commandBuilder.getCalibrationRange() ?: return
+        Log.i(TAG, "Requesting routine calibration refresh ($reason)")
+        enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
     }
 
     /**
@@ -4040,14 +4166,7 @@ class AiDexBleManager(
         lastHistoryNewestGlucose = 0f
         lastHistoryNewestOffset = 0
 
-        // Request calibration range
-        handler.postDelayed({
-            val cmd = commandBuilder.getCalibrationRange()
-            if (cmd != null) {
-                enqueueGattOp(GattOp.Write(CHAR_F002, cmd))
-            }
-            scheduleStreamingMetadataRead("post-history")
-        }, 200L)
+        scheduleOptionalStreamingSync("post-history")
     }
 
     // =========================================================================
@@ -4060,8 +4179,9 @@ class AiDexBleManager(
         phaseStartedAtMs = System.currentTimeMillis()
         when (newPhase) {
             Phase.GATT_CONNECTING -> {
+                val connectAttemptTimeoutMs = reconnect.currentConnectAttemptTimeoutMs()
                 handler.removeCallbacks(connectAttemptWatchdog)
-                handler.postDelayed(connectAttemptWatchdog, CONNECT_ATTEMPT_TIMEOUT_MS)
+                handler.postDelayed(connectAttemptWatchdog, connectAttemptTimeoutMs)
                 handler.removeCallbacks(setupProgressWatchdog)
             }
             Phase.DISCOVERING_SERVICES,

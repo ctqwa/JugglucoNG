@@ -72,6 +72,22 @@ class AiDexReconnect {
     var staleSetupTimeoutMs: Long = 35_000L
         private set
 
+    /** Base timeout for connectGatt() producing its first callback */
+    var connectAttemptTimeoutBaseMs: Long = 55_000L
+        private set
+
+    /** Per-slow-streak adaptive bump added to connect-attempt timeout */
+    var connectAttemptTimeoutAdaptiveStepMs: Long = 10_000L
+        private set
+
+    /** Maximum connect-attempt timeout */
+    var connectAttemptTimeoutMaxMs: Long = 75_000L
+        private set
+
+    /** Callback age beyond which a connect attempt is considered "slow" */
+    var slowConnectCallbackThresholdMs: Long = 15_000L
+        private set
+
     /** Max slow-execute-connect streak before adaptive delay maxes out */
     var maxSlowStreaks: Int = 5
         private set
@@ -126,6 +142,18 @@ class AiDexReconnect {
     fun adaptiveDelayMs(): Long {
         val bump = slowExecuteStreak.coerceIn(0, maxSlowStreaks) * reconnectAdaptiveStepMs
         return (reconnectBaseMs + bump).coerceAtMost(reconnectMaxAdaptiveMs)
+    }
+
+    /**
+     * Bounded timeout for a pending connectGatt() attempt to produce its first
+     * callback. This stays independent from normal reconnect delay selection:
+     * reconnect delays answer "when should we try again?", while this timeout
+     * answers "how long do we tolerate an unresolved connect attempt before we
+     * declare the connection state stale?".
+     */
+    fun currentConnectAttemptTimeoutMs(): Long {
+        val bump = slowExecuteStreak.coerceIn(0, maxSlowStreaks) * connectAttemptTimeoutAdaptiveStepMs
+        return (connectAttemptTimeoutBaseMs + bump).coerceAtMost(connectAttemptTimeoutMaxMs)
     }
 
     /**
@@ -208,6 +236,20 @@ class AiDexReconnect {
      */
     fun recordFastExecuteConnect() {
         slowExecuteStreak = 0
+    }
+
+    /**
+     * Record how long a connectGatt() attempt took to deliver its first
+     * callback. Slow callbacks increase the tolerance for future unresolved
+     * connect attempts on the same device/stack, while fast callbacks reset the
+     * tolerance back to the normal base.
+     */
+    fun recordConnectCallbackAgeMs(callbackAgeMs: Long) {
+        if (callbackAgeMs >= slowConnectCallbackThresholdMs) {
+            recordSlowExecuteConnect()
+        } else {
+            recordFastExecuteConnect()
+        }
     }
 
     // -- Success / Reset --
