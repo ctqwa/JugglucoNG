@@ -71,41 +71,6 @@ class HistoryDisplayMergeTests {
     }
 
     @Test
-    fun mergeReadings_coalescesSameSensorSameMinuteDuplicatesAndPrefersRawfulRow() {
-        val merged = HistoryDisplayMerge.mergeReadings(
-            readings = listOf(
-                reading(
-                    id = 1,
-                    timestamp = 10 * HOUR_MS + 12_000L,
-                    sensorSerial = "sensor-a",
-                    value = 100f,
-                    rawValue = 0f
-                ),
-                reading(
-                    id = 2,
-                    timestamp = 10 * HOUR_MS + 44_000L,
-                    sensorSerial = "sensor-a",
-                    value = 100f,
-                    rawValue = 95f
-                ),
-                reading(
-                    id = 3,
-                    timestamp = 10 * HOUR_MS + 1 * MINUTE_MS + 5_000L,
-                    sensorSerial = "sensor-a",
-                    value = 101f,
-                    rawValue = 96f
-                )
-            ),
-            preferredSerial = "sensor-a"
-        )
-
-        assertEquals(2, merged.size)
-        assertEquals(10 * HOUR_MS + 44_000L, merged[0].timestamp)
-        assertEquals(95f, merged[0].rawValue, 0.001f)
-        assertEquals(10 * HOUR_MS + 1 * MINUTE_MS + 5_000L, merged[1].timestamp)
-    }
-
-    @Test
     fun mergeReadings_keepsOlderRowsAcrossLargePreferredSensorGap() {
         val merged = HistoryDisplayMerge.mergeReadings(
             readings = listOf(

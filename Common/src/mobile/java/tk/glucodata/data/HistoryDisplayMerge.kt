@@ -5,7 +5,6 @@ import tk.glucodata.SensorIdentity
 internal object HistoryDisplayMerge {
     private const val OVERLAP_PADDING_MS = 5L * 60L * 1000L
     private const val COVERAGE_SEGMENT_GAP_MS = 15L * 60L * 1000L
-    private const val SENSOR_MINUTE_BUCKET_MS = 60L * 1000L
 
     fun mergeReadings(
         readings: List<HistoryReading>,
@@ -14,12 +13,11 @@ internal object HistoryDisplayMerge {
         if (readings.isEmpty()) return emptyList()
 
         val filtered = applyPreferredOverlapDominance(readings, preferredSerial)
-        val coalesced = coalesceSensorMinuteDuplicates(filtered, preferredSerial)
         val merged = ArrayList<HistoryReading>(readings.size)
         var currentTimestamp = Long.MIN_VALUE
         var currentBest: HistoryReading? = null
 
-        for (reading in coalesced) {
+        for (reading in filtered) {
             if (currentBest == null || reading.timestamp != currentTimestamp) {
                 currentBest?.let(merged::add)
                 currentTimestamp = reading.timestamp
@@ -31,25 +29,6 @@ internal object HistoryDisplayMerge {
 
         currentBest?.let(merged::add)
         return merged
-    }
-
-    private fun coalesceSensorMinuteDuplicates(
-        readings: List<HistoryReading>,
-        preferredSerial: String?
-    ): List<HistoryReading> {
-        if (readings.isEmpty()) return emptyList()
-
-        val bestPerSensorMinute = LinkedHashMap<String, HistoryReading>(readings.size)
-        for (reading in readings) {
-            val key = "${reading.sensorSerial}|${reading.timestamp / SENSOR_MINUTE_BUCKET_MS}"
-            val current = bestPerSensorMinute[key]
-            bestPerSensorMinute[key] = if (current == null) {
-                reading
-            } else {
-                choosePreferred(current, reading, preferredSerial)
-            }
-        }
-        return bestPerSensorMinute.values.sortedBy { it.timestamp }
     }
 
     private fun applyPreferredOverlapDominance(

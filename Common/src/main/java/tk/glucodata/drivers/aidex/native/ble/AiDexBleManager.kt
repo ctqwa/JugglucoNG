@@ -263,6 +263,7 @@ class AiDexBleManager(
     private var cccdQueue = ArrayDeque<UUID>() // Characteristics to enable notifications on
     private var cccdWriteInProgress = false
     private var cccdChainComplete = false
+    private var pendingBondedCccdUuid: UUID? = null
 
     // -- Key Exchange State --
     private var challengeWritten = false
@@ -1497,6 +1498,7 @@ class AiDexBleManager(
             cccdQueue.clear()
             cccdWriteInProgress = false
             cccdRetryCount = 0
+            pendingBondedCccdUuid = null
             startupMetadataComplete =
                 _modelName.isNotBlank() && _firmwareVersion.isNotBlank() && hasAuthoritativeSessionStart && sensorstartmsec > 0L
             startupDeviceInfoRequested = false
@@ -1795,6 +1797,9 @@ class AiDexBleManager(
                         writeNextCccd(gatt)
                     }
                 }, 500L)
+            } else if (gatt.device.bondState == BluetoothDevice.BOND_BONDING) {
+                pendingBondedCccdUuid = charUuid
+                scheduleDeferredBondCompletionCheck(gatt, attempt = 1)
             }
             return
         }
@@ -1806,6 +1811,9 @@ class AiDexBleManager(
         } else {
             Log.i(TAG, "onDescriptorWrite: CCCD $charUuid enabled successfully")
             cccdWriteInProgress = false
+            if (pendingBondedCccdUuid == charUuid) {
+                pendingBondedCccdUuid = null
+            }
         }
 
         // Continue CCCD chain
@@ -1860,18 +1868,40 @@ class AiDexBleManager(
 
     private fun scheduleDeferredBondCompletionCheck(gatt: BluetoothGatt, attempt: Int) {
         handler.postDelayed({
-            if (mBluetoothGatt !== gatt || !cccdChainComplete || !keyExchangePendingBond) {
+            if (mBluetoothGatt !== gatt) {
+                return@postDelayed
+            }
+
+            val waitingForBondedCccd =
+                phase == Phase.CCCD_CHAIN &&
+                    !cccdWriteInProgress &&
+                    pendingBondedCccdUuid != null &&
+                    cccdQueue.peekFirst() == pendingBondedCccdUuid
+
+            val waitingForDeferredKeyExchange = cccdChainComplete && keyExchangePendingBond
+
+            if (!waitingForBondedCccd && !waitingForDeferredKeyExchange) {
                 return@postDelayed
             }
 
             when (gatt.device.bondState) {
                 BluetoothDevice.BOND_BONDED -> {
-                    keyExchangePendingBond = false
                     if (bondStateAtConnection != BluetoothDevice.BOND_BONDED) {
                         bondBecameBondedThisConnection = true
                     }
-                    Log.w(TAG, "BOND_BONDED observed via fallback check — starting deferred key exchange")
-                    startKeyExchange(gatt)
+
+                    if (waitingForBondedCccd) {
+                        val charUuid = pendingBondedCccdUuid
+                        pendingBondedCccdUuid = null
+                        Log.w(TAG, "BOND_BONDED observed via fallback check — resuming CCCD chain for $charUuid")
+                        writeNextCccd(gatt)
+                    }
+
+                    if (waitingForDeferredKeyExchange) {
+                        keyExchangePendingBond = false
+                        Log.w(TAG, "BOND_BONDED observed via fallback check — starting deferred key exchange")
+                        startKeyExchange(gatt)
+                    }
                 }
                 BluetoothDevice.BOND_BONDING -> {
                     if (attempt < DEFERRED_BOND_CHECK_MAX_ATTEMPTS) {
@@ -1882,11 +1912,13 @@ class AiDexBleManager(
                         )
                         scheduleDeferredBondCompletionCheck(gatt, attempt + 1)
                     } else {
+                        pendingBondedCccdUuid = null
                         Log.w(TAG, "Deferred bond check exhausted while still bonding — forcing setup recovery")
                         recoverFromInvalidSetupState("bonding-stall attempts=$attempt")
                     }
                 }
                 else -> {
+                    pendingBondedCccdUuid = null
                     Log.w(TAG, "Deferred bond check observed state=${gatt.device.bondState} — not starting key exchange")
                 }
             }
@@ -2158,6 +2190,7 @@ class AiDexBleManager(
         } else if (bondState == BluetoothDevice.BOND_BONDING) {
             Log.d(TAG, "bonded() callback: BOND_BONDING — waiting for BOND_BONDED")
         } else if (bondState == BluetoothDevice.BOND_NONE) {
+            pendingBondedCccdUuid = null
             // User cancelled pairing dialog or bonding failed
             Log.w(TAG, "bonded() callback: BOND_NONE — pairing cancelled/failed")
             val delay = reconnect.nextAuthFailureDelayMs()
@@ -5489,7 +5522,14 @@ class AiDexBleManager(
         // Store via JNI
         if (dataptr != 0L) {
             try {
-                val res = Natives.aidexProcessData(dataptr, byteArrayOf(0), sampleTimestampMs, sample.glucoseMgDl.toFloat(), 0f, 1.0f)
+                val res = Natives.aidexProcessData(
+                    dataptr,
+                    byteArrayOf(0),
+                    sampleTimestampMs,
+                    sample.glucoseMgDl.toFloat(),
+                    0f,
+                    1.0f
+                )
                 handleGlucoseResult(res, sampleTimestampMs)
                 maybePromoteFallbackReadingToHistory(now, source)
                 lastBroadcastStoredTime = now
