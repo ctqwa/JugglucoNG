@@ -727,6 +727,7 @@ class AiDexBleManager(
     // Tracks the newest valid entry stored during history download for the
     // catch-up broadcast in onHistoryDownloadComplete().
     private var lastHistoryNewestGlucose: Float = 0f
+    private var lastHistoryNewestRaw: Float = Float.NaN
     private var lastHistoryNewestOffset: Int = 0
 
     // -- Reset Reconnect Flag --
@@ -1123,6 +1124,7 @@ class AiDexBleManager(
         lastOffsetMinutes = 0
         liveOffsetCutoff = 0
         lastHistoryNewestGlucose = 0f
+        lastHistoryNewestRaw = Float.NaN
         lastHistoryNewestOffset = 0
         startupMetadataComplete =
             _modelName.isNotBlank() && _firmwareVersion.isNotBlank() && hasAuthoritativeSessionStart && sensorstartmsec > 0L
@@ -2824,9 +2826,9 @@ class AiDexBleManager(
         clearDefaultParamProbeState()
         clearDefaultParamApplyState()
         defaultParamProbeUserInitiated = false
-        defaultParamAutoProvisioning = true
-        pendingDefaultParamApplyAfterProbe = true
-        Log.i(TAG, "Requesting automatic default-param provisioning probe ($reason)")
+        defaultParamAutoProvisioning = false
+        pendingDefaultParamApplyAfterProbe = false
+        Log.i(TAG, "Requesting automatic default-param compare probe ($reason)")
         requestDefaultParamProbe(0x01, "auto-provision-$reason")
     }
 
@@ -4488,6 +4490,7 @@ class AiDexBleManager(
                 if (entry.offsetMinutes > lastHistoryNewestOffset) {
                     lastHistoryNewestOffset = entry.offsetMinutes
                     lastHistoryNewestGlucose = entry.glucoseMgDl
+                    lastHistoryNewestRaw = rawForStore
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "storeHistoryEntries: aidexProcessData failed: $t")
@@ -4555,9 +4558,25 @@ class AiDexBleManager(
             val mgdlInt = lastHistoryNewestGlucose.toInt().coerceIn(0, 0xFFFF) * 10
             val catchUpTimestamp = sensorstartmsec + (lastHistoryNewestOffset.toLong() * 60_000L)
             handleGlucoseResult(mgdlInt.toLong() and 0xFFFFFFFFL, catchUpTimestamp)
-            Log.i(TAG, "History catch-up broadcast: glucose=$lastHistoryNewestGlucose offset=$lastHistoryNewestOffset")
+            if (lastHistoryNewestRaw.isFinite() && lastHistoryNewestRaw > 0f) {
+                // The catch-up UI emit should not degrade the canonical newest history row
+                // we just flushed into Room for the same timestamp.
+                tk.glucodata.HistorySyncAccess.storeCurrentReadingAsync(
+                    timestamp = catchUpTimestamp,
+                    valueMgdl = lastHistoryNewestGlucose,
+                    rawValueMgdl = lastHistoryNewestRaw,
+                    rate = 0f,
+                    sensorSerial = SerialNumber
+                )
+            }
+            Log.i(
+                TAG,
+                "History catch-up broadcast: glucose=$lastHistoryNewestGlucose raw=$lastHistoryNewestRaw " +
+                    "offset=$lastHistoryNewestOffset"
+            )
         }
         lastHistoryNewestGlucose = 0f
+        lastHistoryNewestRaw = Float.NaN
         lastHistoryNewestOffset = 0
 
         scheduleOptionalStreamingSync("post-history")
