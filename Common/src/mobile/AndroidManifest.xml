@@ -53,6 +53,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="tk.glucodata.action.GLUCOSE_UPDATE" />
             </intent-filter>
 
             <meta-data
@@ -66,6 +67,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="tk.glucodata.action.GLUCOSE_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

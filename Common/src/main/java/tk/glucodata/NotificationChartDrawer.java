@@ -17,6 +17,7 @@ import java.util.List;
 public class NotificationChartDrawer {
     private static final int DASHBOARD_LOW_COLOR = 0xFFE7C85A;
     private static final int DASHBOARD_HIGH_COLOR = 0xFFC56F33;
+    private static final long DEFAULT_CHART_DURATION_MS = 3 * 60 * 60 * 1000L;
 
     private static int resolveThresholdSegmentColor(float startValue, float endValue, float targetLow, float targetHigh,
             int inRangeColor) {
@@ -453,14 +454,14 @@ public class NotificationChartDrawer {
             boolean isMmol, int viewMode, boolean showTargetRange) {
         boolean compactMode = (heightHint > 0 && heightHint < 150);
         return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange, false,
-                compactMode, null);
+                compactMode, null, DEFAULT_CHART_DURATION_MS);
     }
 
     public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
             boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration) {
         boolean compactMode = (heightHint > 0 && heightHint < 150);
         return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
-                hasCalibration, compactMode, null);
+                hasCalibration, compactMode, null, DEFAULT_CHART_DURATION_MS);
     }
 
     public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
@@ -468,25 +469,32 @@ public class NotificationChartDrawer {
             String calibrationSensorId) {
         boolean compactMode = (heightHint > 0 && heightHint < 150);
         return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
-                hasCalibration, compactMode, calibrationSensorId);
+                hasCalibration, compactMode, calibrationSensorId, DEFAULT_CHART_DURATION_MS);
     }
 
     public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
             boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration, boolean compactMode) {
         return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
-                hasCalibration, compactMode, null);
+                hasCalibration, compactMode, null, DEFAULT_CHART_DURATION_MS);
     }
 
     public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
             boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration, boolean compactMode,
             String calibrationSensorId) {
         return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
-                hasCalibration, compactMode, calibrationSensorId);
+                hasCalibration, compactMode, calibrationSensorId, DEFAULT_CHART_DURATION_MS);
+    }
+
+    public static Bitmap drawChart(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
+            boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration, boolean compactMode,
+            String calibrationSensorId, long durationMs) {
+        return drawChartInternal(context, data, widthHint, heightHint, isMmol, viewMode, showTargetRange,
+                hasCalibration, compactMode, calibrationSensorId, durationMs);
     }
 
     private static Bitmap drawChartInternal(Context context, List<GlucosePoint> data, int widthHint, int heightHint,
             boolean isMmol, int viewMode, boolean showTargetRange, boolean hasCalibration, boolean compactMode,
-            String calibrationSensorId) {
+            String calibrationSensorId, long durationMs) {
         // Get display metrics for proper sizing
         DisplayMetrics dm = context.getResources().getDisplayMetrics();
         int width = (widthHint > 0) ? widthHint : dm.widthPixels;
@@ -524,9 +532,9 @@ public class NotificationChartDrawer {
         float chartWidth = chartRight - chartLeft;
         float chartHeight = chartBottom - chartTop;
 
-        // Time range: 3 hours
+        // Time range: notification defaults to 3 hours; widgets can request longer.
         long now = System.currentTimeMillis();
-        long duration = 3 * 60 * 60 * 1000L;
+        long duration = durationMs > 0L ? durationMs : DEFAULT_CHART_DURATION_MS;
         long startTime = now - duration;
 
         int smoothingMinutes = DataSmoothing.getMinutes(context);

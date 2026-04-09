@@ -34,6 +34,7 @@ import static tk.glucodata.Notify.unitlabel;
 
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
@@ -129,6 +130,80 @@ class RemoteGlucose {
    }
 
    static final String stopalarmAction = "StopAlarm";
+
+   private void applyWidgetTypeface(Paint paint) {
+      try {
+         var prefs = Applic.app.getSharedPreferences("tk.glucodata_preferences", Context.MODE_PRIVATE);
+         boolean useSystemFont = prefs.getInt("notification_font_family", 0) == 1;
+         int fontWeight = prefs.getInt("notification_font_weight", 400);
+
+         if (useSystemFont) {
+            String familyName = fontWeight >= 500 ? "google-sans-medium" : "google-sans";
+            android.graphics.Typeface tf = android.graphics.Typeface.create(familyName, android.graphics.Typeface.NORMAL);
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+               tf = android.graphics.Typeface.create(tf, fontWeight, false);
+            }
+            paint.setTypeface(tf);
+         } else {
+            android.graphics.Typeface tf = androidx.core.content.res.ResourcesCompat.getFont(Applic.app,
+                  R.font.ibm_plex_sans_var);
+            paint.setTypeface(tf);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+               paint.setFontVariationSettings("'wght' " + fontWeight + ", 'wdth' 100");
+            }
+         }
+      } catch (Throwable t) {
+      }
+   }
+
+   final RemoteViews widgetRemote(CurrentDisplaySource.Snapshot snapshot) {
+      RemoteViews remoteViews = new RemoteViews(Applic.app.getPackageName(), R.layout.arrowandvalue);
+      if (snapshot == null) {
+         return remoteViews;
+      }
+
+      final boolean isMmol = Applic.unit == 1;
+      final int glucoseColor = NotificationChartDrawer.getGlucoseColor(Applic.app, snapshot.getPrimaryValue(), isMmol);
+      final float useglsize = glucosesize;
+      final float usedensity = density;
+      float getx = notglucosex;
+      float gety = (canvas.getHeight() - timeHeight) * 0.98f;
+      float rate = snapshot.getRate();
+
+      canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+      glucosePaint.setColor(glucoseColor);
+      glucosePaint.setTextSize(useglsize);
+      applyWidgetTypeface(glucosePaint);
+
+      if (isNaN(rate)) {
+         getx *= 0.82f;
+      } else {
+         try {
+            float displayDensity = Applic.app.getResources().getDisplayMetrics().density;
+            float arrowScale = Math.max(1.05f, Math.min(1.7f, useglsize / (22f * displayDensity)));
+            Bitmap arrowBitmap = NotificationChartDrawer.drawArrow(Applic.app, rate, isMmol, glucoseColor, arrowScale);
+            float arrowCenterX = getx * 0.85f;
+            float arrowCenterY = gety - useglsize * 0.4f;
+            float arrowLeft = arrowCenterX - (arrowBitmap.getWidth() / 2.0f);
+            float arrowTop = arrowCenterY - (arrowBitmap.getHeight() / 2.0f);
+            canvas.drawBitmap(arrowBitmap, arrowLeft, arrowTop, null);
+         } catch (Throwable t) {
+            drawarrow(canvas, glucosePaint, usedensity, rate, getx * .85f, gety - useglsize * .4f);
+         }
+      }
+
+      canvas.drawText(snapshot.getPrimaryStr(), getx, gety, glucosePaint);
+
+      String timestr = minhourstr(snapshot.getTimeMillis());
+      glucosePaint.setTextSize(timesize);
+      glucosePaint.setAlpha(200);
+      canvas.drawText(timestr, usedensity * 16, gety + timeHeight, glucosePaint);
+      glucosePaint.setAlpha(255);
+
+      canvas.setBitmap(glucoseBitmap);
+      remoteViews.setImageViewBitmap(arrowandvalue, glucoseBitmap);
+      return remoteViews;
+   }
 
    final RemoteViews arrowremote(int kind, notGlucose glucose, final boolean alarm) {
       RemoteViews remoteViews = new RemoteViews(Applic.app.getPackageName(),

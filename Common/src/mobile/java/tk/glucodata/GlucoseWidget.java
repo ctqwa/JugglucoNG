@@ -38,6 +38,7 @@ import android.os.SystemClock;
 import android.widget.RemoteViews;
 
 public class GlucoseWidget extends AppWidgetProvider {
+    private static final String ACTION_GLUCOSE_UPDATE = "tk.glucodata.action.GLUCOSE_UPDATE";
     private static final Object widgetLock = new Object();
     private static final long MIN_UPDATE_INTERVAL_MS = 1500L;
     private static long lastUpdateElapsedRealtime = 0L;
@@ -67,6 +68,15 @@ public void onAppWidgetOptionsChanged(Context context, AppWidgetManager appWidge
        updateAppWidget(context, appWidgetManager, appWidgetId);
        }
    } 
+
+@Override
+public void onReceive(Context context, Intent intent) {
+   super.onReceive(context, intent);
+   if (intent != null && ACTION_GLUCOSE_UPDATE.equals(intent.getAction())) {
+      update();
+   }
+}
+
 static private RemoteViews remoteMessage(String message) {
     RemoteViews remoteViews = new RemoteViews(Applic.app.getPackageName(), R.layout.text);
     remoteViews.setTextColor(R.id.content, Notify.foregroundcolor);
@@ -105,17 +115,17 @@ static private void updateAppWidget(Context context, AppWidgetManager appWidgetM
       if (remote == null) {
          setWidth(widthdip == 0 ? 200 : widthdip);
       }
-	      final var current = CurrentDisplaySource.getFreshNotGlucose(glucosetimeout);
+	      final var current = WidgetDisplaySource.resolveWidgetSnapshot(glucosetimeout);
       if (current != null) {
          final var now = System.currentTimeMillis();
-         final var time = current.time;
+         final var time = current.getTimeMillis();
          if ((now - time) > oldage) {
             final String tformat = timef.format(time);
             String message = "\n  " + context.getString(R.string.nonewvalue) + tformat;
             views = remoteMessage(message);
             id = R.id.content;
          } else {
-            views = remote.arrowremote(50, current, false);
+            views = remote.widgetRemote(current);
          }
       } else {
          views = remoteMessage("\n  " + context.getString(R.string.novalue));
