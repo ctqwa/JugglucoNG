@@ -591,7 +591,9 @@ class ICanHealthBleManager(
         } else {
             glucoseMgdl
         }
-        val rawDisplay = latestCurrentRaw.takeIf { it.isFinite() && it > 0f }?.let {
+        val rawDisplay = ICanHealthConstants.normalizePseudoRawCurrentMgdl(latestCurrentRaw).takeIf {
+            it.isFinite() && it > 0f
+        }?.let {
             if (Applic.unit == 1) it / ICanHealthConstants.MMOL_TO_MGDL else it
         } ?: Float.NaN
         return ICanHealthCurrentSnapshot(
@@ -2209,7 +2211,7 @@ class ICanHealthBleManager(
     }
 
     private fun resolveRawLaneValue(rawCurrent: Float, glucoseMgdl: Float): Float {
-        return Float.NaN
+        return ICanHealthConstants.normalizePseudoRawCurrentMgdl(rawCurrent)
     }
 
     private fun rememberRecentGlucose(glucoseMgdl: Float) {

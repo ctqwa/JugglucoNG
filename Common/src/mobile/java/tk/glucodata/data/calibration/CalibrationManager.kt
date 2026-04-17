@@ -116,6 +116,12 @@ object CalibrationManager {
         val quantizedValue: Int,
         val revision: Long
     )
+
+    private data class ValidPointsCacheKey(
+        val isRawMode: Boolean,
+        val sensorId: String,
+        val revision: Long
+    )
     
     private lateinit var database: CalibrationDatabase
     private lateinit var dao: CalibrationDao
@@ -172,6 +178,11 @@ object CalibrationManager {
             return size > 4096
         }
     }
+    private val validPointsCache = object : LinkedHashMap<ValidPointsCacheKey, List<CalPoint>>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ValidPointsCacheKey, List<CalPoint>>?): Boolean {
+            return size > 128
+        }
+    }
 
     fun init(context: Context) {
         database = CalibrationDatabase.getInstance(context)
@@ -198,8 +209,13 @@ object CalibrationManager {
         synchronized(calibrationCache) {
             calibrationCache.clear()
         }
+        synchronized(validPointsCache) {
+            validPointsCache.clear()
+        }
         Log.d(TAG, "Calibration cache invalidated: $reason")
     }
+
+    fun getRevision(): Long = calibrationRevision
 
     private fun normalizeSensorId(sensorId: String?): String {
         val normalized = sensorId?.trim()?.takeIf { it.isNotEmpty() } ?: return ""
@@ -246,13 +262,23 @@ object CalibrationManager {
     }
 
     private fun getValidPoints(isRawMode: Boolean, sensorId: String): List<CalPoint> {
+        val normalizedSensorId = normalizeSensorId(sensorId)
+        val cacheKey = ValidPointsCacheKey(
+            isRawMode = isRawMode,
+            sensorId = normalizedSensorId,
+            revision = calibrationRevision
+        )
+        synchronized(validPointsCache) {
+            validPointsCache[cacheKey]
+        }?.let { return it }
+
         val currentList = _calibrations.value
-        return currentList
+        val points = currentList
             .asSequence()
             .filter {
                 it.isEnabled &&
                     it.isRawMode == isRawMode &&
-                    sensorMatches(it.sensorId, sensorId)
+                    sensorMatches(it.sensorId, normalizedSensorId)
             }
             .map { p ->
                 CalPoint(
@@ -262,6 +288,10 @@ object CalibrationManager {
                 )
             }
             .toList()
+        synchronized(validPointsCache) {
+            validPointsCache[cacheKey] = points
+        }
+        return points
     }
 
     private fun getValidPointsForSensor(isRawMode: Boolean, sensorIdOverride: String?): List<CalPoint> {

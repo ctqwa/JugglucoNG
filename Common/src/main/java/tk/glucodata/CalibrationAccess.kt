@@ -28,6 +28,9 @@ object CalibrationAccess {
     private val shouldOverwriteSensorValuesMethod by lazy {
         runCatching { holder?.getMethod("shouldOverwriteSensorValues") }.getOrNull()
     }
+    private val getRevisionMethod by lazy {
+        runCatching { holder?.getMethod("getRevision") }.getOrNull()
+    }
 
     @JvmStatic
     fun hasActiveCalibration(isRawMode: Boolean, sensorId: String? = null): Boolean {
@@ -69,5 +72,16 @@ object CalibrationAccess {
         return runCatching {
             shouldOverwriteSensorValuesMethod?.invoke(instance) as? Boolean
         }.getOrNull() ?: false
+    }
+
+    @JvmStatic
+    fun getRevision(): Long {
+        return runCatching {
+            when (val value = getRevisionMethod?.invoke(instance)) {
+                is Long -> value
+                is Number -> value.toLong()
+                else -> null
+            }
+        }.getOrNull() ?: 0L
     }
 }

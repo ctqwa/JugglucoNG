@@ -518,6 +518,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         return viewMode == 1 || viewMode == 3;
     }
 
+    private static final long ROOM_MINUTE_BUCKET_MS = 60_000L;
+
     private static void storeLiveReadingInRoom(String sensorSerial, long timmsec, float autoMgdl, float rawMgdl,
             float rate) {
         if (sensorSerial == null || sensorSerial.isEmpty() || timmsec <= 0L) {
@@ -527,9 +529,16 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             return;
         }
         final SensorHistoryMatch match = findSensorHistoryMatchNear(sensorSerial, timmsec / 1000L);
-        final long storedTimestamp = match != null && match.timestampMs > 0L
+        long storedTimestamp = match != null && match.timestampMs > 0L
                 ? match.timestampMs
                 : (timmsec / 1000L) * 1000L;
+        if (match == null || match.timestampMs <= 0L) {
+            final long latestRoomTimestamp = HistorySyncAccess.getLatestTimestampForSensor(sensorSerial);
+            if (latestRoomTimestamp > 0L
+                    && (latestRoomTimestamp / ROOM_MINUTE_BUCKET_MS) == (storedTimestamp / ROOM_MINUTE_BUCKET_MS)) {
+                storedTimestamp = latestRoomTimestamp;
+            }
+        }
         final float storedAuto = (Float.isFinite(autoMgdl) && autoMgdl > 0f) ? autoMgdl : 0f;
         final float matchedRaw = match != null ? match.rawMgdl : Float.NaN;
         final float storedRaw = (Float.isFinite(rawMgdl) && rawMgdl > 0f)

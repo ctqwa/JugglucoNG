@@ -92,6 +92,8 @@ object ICanHealthConstants {
     const val MMOL_TO_MGDL: Float = 18.0182f
     const val MIN_VALID_GLUCOSE_MGDL = 10f
     const val MAX_VALID_GLUCOSE_MGDL = 500f
+    private const val VENDOR_CURRENT_PREFIX = 2_500_000f
+    private const val MAX_PSEUDO_RAW_MGDL = 600f
 
     private enum class BundledKeyFamily {
         OLD,
@@ -211,6 +213,20 @@ object ICanHealthConstants {
             return deriveShortSnFromActiveCode(sanitized)
         }
         return sanitized
+    }
+
+    @JvmStatic
+    fun normalizePseudoRawCurrentMgdl(sensorCurrent: Float): Float {
+        if (!sensorCurrent.isFinite() || sensorCurrent <= 0f) {
+            return Float.NaN
+        }
+        val decodedCurrent = if (sensorCurrent >= VENDOR_CURRENT_PREFIX) {
+            sensorCurrent - VENDOR_CURRENT_PREFIX
+        } else {
+            sensorCurrent
+        }
+        val pseudoRawMgdl = decodedCurrent / 100f
+        return pseudoRawMgdl.takeIf { it.isFinite() && it > 0f && it <= MAX_PSEUDO_RAW_MGDL } ?: Float.NaN
     }
 
     private fun deriveShortSnFromActiveCode(activeCode: String): String {
