@@ -1316,12 +1316,18 @@ public class Notify {
 
     private static String resolvePrimarySensorName() {
         try {
-            final String mainName = Natives.lastsensorname();
+            final String mainName = SensorIdentity.resolveAppSensorId(Natives.lastsensorname());
             if (mainName != null && !mainName.isEmpty()) {
                 return mainName;
             }
             final String[] activeSensors = Natives.activeSensors();
             if (activeSensors != null && activeSensors.length > 0) {
+                for (final String sensor : activeSensors) {
+                    final String resolved = SensorIdentity.resolveAppSensorId(sensor);
+                    if (resolved != null && !resolved.isEmpty()) {
+                        return resolved;
+                    }
+                }
                 return activeSensors[0];
             }
         } catch (Throwable th) {

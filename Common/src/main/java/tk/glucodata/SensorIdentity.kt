@@ -7,6 +7,11 @@ object SensorIdentity {
         return sensorId?.trim()?.takeIf { it.isNotEmpty() }
     }
 
+    private fun canonicalOrRaw(sensorId: String?): String? {
+        val raw = normalized(sensorId) ?: return null
+        return resolveAppSensorId(raw) ?: raw
+    }
+
     @JvmStatic
     fun invalidateCaches() {
         // main keeps no identity cache by default; managed adapters call this
@@ -31,6 +36,15 @@ object SensorIdentity {
             .mapNotNull { it.resolveNativeSensorName(raw) }
             .firstOrNull { it.isNotBlank() }
             ?: raw
+    }
+
+    @JvmStatic
+    fun shouldUseNativeHistorySync(sensorId: String?): Boolean {
+        val raw = normalized(sensorId) ?: return true
+        val canonical = canonicalOrRaw(raw) ?: raw
+        return ManagedSensorIdentityRegistry.shouldUseNativeHistorySync(canonical)
+            ?: ManagedSensorIdentityRegistry.shouldUseNativeHistorySync(raw)
+            ?: true
     }
 
     @JvmStatic
@@ -65,21 +79,22 @@ object SensorIdentity {
         activeSensors: Array<String?>?
     ): String? {
         val active = activeSensors
-            ?.mapNotNull(::normalized)
+            ?.mapNotNull(::canonicalOrRaw)
             ?.distinct()
             .orEmpty()
+        val canonicalSelected = canonicalOrRaw(selectedMain)
+        val canonicalPreferred = canonicalOrRaw(preferredSensorId)
+
         if (active.isEmpty()) {
-            return normalized(selectedMain) ?: normalized(preferredSensorId)
+            return canonicalSelected ?: canonicalPreferred
         }
 
-        val normalizedSelected = normalized(selectedMain)
-        if (normalizedSelected != null && active.any { matches(it, normalizedSelected) }) {
-            return normalizedSelected
+        if (canonicalSelected != null && active.any { matches(it, canonicalSelected) }) {
+            return canonicalSelected
         }
 
-        val preferred = normalized(preferredSensorId)
-        if (preferred != null && active.any { matches(it, preferred) }) {
-            return preferred
+        if (canonicalPreferred != null && active.any { matches(it, canonicalPreferred) }) {
+            return canonicalPreferred
         }
 
         return active.firstOrNull()

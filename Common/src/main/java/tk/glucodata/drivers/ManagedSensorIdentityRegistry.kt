@@ -28,6 +28,14 @@ object ManagedSensorIdentityRegistry {
             .mapNotNull { it.resolveNativeSensorName(sensorId) }
             .firstOrNull { it.isNotBlank() }
 
+    fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
+        all.any { it.isExternallyManagedBleSensor(sensorId) }
+
+    fun shouldUseNativeHistorySync(sensorId: String?): Boolean? =
+        all.asSequence()
+            .mapNotNull { it.shouldUseNativeHistorySync(sensorId) }
+            .firstOrNull()
+
     fun removePersistedSensor(context: Context, sensorId: String?) {
         all.forEach { it.removePersistedSensor(context, sensorId) }
         SensorIdentity.invalidateCaches()

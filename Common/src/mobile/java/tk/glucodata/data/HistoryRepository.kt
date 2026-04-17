@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import tk.glucodata.Applic
 import tk.glucodata.BatteryTrace
 import tk.glucodata.Natives
+import tk.glucodata.SensorIdentity
 import tk.glucodata.data.calibration.CalibrationManager
 import tk.glucodata.ui.GlucosePoint
 import java.text.SimpleDateFormat
@@ -65,7 +66,7 @@ class HistoryRepository(context: Context = Applic.app) {
         @JvmStatic
         fun getHistoryBlocking(startTime: Long, isMmol: Boolean): List<GlucosePoint> {
             return kotlinx.coroutines.runBlocking {
-                val raw = HistoryRepository().getDisplayHistory(Natives.lastsensorname(), startTime)
+                val raw = HistoryRepository().getDisplayHistory(SensorIdentity.resolveMainSensor(), startTime)
                 if (isMmol) {
                     raw.map { p ->
                         val v = p.value / 18.0182f
@@ -85,7 +86,7 @@ class HistoryRepository(context: Context = Applic.app) {
                 try {
                     val valueMgDl = valueMmol * 18.0182f
                     // Use main sensor serial for source tagging
-                    val serial = Natives.lastsensorname() ?: "unknown"
+                    val serial = SensorIdentity.resolveMainSensor() ?: Natives.lastsensorname() ?: "unknown"
                     HistoryRepository().storeReading(
                         timestamp = timestamp,
                         value = valueMgDl,
@@ -107,7 +108,7 @@ class HistoryRepository(context: Context = Applic.app) {
         @JvmStatic
         fun getHistoryForNotification(startTime: Long, isMmol: Boolean): List<tk.glucodata.GlucosePoint> {
             return kotlinx.coroutines.runBlocking {
-                val serial = Natives.lastsensorname() ?: ""
+                val serial = SensorIdentity.resolveMainSensor() ?: ""
                 val repo = HistoryRepository()
                 val uiPoints = if (serial.isNotEmpty()) {
                     repo.getHistoryForSensor(serial, startTime)
@@ -134,7 +135,9 @@ class HistoryRepository(context: Context = Applic.app) {
             isMmol: Boolean
         ): List<tk.glucodata.GlucosePoint> {
             return kotlinx.coroutines.runBlocking {
-                val serial = sensorSerial?.takeIf { it.isNotBlank() } ?: Natives.lastsensorname() ?: ""
+                val serial = SensorIdentity.resolveAppSensorId(sensorSerial)
+                    ?: SensorIdentity.resolveMainSensor()
+                    ?: ""
                 if (serial.isEmpty()) {
                     Log.w(TAG, "getHistoryForNotificationForSensor: no sensor serial, returning empty list")
                     return@runBlocking emptyList()
@@ -155,7 +158,7 @@ class HistoryRepository(context: Context = Applic.app) {
         @JvmStatic
         fun getHistoryRawForNotification(startTime: Long): List<tk.glucodata.GlucosePoint> {
             return kotlinx.coroutines.runBlocking {
-                val serial = Natives.lastsensorname() ?: ""
+                val serial = SensorIdentity.resolveMainSensor() ?: ""
                 val repo = HistoryRepository()
                 val uiPoints = if (serial.isNotEmpty()) {
                     repo.getHistoryForSensor(serial, startTime)
@@ -248,7 +251,10 @@ class HistoryRepository(context: Context = Applic.app) {
         // Don't store invalid readings
         if (value <= 0 && rawValue <= 0) return
         
-        val serial = sensorSerial ?: Natives.lastsensorname() ?: "unknown"
+        val serial = SensorIdentity.resolveAppSensorId(sensorSerial)
+            ?: SensorIdentity.resolveMainSensor()
+            ?: Natives.lastsensorname()
+            ?: "unknown"
         val storedValue = maybeProjectCalibratedValueForStorage(
             sensorSerial = serial,
             timestamp = timestamp,
@@ -621,7 +627,7 @@ class HistoryRepository(context: Context = Applic.app) {
             Natives.activeSensors(),
             Natives.lastsensorname(),
             preferredSerial
-        )
+        ).filter(SensorIdentity::shouldUseNativeHistorySync)
         if (sensorsToCheck.isEmpty()) {
             Log.d(TAG, "No sensors for backfill")
             return
@@ -797,10 +803,16 @@ class HistoryRepository(context: Context = Applic.app) {
     ): LinkedHashSet<String> {
         val result = LinkedHashSet<String>()
         activeSensors?.forEach { serial ->
-            serial?.takeIf { it.isNotBlank() }?.let(result::add)
+            (SensorIdentity.resolveAppSensorId(serial) ?: serial)
+                ?.takeIf { it.isNotBlank() }
+                ?.let(result::add)
         }
-        mainSensor?.takeIf { it.isNotBlank() }?.let(result::add)
-        preferredSerial?.takeIf { it.isNotBlank() }?.let(result::add)
+        (SensorIdentity.resolveAppSensorId(mainSensor) ?: mainSensor)
+            ?.takeIf { it.isNotBlank() }
+            ?.let(result::add)
+        (SensorIdentity.resolveAppSensorId(preferredSerial) ?: preferredSerial)
+            ?.takeIf { it.isNotBlank() }
+            ?.let(result::add)
         return result
     }
 }

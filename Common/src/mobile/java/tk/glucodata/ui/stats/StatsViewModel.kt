@@ -246,8 +246,8 @@ class StatsViewModel : ViewModel() {
 
     private fun resolveStatsSensorSerial(): String? {
         return SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = Natives.lastsensorname(),
-            preferredSensorId = activeSerial,
+            selectedMain = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()),
+            preferredSensorId = SensorIdentity.resolveAppSensorId(activeSerial) ?: activeSerial,
             activeSensors = Natives.activeSensors()
         ) ?: SensorIdentity.resolveMainSensor()
     }

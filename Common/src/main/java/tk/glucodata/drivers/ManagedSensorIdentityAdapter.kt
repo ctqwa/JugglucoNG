@@ -28,4 +28,6 @@ interface ManagedSensorIdentityAdapter {
     fun resolveNativeHistorySensorNames(sensorId: String?): List<String> = emptyList()
 
     fun isExternallyManagedBleSensor(sensorId: String?): Boolean = false
+
+    fun shouldUseNativeHistorySync(sensorId: String?): Boolean? = null
 }

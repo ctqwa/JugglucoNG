@@ -39,7 +39,7 @@ class GlucoseRepository {
      */
     private val _currentSerial = MutableStateFlow(
         SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = Natives.lastsensorname(),
+            selectedMain = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()),
             preferredSensorId = null,
             activeSensors = Natives.activeSensors()
         ) ?: ""
@@ -52,7 +52,8 @@ class GlucoseRepository {
      */
     fun refreshSensorSerial(preferredSerial: String? = null) {
         val current = _currentSerial.value
-        val nativeCurrent = Natives.lastsensorname()?.takeIf { it.isNotBlank() }
+        val nativeCurrent = SensorIdentity.resolveAppSensorId(Natives.lastsensorname())
+            ?.takeIf { it.isNotBlank() }
         val resolved = preferredSerial?.takeIf { it.isNotBlank() }
             ?: nativeCurrent
             ?: SensorIdentity.resolveAvailableMainSensor(
@@ -149,7 +150,8 @@ class GlucoseRepository {
             BatteryTrace.bump("glucose.native.poll_once", logEvery = 20L)
             // Get the main sensor serial for tagging
             val sensorSerial = Natives.lastsensorname() ?: "unknown"
-            if (sensorSerial.isBlank()) return
+            val canonicalSerial = SensorIdentity.resolveAppSensorId(sensorSerial) ?: sensorSerial
+            if (canonicalSerial.isBlank()) return
             
             // Fetch the last 2 minutes of main-sensor history.
             // getGlucoseHistory uses infoblockptr()->current — main sensor only.
@@ -184,7 +186,7 @@ class GlucoseRepository {
                 value = valueMgdl,
                 rawValue = rawValueMgdl,
                 rate = rate,
-                sensorSerial = sensorSerial
+                sensorSerial = canonicalSerial
             )
             lastStoredTimestampMs = timestampMs
         } catch (e: Exception) {
@@ -193,10 +195,11 @@ class GlucoseRepository {
     }
 
     private fun resolveDisplayPreferredSerial(explicitSerial: String? = null): String? {
-        val preferred = explicitSerial?.takeIf { it.isNotBlank() }
+        val preferred = (SensorIdentity.resolveAppSensorId(explicitSerial) ?: explicitSerial)
+            ?.takeIf { it.isNotBlank() }
             ?: _currentSerial.value.takeIf { it.isNotBlank() }
         return SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = Natives.lastsensorname(),
+            selectedMain = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()),
             preferredSensorId = preferred,
             activeSensors = Natives.activeSensors()
         ) ?: preferred

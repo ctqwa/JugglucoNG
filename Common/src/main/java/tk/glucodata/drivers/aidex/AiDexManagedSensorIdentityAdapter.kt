@@ -115,4 +115,7 @@ object AiDexManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
 
     override fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
         isManagedSensorId(sensorId)
+
+    override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? =
+        if (resolveCanonicalSensorId(sensorId) != null) true else null
 }

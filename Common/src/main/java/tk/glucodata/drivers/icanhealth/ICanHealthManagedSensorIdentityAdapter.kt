@@ -105,5 +105,8 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     }
 
     override fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
-        ICanHealthConstants.isProvisionalSensorId(sensorId)
+        resolveCanonicalSensorId(sensorId) != null
+
+    override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? =
+        if (resolveCanonicalSensorId(sensorId) != null) false else null
 }

@@ -303,11 +303,13 @@ class DashboardViewModel(
     }
 
     private fun refreshSensorSnapshot() {
-        var sName = Natives.lastsensorname()
+        var sName = SensorIdentity.resolveAppSensorId(Natives.lastsensorname())
         val activeSensors = Natives.activeSensors()
 
         if (activeSensors != null && activeSensors.isNotEmpty()) {
-            _activeSensorList.value = activeSensors.toList()
+            _activeSensorList.value = activeSensors
+                .mapNotNull { SensorIdentity.resolveAppSensorId(it) ?: it }
+                .distinct()
         } else {
             _activeSensorList.value = emptyList()
         }
@@ -665,6 +667,9 @@ class DashboardViewModel(
     }
 
     private fun requestHistoryRecoverySync(serial: String, reason: String) {
+        if (!SensorIdentity.shouldUseNativeHistorySync(serial)) {
+            return
+        }
         val nowMs = SystemClock.elapsedRealtime()
         synchronized(this) {
             if (serial == lastHistoryRecoverySerial &&
@@ -715,7 +720,8 @@ class DashboardViewModel(
     }
 
     private fun preferredDashboardSensorId(): String? {
-        val nativeCurrent = Natives.lastsensorname()?.takeIf { it.isNotBlank() }
+        val nativeCurrent = SensorIdentity.resolveAppSensorId(Natives.lastsensorname())
+            ?.takeIf { it.isNotBlank() }
         if (nativeCurrent != null) {
             return nativeCurrent
         }

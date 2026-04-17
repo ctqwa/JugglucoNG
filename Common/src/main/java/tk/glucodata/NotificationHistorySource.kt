@@ -9,14 +9,17 @@ object NotificationHistorySource {
 
     @JvmStatic
     fun resolveSensorSerial(preferredSerial: String? = null): String? {
-        if (!preferredSerial.isNullOrBlank()) {
-            return preferredSerial
+        val preferred = SensorIdentity.resolveAppSensorId(preferredSerial) ?: preferredSerial
+        if (!preferred.isNullOrBlank()) {
+            return preferred
         }
-        val lastSensor = Natives.lastsensorname()
+        val lastSensor = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()) ?: Natives.lastsensorname()
         if (!lastSensor.isNullOrBlank()) {
             return lastSensor
         }
-        return Natives.activeSensors()?.firstOrNull { !it.isNullOrBlank() }
+        return Natives.activeSensors()
+            ?.mapNotNull { SensorIdentity.resolveAppSensorId(it) ?: it }
+            ?.firstOrNull { !it.isNullOrBlank() }
     }
 
     @JvmStatic
@@ -37,6 +40,9 @@ object NotificationHistorySource {
         val startSec = startTimeMs / 1000L
         val resolvedSerial = resolveSensorSerial(sensorSerial)
         if (resolvedSerial.isNullOrBlank()) {
+            return emptyList()
+        }
+        if (!SensorIdentity.shouldUseNativeHistorySync(resolvedSerial)) {
             return emptyList()
         }
         val history = try {
