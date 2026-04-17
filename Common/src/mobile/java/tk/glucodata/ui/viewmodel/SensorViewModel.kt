@@ -120,6 +120,59 @@ class SensorViewModel : ViewModel() {
     private var pollingJob: Job? = null
     private var lastDeviceSyncElapsedMs: Long = 0L
 
+    private fun normalizePublishedSensor(sensor: SensorInfo): SensorInfo {
+        val resolved = SensorIdentity.resolveAppSensorId(sensor.serial) ?: sensor.serial
+        return if (resolved == sensor.serial) sensor else sensor.copy(serial = resolved)
+    }
+
+    private fun sensorPriority(sensor: SensorInfo): Int {
+        var score = 0
+        if (sensor.isActive) score += 10_000
+        if (sensor.streaming) score += 5_000
+        if (sensor.dataptr != 0L) score += 2_000
+        if (sensor.deviceAddress != "Unknown") score += 500
+        if (sensor.vendorModel.isNotBlank()) score += 200
+        if (sensor.vendorFirmware.isNotBlank()) score += 200
+        if (sensor.startMs > 0L) score += 100
+        if (sensor.detailedStatus.isNotBlank()) score += 50
+        if (sensor.connectionStatus.isNotBlank()) score += 20
+        return score
+    }
+
+    private fun mergeDuplicateSensorInfo(existing: SensorInfo, candidate: SensorInfo): SensorInfo {
+        val existingScore = sensorPriority(existing)
+        val candidateScore = sensorPriority(candidate)
+        return when {
+            candidateScore > existingScore -> candidate
+            candidateScore < existingScore -> existing
+            candidate.detailedStatus.length > existing.detailedStatus.length -> candidate
+            candidate.connectionStatus.length > existing.connectionStatus.length -> candidate
+            candidate.displayName.length > existing.displayName.length -> candidate
+            else -> existing
+        }
+    }
+
+    private fun dedupePublishedSensors(sensors: List<SensorInfo>): List<SensorInfo> {
+        if (sensors.size < 2) {
+            return sensors.map(::normalizePublishedSensor)
+        }
+        val deduped = LinkedHashMap<String, SensorInfo>()
+        sensors.forEach { original ->
+            val sensor = normalizePublishedSensor(original)
+            val existing = deduped[sensor.serial]
+            if (existing == null) {
+                deduped[sensor.serial] = sensor
+            } else {
+                android.util.Log.w(
+                    "SensorViewModel",
+                    "Deduping duplicate published sensor ${sensor.serial} (${existing.displayName} / ${sensor.displayName})"
+                )
+                deduped[sensor.serial] = mergeDuplicateSensorInfo(existing, sensor)
+            }
+        }
+        return deduped.values.toList()
+    }
+
     init {
         // Initial refresh with device sync — only time we need to call updateDevices() automatically
         refreshSensorsWithDeviceSync()
@@ -354,8 +407,10 @@ class SensorViewModel : ViewModel() {
                         }
                         
                         val displayStatus = mapBleStatus(finalStatus)
-                        val sensorSerial = gatt.SerialNumber ?: "Unknown"
-                        val isActiveSensor = activeSensorSerial != null && sensorSerial == activeSensorSerial
+                        val sensorSerial = SensorIdentity.resolveAppSensorId(gatt.SerialNumber)
+                            ?: gatt.SerialNumber
+                            ?: "Unknown"
+                        val isActiveSensor = activeSensorSerial != null && SensorIdentity.matches(sensorSerial, activeSensorSerial)
     
                         SensorInfo(
                             serial = sensorSerial,
@@ -421,7 +476,7 @@ class SensorViewModel : ViewModel() {
             // The main sensor is visually distinguished by its isActive styling —
             // no need to sort it to the top. Sorting on every refresh caused the
             // list to jump when the user manually switched the main sensor.
-            _sensors.value = sensorList
+            _sensors.value = dedupePublishedSensors(sensorList)
         }
     }
 
