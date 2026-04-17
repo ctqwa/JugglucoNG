@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import tk.glucodata.Natives
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.BatteryTrace
@@ -29,6 +29,15 @@ import tk.glucodata.ui.util.resolveDashboardSensorStatus
 class DashboardViewModel(
     private val glucoseRepository: GlucoseRepository = GlucoseRepository()
 ) : ViewModel() {
+    private data class HistoryEdgeSignature(
+        val size: Int,
+        val firstTimestamp: Long,
+        val lastTimestamp: Long,
+        val lastValueBits: Int,
+        val lastRawBits: Int,
+        val lastSerial: String?
+    )
+
     private companion object {
         const val TARGET_RANGE_DEFAULTS_MIGRATION_KEY = "target_range_defaults_v2"
         const val UI_RECOVERY_SYNC_MIN_INTERVAL_MS = 30_000L
@@ -411,7 +420,8 @@ class DashboardViewModel(
             var lastRecoveryRequestSerial: String? = null
             combine(
                 _unit,
-                glucoseRepository.getHistoryFlowRaw(queryStartTimeMs).distinctUntilChanged()
+                glucoseRepository.getHistoryFlowRaw(queryStartTimeMs)
+                    .distinctUntilChangedBy(::historyEdgeSignature)
             ) { unitStr, rawHistory ->
                 unitStr to rawHistory
             }.conflate().collect { (unitStr, rawHistory) ->
@@ -445,6 +455,19 @@ class DashboardViewModel(
                 _isLoading.value = false
             }
         }
+    }
+
+    private fun historyEdgeSignature(points: List<tk.glucodata.ui.GlucosePoint>): HistoryEdgeSignature {
+        val first = points.firstOrNull()
+        val last = points.lastOrNull()
+        return HistoryEdgeSignature(
+            size = points.size,
+            firstTimestamp = first?.timestamp ?: 0L,
+            lastTimestamp = last?.timestamp ?: 0L,
+            lastValueBits = java.lang.Float.floatToRawIntBits(last?.value ?: 0f),
+            lastRawBits = java.lang.Float.floatToRawIntBits(last?.rawValue ?: 0f),
+            lastSerial = last?.sensorSerial
+        )
     }
 
     private fun stopCollectionJobs() {

@@ -122,6 +122,13 @@ class GlucoseRepository {
     }
 
     suspend fun syncLatestNativeReadingOnce() {
+        val serial = _currentSerial.value.takeIf { it.isNotBlank() }
+            ?: SensorIdentity.resolveAppSensorId(Natives.lastsensorname())
+            ?: Natives.lastsensorname()
+        if (!SensorIdentity.shouldUseNativeHistorySync(serial)) {
+            Log.d(TAG, "syncLatestNativeReadingOnce skipped for driver-owned Room sensor '$serial'")
+            return
+        }
         val nowMs = SystemClock.elapsedRealtime()
         synchronized(this) {
             if ((nowMs - lastOneShotSyncStartedAtMs) < ONE_SHOT_SYNC_MIN_INTERVAL_MS) {

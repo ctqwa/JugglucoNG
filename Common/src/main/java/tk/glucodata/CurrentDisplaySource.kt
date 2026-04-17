@@ -147,7 +147,20 @@ object CurrentDisplaySource {
             }
         }
 
-        val displayValues = exactMatch?.let {
+        val resolvedExactPoint = exactMatch?.let { point ->
+            mergeExactPointWithLive(
+                point = point,
+                liveAutoValue = liveValue,
+                liveRawValue = liveRawValue
+            )
+        }
+
+        if (resolvedExactPoint != null) {
+            autoValue = resolvedExactPoint.value.takeIf { it.isFinite() && it > 0.1f } ?: autoValue
+            rawValue = resolvedExactPoint.rawValue.takeIf { it.isFinite() && it > 0.1f } ?: rawValue
+        }
+
+        val displayValues = resolvedExactPoint?.let {
             resolveDisplayValuesForPoint(
                 point = it,
                 viewMode = viewMode,
@@ -287,6 +300,27 @@ object CurrentDisplaySource {
             calibratedValue = calibratedValue,
             hideInitialWhenCalibrated = calibratedValue != null && shouldHideInitialWhenCalibrated()
         )
+    }
+
+    private fun mergeExactPointWithLive(
+        point: GlucosePoint,
+        liveAutoValue: Float?,
+        liveRawValue: Float
+    ): GlucosePoint {
+        val mergedAuto = if (point.value.isFinite() && point.value > 0.1f) {
+            point.value
+        } else {
+            liveAutoValue?.takeIf { it.isFinite() && it > 0.1f } ?: point.value
+        }
+        val mergedRaw = if (point.rawValue.isFinite() && point.rawValue > 0.1f) {
+            point.rawValue
+        } else {
+            liveRawValue.takeIf { it.isFinite() && it > 0.1f } ?: point.rawValue
+        }
+        if (mergedAuto == point.value && mergedRaw == point.rawValue) {
+            return point
+        }
+        return GlucosePoint(point.timestamp, mergedAuto, mergedRaw)
     }
 
     private fun shouldHideInitialWhenCalibrated(): Boolean {

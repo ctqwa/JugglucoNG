@@ -325,7 +325,7 @@ class ICanHealthBleManager(
         return if (supportsRawDisplayModes()) value.coerceIn(0, 3) else 0
     }
 
-    override fun supportsRawDisplayModes(): Boolean = true
+    override fun supportsRawDisplayModes(): Boolean = false
 
     private fun connectedStatus(): String {
         return runCatching { Applic.app.getString(tk.glucodata.R.string.status_connected) }
@@ -591,15 +591,10 @@ class ICanHealthBleManager(
         } else {
             glucoseMgdl
         }
-        val rawDisplay = ICanHealthConstants.normalizePseudoRawCurrentMgdl(latestCurrentRaw).takeIf {
-            it.isFinite() && it > 0f
-        }?.let {
-            if (Applic.unit == 1) it / ICanHealthConstants.MMOL_TO_MGDL else it
-        } ?: Float.NaN
         return ICanHealthCurrentSnapshot(
             timeMillis = timestampMs,
             glucoseValue = glucoseDisplay,
-            rawValue = rawDisplay,
+            rawValue = Float.NaN,
             rate = Float.NaN,
             sensorGen = SENSOR_GEN,
         )
@@ -2052,15 +2047,11 @@ class ICanHealthBleManager(
 
     private fun flushImportedGlucoseHistory() {
         val importedHistoryCount = pendingHistoryBatch.size
-        val latestImportedReading = pendingHistoryBatch.values
-            .filter { it.timestampMs > 0L && it.glucoseMgdl.isFinite() && it.glucoseMgdl > 0f }
-            .maxByOrNull { it.timestampMs }
         if (importedHistoryCount > 0) {
             glucoseHistoryImportedRecordCount += importedHistoryCount
         }
         val storedDirectlyInRoom = flushHistoryBackfillBatch()
         if (importedHistoryCount > 0 && SerialNumber.isNotBlank()) {
-            latestImportedReading?.let { rememberDriverCurrentReading(it.glucoseMgdl, it.timestampMs) }
             if (!storedDirectlyInRoom) {
                 Log.w(
                     TAG,
@@ -2068,10 +2059,9 @@ class ICanHealthBleManager(
                 )
                 HistorySyncAccess.mergeFullSyncForSensor(SerialNumber)
             } else {
-                if (!hasObservedLiveMeasurement()) {
-                    Notify.showoldglucose()
+                if (hasObservedLiveMeasurement()) {
+                    scheduleForegroundNotificationRefresh()
                 }
-                scheduleForegroundNotificationRefresh()
             }
             UiRefreshBus.requestDataRefresh()
         }
@@ -2211,7 +2201,7 @@ class ICanHealthBleManager(
     }
 
     private fun resolveRawLaneValue(rawCurrent: Float, glucoseMgdl: Float): Float {
-        return ICanHealthConstants.normalizePseudoRawCurrentMgdl(rawCurrent)
+        return Float.NaN
     }
 
     private fun rememberRecentGlucose(glucoseMgdl: Float) {
