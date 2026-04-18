@@ -107,4 +107,8 @@ interface ManagedBluetoothSensorDriver {
     fun supportsDisplayModes(): Boolean = false
 
     fun supportsManualCalibration(): Boolean = false
+
+    fun supportsGenericDisplayCalibration(): Boolean = true
+
+    fun supportsGenericLiveCalibration(): Boolean = true
 }
