@@ -39,9 +39,11 @@
 -keepclassmembers class tk.glucodata.data.HistoryRepository {
     public static void resetBackfillFlag();
     public static java.util.List getHistoryForNotificationForSensor(java.lang.String,long,boolean);
+    public static long getLatestTimestampForSensorBlocking(java.lang.String);
     public static void storeReadingAsync(long,float,int);
     public static void storeReadingAsync(long,float,float,float);
     public static void storeReadingAsync(long,float,float,float,java.lang.String);
+    public static void storeHistoryBatchAsync(java.lang.String,long[],float[],float[]);
 }
 
 -keepnames class tk.glucodata.data.HistorySync
@@ -50,6 +52,7 @@
     public final void syncSensorFromNative(java.lang.String,boolean);
     public final void syncRecentSensorFromNative(java.lang.String,long);
     public final void forceFullSyncForSensor(java.lang.String);
+    public final void mergeFullSyncForSensor(java.lang.String);
 }
 
 # Keep CalibrationManager names and reflected members stable.

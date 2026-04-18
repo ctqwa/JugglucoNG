@@ -1,5 +1,8 @@
 package tk.glucodata.drivers
 
+import tk.glucodata.Applic
+import tk.glucodata.R
+
 data class ManagedSensorLifecycleSummary(
     val progress: Float,
     val daysText: String,
@@ -35,6 +38,27 @@ object ManagedSensorStatusPolicy {
         "waiting for broadcast...",
     )
 
+    private val passiveSummaryStatusResourceIds = intArrayOf(
+        R.string.status_connected,
+        R.string.status_disconnected,
+        R.string.status_waiting_for_data,
+        R.string.connecting,
+        R.string.syncing,
+    )
+
+    private fun localizedPassiveSummaryStatuses(): Set<String> {
+        val context = Applic.app ?: return passiveSummaryStatuses
+        return buildSet(passiveSummaryStatuses.size + passiveSummaryStatusResourceIds.size) {
+            addAll(passiveSummaryStatuses)
+            passiveSummaryStatusResourceIds.forEach { resId ->
+                runCatching { context.getString(resId).trim().lowercase() }
+                    .getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let(::add)
+            }
+        }
+    }
+
     @JvmStatic
     fun collapseSummaryStatus(status: String?): String {
         val normalized = status?.trim().orEmpty()
@@ -50,7 +74,7 @@ object ManagedSensorStatusPolicy {
         if (normalized.isEmpty()) {
             return true
         }
-        return normalized in passiveSummaryStatuses
+        return normalized in localizedPassiveSummaryStatuses()
     }
 
     @JvmStatic
