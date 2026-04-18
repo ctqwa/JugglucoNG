@@ -124,6 +124,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import tk.glucodata.CalibrationAccess
 import tk.glucodata.R
 import kotlin.math.abs
 import tk.glucodata.DataSmoothing
@@ -260,10 +261,49 @@ private fun collapseSmoothedChartData(
     }
 }
 
+private data class ResolvedPrimarySeries(
+    val values: FloatArray,
+    val hasCalibration: Boolean,
+)
+
+private fun buildResolvedPrimarySeries(points: List<GlucosePoint>, isRawMode: Boolean): ResolvedPrimarySeries {
+    if (points.isEmpty()) return ResolvedPrimarySeries(FloatArray(0), false)
+    val calibrationActiveCache = HashMap<String?, Boolean>()
+    val resolved = FloatArray(points.size)
+    var hasCalibration = false
+    points.forEachIndexed { index, point ->
+        val baseValue = if (isRawMode) point.rawValue else point.value
+        if (!baseValue.isFinite() || baseValue <= 0.1f) {
+            resolved[index] = baseValue
+            return@forEachIndexed
+        }
+        val sensorId = point.sensorSerial
+        val calibrationActive = calibrationActiveCache.getOrPut(sensorId) {
+            CalibrationAccess.hasActiveCalibration(isRawMode, sensorId)
+        }
+        if (calibrationActive) {
+            hasCalibration = true
+        }
+        resolved[index] = if (calibrationActive) {
+            CalibrationAccess.getCalibratedValue(
+                baseValue,
+                point.timestamp,
+                isRawMode,
+                false,
+                sensorId
+            )
+        } else {
+            baseValue
+        }
+    }
+    return ResolvedPrimarySeries(resolved, hasCalibration)
+}
+
 @Composable
 private fun PreviewWindowNavigator(
     modifier: Modifier = Modifier,
     renderData: List<GlucosePoint>,
+    resolvedPrimaryValues: FloatArray,
     previewCenterTime: Long,
     viewMode: Int,
     targetLow: Float,
@@ -283,21 +323,12 @@ private fun PreviewWindowNavigator(
     val windowStrokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)
     val minimumWindowWidthPx = with(LocalDensity.current) { 12.dp.toPx() }
-    val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(viewMode == 1 || viewMode == 3)
-
     fun activeValue(index: Int): Float {
-        val renderPoint = renderData[index]
-        val isRawMode = viewMode == 1 || viewMode == 3
-        val baseValue = if (isRawMode) renderPoint.rawValue else renderPoint.value
-        return if (hasCalibration && baseValue.isFinite() && baseValue > 0.1f) {
-            tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(
-                baseValue,
-                renderPoint.timestamp,
-                isRawMode
-            )
-        } else {
-            baseValue
+        if (index in resolvedPrimaryValues.indices) {
+            return resolvedPrimaryValues[index]
         }
+        val renderPoint = renderData[index]
+        return if (viewMode == 1 || viewMode == 3) renderPoint.rawValue else renderPoint.value
     }
 
     fun windowBoundsPx(width: Float): Pair<Float, Float> {
@@ -687,6 +718,13 @@ fun InteractiveGlucoseChart(
     val interactionData = remember(safeData, renderData, graphSmoothingMinutes) {
         if (graphSmoothingMinutes > 0) renderData else safeData
     }
+    val isRawModeChart = viewMode == 1 || viewMode == 3
+    val calibrationRevision = CalibrationAccess.getRevision()
+    val resolvedPrimarySeries = remember(renderData, isRawModeChart, calibrationRevision) {
+        buildResolvedPrimarySeries(renderData, isRawModeChart)
+    }
+    val hasCalibration = resolvedPrimarySeries.hasCalibration
+    val resolvedPrimaryValues = resolvedPrimarySeries.values
 
     // --- FORMATTERS & TOOLS (Hoisted for Performance) ---
     val cal = remember { java.util.Calendar.getInstance() }
@@ -1721,8 +1759,6 @@ fun InteractiveGlucoseChart(
                     }
                 }
 
-                val isRawModeChart = viewMode == 1 || viewMode == 3
-                val hasCalibration = tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(isRawModeChart)
                 val hideInitialWhenCalibrated = hasCalibration &&
                     tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
 
@@ -1903,11 +1939,7 @@ fun InteractiveGlucoseChart(
                                 }
                             }
 
-                            val v = tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(
-                                baseV,
-                                renderPoint.timestamp,
-                                isRawModeChart
-                            )
+                            val v = resolvedPrimaryValues[i]
                             
                             if (v.isNaN() || v < 0.1f) {
                                 calFirst = true
@@ -1978,16 +2010,7 @@ fun InteractiveGlucoseChart(
                         // If showing Raw (Mode 1) or Raw-Primary (Mode 3), prioritize Raw
                         val useRaw = viewMode == 1 || viewMode == 3
                         val v = if (hideInitialWhenCalibrated) {
-                            val baseValue = if (useRaw) p.rawValue else p.value
-                            if (baseValue.isFinite() && baseValue > 0.1f) {
-                                tk.glucodata.data.calibration.CalibrationManager.getCalibratedValue(
-                                    baseValue,
-                                    p.timestamp,
-                                    useRaw
-                                )
-                            } else {
-                                baseValue
-                            }
+                            resolvedPrimaryValues[i]
                         } else {
                             if (useRaw) p.rawValue else p.value
                         }
@@ -2496,6 +2519,7 @@ fun InteractiveGlucoseChart(
                 PreviewWindowNavigator(
                     modifier = Modifier.fillMaxWidth(),
                     renderData = renderData,
+                    resolvedPrimaryValues = resolvedPrimaryValues,
                     previewCenterTime = previewCenterTime,
                     viewMode = viewMode,
                     targetLow = targetLow,
