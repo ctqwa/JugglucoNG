@@ -28,17 +28,35 @@ interface HistoryDao {
     @Query("SELECT * FROM history_readings WHERE sensorSerial = :serial AND timestamp >= :startTime ORDER BY timestamp ASC")
     suspend fun getReadingsSinceForSensor(serial: String, startTime: Long): List<HistoryReading>
 
+    @Query("SELECT * FROM history_readings WHERE sensorSerial IN (:serials) AND timestamp >= :startTime ORDER BY timestamp ASC")
+    fun getHistoryFlowForSensors(serials: List<String>, startTime: Long): Flow<List<HistoryReading>>
+
+    @Query("SELECT * FROM history_readings WHERE sensorSerial IN (:serials) AND timestamp >= :startTime ORDER BY timestamp ASC")
+    suspend fun getReadingsSinceForSensors(serials: List<String>, startTime: Long): List<HistoryReading>
+
     @Query("SELECT * FROM history_readings WHERE sensorSerial = :serial ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatestReadingForSensor(serial: String): HistoryReading?
 
     @Query("SELECT * FROM history_readings WHERE sensorSerial = :serial ORDER BY timestamp DESC LIMIT 1")
     fun getLatestReadingFlowForSensor(serial: String): Flow<HistoryReading?>
 
+    @Query("SELECT * FROM history_readings WHERE sensorSerial IN (:serials) ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestReadingForSensors(serials: List<String>): HistoryReading?
+
+    @Query("SELECT * FROM history_readings WHERE sensorSerial IN (:serials) ORDER BY timestamp DESC LIMIT 1")
+    fun getLatestReadingFlowForSensors(serials: List<String>): Flow<HistoryReading?>
+
     @Query("SELECT COUNT(*) FROM history_readings WHERE sensorSerial = :serial")
     suspend fun getCountForSensor(serial: String): Int
 
     @Query("SELECT MIN(timestamp) FROM history_readings WHERE sensorSerial = :serial")
     suspend fun getOldestTimestampForSensor(serial: String): Long?
+
+    @Query("SELECT COUNT(*) FROM history_readings WHERE sensorSerial IN (:serials)")
+    suspend fun getCountForSensors(serials: List<String>): Int
+
+    @Query("SELECT MIN(timestamp) FROM history_readings WHERE sensorSerial IN (:serials)")
+    suspend fun getOldestTimestampForSensors(serials: List<String>): Long?
 
     // ── All-sensor queries (used for export, global count, migration) ──
 

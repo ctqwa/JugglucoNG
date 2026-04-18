@@ -124,6 +124,27 @@ static void mirrorSyncSensor(int sendindex, bool forceFull) {
     }
 }
 
+static std::string extractMirrorSensorSerial(std::string_view name) {
+    static constexpr std::string_view sensorsPrefix = "sensors/";
+    if (name.size() <= sensorsPrefix.size() || name.substr(0, sensorsPrefix.size()) != sensorsPrefix) {
+        return {};
+    }
+    const auto rest = name.substr(sensorsPrefix.size());
+    const auto slash = rest.find('/');
+    if (slash == std::string_view::npos || slash == 0) {
+        return {};
+    }
+    return std::string(rest.substr(0, slash));
+}
+
+static void mirrorSyncSensorForPath(std::string_view path, int sendindex, bool forceFull) {
+    if (std::string serial = extractMirrorSensorSerial(path); !serial.empty()) {
+        javaMirrorSyncSensor(serial.c_str(), forceFull);
+        return;
+    }
+    mirrorSyncSensor(sendindex, forceFull);
+}
+
 static constexpr std::string_view mirrorCalibrationPrefix = "mirror/calibration/";
 static constexpr std::string_view mirrorCalibrationSuffix = ".json";
 
@@ -809,20 +830,20 @@ static bool savefileonce(const struct fileonce_t *gegs) {
         if((gegs->dowith&startcalibratedupdate)==startcalibratedupdate) {
             const auto [sendindex,startpos]=getstartinfo(gegs,start);
             setcalibratedstart(sendindex,startpos);
-            mirrorSyncSensor(sendindex, true);
+            mirrorSyncSensorForPath(namesv, sendindex, true);
             }
          else {
             if((gegs->dowith&streamupdatebit)==streamupdatebit) {
                     const auto [sendindex,startpos]=getstartinfo(gegs,start);
                     processglucosevalue(sendindex,startpos);
-                    mirrorSyncSensor(sendindex, false);
+                    mirrorSyncSensorForPath(namesv, sendindex, false);
 
                     }
             else {
                     if((gegs->dowith&starthistoryupdate)==starthistoryupdate) {
                             const auto [sendindex,startpos]=getstartinfo(gegs,start);
                             sethistorystart(sendindex,startpos);
-                            mirrorSyncSensor(sendindex, true);
+                            mirrorSyncSensorForPath(namesv, sendindex, true);
                             }
                  }
             }

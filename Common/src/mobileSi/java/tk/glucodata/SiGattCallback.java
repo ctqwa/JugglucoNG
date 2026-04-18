@@ -97,6 +97,7 @@ public class SiGattCallback extends SuperGattCallback {
    boolean connected = false;
    private boolean pendingHistoryUiRefresh = false;
    private long historyReplayBaselineSec = 0L;
+   private boolean pendingHistoryRoomMerge = false;
    private final Runnable historyUiRefreshRunnable = new Runnable() {
       @Override
       public void run() {
@@ -107,15 +108,22 @@ public class SiGattCallback extends SuperGattCallback {
          if (liveMainSensor != null && !liveMainSensor.isEmpty() && !SensorIdentity.matches(SerialNumber, liveMainSensor))
             return;
          long[] lastGlucose = Natives.getlastGlucose();
-         if (lastGlucose == null || lastGlucose.length < 2 || lastGlucose[0] <= historyReplayBaselineSec) {
-            return;
+         final boolean glucoseAdvanced =
+               lastGlucose != null &&
+               lastGlucose.length >= 2 &&
+               lastGlucose[0] > historyReplayBaselineSec;
+         if (glucoseAdvanced) {
+            if (constatstatusstr != null &&
+                  (constatstatusstr.equals(Applic.app.getString(R.string.status_waiting_for_data)) ||
+                   constatstatusstr.equals(Applic.app.getString(R.string.status_raw_values_received)))) {
+               constatstatusstr = "";
+            }
+            historyReplayBaselineSec = lastGlucose[0];
          }
-         if (constatstatusstr != null &&
-               (constatstatusstr.equals(Applic.app.getString(R.string.status_waiting_for_data)) ||
-                constatstatusstr.equals(Applic.app.getString(R.string.status_raw_values_received)))) {
-            constatstatusstr = "";
+         if (pendingHistoryRoomMerge) {
+            pendingHistoryRoomMerge = false;
+            HistorySyncAccess.mergeFullSyncForSensor(SerialNumber);
          }
-         historyReplayBaselineSec = lastGlucose[0];
          Applic.updatescreen();
          UiRefreshBus.requestDataRefresh();
       }
@@ -127,6 +135,7 @@ public class SiGattCallback extends SuperGattCallback {
          historyReplayBaselineSec = Math.max(historyReplayBaselineSec, lastGlucose[0]);
       }
       pendingHistoryUiRefresh = true;
+      pendingHistoryRoomMerge = true;
       Applic.app.getHandler().removeCallbacks(historyUiRefreshRunnable);
       Applic.app.getHandler().postDelayed(historyUiRefreshRunnable, 250L);
    }

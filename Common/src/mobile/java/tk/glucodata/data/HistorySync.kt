@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import tk.glucodata.Applic
 import tk.glucodata.BatteryTrace
 import tk.glucodata.Natives
+import tk.glucodata.SensorIdentity
 import tk.glucodata.UiRefreshBus
 import java.util.concurrent.ConcurrentHashMap
 import java.util.LinkedHashSet
@@ -95,72 +96,76 @@ object HistorySync {
     @JvmStatic
     @JvmOverloads
     fun syncSensorFromNative(serial: String, forceFull: Boolean = false) {
-        if (serial.isBlank()) return
+        val canonicalSerial = SensorIdentity.resolveAppSensorId(serial) ?: serial
+        if (canonicalSerial.isBlank()) return
+        if (!SensorIdentity.shouldUseNativeHistorySync(canonicalSerial)) return
 
         val now = System.currentTimeMillis()
-        val (_, stableCount) = sensorStability[serial] ?: Pair(-1, 0)
+        val (_, stableCount) = sensorStability[canonicalSerial] ?: Pair(-1, 0)
         val sensorStable = stableCount >= STABLE_THRESHOLD
         val minInterval = if (sensorStable && initialSyncDone) MIN_INCR_SYNC_INTERVAL_MS else MIN_FULL_SYNC_INTERVAL_MS
-        val lastSensorSync = sensorLastSyncTimeMs[serial] ?: 0L
+        val lastSensorSync = sensorLastSyncTimeMs[canonicalSerial] ?: 0L
 
         if (!forceFull && (now - lastSensorSync) < minInterval) {
             return
         }
-        if (!sensorSyncInProgress.add(serial)) {
+        if (!sensorSyncInProgress.add(canonicalSerial)) {
             return
         }
 
         BatteryTrace.bump(
             key = "history.sync.sensor.request",
             logEvery = 20L,
-            detail = "serial=$serial forceFull=$forceFull"
+            detail = "serial=$canonicalSerial forceFull=$forceFull"
         )
 
         scope.launch {
             try {
                 syncGate.withLock {
-                    doSyncSensor(serial, forceFull)
-                    sensorLastSyncTimeMs[serial] = System.currentTimeMillis()
+                    doSyncSensor(canonicalSerial, forceFull)
+                    sensorLastSyncTimeMs[canonicalSerial] = System.currentTimeMillis()
                     if (!initialSyncDone) {
                         initialSyncDone = true
                     }
                 }
             } finally {
-                sensorSyncInProgress.remove(serial)
+                sensorSyncInProgress.remove(canonicalSerial)
             }
         }
     }
 
     @JvmStatic
     fun syncRecentSensorFromNative(serial: String, anchorTimeMs: Long) {
-        if (serial.isBlank() || anchorTimeMs <= 0L) return
+        val canonicalSerial = SensorIdentity.resolveAppSensorId(serial) ?: serial
+        if (canonicalSerial.isBlank() || anchorTimeMs <= 0L) return
+        if (!SensorIdentity.shouldUseNativeHistorySync(canonicalSerial)) return
 
         val currentBucket = (anchorTimeMs / RECENT_SYNC_BUCKET_MS) * RECENT_SYNC_BUCKET_MS
-        val previousBucket = sensorLastRecentSyncBucketMs[serial]
+        val previousBucket = sensorLastRecentSyncBucketMs[canonicalSerial]
         if (previousBucket != null && previousBucket >= currentBucket) {
             return
         }
-        if (!sensorRecentSyncInProgress.add(serial)) {
+        if (!sensorRecentSyncInProgress.add(canonicalSerial)) {
             return
         }
 
         BatteryTrace.bump(
             key = "history.sync.sensor.live.request",
             logEvery = 20L,
-            detail = "serial=$serial bucket=$currentBucket"
+            detail = "serial=$canonicalSerial bucket=$currentBucket"
         )
 
         scope.launch {
             try {
                 syncGate.withLock {
                     val startMs = resolveRecentSyncStartMs(currentBucket, previousBucket)
-                    val readings = doSyncSensorWindow(serial, startMs / 1000L)
+                    val readings = doSyncSensorWindow(canonicalSerial, startMs / 1000L)
                     if (readings > 0) {
-                        sensorLastRecentSyncBucketMs[serial] = currentBucket
+                        sensorLastRecentSyncBucketMs[canonicalSerial] = currentBucket
                     }
                 }
             } finally {
-                sensorRecentSyncInProgress.remove(serial)
+                sensorRecentSyncInProgress.remove(canonicalSerial)
             }
         }
     }
@@ -231,7 +236,7 @@ object HistorySync {
                 val sensorsToSync = linkedSetOfSensors(
                     Natives.activeSensors(),
                     Natives.lastsensorname()
-                )
+                ).filter(SensorIdentity::shouldUseNativeHistorySync)
                 if (sensorsToSync.isEmpty()) {
                     Log.w(TAG, "No active sensors and no main sensor — nothing to sync")
                     lastSyncTimeMs = 0L
@@ -255,9 +260,13 @@ object HistorySync {
     private fun linkedSetOfSensors(activeSensors: Array<String?>?, mainSensor: String?): LinkedHashSet<String> {
         val result = LinkedHashSet<String>()
         activeSensors?.forEach { serial ->
-            serial?.takeIf { it.isNotBlank() }?.let(result::add)
+            (SensorIdentity.resolveAppSensorId(serial) ?: serial)
+                ?.takeIf { it.isNotBlank() }
+                ?.let(result::add)
         }
-        mainSensor?.takeIf { it.isNotBlank() }?.let(result::add)
+        (SensorIdentity.resolveAppSensorId(mainSensor) ?: mainSensor)
+            ?.takeIf { it.isNotBlank() }
+            ?.let(result::add)
         return result
     }
 
@@ -360,19 +369,14 @@ object HistorySync {
     }
 
     private fun loadNativeHistory(serial: String, startSec: Long): LongArray? {
-        val exact = try {
-            Natives.getGlucoseHistoryForSensor(serial, startSec)
-        } catch (_: Throwable) {
-            null
-        }
-        if (exact != null) {
-            return exact
-        }
-        if (serial.startsWith("X-") && serial.length > 2) {
-            return try {
-                Natives.getGlucoseHistoryForSensor(serial.substring(2), startSec)
+        for (nativeName in SensorIdentity.resolveNativeHistorySensorNames(serial).ifEmpty { listOf(serial) }) {
+            val exact = try {
+                Natives.getGlucoseHistoryForSensor(nativeName, startSec)
             } catch (_: Throwable) {
                 null
+            }
+            if (exact != null) {
+                return exact
             }
         }
         return null
@@ -411,21 +415,19 @@ object HistorySync {
         Log.i(TAG, "forceFullSyncForSensor($serial) — full Room/native resync requested")
         sensorStability.remove(serial)
         sensorLastSyncTimeMs.remove(serial)
-        val legacyAlias = if (serial.startsWith("X-") && serial.length > 2) serial.substring(2) else null
-        if (legacyAlias != null) {
-            sensorStability.remove(legacyAlias)
-            sensorLastSyncTimeMs.remove(legacyAlias)
+        val legacyAliases = SensorIdentity.resolveNativeHistorySensorNames(serial)
+        legacyAliases.forEach {
+            sensorStability.remove(it)
+            sensorLastSyncTimeMs.remove(it)
         }
         lastSyncTimeMs = 0L  // Allow immediate sync
         scope.launch {
             syncGate.withLock {
-                val preserveExistingHistory = shouldPreserveExistingHistoryOnFullResync(serial, legacyAlias)
+                val preserveExistingHistory = shouldPreserveExistingHistoryOnFullResync(serial, legacyAliases)
                 if (!preserveExistingHistory) {
                     try {
                         historyRepository.deleteForSensor(serial)
-                        if (legacyAlias != null) {
-                            historyRepository.deleteForSensor(legacyAlias)
-                        }
+                        legacyAliases.forEach { historyRepository.deleteForSensor(it) }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error deleting Room data for $serial before resync: ${e.message}")
                     }
@@ -446,10 +448,9 @@ object HistorySync {
         Log.i(TAG, "mergeFullSyncForSensor($serial) — full non-destructive Room/native merge requested")
         sensorStability.remove(serial)
         sensorLastSyncTimeMs.remove(serial)
-        val legacyAlias = if (serial.startsWith("X-") && serial.length > 2) serial.substring(2) else null
-        if (legacyAlias != null) {
-            sensorStability.remove(legacyAlias)
-            sensorLastSyncTimeMs.remove(legacyAlias)
+        SensorIdentity.resolveNativeHistorySensorNames(serial).forEach {
+            sensorStability.remove(it)
+            sensorLastSyncTimeMs.remove(it)
         }
         lastSyncTimeMs = 0L
         scope.launch {
@@ -463,16 +464,14 @@ object HistorySync {
         if (serial.isBlank()) return
         val deadline = System.currentTimeMillis() + RESET_PRESERVE_WINDOW_MS
         sensorResetPreserveUntilMs[serial] = deadline
-        if (serial.startsWith("X-") && serial.length > 2) {
-            sensorResetPreserveUntilMs[serial.substring(2)] = deadline
-        }
+        SensorIdentity.resolveNativeHistorySensorNames(serial).forEach { sensorResetPreserveUntilMs[it] = deadline }
     }
 
     private suspend fun shouldPreserveExistingHistoryOnFullResync(
         serial: String,
-        legacyAlias: String?
+        legacyAliases: List<String>
     ): Boolean {
-        val candidateSerials = linkedSetOf(serial, legacyAlias).filterNotNull()
+        val candidateSerials = linkedSetOf(serial, *legacyAliases.toTypedArray()).filterNotNull()
         val now = System.currentTimeMillis()
         val resetMarked = candidateSerials.any { candidate ->
             val deadline = sensorResetPreserveUntilMs[candidate] ?: return@any false

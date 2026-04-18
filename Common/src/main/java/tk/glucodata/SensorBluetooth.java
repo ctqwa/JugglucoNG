@@ -964,8 +964,24 @@ public class SensorBluetooth {
     }
     // static boolean nullKAuth=false;
 
+    private static ArrayList<String> distinctRuntimeSensorIds(Iterable<String> sensorIds) {
+        final ArrayList<String> distinct = new ArrayList<>();
+        if (sensorIds == null) {
+            return distinct;
+        }
+        for (String sensorId : sensorIds) {
+            if (!isValidShortSensorName(sensorId)) {
+                continue;
+            }
+            if (!containsMatching(distinct, sensorId)) {
+                distinct.add(sensorId);
+            }
+        }
+        return distinct;
+    }
+
     private void setDevices(String[] names) {
-        for (String name : SensorIdentity.distinctLogicalSensorIds(Arrays.asList(names))) {
+        for (String name : distinctRuntimeSensorIds(names != null ? Arrays.asList(names) : null)) {
             if (name != null) {
                 if (!isValidShortSensorName(name)) {
                     if (doLog) {
@@ -1277,7 +1293,7 @@ public class SensorBluetooth {
                 candidateDevs.add(serial);
             }
         }
-        ArrayList<String> allDevs = new ArrayList<>(SensorIdentity.distinctLogicalSensorIds(candidateDevs));
+        ArrayList<String> allDevs = distinctRuntimeSensorIds(candidateDevs);
 
         String[] devs = allDevs.toArray(new String[0]);
         ArrayList<Integer> rem = new ArrayList<>();
@@ -1349,7 +1365,9 @@ public class SensorBluetooth {
                     ;
                     long dataptr = 0L;
                     dataptr = Natives.getdataptr(dev);
-                    if (hasPersistedManagedRecord(dev)) {
+                    final boolean persistedManaged = hasPersistedManagedRecord(dev);
+                    final boolean managedNativeBacked = shouldSuppressGenericManagedShell(dev) && dataptr != 0L;
+                    if (persistedManaged || managedNativeBacked) {
                         final long managedDataptr = dataptr != 0L ? dataptr : resolvePersistedManagedDataptr(dev);
                         final SuperGattCallback managed = ManagedSensorIdentityRegistry.INSTANCE.createManagedCallback(Applic.app, dev, managedDataptr);
                         if (managed != null) {
