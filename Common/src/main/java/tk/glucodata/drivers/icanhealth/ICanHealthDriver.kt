@@ -56,10 +56,6 @@ interface ICanHealthDriver : ManagedBluetoothSensorDriver {
 
     override fun supportsManualCalibration(): Boolean = supportsSensorCalibration()
 
-    override fun supportsGenericDisplayCalibration(): Boolean = false
-
-    override fun supportsGenericLiveCalibration(): Boolean = false
-
     override fun getManagedUiSnapshot(activeSensorId: String?): ManagedSensorUiSnapshot? {
         val callback = this as? SuperGattCallback ?: return null
         val sensorSerial = callback.SerialNumber ?: return null

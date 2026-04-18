@@ -1,7 +1,6 @@
 package tk.glucodata
 
 import kotlin.math.roundToInt
-import tk.glucodata.drivers.ManagedSensorRuntime
 import tk.glucodata.ui.DisplayValueResolver
 import tk.glucodata.ui.DisplayValues
 
@@ -220,9 +219,6 @@ object CurrentDisplaySource {
         allowLiveFallback: Boolean
     ): Float? {
         val isRawMode = isRawPrimary(viewMode)
-        if (!ManagedSensorRuntime.supportsGenericDisplayCalibration(sensorId)) {
-            return null
-        }
         if (!CalibrationAccess.hasActiveCalibration(isRawMode, sensorId)) {
             if (allowLiveFallback && liveValue != null && CalibrationAccess.hasActiveCalibration(isRawMode, null)) {
                 val fallbackCalibrated = CalibrationAccess.getCalibratedValue(
@@ -261,7 +257,6 @@ object CurrentDisplaySource {
     ): DisplayValues {
         val isRawMode = isRawPrimary(viewMode)
         val calibratedValue = if (
-            ManagedSensorRuntime.supportsGenericDisplayCalibration(sensorId) &&
             CalibrationAccess.hasActiveCalibration(isRawMode, sensorId)
         ) {
             val baseValue = if (isRawMode) point.rawValue else point.value
@@ -363,9 +358,6 @@ object CurrentDisplaySource {
         isRawMode: Boolean
     ): Float {
         if (!baseValue.isFinite() || baseValue <= 0f) {
-            return 0f
-        }
-        if (!ManagedSensorRuntime.supportsGenericDisplayCalibration(sensorId)) {
             return 0f
         }
         if (!CalibrationAccess.hasActiveCalibration(isRawMode, sensorId)) {

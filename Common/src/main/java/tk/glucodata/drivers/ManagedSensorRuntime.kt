@@ -46,14 +46,4 @@ object ManagedSensorRuntime {
         return resolveDriver(resolvedSensorId)
             ?.let { driver -> runCatching { driver.getManagedCurrentSnapshot(maxAgeMillis) }.getOrNull() }
     }
-
-    @JvmStatic
-    fun supportsGenericDisplayCalibration(sensorId: String?): Boolean {
-        return resolveDriver(sensorId)?.supportsGenericDisplayCalibration() ?: true
-    }
-
-    @JvmStatic
-    fun supportsGenericLiveCalibration(sensorId: String?): Boolean {
-        return resolveDriver(sensorId)?.supportsGenericLiveCalibration() ?: true
-    }
 }
