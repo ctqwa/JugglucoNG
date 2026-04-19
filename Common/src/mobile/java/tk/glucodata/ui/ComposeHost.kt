@@ -785,6 +785,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                     composable("settings/turnserver") { tk.glucodata.ui.TurnServerSettingsScreen(navController) }
                     composable("settings/debug") { DebugSettingsScreen(navController) }
                     composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
+                    composable("settings/alerts/talker") { tk.glucodata.ui.alerts.TalkerSettingsScreen(navController) }
                     composable("settings/calibrations") {
                         CalibrationListRoute(
                             dashboardViewModel = dashboardViewModel,
@@ -880,6 +881,7 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
                 composable("settings/turnserver") { tk.glucodata.ui.TurnServerSettingsScreen(navController) }
                 composable("settings/debug") { DebugSettingsScreen(navController) }
                 composable("settings/alerts") { tk.glucodata.ui.alerts.AlertSettingsScreen(navController) }
+                composable("settings/alerts/talker") { tk.glucodata.ui.alerts.TalkerSettingsScreen(navController) }
                 composable("settings/calibrations") {
                     CalibrationListRoute(
                         dashboardViewModel = dashboardViewModel,

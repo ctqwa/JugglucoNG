@@ -53,7 +53,9 @@ import tk.glucodata.Applic
 import tk.glucodata.Notify
 import tk.glucodata.R
 import tk.glucodata.alerts.*
+import tk.glucodata.ui.components.SettingsItem
 import tk.glucodata.ui.components.StyledSwitch
+import tk.glucodata.ui.components.CardPosition as SettingsItemPosition
 import tk.glucodata.ui.theme.displayLargeExpressive
 import tk.glucodata.ui.theme.labelLargeExpressive
 import tk.glucodata.ui.util.ConnectedButtonGroup
@@ -153,6 +155,11 @@ fun AlertSettingsScreen(
     }
     val customHighs = remember(customAlerts) { customAlerts.filter { it.type == CustomAlertType.HIGH } }
     val customLows = remember(customAlerts) { customAlerts.filter { it.type == CustomAlertType.LOW } }
+    val talkerSummary = listOf(
+        stringResource(R.string.speakglucose),
+//        stringResource(R.string.speakmessages),
+        stringResource(R.string.speakalarms)
+    ).joinToString(" • ")
 
     // Track expanded states
     var expandedType by remember { mutableStateOf<AlertType?>(null) }
@@ -519,6 +526,19 @@ fun AlertSettingsScreen(
             item {
                 Spacer(Modifier.height(24.dp))
                 PreemptiveSnoozeCard()
+            }
+
+            item {
+                Spacer(Modifier.height(24.dp))
+                SettingsItem(
+                    title = stringResource(R.string.talker),
+                    subtitle = talkerSummary,
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    showArrow = true,
+                    position = SettingsItemPosition.SINGLE,
+                    onClick = { navController.navigate("settings/alerts/talker") }
+                )
             }
 
             // Bottom padding

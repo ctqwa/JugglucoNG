@@ -108,6 +108,147 @@ if(!DontTalk) {
     }
 
 static final private ArrayList<Voice> voiceChoice=new ArrayList<>();
+static final private ArrayList<Runnable> voiceListeners=new ArrayList<>();
+
+private static void notifyVoiceListeners() {
+    final ArrayList<Runnable> listeners;
+    synchronized(voiceListeners) {
+        listeners=new ArrayList<>(voiceListeners);
+        }
+    if(listeners.isEmpty())
+        return;
+    Applic.RunOnUiThread(() -> {
+        for(var listener:listeners) {
+            try {
+                listener.run();
+                }
+            catch(Throwable th) {
+                Log.stack(LOG_ID,"voiceListener",th);
+                }
+            }
+        });
+    }
+
+public static void addVoiceOptionsListener(Runnable listener) {
+    if(listener==null)
+        return;
+    synchronized(voiceListeners) {
+        if(!voiceListeners.contains(listener))
+            voiceListeners.add(listener);
+        }
+    }
+
+public static void removeVoiceOptionsListener(Runnable listener) {
+    if(listener==null)
+        return;
+    synchronized(voiceListeners) {
+        voiceListeners.remove(listener);
+        }
+    }
+
+public static ArrayList<String> getVoiceNames() {
+    ArrayList<String> names=new ArrayList<>();
+    synchronized(voiceChoice) {
+        for(var voice:voiceChoice) {
+            names.add(voice.getName());
+            }
+        }
+    return names;
+    }
+
+public static int getSelectedVoiceIndex() {
+    getvalues();
+    return voicepos;
+    }
+
+public static int getSeparationSeconds() {
+    getvalues();
+    return (int)(cursep/1000L);
+    }
+
+public static float getSelectedSpeed() {
+    getvalues();
+    return curspeed;
+    }
+
+public static float getSelectedPitch() {
+    getvalues();
+    return curpitch;
+    }
+
+public static void ensureComposeTalker(Context context) {
+    if(!DontTalk&&SuperGattCallback.talker==null)
+        SuperGattCallback.newtalker(context);
+    }
+
+public static void applyComposeSettings(Context context, boolean speakGlucose, boolean touchTalk, boolean speakMessages, boolean speakAlarms, boolean mediaSound, float speed, float pitch, int separationSeconds, int selectedVoice) {
+    if(DontTalk)
+        return;
+    curspeed=speed;
+    curpitch=pitch;
+    cursep=Math.max(1,separationSeconds)*1000L;
+    nexttime=System.currentTimeMillis()+cursep;
+    if(selectedVoice>=0)
+        voicepos=selectedVoice;
+
+    if(mediaSound) {
+        Natives.setSoundType(AudioAttributes.USAGE_MEDIA);
+        }
+    else {
+        Natives.setSoundType(isWearable ? USAGE_ASSISTANCE_SONIFICATION : AudioAttributes.USAGE_NOTIFICATION);
+        }
+    Notify.makenotification_audio();
+
+    SuperGattCallback.dotalk = speakGlucose;
+    settouchtalk(touchTalk);
+    Natives.setspeakmessages(speakMessages);
+    Natives.setspeakalarms(speakAlarms);
+    Natives.saveVoice(curspeed,curpitch,(int)(cursep/1000L),voicepos,SuperGattCallback.dotalk);
+
+    final boolean hasAny=speakGlucose||touchTalk||speakMessages||speakAlarms;
+    if(hasAny&&SuperGattCallback.talker==null)
+        SuperGattCallback.newtalker(context);
+    var talk=SuperGattCallback.talker;
+    if(talk!=null) {
+        talk.setvalues();
+        talk.setvoice();
+        }
+    }
+
+public static void finishComposeSession() {
+    if(!DontTalk&&!shouldtalk())
+        SuperGattCallback.endtalk();
+    }
+
+public static void selectProfile(Context context,int profile) {
+    if(DontTalk)
+        return;
+    if(profile==Natives.getProfile())
+        return;
+    Natives.setProfile(profile);
+    SuperGattCallback.initAlarmTalk();
+    ensureComposeTalker(context);
+    notifyVoiceListeners();
+    }
+
+public static void testCurrentValue(Context context) {
+    if(DontTalk)
+        return;
+    var current = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
+    var say=(current!=null&&current.getPrimaryStr()!=null)?current.getPrimaryStr():"8.7";
+    if(istalking()) {
+        var talk=SuperGattCallback.talker;
+        if(talk!=null) {
+            talk.setvalues();
+            talk.setvoice();
+            talk.speak(say);
+            return;
+            }
+        }
+    playstring=say;
+    SuperGattCallback.newtalker(context);
+    }
+
 void setvalues() {
 if(!DontTalk) {
    var gine=engine;
@@ -140,7 +281,9 @@ if(!DontTalk) {
         engine.shutdown();
         engine=null;
         }
-    voiceChoice.clear();
+    synchronized(voiceChoice) {
+        voiceChoice.clear();
+        }
     }
     }
 
@@ -172,10 +315,12 @@ if(!DontTalk) {
                     var lang=loc.getLanguage();
                     {if(doLog) {Log.i(LOG_ID,"lang="+lang);};};
 
-                    voiceChoice.clear();
-                    for(var voice:voices) {
-                        if(lang.equals(voice.getLocale().getLanguage())) {
-                            voiceChoice.add(voice);
+                    synchronized(voiceChoice) {
+                        voiceChoice.clear();
+                        for(var voice:voices) {
+                            if(lang.equals(voice.getLocale().getLanguage())) {
+                                voiceChoice.add(voice);
+                                }
                             }
                         }
                     var spin=spinner;
@@ -191,6 +336,7 @@ if(!DontTalk) {
                         }
                     }
                 setvoice();
+                notifyVoiceListeners();
             }
              if(playstring!=null) {
                  speak(playstring);
@@ -390,247 +536,284 @@ public  static boolean istalking() {
     else
         return SuperGattCallback.talker!=null;
     }
-public static void config(MainActivity context) {
-    if(!DontTalk) {
-        if(!istalking()) {
-             SuperGattCallback.newtalker(context);
+private static void cleanupConfigOverlay(MainActivity context, View layout) {
+    tk.glucodata.help.hidekeyboard(context);
+    removeContentView(layout);
+    spinner=null;
+    if(Menus.on)
+        Menus.show(context);
+    context.lightBars(!getInvertColors( ));
+    }
+
+public static View createConfigView(MainActivity context, Runnable onClose) {
+    return createConfigView(context, onClose, null);
+    }
+
+public static View createConfigView(MainActivity context, Runnable onClose, Runnable onProfileChange) {
+    return makeConfigView(context,false,onClose,onProfileChange);
+    }
+
+private static View makeConfigView(MainActivity context, boolean overlayMode, Runnable onClose, Runnable onProfileChange) {
+    if(DontTalk) {
+        return new View(context);
+        }
+    if(!istalking()) {
+        SuperGattCallback.newtalker(context);
+        }
+
+    var separation=new EditText(context);
+
+    separation.setImeOptions(editoptions);
+    separation.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    separation.setMinEms(2);
+    int sep=(int)(cursep/1000L);
+    separation.setText(sep+"");
+    var seplabel=getlabel(context,context.getString(R.string.secondsbetween));
+    float density=GlucoseCurve.metrics.density;
+    int pad=(int)(density*3);
+    seplabel.setPadding(pad*3,0,0,0);
+    var speeds=slider(context,curspeed);
+
+    var pitchs=slider(context,curpitch);
+    var cancel=getbutton(context,R.string.cancel);
+
+    var save=getbutton(context,R.string.save);
+    var width= GlucoseCurve.getwidth();
+    var speedlabel=getlabel(context,context.getString(R.string.speed));
+    speedlabel.setPadding(pad,0,pad*2,0);
+    var pitchlabel=getlabel(context,context.getString(R.string.pitch));
+    pitchlabel.setPadding(pad,0,pad*2,0);
+    var voicelabel=getlabel(context,context.getString(R.string.talker));
+    var active=getcheckbox(context,R.string.speakglucose, SuperGattCallback.dotalk);
+    active.setPadding(0,0,pad*3,0);
+
+    var mediasound=getcheckbox(context,"MEDIA", Natives.getSoundType( )==AudioAttributes.USAGE_MEDIA);
+    mediasound.setOnCheckedChangeListener(
+             (buttonView,  isChecked) -> {
+                 if (isChecked) {
+                     Natives.setSoundType(AudioAttributes.USAGE_MEDIA);
+                 } else {
+                     Natives.setSoundType(isWearable ? USAGE_ASSISTANCE_SONIFICATION : AudioAttributes.USAGE_NOTIFICATION);
+                 }
+                 Notify.makenotification_audio();
+                    }
+                    );
+
+
+    var test=getbutton(context,context.getString(R.string.test));
+    if(spinner!=null) {
+            {if(doLog) {Log.i(LOG_ID, "Talker.config spinner=!null");};};
+            try {
+            ViewGroup par = (ViewGroup) spinner.getParent();
+            if (par != null)
+                par.removeView(spinner);
             }
-
-        var separation=new EditText(context);
-
-        separation.setImeOptions(editoptions);
-        separation.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        separation.setMinEms(2);
-        int sep=(int)(cursep/1000L);
-        separation.setText(sep+"");
-        var seplabel=getlabel(context,context.getString(R.string.secondsbetween));
-        float density=GlucoseCurve.metrics.density;
-        int pad=(int)(density*3);
-        seplabel.setPadding(pad*3,0,0,0);
-        var speeds=slider(context,curspeed);
-
-        var pitchs=slider(context,curpitch);
-        var cancel=getbutton(context,R.string.cancel);
-
-        var save=getbutton(context,R.string.save);
-        var width= GlucoseCurve.getwidth();
-        var speedlabel=getlabel(context,context.getString(R.string.speed));
-        speedlabel.setPadding(pad,0,pad*2,0);
-        var pitchlabel=getlabel(context,context.getString(R.string.pitch));
-        pitchlabel.setPadding(pad,0,pad*2,0);
-        var voicelabel=getlabel(context,context.getString(R.string.talker));
-        var active=getcheckbox(context,R.string.speakglucose, SuperGattCallback.dotalk);
-        active.setPadding(0,0,pad*3,0);
-
-        var mediasound=getcheckbox(context,"MEDIA", Natives.getSoundType( )==AudioAttributes.USAGE_MEDIA);
-        mediasound.setOnCheckedChangeListener(
-                 (buttonView,  isChecked) -> {
-                     if (isChecked) {
-                         Natives.setSoundType(AudioAttributes.USAGE_MEDIA);
-                     } else {
-                         Natives.setSoundType(isWearable ? USAGE_ASSISTANCE_SONIFICATION : AudioAttributes.USAGE_NOTIFICATION);
-                     }
-                     Notify.makenotification_audio();
-                        }
-                        );
-                        
-
-
-        var test=getbutton(context,context.getString(R.string.test));
-        if(spinner!=null) {
-                {if(doLog) {Log.i(LOG_ID, "Talker.config spinner=!null");};};
-                try {
-                ViewGroup par = (ViewGroup) spinner.getParent();
-                if (par != null)
-                    par.removeView(spinner);
-                }
-            catch (Throwable th) {
-                Log.stack(LOG_ID,"spinner",th);
-                }
+        catch (Throwable th) {
+            Log.stack(LOG_ID,"spinner",th);
             }
-        else
-                Log.i(LOG_ID,"Talker.config spinner==null");  
-        var spin= spinner!=null?spinner:((android.os.Build.VERSION.SDK_INT >= minandroid)? (spinner=getGenSpin(context)):null);
+        }
+    else
+            Log.i(LOG_ID,"Talker.config spinner==null");
+    var spin= spinner!=null?spinner:((android.os.Build.VERSION.SDK_INT >= minandroid)? (spinner=getGenSpin(context)):null);
 
-        int[] spinpos={-1};
-        var touchtalk= getcheckbox(context,context.getString(R.string.talk_touch), Natives.gettouchtalk());
-        var speakmessages= getcheckbox(context,context.getString(R.string.speakmessages), Natives.speakmessages());
-        var speakalarms= getcheckbox(context,context.getString(R.string.speakalarms), Natives.speakalarms());
-        var pro=getProfileSpinner(context);
-       int curProfile=Natives.getProfile();
-        pro.setSelection(curProfile);
-       pro.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-        @Override
-        public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-            if(position!=curProfile) {
-               Natives.setProfile(position);
-               SuperGattCallback.initAlarmTalk();
+    int[] spinpos={-1};
+    var touchtalk= getcheckbox(context,context.getString(R.string.talk_touch), Natives.gettouchtalk());
+    var speakmessages= getcheckbox(context,context.getString(R.string.speakmessages), Natives.speakmessages());
+    var speakalarms= getcheckbox(context,context.getString(R.string.speakalarms), Natives.speakalarms());
+    var pro=getProfileSpinner(context);
+    int curProfile=Natives.getProfile();
+    pro.setSelection(curProfile);
+    pro.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+    @Override
+    public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
+        if(position!=curProfile) {
+           Natives.setProfile(position);
+           SuperGattCallback.initAlarmTalk();
+           if(overlayMode) {
                MainActivity.doonback();
                config(context);
                }
-            }
-        @Override
-        public  void onNothingSelected (AdapterView<?> parent) {
+           else if(onProfileChange!=null) {
+               onProfileChange.run();
+               }
+           }
+        }
+    @Override
+    public  void onNothingSelected (AdapterView<?> parent) {
 
-        } });
-        if(android.os.Build.VERSION.SDK_INT >= minandroid) { 
-            spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
-                    {if(doLog) {Log.i(LOG_ID,"onItemSelected "+position);};};
-                    
-                    spinpos[0]=position;
-                    }
-                @Override
-                public  void onNothingSelected (AdapterView<?> parent) {
+    } });
+    if(android.os.Build.VERSION.SDK_INT >= minandroid) {
+        spin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public  void onItemSelected (AdapterView<?> parent, View view, int position, long id) {
+                {if(doLog) {Log.i(LOG_ID,"onItemSelected "+position);};};
 
-                } });
-            spin.setAdapter(new RangeAdapter<Voice>(voiceChoice, context, voice -> {
-                    return voice.getName();
-                    }));
-            {if(doLog) {Log.i(LOG_ID,"voicepos="+voicepos);};};
-            if(voicepos>=0&&voicepos<voiceChoice.size())
-                spin.setSelection(voicepos);
-            spinpos[0]=-1;
-            }
-        ViewGroup layout;
+                spinpos[0]=position;
+                }
+            @Override
+            public  void onNothingSelected (AdapterView<?> parent) {
+
+            } });
+        spin.setAdapter(new RangeAdapter<Voice>(voiceChoice, context, voice -> {
+                return voice.getName();
+                }));
+        {if(doLog) {Log.i(LOG_ID,"voicepos="+voicepos);};};
+        if(voicepos>=0&&voicepos<voiceChoice.size())
+            spin.setSelection(voicepos);
+        spinpos[0]=-1;
+        }
+    ViewGroup layout;
     var schedules=getbutton(context,R.string.schedules);
 
-        if(isWearable) {
-            int marg=(int)(width*.1f);
-             Layout.getMargins(voicelabel).topMargin=marg;
-             Layout.getMargins(cancel).leftMargin=marg;
-             Layout.getMargins(test).rightMargin=marg;
-             Layout.getMargins(separation).rightMargin=marg;
-            var lay=new Layout(context,(l,w,h)-> {
-                return new int[] {w,h};
-                },
+    if(isWearable) {
+        int marg=(int)(width*.1f);
+         Layout.getMargins(voicelabel).topMargin=marg;
+         Layout.getMargins(cancel).leftMargin=marg;
+         Layout.getMargins(test).rightMargin=marg;
+         Layout.getMargins(separation).rightMargin=marg;
+        var lay=new Layout(context,(l,w,h)-> {
+            return new int[] {w,h};
+            },
 
-                 new View[]{voicelabel},new View[]{spin},new View[]{active},new View[]{seplabel,separation}, new View[]{touchtalk},new View[]{ speakmessages},new View[]{speakalarms },new View[]{speedlabel},new View[]{speeds[1],speeds[0]},new View[]{pitchlabel},new View[]{pitchs[1],pitchs[0]},new View[]{mediasound},  new View[]{pro},new View[]{schedules},new View[]{cancel,test},new View[]{save});
+             new View[]{voicelabel},new View[]{spin},new View[]{active},new View[]{seplabel,separation}, new View[]{touchtalk},new View[]{ speakmessages},new View[]{speakalarms },new View[]{speedlabel},new View[]{speeds[1],speeds[0]},new View[]{pitchlabel},new View[]{pitchs[1],pitchs[0]},new View[]{mediasound},  new View[]{pro},new View[]{schedules},new View[]{cancel,test},new View[]{save});
 
-            var scroll=new ScrollView(context);
-            scroll.addView(lay);
-            scroll.setFillViewport(true);
-            scroll.setSmoothScrollingEnabled(false);
-           scroll.setScrollbarFadingEnabled(true);
-           scroll.setVerticalScrollBarEnabled(Applic.scrollbar);
-            layout=scroll;
-           }
+        var scroll=new ScrollView(context);
+        scroll.addView(lay);
+        scroll.setFillViewport(true);
+        scroll.setSmoothScrollingEnabled(false);
+       scroll.setScrollbarFadingEnabled(true);
+       scroll.setVerticalScrollBarEnabled(Applic.scrollbar);
+        layout=scroll;
+       }
+    else {
+        View[]  firstrow;
+        if(android.os.Build.VERSION.SDK_INT >= minandroid) {
+             firstrow=new View[]{active,seplabel,separation,voicelabel,spin};
+             }
         else {
-            View[]  firstrow; 
-            if(android.os.Build.VERSION.SDK_INT >= minandroid) { 
-                 firstrow=new View[]{active,seplabel,separation,voicelabel,spin};
-                 }
-            else {
-                var space=new Space(context);
-                space.setMinimumWidth((int)(width*0.4));
-                firstrow=new View[]{active,seplabel,separation,space};
-              }
-            var secondrow=new View[]{touchtalk, speakmessages, speakalarms };
-            Layout.getMargins(cancel).leftMargin=Layout.getMargins(save).rightMargin=(int)(width*.05f);
-            var helpview=getbutton(context,R.string.helpname);
-            helpview.setOnClickListener(v-> help.help(R.string.talkhelp,context));
-            layout= new Layout(context,(l,w,h)-> {
-                return new int[] {w,h};
-                },firstrow,secondrow,new View[]{speedlabel,speeds[1],speeds[0],pro},new View[]{pitchlabel,pitchs[1],pitchs[0],mediasound}, new View[]{cancel,helpview,schedules,test,save});
-            }
+            var space=new Space(context);
+            space.setMinimumWidth((int)(width*0.4));
+            firstrow=new View[]{active,seplabel,separation,space};
+          }
+        var secondrow=new View[]{touchtalk, speakmessages, speakalarms };
+        Layout.getMargins(cancel).leftMargin=Layout.getMargins(save).rightMargin=(int)(width*.05f);
+        var helpview=getbutton(context,R.string.helpname);
+        helpview.setOnClickListener(v-> help.help(R.string.talkhelp,context));
+        layout= new Layout(context,(l,w,h)-> {
+            return new int[] {w,h};
+            },firstrow,secondrow,new View[]{speedlabel,speeds[1],speeds[0],pro},new View[]{pitchlabel,pitchs[1],pitchs[0],mediasound}, new View[]{cancel,helpview,schedules,test,save});
+        }
 
-        final var lay=layout;
-        schedules.setOnClickListener(v->  {
-            scheduleProfiles(context,lay);
+    final var lay=layout;
+    schedules.setOnClickListener(v->  {
+        scheduleProfiles(context,lay);
+    });
+    layout.setBackgroundColor( Applic.backgroundcolor);
+    cancel.setOnClickListener(v->  {
+        if(onClose!=null)
+            onClose.run();
         });
-          //layout.setBackgroundResource(R.drawable.dialogbackground);
-        layout.setBackgroundColor( Applic.backgroundcolor);
-          context.lightBars(false);
-        MainActivity.setonback(()-> {
-            tk.glucodata.help.hidekeyboard(context);
-            removeContentView(lay);
-            spinner=null;
-            if(Menus.on)
-                Menus.show(context);
-
-               context.lightBars(!getInvertColors( ));
-            });
-        cancel.setOnClickListener(v->  {
-            context.doonback();
-            });
-        Runnable getvalues=()-> {
-            try {
-                if (android.os.Build.VERSION.SDK_INT >= minandroid) {
-                    int pos=spinpos[0];
-                    if(pos>=0) {
-                        voicepos=pos;
-                        }
-                      }
-                 var str = separation.getText().toString();
-                if(str != null) {
-                    cursep = Integer.parseInt(str)*1000L;
-                    var now=System.currentTimeMillis();    
-                    nexttime=now+cursep;
+    Runnable getvalues=()-> {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= minandroid) {
+                int pos=spinpos[0];
+                if(pos>=0) {
+                    voicepos=pos;
                     }
-                var speedstr=((EditText)speeds[1]).getText().toString();
-                if(speedstr != null) {
-                    curspeed = str2float(speedstr);
-                    {if(doLog) {Log.i(LOG_ID,"speedstr: "+speedstr+" "+curspeed);};};
-                    }
-                var pitchstr=((EditText)pitchs[1]).getText().toString();
-                if(pitchstr != null) {
-                    curpitch = str2float(pitchstr);
-                    {if(doLog) {Log.i(LOG_ID,"pitchstr: "+pitchstr+" "+curpitch);};};
-                    }
-    ;
-                } catch(Throwable th) {
-                    Log.stack(LOG_ID,"parseInt",th);
-                    }
-
-             };
-        save.setOnClickListener(v->  {
-            getvalues.run();
-            
-            if(active.isChecked()||touchtalk.isChecked()||speakmessages.isChecked()||speakalarms.isChecked()) {
-                SuperGattCallback.newtalker(context);
-                SuperGattCallback.dotalk = active.isChecked();
-                settouchtalk(touchtalk.isChecked());
-                Natives.setspeakmessages(speakmessages.isChecked());
-                Natives.setspeakalarms(speakalarms.isChecked());
+                  }
+             var str = separation.getText().toString();
+            if(str != null) {
+                cursep = Integer.parseInt(str)*1000L;
+                var now=System.currentTimeMillis();
+                nexttime=now+cursep;
                 }
-            else {
-                settouchtalk(false);
-                Natives.setspeakmessages(false);
-                Natives.setspeakalarms(false);
-                SuperGattCallback.endtalk();
+            var speedstr=((EditText)speeds[1]).getText().toString();
+            if(speedstr != null) {
+                curspeed = str2float(speedstr);
+                {if(doLog) {Log.i(LOG_ID,"speedstr: "+speedstr+" "+curspeed);};};
                 }
-            Natives.saveVoice(curspeed,curpitch,(int)(cursep/1000L),voicepos,SuperGattCallback.dotalk);
+            var pitchstr=((EditText)pitchs[1]).getText().toString();
+            if(pitchstr != null) {
+                curpitch = str2float(pitchstr);
+                {if(doLog) {Log.i(LOG_ID,"pitchstr: "+pitchstr+" "+curpitch);};};
+                }
+            } catch(Throwable th) {
+                Log.stack(LOG_ID,"parseInt",th);
+                }
 
-            context.doonback();
-            });
-        test.setOnClickListener(v->  {
-            var current = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
-            var say=(current!=null&&current.getPrimaryStr()!=null)?current.getPrimaryStr():"8.7";
-            getvalues.run();
-            if(istalking()) {
-                var talk=SuperGattCallback.talker;
-                if(talk!=null) {
-                    talk.setvalues();
-                    talk.setvoice();
-                    talk.speak(say);
-                    return;
-                    }
-                }
-            playstring=say;
+         };
+    save.setOnClickListener(v->  {
+        getvalues.run();
+
+        if(active.isChecked()||touchtalk.isChecked()||speakmessages.isChecked()||speakalarms.isChecked()) {
             SuperGattCallback.newtalker(context);
-            });
+            SuperGattCallback.dotalk = active.isChecked();
+            settouchtalk(touchtalk.isChecked());
+            Natives.setspeakmessages(speakmessages.isChecked());
+            Natives.setspeakalarms(speakalarms.isChecked());
+            }
+        else {
+            settouchtalk(false);
+            Natives.setspeakmessages(false);
+            Natives.setspeakalarms(false);
+            SuperGattCallback.endtalk();
+            }
+        Natives.saveVoice(curspeed,curpitch,(int)(cursep/1000L),voicepos,SuperGattCallback.dotalk);
 
+        if(onClose!=null)
+            onClose.run();
+        });
+    test.setOnClickListener(v->  {
+        var current = CurrentDisplaySource.resolveCurrent(Notify.glucosetimeout);
+        var say=(current!=null&&current.getPrimaryStr()!=null)?current.getPrimaryStr():"8.7";
+        getvalues.run();
+        if(istalking()) {
+            var talk=SuperGattCallback.talker;
+            if(talk!=null) {
+                talk.setvalues();
+                talk.setvoice();
+                talk.speak(say);
+                return;
+                }
+            }
+        playstring=say;
+        SuperGattCallback.newtalker(context);
+        });
 
-    //      layout.setPadding(MainActivity.systembarLeft,MainActivity.systembarTop/2,MainActivity.systembarRight,0);
-    //    context.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+    if(overlayMode) {
         var top=MainActivity.systembarTop;
-         
         var left=MainActivity.systembarLeft;
-          layout.setPadding(left+(int)(density*5.0),top,MainActivity.systembarRight+(int)(density*8.0),MainActivity.systembarBottom);
-    /*    var layheight=GlucoseCurve.getheight()-MainActivity.systembarBottom;
-        var laywidth=GlucoseCurve.getwidth()-left-MainActivity.systembarRight;
-        layout.setX(left); */
+        layout.setPadding(left+(int)(density*5.0),top,MainActivity.systembarRight+(int)(density*8.0),MainActivity.systembarBottom);
+        context.lightBars(false);
+        }
+    else {
+        int sidepad=(int)(density*8.0f);
+        int toppad=(int)(density*4.0f);
+        int bottompad=(int)(density*12.0f);
+        layout.setPadding(sidepad,toppad,sidepad,bottompad);
+        }
+
+    final var trackedSpinner=spin;
+    layout.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+        @Override
+        public void onViewAttachedToWindow(View v) {
+        }
+
+        @Override
+        public void onViewDetachedFromWindow(View v) {
+            tk.glucodata.help.hidekeyboard(context);
+            if(spinner==trackedSpinner) {
+                spinner=null;
+                }
+        }
+    });
+    return layout;
+    }
+
+public static void config(MainActivity context) {
+    if(!DontTalk) {
+        final View layout=makeConfigView(context,true,()-> context.doonback(),null);
+        MainActivity.setonback(()-> cleanupConfigOverlay(context,layout));
         context.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
         }
   }
