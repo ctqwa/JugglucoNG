@@ -41,13 +41,16 @@ object CustomAlertManager {
             return
         }
 
-        val readingMs = if (timestamp > 0L) timestamp else System.currentTimeMillis()
-        val readingMinutes = ((readingMs / 60000L) % (24 * 60)).toInt()
+        // Apply active-window and snooze gating against the actual delivery time, not the
+        // sensor sample timestamp. A delayed/stale reading should not fire outside the
+        // user's currently selected alert window just because the sample itself was older.
+        val evaluationMs = System.currentTimeMillis()
+        val evaluationMinutes = ((evaluationMs / 60000L) % (24 * 60)).toInt()
 
         val validConfigs = allAlerts.filter { config ->
             if (!config.enabled) return@filter false
-            if (!config.isActiveTime(readingMinutes)) return@filter false
-            if (readingMs < config.snoozedUntil) return@filter false
+            if (!config.isActiveTime(evaluationMinutes)) return@filter false
+            if (evaluationMs < config.snoozedUntil) return@filter false
             true
         }
 
