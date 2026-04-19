@@ -23,6 +23,11 @@ object ManagedSensorIdentityRegistry {
             .mapNotNull { it.createManagedCallback(context, sensorId, dataptr) }
             .firstOrNull()
 
+    fun resolveManagedCallbackDataptr(sensorId: String?): Long? =
+        all.asSequence()
+            .mapNotNull { it.resolveCallbackDataptr(sensorId) }
+            .firstOrNull()
+
     fun resolveManagedNativeSensorName(sensorId: String?): String? =
         all.asSequence()
             .mapNotNull { it.resolveNativeSensorName(sensorId) }

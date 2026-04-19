@@ -1336,6 +1336,32 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(ensureSensorShell)(
   return reinterpret_cast<jlong>(hist);
 }
 
+extern "C" JNIEXPORT void JNICALL fromjava(rebaseDirectStreamWindow)(
+    JNIEnv *env, jclass cl, jstring sensorId, jlong startTimeSec) {
+  if (!sensors || !sensorId || startTimeSec <= 0)
+    return;
+  const char *str = env->GetStringUTFChars(sensorId, NULL);
+  if (!str)
+    return;
+
+  int ind = sensors->sensorindex(str);
+  if (ind < 0) {
+    ind = sensors->sensorindexshort(str);
+  }
+  if (ind < 0) {
+    ind = sensors->addsensor(std::string_view(str));
+  }
+  if (ind >= 0) {
+    if (SensorGlucoseData *hist = sensors->getSensorData(ind)) {
+      if (!hist->error()) {
+        hist->rebaseDirectStreamWindow(static_cast<uint32_t>(startTimeSec));
+      }
+    }
+  }
+
+  env->ReleaseStringUTFChars(sensorId, str);
+}
+
 extern "C" JNIEXPORT void JNICALL
 fromjava(addRawGlucoseStream)(JNIEnv *env, jclass cl, jlong timestamp,
                               jfloat rawGlucose, jstring sensorId) {

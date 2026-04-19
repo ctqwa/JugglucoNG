@@ -1073,6 +1073,10 @@ public class SensorBluetooth {
         if (context == null || sensorId == null || sensorId.isEmpty()) {
             return 0L;
         }
+        final Long managedDataptr = ManagedSensorIdentityRegistry.INSTANCE.resolveManagedCallbackDataptr(sensorId);
+        if (managedDataptr != null) {
+            return managedDataptr;
+        }
         final String nativeName = ManagedSensorIdentityRegistry.INSTANCE.resolveManagedNativeSensorName(sensorId);
         if (nativeName == null || nativeName.isEmpty()) {
             return 0L;
@@ -1363,12 +1367,11 @@ public class SensorBluetooth {
                         ;
                     }
                     ;
-                    long dataptr = 0L;
-                    dataptr = Natives.getdataptr(dev);
                     final boolean persistedManaged = hasPersistedManagedRecord(dev);
-                    final boolean managedNativeBacked = shouldSuppressGenericManagedShell(dev) && dataptr != 0L;
-                    if (persistedManaged || managedNativeBacked) {
-                        final long managedDataptr = dataptr != 0L ? dataptr : resolvePersistedManagedDataptr(dev);
+                    final boolean suppressGenericManagedShell = shouldSuppressGenericManagedShell(dev);
+                    final long managedDataptr =
+                        (persistedManaged || suppressGenericManagedShell) ? resolvePersistedManagedDataptr(dev) : 0L;
+                    if (persistedManaged || suppressGenericManagedShell) {
                         final SuperGattCallback managed = ManagedSensorIdentityRegistry.INSTANCE.createManagedCallback(Applic.app, dev, managedDataptr);
                         if (managed != null) {
                             gattcallbacks.add(managed);
@@ -1378,7 +1381,10 @@ public class SensorBluetooth {
                             increasedwait = startincreasedwait;
                             index++;
                         }
-                    } else if (dataptr != 0L && !shouldSuppressGenericManagedShell(dev)) {
+                        continue;
+                    }
+                    final long dataptr = Natives.getdataptr(dev);
+                    if (dataptr != 0L) {
                         gattcallbacks.add(getGattCallback(dev, dataptr));
                         adoptCurrentSensorIfBlank(dev);
                         increasedwait = startincreasedwait;

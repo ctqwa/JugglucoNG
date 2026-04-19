@@ -363,6 +363,7 @@ object HistorySync {
 
         if (readings.isNotEmpty()) {
             historyRepository.storeReadings(readings)
+            UiRefreshBus.requestDataRefresh()
             UiRefreshBus.requestStatusRefresh()
         }
         return readings.size

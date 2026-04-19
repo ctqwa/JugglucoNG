@@ -2462,6 +2462,34 @@ void setbackuptime(int ind,uint32_t starttime) {
     }
   }
 
+  void rebaseDirectStreamWindow(uint32_t starttime) {
+    auto *info = getinfo();
+    if (!info || !starttime)
+      return;
+
+    info->starttime = starttime;
+    info->pollcount = 0;
+    info->pollstart = 0;
+    info->lastHistoricLifeCountReceivedPos = 12;
+
+    if (polls.data()) {
+      memset(polls.data(), 0, polls.count() * sizeof(ScanData));
+    }
+    if (rawpolls.data()) {
+      memset(rawpolls.data(), 0, rawpolls.count() * sizeof(RawData));
+    }
+    if (temppolls.data()) {
+      memset(temppolls.data(), 0, temppolls.count() * sizeof(uint16_t));
+    }
+
+    for (auto &up : info->update) {
+      up.streamstart = 0;
+      up.rawstreamstart = 0;
+      up.changedstreamstart = true;
+      up.sendstreaming = true;
+    }
+  }
+
   void sendbluetoothOn(int maxind) {
     updatestate *up = getinfo()->update;
     for (int i = 0; i < maxind; i++) {

@@ -117,11 +117,20 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
         return ICanHealthRegistry.findRecord(Applic.app, normalized) != null
     }
 
+    override fun resolveCallbackDataptr(sensorId: String?): Long? =
+        resolveCanonicalSensorId(sensorId)?.let { 0L }
+
     override fun persistedSensorIds(context: Context): List<String> =
         ICanHealthRegistry.persistedRecords(context).map { it.sensorId }
 
-    override fun createManagedCallback(context: Context, sensorId: String, dataptr: Long): SuperGattCallback? =
-        ICanHealthRegistry.createRestoredCallback(context, sensorId, dataptr)
+    override fun createManagedCallback(context: Context, sensorId: String, dataptr: Long): SuperGattCallback? {
+        ICanHealthRegistry.createRestoredCallback(context, sensorId, dataptr)?.let { return it }
+
+        val canonical = resolveCanonicalSensorId(sensorId)
+            ?.takeIf { it.isNotBlank() && !ICanHealthConstants.isProvisionalSensorId(it) }
+            ?: return null
+        return ICanHealthBleManager(canonical, dataptr)
+    }
 
     override fun removePersistedSensor(context: Context, sensorId: String?) {
         ICanHealthRegistry.removeSensor(context, sensorId)
@@ -130,6 +139,9 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     override fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
         resolveCanonicalSensorId(sensorId) != null
 
-    override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? =
-        if (resolveCanonicalSensorId(sensorId) != null) false else null
+    override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? {
+        val canonical = resolveCanonicalSensorId(sensorId) ?: return null
+        val hasPersistedRecord = ICanHealthRegistry.findRecord(Applic.app, canonical) != null
+        return !hasPersistedRecord
+    }
 }

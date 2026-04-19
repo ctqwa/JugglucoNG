@@ -104,7 +104,8 @@ jmethodID jdoglucose = nullptr, jupdateDevices = nullptr,
           jbluePermission = nullptr;
 static jclass JNIHistorySyncAccess = nullptr;
 static jmethodID jhistorySyncSensor = nullptr,
-                 jhistoryForceFullSyncSensor = nullptr;
+                 jhistoryForceFullSyncSensor = nullptr,
+                 jhistoryMergeFullSyncSensor = nullptr;
 static jclass JNICalibrationProfileAccess = nullptr;
 static jmethodID jexportCalibrationProfile = nullptr,
                  jimportMirrorCalibrationProfile = nullptr;
@@ -299,6 +300,13 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
             R"(GetStaticMethodID(JNIHistorySyncAccess,"forceFullSyncForSensor","(Ljava/lang/String;)V") failed)"
             "");
       }
+      if (!(jhistoryMergeFullSyncSensor = env->GetStaticMethodID(
+                JNIHistorySyncAccess, "mergeFullSyncForSensor",
+                "(Ljava/lang/String;)V"))) {
+        LOGAR(
+            R"(GetStaticMethodID(JNIHistorySyncAccess,"mergeFullSyncForSensor","(Ljava/lang/String;)V") failed)"
+            "");
+      }
     } else {
       LOGAR(R"(FindClass("tk/glucodata/HistorySyncAccess") failed)"
             "");
@@ -455,7 +463,10 @@ void javaMirrorSyncSensor(const char *serial, bool forceFull) {
   JNIEnv *env = getenv();
   jstring jserial = env->NewStringUTF(serial);
   if (forceFull) {
-    if (jhistoryForceFullSyncSensor) {
+    if (jhistoryMergeFullSyncSensor) {
+      env->CallStaticVoidMethod(JNIHistorySyncAccess, jhistoryMergeFullSyncSensor,
+                                jserial);
+    } else if (jhistoryForceFullSyncSensor) {
       env->CallStaticVoidMethod(JNIHistorySyncAccess, jhistoryForceFullSyncSensor,
                                 jserial);
     } else if (jhistorySyncSensor) {

@@ -732,6 +732,8 @@ public class Natives {
 
         public static native long ensureSensorShell(String sensorId, long startTimeSec);
 
+        public static native void rebaseDirectStreamWindow(String sensorId, long startTimeSec);
+
         public static native void addRawGlucoseStream(long time, float rawGlucose, String sensorId);
 
         public static native byte[] bytesettings();

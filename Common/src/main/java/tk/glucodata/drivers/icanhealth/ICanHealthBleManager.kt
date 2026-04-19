@@ -72,6 +72,7 @@ class ICanHealthBleManager(
         private const val MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS = 6 * 60 * 60 * 1000L
         private const val MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS = 2 * 60 * 1000L
         private const val RECENT_GLUCOSE_WINDOW_SIZE = 24
+        private const val NATIVE_MIRROR_STREAM_WINDOW_SEC = 15L * 24L * 60L * 60L
     }
 
     enum class Phase {
@@ -202,6 +203,7 @@ class ICanHealthBleManager(
     @Volatile private var viewModeInitialized = false
     @Volatile private var latestDriverGlucoseMgdl = Float.NaN
     @Volatile private var latestDriverReadingTimestampMs = 0L
+    @Volatile private var mirrorHistoryMergeScheduled = false
     @Volatile override var vendorModelName: String = ""
         private set
     @Volatile override var vendorFirmwareVersion: String = ""
@@ -259,6 +261,20 @@ class ICanHealthBleManager(
         } catch (t: Throwable) {
             Log.stack(TAG, "foregroundNotificationRefreshRunnable", t)
         }
+    }
+
+    private val mirrorHistoryMergeRunnable = Runnable {
+        mirrorHistoryMergeScheduled = false
+        if (hasLocalPersistedRecord()) {
+            return@Runnable
+        }
+        val nativeSensorPtr = resolveNativeSensorPtr(SerialNumber)
+        if (nativeSensorPtr == 0L) {
+            return@Runnable
+        }
+        Log.i(TAG, "Requesting mirror history merge for iCan follower shell $SerialNumber")
+        HistorySyncAccess.mergeFullSyncForSensor(SerialNumber)
+        UiRefreshBus.requestDataRefresh()
     }
 
     private val sensorInfoFallbackRunnable = Runnable {
@@ -343,6 +359,9 @@ class ICanHealthBleManager(
             .getOrDefault("Connected")
     }
 
+    private fun hasLocalPersistedRecord(): Boolean =
+        ICanHealthRegistry.findRecord(Applic.app, SerialNumber) != null
+
     private fun disconnectedStatus(): String {
         return runCatching { Applic.app.getString(tk.glucodata.R.string.status_disconnected) }
             .getOrDefault("Disconnected")
@@ -363,6 +382,10 @@ class ICanHealthBleManager(
             else -> connectedStatus()
         }
     }
+
+    override fun canConnectWithoutDataptr(): Boolean = true
+
+    override fun shouldShowSearchingStatusWhenIdle(): Boolean = true
 
     private fun syncingStatus(): String {
         return runCatching { Applic.app.getString(tk.glucodata.R.string.syncing) }
@@ -631,6 +654,9 @@ class ICanHealthBleManager(
         if (sensorstartmsec > 0L) return sensorstartmsec
         if (dataptr != 0L) {
             return runCatching { Natives.getSensorStartmsec(dataptr) }.getOrDefault(0L)
+        }
+        if (!hasLocalPersistedRecord()) {
+            mirrorDerivedStartTimeMs()?.let { return it }
         }
         return 0L
     }
@@ -1619,6 +1645,7 @@ class ICanHealthBleManager(
             applyNativeSensorMetadata()
             val nativeWriteName = resolveExistingNativeSensorName(SerialNumber)
                 ?: nativeCreationSensorName(SerialNumber)
+            prepareNativeMirrorWindow(nativeWriteName, sampleTimeSec)
             // Native addGlucoseStream() multiplies its float input by 10 before
             // storing the internal mg/dL value. Feed mg/dL / 10 here so native
             // stream storage matches the driver-decoded glucose value.
@@ -1628,6 +1655,7 @@ class ICanHealthBleManager(
             if (sensorPtr != 0L || nativeWriteName.isNotBlank()) {
                 adoptNativeSensorIfAppropriate(SerialNumber, nativeWriteName)
             }
+            Natives.wakebackup()
         }.onFailure {
             Log.stack(TAG, "storeMeasurement", it)
         }
@@ -2129,6 +2157,33 @@ class ICanHealthBleManager(
         scheduleNoDataWatchdog()
     }
 
+    private fun scheduleMirrorHistoryMerge(delayMs: Long = 750L) {
+        if (hasLocalPersistedRecord()) {
+            return
+        }
+        mirrorHistoryMergeScheduled = true
+        handler.removeCallbacks(mirrorHistoryMergeRunnable)
+        handler.postDelayed(mirrorHistoryMergeRunnable, delayMs)
+    }
+
+    private fun mirrorDerivedStartTimeMs(): Long? {
+        val nativeSensorPtr = resolveNativeSensorPtr(SerialNumber)
+        if (nativeSensorPtr == 0L) {
+            return null
+        }
+        val reportedMinutes = runCatching {
+            maxOf(
+                Natives.getlastHistoricLifeCountReceived(nativeSensorPtr),
+                Natives.getlastLifeCountReceived(nativeSensorPtr)
+            )
+        }.getOrDefault(0)
+        if (reportedMinutes <= 0) {
+            return null
+        }
+        val ageMs = reportedMinutes.toLong() * 60_000L
+        return (System.currentTimeMillis() - ageMs).coerceAtLeast(0L)
+    }
+
     private fun handleRacpPhaseCompletion(noData: Boolean) {
         when (historyBackfillPhase) {
             HistoryBackfillPhase.GLUCOSE -> {
@@ -2335,8 +2390,41 @@ class ICanHealthBleManager(
             updatePersistedHistoryTailTimestamp(timestamps.last())
             val lastRecord = ordered.last()
             rememberCoveredEdge(lastRecord.sequenceNumber, lastRecord.timestampMs)
+            mirrorHistoryBatchIntoNative(ordered)
         }
         return stored
+    }
+
+    private fun mirrorHistoryBatchIntoNative(ordered: List<PendingHistoryReading>) {
+        if (ordered.isEmpty() || SerialNumber.isBlank()) {
+            return
+        }
+        runCatching {
+            ensureNativeDataptr(SerialNumber)
+            applyNativeSensorMetadata()
+            val nativeWriteName = resolveExistingNativeSensorName(SerialNumber)
+                ?: nativeCreationSensorName(SerialNumber)
+            val newestTimestampSec = ordered.last().timestampMs / 1000L
+            val windowStartSec = prepareNativeMirrorWindow(nativeWriteName, newestTimestampSec)
+            val replayable = if (windowStartSec > 0L) {
+                ordered.filter { (it.timestampMs / 1000L) >= windowStartSec }
+            } else {
+                ordered
+            }
+            for (record in replayable) {
+                if (record.timestampMs <= 0L) continue
+                val glucoseMgdl = record.glucoseMgdl
+                if (!glucoseMgdl.isFinite() || glucoseMgdl <= 0f) continue
+                Natives.addGlucoseStream(record.timestampMs / 1000L, glucoseMgdl / 10f, nativeWriteName)
+            }
+            applyNativeSensorMetadata()
+            if (nativeWriteName.isNotBlank()) {
+                adoptNativeSensorIfAppropriate(SerialNumber, nativeWriteName)
+            }
+            Natives.wakebackup()
+        }.onFailure {
+            Log.stack(TAG, "mirrorHistoryBatchIntoNative", it)
+        }
     }
 
     private fun resolveSequenceTimelineTimestampMs(
@@ -2697,6 +2785,29 @@ class ICanHealthBleManager(
         return if (startMs > 0L) startMs / 1000L else 0L
     }
 
+    private fun prepareNativeMirrorWindow(nativeName: String, anchorTimestampSec: Long): Long {
+        if (nativeName.isBlank() || anchorTimestampSec <= 0L) {
+            return 0L
+        }
+        val windowStartSec =
+            (anchorTimestampSec - (NATIVE_MIRROR_STREAM_WINDOW_SEC - SEQUENCE_UNIT_MS / 1000L)).coerceAtLeast(0L)
+        if (windowStartSec <= 0L) {
+            return 0L
+        }
+        val sensorPtr = resolveNativeSensorPtr(SerialNumber)
+        val currentNativeStartSec = if (sensorPtr != 0L) {
+            runCatching { Natives.getSensorStartmsecFromSensorptr(sensorPtr) / 1000L }
+                .getOrDefault(0L)
+        } else {
+            0L
+        }
+        if (currentNativeStartSec in 1 until windowStartSec) {
+            Log.i(TAG, "Rebasing iCan native mirror window from $currentNativeStartSec to $windowStartSec for $nativeName")
+            Natives.rebaseDirectStreamWindow(nativeName, windowStartSec)
+        }
+        return windowStartSec
+    }
+
     private fun adoptNativeSensorIfAppropriate(sensorId: String, nativeName: String) {
         if (nativeName.isBlank()) {
             return
@@ -2809,6 +2920,9 @@ class ICanHealthBleManager(
         }
         latestDriverGlucoseMgdl = glucoseMgdl
         latestDriverReadingTimestampMs = timestampMs
+        if (!hasLocalPersistedRecord()) {
+            scheduleMirrorHistoryMerge()
+        }
     }
 
     private fun scheduleForegroundNotificationRefresh() {

@@ -17,6 +17,15 @@ interface ManagedSensorIdentityAdapter {
 
     fun resolveNativeSensorName(sensorId: String?): String? = null
 
+    /**
+     * Optional driver-owned callback dataptr resolution.
+     *
+     * Return null to let shared code use its legacy native-stream lookup.
+     * Return 0 when the managed callback should be restored without a native
+     * stream dataptr and the driver owns any native-shell interaction itself.
+     */
+    fun resolveCallbackDataptr(sensorId: String?): Long? = null
+
     fun hasPersistedManagedRecord(sensorId: String?): Boolean = false
 
     fun persistedSensorIds(context: Context): List<String> = emptyList()
