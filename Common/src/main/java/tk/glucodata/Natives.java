@@ -138,8 +138,8 @@ public class Natives {
 
         public static native long getsensorptr(long dataptr);
 
-        // Temperature data for Sibionics sensors - returns int array from temppolls.dat
-        // Values are in 0.1°C units. Returns null if not a Sibionics sensor.
+        // Temperature data from temppolls.dat.
+        // Values are in 0.1°C units. Returns null if the sensor has no temperature channel.
         public static native int[] getTemperatureData(long sensorptr);
 
         public static native int[] getTemperatureDataByName(String sensorname);
@@ -729,6 +729,8 @@ public class Natives {
         public static native void addGlucoseInjection(long time, float glucose, String sensorId);
 
         public static native void addGlucoseStream(long time, float glucose, String sensorId);
+
+        public static native void addGlucoseStreamWithTemp(long time, float glucose, float temperatureC, String sensorId);
 
         public static native long ensureSensorShell(String sensorId, long startTimeSec);
 

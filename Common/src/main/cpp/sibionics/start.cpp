@@ -1183,14 +1183,12 @@ bool SiContext::reloadFromPersistedState(SensorGlucoseData *sens) {
 
 SiContext::~SiContext() { release(); };
 
-// Temperature data for Sibionics sensors - returns values from temppolls.dat
+// Temperature data from temppolls.dat for any sensor that populates it.
 extern "C" JNIEXPORT jintArray JNICALL
 fromjava(getTemperatureData)(JNIEnv *env, jclass cl, jlong sensorptr) {
   if (!sensorptr)
     return nullptr;
   const auto *sens = reinterpret_cast<const SensorGlucoseData *>(sensorptr);
-  if (!sens->isSibionics())
-    return nullptr;
 
   const uint16_t *tempData = sens->getTempPollsData();
   const int count = sens->pollcount();
@@ -1226,7 +1224,7 @@ fromjava(getTemperatureDataByName)(JNIEnv *env, jclass cl, jstring jsensor) {
     sens = sensors->gethistshort(sensorChars);
   }
   env->ReleaseStringUTFChars(jsensor, sensorChars);
-  if (!sens || !sens->isSibionics())
+  if (!sens)
     return nullptr;
 
   const uint16_t *tempData = sens->getTempPollsData();

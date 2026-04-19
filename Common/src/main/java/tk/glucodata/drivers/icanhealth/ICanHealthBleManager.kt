@@ -1649,7 +1649,12 @@ class ICanHealthBleManager(
             // Native addGlucoseStream() multiplies its float input by 10 before
             // storing the internal mg/dL value. Feed mg/dL / 10 here so native
             // stream storage matches the driver-decoded glucose value.
-            Natives.addGlucoseStream(sampleTimeSec, nativeStreamValue, nativeWriteName)
+            Natives.addGlucoseStreamWithTemp(
+                sampleTimeSec,
+                nativeStreamValue,
+                latestTemperatureC,
+                nativeWriteName
+            )
             applyNativeSensorMetadata()
             val sensorPtr = resolveNativeSensorPtr(SerialNumber)
             if (sensorPtr != 0L || nativeWriteName.isNotBlank()) {
@@ -2415,7 +2420,12 @@ class ICanHealthBleManager(
                 if (record.timestampMs <= 0L) continue
                 val glucoseMgdl = record.glucoseMgdl
                 if (!glucoseMgdl.isFinite() || glucoseMgdl <= 0f) continue
-                Natives.addGlucoseStream(record.timestampMs / 1000L, glucoseMgdl / 10f, nativeWriteName)
+                Natives.addGlucoseStreamWithTemp(
+                    record.timestampMs / 1000L,
+                    glucoseMgdl / 10f,
+                    record.temperatureC,
+                    nativeWriteName
+                )
             }
             applyNativeSensorMetadata()
             if (nativeWriteName.isNotBlank()) {

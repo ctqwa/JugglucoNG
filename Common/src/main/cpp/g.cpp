@@ -1214,8 +1214,9 @@ extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseInjection)(
   env->ReleaseStringUTFChars(sensorId, str);
 }
 
-extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
-    JNIEnv *env, jclass cl, jlong timestamp, jfloat glucose, jstring sensorId) {
+static void addGlucoseStreamInternal(JNIEnv *env, jlong timestamp, jfloat glucose,
+                                     jfloat temperatureC, jstring sensorId,
+                                     bool overwriteTemp) {
   if (!sensors || !sensorId)
     return;
   const char *str = env->GetStringUTFChars(sensorId, NULL);
@@ -1271,6 +1272,9 @@ extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
             }
             preservedTemp = hist->getTempForPoll(lifeCount);
           }
+          if (overwriteTemp && temperatureC > 0.0f) {
+            preservedTemp = static_cast<uint16_t>(temperatureC * 10.0f);
+          }
           hist->savepollallIDs<60>(timestamp, lifeCount, mgVal, 0, 0.0f,
                                    preservedRaw, preservedTemp);
           if (backup) {
@@ -1287,6 +1291,18 @@ extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
     }
   }
   env->ReleaseStringUTFChars(sensorId, str);
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStream)(
+    JNIEnv *env, jclass cl, jlong timestamp, jfloat glucose, jstring sensorId) {
+  addGlucoseStreamInternal(env, timestamp, glucose, 0.0f, sensorId, false);
+}
+
+extern "C" JNIEXPORT void JNICALL fromjava(addGlucoseStreamWithTemp)(
+    JNIEnv *env, jclass cl, jlong timestamp, jfloat glucose, jfloat temperatureC,
+    jstring sensorId) {
+  addGlucoseStreamInternal(env, timestamp, glucose, temperatureC, sensorId,
+                           true);
 }
 
 extern "C" JNIEXPORT jlong JNICALL fromjava(ensureSensorShell)(
