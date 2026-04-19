@@ -117,8 +117,23 @@ object AlertRepository {
         return applyLegacyOverrides(type, base)
     }
 
+    private fun legacyDurationMinutesFallback(type: AlertType, base: AlertConfig): Int? {
+        return when (type) {
+            AlertType.LOSS -> {
+                val nativeSeconds = Natives.readalarmduration(type.id)
+                val nativeMinutes = if (nativeSeconds > 0) (nativeSeconds + 59) / 60 else 0
+                nativeMinutes.takeIf { it > 0 } ?: base.durationMinutes
+            }
+            else -> base.durationMinutes
+        }
+    }
+
     private fun applyLegacyOverrides(type: AlertType, base: AlertConfig): AlertConfig {
         return base.copy(
+            durationMinutes = prefs.getInt(keyDuration(type), legacyDurationMinutesFallback(type, base) ?: 0)
+                .takeIf { it > 0 },
+            forecastMinutes = prefs.getInt(keyForecast(type), base.forecastMinutes ?: 0)
+                .takeIf { it > 0 },
             deliveryMode = prefs.getString(keyDeliveryMode(type), null)
                 ?.let { AlertDeliveryMode.valueOf(it) } ?: base.deliveryMode,
             volumeProfile = prefs.getString(keyVolumeProfile(type), null)
