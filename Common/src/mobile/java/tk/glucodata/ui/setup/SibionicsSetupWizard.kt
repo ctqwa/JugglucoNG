@@ -588,7 +588,10 @@ fun SibionicsSetupWizard(
                     }
                 )
 
-                SibionicsSetupStep.CONNECTING -> ConnectingStep(compact = ui.compact)
+                SibionicsSetupStep.CONNECTING -> ConnectingStep(
+                    ui = ui,
+                    sensorLabel = sensorName.ifBlank { null }
+                )
             }
         }
     }
@@ -1246,32 +1249,14 @@ fun ScanTransmitterStep(
 }
 
 @Composable
-fun ConnectingStep(compact: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = if (compact) 16.dp else 24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CircularProgressIndicator(
-             modifier = Modifier.size(if (compact) 54.dp else 64.dp),
-             strokeWidth = if (compact) 5.dp else 6.dp
-        )
-        Spacer(modifier = Modifier.height(if (compact) 16.dp else 24.dp))
-        Text(
-            text = stringResource(R.string.connecting_to_sensor),
-            style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(if (compact) 6.dp else 8.dp))
-        Text(
-            text = stringResource(R.string.connecting_to_sensor_wait),
-            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
+fun ConnectingStep(
+    ui: WizardUiMetrics,
+    sensorLabel: String?
+) {
+    SensorSetupConnectingScreen(
+        ui = ui,
+        sensorLabel = sensorLabel
+    )
 }
 
 private fun finishSetup(sensorPtr: Long, reset: Boolean) {

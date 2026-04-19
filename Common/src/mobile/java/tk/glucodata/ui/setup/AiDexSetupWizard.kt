@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.microtechmd.blecomm.BlecommLoader
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tk.glucodata.Log
 import tk.glucodata.R
@@ -83,6 +84,13 @@ fun AiDexSetupWizard(
     }
     BackHandler {
         if (currentStep == AiDexSetupStep.SCAN) onDismiss() else currentStep = AiDexSetupStep.SCAN
+    }
+
+    LaunchedEffect(currentStep) {
+        if (currentStep == AiDexSetupStep.SUCCESS) {
+            delay(SENSOR_SETUP_SUCCESS_AUTO_ADVANCE_MS)
+            onComplete()
+        }
     }
 
     Scaffold(
@@ -159,36 +167,22 @@ fun AiDexSetupWizard(
                     }
                 )
                 AiDexSetupStep.CONNECTING -> Box(
-                     modifier = Modifier.fillMaxSize(),
-                     contentAlignment = Alignment.Center
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(ui.spacerMedium))
-                        Text(stringResource(R.string.aidex_connecting_to, selectedDeviceName))
-                    }
+                    SensorSetupConnectingScreen(
+                        ui = ui,
+                        sensorLabel = selectedDeviceName.ifBlank { null }
+                    )
                 }
                 AiDexSetupStep.SUCCESS -> Box(
-                     modifier = Modifier.fillMaxSize(),
-                     contentAlignment = Alignment.Center
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(if (ui.compact) 56.dp else 64.dp)
-                        )
-                        Spacer(Modifier.height(ui.spacerMedium))
-                        Text(stringResource(R.string.aidex_connected), style = MaterialTheme.typography.headlineMedium)
-                        Spacer(Modifier.height(ui.spacerLarge))
-                        Button(
-                            onClick = onComplete,
-                            modifier = Modifier.height(ui.buttonHeight)
-                        ) {
-                            Text(stringResource(R.string.finish_setup))
-                        }
-                    }
+                    SensorSetupSuccessScreen(
+                        ui = ui,
+                        sensorLabel = selectedDeviceName.ifBlank { null }
+                    )
                 }
             }
         }
