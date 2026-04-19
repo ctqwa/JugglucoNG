@@ -172,7 +172,12 @@ class DashboardViewModel(
     fun onResume() {
         refreshData()
         if (collectionMode != CollectionMode.INACTIVE) {
-            viewModelScope.launch { requestUiRecoverySync() }
+            ensureUiRefreshCollection()
+            ensureCurrentReadingCollection()
+            startHistoryCollectionForMode(collectionMode)
+            viewModelScope.launch {
+                requestUiRecoverySync()
+            }
         }
     }
 

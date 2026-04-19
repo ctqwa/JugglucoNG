@@ -1096,6 +1096,7 @@ fun RecentReadingsCard(
     recentReadings: List<GlucosePoint>,
     unit: String,
     viewMode: Int,
+    animateNewReadingsAfterTimestampMs: Long = Long.MAX_VALUE,
     onViewHistory: (() -> Unit)? = null,
     content: @Composable (Int, GlucosePoint) -> Unit // Rendering the row with Index
 ) {
@@ -1124,8 +1125,12 @@ fun RecentReadingsCard(
                 recentReadings.forEachIndexed { index, item ->
                     key(item.timestamp) {
                         val isNewReading = !seenTimestamps.contains(item.timestamp)
+                        val shouldAnimateNewReading = isNewReading &&
+                            item.timestamp > animateNewReadingsAfterTimestampMs
                         if (isNewReading) {
                             seenTimestamps.add(item.timestamp)
+                        }
+                        if (shouldAnimateNewReading) {
                             AnimatedVisibility(
                                 visibleState = remember { MutableTransitionState(false).apply { targetState = true } },
                                 enter = expandVertically(expandFrom = Alignment.Top) + fadeIn()

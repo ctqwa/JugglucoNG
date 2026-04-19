@@ -929,6 +929,12 @@ fun DashboardScreen(
     LaunchedEffect(timeRange) {
         dashboardPrefs.edit().putString("dashboard_chart_time_range", timeRange.name).apply()
     }
+    var recentReadingsAnimateAfterTimestampMs by rememberSaveable {
+        mutableLongStateOf(Long.MAX_VALUE)
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        recentReadingsAnimateAfterTimestampMs = System.currentTimeMillis()
+    }
 
 
     val currentGlucose by viewModel.currentGlucose.collectAsStateWithLifecycle()
@@ -1509,6 +1515,7 @@ fun DashboardScreen(
                             recentReadings = recentReadings,
                             unit = unit,
                             viewMode = viewMode,
+                            animateNewReadingsAfterTimestampMs = recentReadingsAnimateAfterTimestampMs,
                             onViewHistory = onNavigateToHistory
                         ) { index, item ->
                             ReadingRow(
@@ -1677,6 +1684,7 @@ fun DashboardScreen(
                             recentReadings = recentReadings,
                             unit = unit,
                             viewMode = viewMode,
+                            animateNewReadingsAfterTimestampMs = recentReadingsAnimateAfterTimestampMs,
                             onViewHistory = onNavigateToHistory
                         ) { index, item ->
                             ReadingRow(
