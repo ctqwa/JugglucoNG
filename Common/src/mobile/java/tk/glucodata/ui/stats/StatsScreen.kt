@@ -75,6 +75,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -284,6 +285,8 @@ fun StatsScreen(
                 selectedTirBand = null
             }
     ) {
+        val showLoadingPlaceholder = uiState.isLoading && uiState.summary.readingCount == 0
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp)
@@ -314,7 +317,7 @@ fun StatsScreen(
                 )
             }
 
-            if (uiState.isLoading) {
+            if (showLoadingPlaceholder) {
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
                     LoadingCard()
@@ -336,6 +339,19 @@ fun StatsScreen(
                     )
                 }
             } else {
+                item {
+                    AnimatedVisibility(
+                        visible = uiState.isLoading,
+                        enter = fadeIn(tween(180)) + expandVertically(),
+                        exit = fadeOut(tween(180)) + shrinkVertically()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            RangeLoadingCard()
+                        }
+                    }
+                }
+
                 // TIR overview
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -827,6 +843,44 @@ private fun LoadingCard() {
             Text(
                 text = stringResource(R.string.loading_data),
                 style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun RangeLoadingCard() {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = stringResource(R.string.loading_data),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
             )
         }
     }

@@ -543,7 +543,6 @@ fun DashboardChartSection(
     expandedUnderlayBottom: androidx.compose.ui.unit.Dp = 116.dp,
     onToggleExpanded: (() -> Unit)? = null,
     calibrations: List<tk.glucodata.data.calibration.CalibrationEntity> = emptyList(),
-    resumeAnimationBoundaryTimestampMs: Long = 0L,
     onPointClick: ((GlucosePoint) -> Unit)? = null,
     onCalibrationClick: ((tk.glucodata.data.calibration.CalibrationEntity) -> Unit)? = null,
     chartBoostProgress: Float = 0f,
@@ -563,7 +562,6 @@ fun DashboardChartSection(
                         unit = unit,
                         viewMode = viewMode,
                         calibrations = calibrations,
-                        resumeAnimationBoundaryTimestampMs = resumeAnimationBoundaryTimestampMs,
                         onTimeRangeSelected = onTimeRangeSelected,
                         selectedTimeRange = selectedTimeRange,
                         isExpanded = isExpanded,
@@ -612,7 +610,6 @@ fun InteractiveGlucoseChart(
     unit: String,
     viewMode: Int = 0,
     calibrations: List<tk.glucodata.data.calibration.CalibrationEntity> = emptyList(),
-    resumeAnimationBoundaryTimestampMs: Long = 0L,
     onDateSelected: (Long) -> Unit = {},
     onTimeRangeSelected: ((TimeRange) -> Unit)? = null,
     selectedTimeRange: TimeRange? = null,
@@ -837,31 +834,13 @@ fun InteractiveGlucoseChart(
 
     // TRACKING INACTIVITY FOR GRAPH RESET
     var lastActiveTime by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
-    var localResumeAnimationBoundaryTimestampMs by rememberSaveable { mutableLongStateOf(0L) }
     val currentLatestDataTimestamp by rememberUpdatedState(latestDataTimestamp)
     val currentSelectedTimeRange by rememberUpdatedState(selectedTimeRange)
-    val resumeCatchUpBoundaryTimestampMs = maxOf(
-        resumeAnimationBoundaryTimestampMs,
-        localResumeAnimationBoundaryTimestampMs
-    )
-
-    fun applyResumeBaseline(latestTimestamp: Long) {
-        if (latestTimestamp <= 0L) return
-        val currentEnd = centerTime + visibleDuration / 2
-        val dist = kotlin.math.abs(lastAutoScrolledTimestamp - currentEnd)
-        val wasMonitoring = lastAutoScrolledTimestamp == 0L || dist < 60 * 60 * 1000L
-        if (wasMonitoring) {
-            centerTime = latestTimestamp - visibleDuration / 2
-            previewCenterTime = centerTime
-        }
-        lastAutoScrolledTimestamp = latestTimestamp
-    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isResumed = true
-                localResumeAnimationBoundaryTimestampMs = System.currentTimeMillis()
 
                 val currentTime = System.currentTimeMillis()
                 val latestTimestamp = currentLatestDataTimestamp
@@ -871,13 +850,10 @@ fun InteractiveGlucoseChart(
                     if (latestTimestamp > 0) {
                         visibleDuration = (currentSelectedTimeRange?.hours?.toLong() ?: 3L) * 60 * 60 * 1000
                         lastAutoScrolledTimestamp = 0L
-                        applyResumeBaseline(latestTimestamp)
+                        centerTime = latestTimestamp - visibleDuration / 2
+                        previewCenterTime = centerTime
+                        lastAutoScrolledTimestamp = latestTimestamp
                     }
-                } else if (
-                    latestTimestamp > lastAutoScrolledTimestamp &&
-                    latestTimestamp <= resumeCatchUpBoundaryTimestampMs
-                ) {
-                    applyResumeBaseline(latestTimestamp)
                 }
             }
             else if (event == Lifecycle.Event.ON_PAUSE) {
@@ -941,34 +917,25 @@ fun InteractiveGlucoseChart(
         }
     }
 
-    LaunchedEffect(
-        latestDataTimestamp,
-        isResumed,
-        isUserInteracting,
-        autoScrollJob,
-        lastInteractionTimestamp,
-        resumeCatchUpBoundaryTimestampMs
-    ) {
-        if (isResumed && latestDataTimestamp > lastAutoScrolledTimestamp) {
-            if (latestDataTimestamp <= resumeCatchUpBoundaryTimestampMs) {
-                applyResumeBaseline(latestDataTimestamp)
+    LaunchedEffect(latestDataTimestamp, isResumed, isUserInteracting, autoScrollJob, lastInteractionTimestamp) {
+        if (latestDataTimestamp > lastAutoScrolledTimestamp) {
+            val currentEnd = centerTime + visibleDuration / 2
+            val dist = kotlin.math.abs(lastAutoScrolledTimestamp - currentEnd)
+            val isMonitoring = lastAutoScrolledTimestamp == 0L || dist < 60 * 60 * 1000
+
+            if (!isResumed) {
+                if (isMonitoring) {
+                    centerTime = latestDataTimestamp - visibleDuration / 2
+                    previewCenterTime = centerTime
+                }
+                lastAutoScrolledTimestamp = latestDataTimestamp
                 return@LaunchedEffect
             }
             if (isUserInteracting || autoScrollJob != null || System.currentTimeMillis() - lastInteractionTimestamp < 1200L) {
                 return@LaunchedEffect
             }
-            val currentEnd = centerTime + visibleDuration / 2
 
-            // Robust Logic:
-            // 1. If we JUST Resumed (or started), we force snap (User: "exited via Home... regardless of 1h").
-            // 2. If we are Active/Monitoring (last update was recent), we snap.
-            // 3. If we are Active but viewing History (dist > 1h), we STAY PUT.
-
-            val dist = kotlin.math.abs(lastAutoScrolledTimestamp - currentEnd)
-            val isMonitoring = lastAutoScrolledTimestamp == 0L || dist < 60 * 60 * 1000
-
-            // User request: Don't snap just because we resumed unless we were monitoring. 
-            // We rely on timeout logic in ON_RESUME to handle stale state for long absences.
+            // Keep monitoring users on live data, but preserve viewport when they were browsing history.
             if (isMonitoring) {
                 centerTime = latestDataTimestamp - visibleDuration / 2
             }

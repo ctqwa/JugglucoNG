@@ -155,6 +155,7 @@ class DashboardViewModel(
     private var currentReadingJob: Job? = null
     private var historyJob: Job? = null
     private var uiRefreshJob: Job? = null
+    private var activeHistoryMode: CollectionMode? = null
     private var activeHistoryStartTimeMs: Long? = null
 
     init {
@@ -418,11 +419,12 @@ class DashboardViewModel(
             CollectionMode.DASHBOARD,
             CollectionMode.FULL_HISTORY -> 0L
         }
+        activeHistoryStartTimeMs = recoveryStartTimeMs
 
-        if (historyJob?.isActive == true && activeHistoryStartTimeMs == recoveryStartTimeMs) return
+        if (historyJob?.isActive == true && activeHistoryMode == mode) return
 
         historyJob?.cancel()
-        activeHistoryStartTimeMs = recoveryStartTimeMs
+        activeHistoryMode = mode
         _isLoading.value = _glucoseHistory.value.isEmpty()
 
         historyJob = viewModelScope.launch {
@@ -436,8 +438,9 @@ class DashboardViewModel(
             }.collect { (unitStr, rawHistory) ->
                 val preferredSerial = preferredDashboardSensorId()?.takeIf { it.isNotBlank() }
                 val current = resolveCurrentForHistoryRecovery(preferredSerial)
+                val currentRecoveryStartTimeMs = activeHistoryStartTimeMs ?: recoveryStartTimeMs
                 if (preferredSerial != null &&
-                    shouldRequestHistoryRecovery(recoveryStartTimeMs, rawHistory, preferredSerial, current) &&
+                    shouldRequestHistoryRecovery(currentRecoveryStartTimeMs, rawHistory, preferredSerial, current) &&
                     lastRecoveryRequestSerial != preferredSerial
                 ) {
                     lastRecoveryRequestSerial = preferredSerial
@@ -502,6 +505,7 @@ class DashboardViewModel(
         historyJob = null
         uiRefreshJob?.cancel()
         uiRefreshJob = null
+        activeHistoryMode = null
         activeHistoryStartTimeMs = null
     }
 

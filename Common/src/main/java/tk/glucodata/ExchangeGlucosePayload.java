@@ -80,7 +80,10 @@ final class ExchangeGlucosePayload {
                     : (isFinitePositive(current.getSharedDisplayValue())
                             ? current.getSharedDisplayValue()
                             : fallbackDisplayValue);
-            final String sensorId = notBlank(current.getSensorId()) ? current.getSensorId() : preferredSensorId;
+            final String rawSensorId = notBlank(current.getSensorId()) ? current.getSensorId() : preferredSensorId;
+            final String sensorId = SensorIdentity.resolveAppSensorId(rawSensorId) != null
+                    ? SensorIdentity.resolveAppSensorId(rawSensorId)
+                    : rawSensorId;
             final String primaryText = formatPrimary(primaryDisplayValue, current.getPrimaryStr());
             final float rate = Float.isFinite(current.getRate()) ? current.getRate() : fallbackRate;
             final long timeMillis = current.getTimeMillis() > 0L ? current.getTimeMillis() : fallbackTimeMillis;
@@ -96,8 +99,12 @@ final class ExchangeGlucosePayload {
                     sensorGen);
         }
 
+        final String fallbackSensorId = SensorIdentity.resolveAppSensorId(preferredSensorId) != null
+                ? SensorIdentity.resolveAppSensorId(preferredSensorId)
+                : preferredSensorId;
+
         return new ExchangeGlucosePayload(
-                preferredSensorId,
+                fallbackSensorId,
                 formatPrimary(fallbackDisplayValue, fallbackPrimaryText),
                 fallbackDisplayValue,
                 toMgdl(fallbackDisplayValue),

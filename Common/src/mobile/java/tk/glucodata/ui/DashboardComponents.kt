@@ -185,7 +185,6 @@ fun DashboardCombinedHeader(
     calibratedValue: Float? = null,
     currentSnapshot: CurrentDisplaySource.Snapshot? = null,
     dataState: DisplayDataState.Status? = null,
-    resumeAnimationBoundaryTimestampMs: Long = 0L,
     isMmol: Boolean,
     onHeroClick: () -> Unit = {}
 ) {
@@ -306,11 +305,6 @@ fun DashboardCombinedHeader(
     val primaryText = dvs?.primaryStr ?: currentGlucose
     val secondaryText = dvs?.secondaryStr
     val tertiaryText = dvs?.tertiaryStr
-    val primaryValueTimestampMs = resolvedCurrentSnapshot?.timeMillis
-        ?: latestPoint?.timestamp
-        ?: 0L
-    val animatePrimaryValue = statusCopy == null &&
-        primaryValueTimestampMs > resumeAnimationBoundaryTimestampMs
     val hasSecondary = secondaryText != null
     val hasTertiary = tertiaryText != null
     val hasThreeValues = hasSecondary && hasTertiary
@@ -455,8 +449,7 @@ fun DashboardCombinedHeader(
                                 DashboardHeroPrimaryText(
                                     value = primaryText,
                                     style = primaryValueStyle,
-                                    color = glucoseContentColor,
-                                    animateChanges = animatePrimaryValue
+                                    color = glucoseContentColor
                                 )
                             }
 
@@ -537,7 +530,6 @@ fun DashboardCombinedHeader(
                             separatorStyle = slashStyle,
                             secondaryStackStyle = secondaryThreeValueStyle,
                             tertiaryStackStyle = tertiaryThreeValueStyle,
-                            animatePrimaryValue = animatePrimaryValue,
                             contentColor = glucoseContentColor
                         )
 
@@ -746,28 +738,22 @@ private fun DashboardHeroPrimaryText(
     value: String,
     style: TextStyle,
     color: Color,
-    animateChanges: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
         targetState = value,
         transitionSpec = {
-            if (!animateChanges) {
-                androidx.compose.animation.EnterTransition.None
-                    .togetherWith(androidx.compose.animation.ExitTransition.None)
-            } else {
-                (slideInVertically(
-                    spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) { -it / 2 } + fadeIn(tween(200)))
-                    .togetherWith(
-                        slideOutVertically(
-                            spring(stiffness = Spring.StiffnessMedium)
-                        ) { it / 2 } + fadeOut(tween(100))
-                    )
-            }
+            (slideInVertically(
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) { -it / 2 } + fadeIn(tween(200)))
+                .togetherWith(
+                    slideOutVertically(
+                        spring(stiffness = Spring.StiffnessMedium)
+                    ) { it / 2 } + fadeOut(tween(100))
+                )
         },
         label = "GlucoseHeroAnimation"
     ) { animatedValue ->
@@ -808,7 +794,6 @@ private fun DashboardHeroValueCluster(
     separatorStyle: TextStyle,
     secondaryStackStyle: TextStyle,
     tertiaryStackStyle: TextStyle,
-    animatePrimaryValue: Boolean = true,
     contentColor: Color,
     modifier: Modifier = Modifier
 ) {
@@ -887,8 +872,7 @@ private fun DashboardHeroValueCluster(
                 DashboardHeroPrimaryText(
                     value = primaryText,
                     style = primaryStyle,
-                    color = contentColor,
-                    animateChanges = animatePrimaryValue
+                    color = contentColor
                 )
             }
 
@@ -903,8 +887,7 @@ private fun DashboardHeroValueCluster(
                     DashboardHeroPrimaryText(
                         value = primaryText,
                         style = scaledPrimaryStyle,
-                        color = contentColor,
-                        animateChanges = animatePrimaryValue
+                        color = contentColor
                     )
                     Spacer(modifier = Modifier.width(6.dp * pairScale))
                     Text(
@@ -939,8 +922,7 @@ private fun DashboardHeroValueCluster(
                     DashboardHeroPrimaryText(
                         value = primaryText,
                         style = scaledPrimaryStyle,
-                        color = contentColor,
-                        animateChanges = animatePrimaryValue
+                        color = contentColor
                     )
 
                     Spacer(modifier = Modifier.width(8.dp * stackScale))
@@ -1135,7 +1117,6 @@ fun RecentReadingsCard(
     recentReadings: List<GlucosePoint>,
     unit: String,
     viewMode: Int,
-    resumeAnimationBoundaryTimestampMs: Long = 0L,
     onViewHistory: (() -> Unit)? = null,
     content: @Composable (Int, GlucosePoint) -> Unit // Rendering the row with Index
 ) {
@@ -1164,8 +1145,7 @@ fun RecentReadingsCard(
                 recentReadings.forEachIndexed { index, item ->
                     key(item.timestamp) {
                         val isNewReading = !seenTimestamps.contains(item.timestamp)
-                        val shouldAnimateNewReading = isNewReading &&
-                            item.timestamp > resumeAnimationBoundaryTimestampMs
+                        val shouldAnimateNewReading = isNewReading
                         if (isNewReading) {
                             seenTimestamps.add(item.timestamp)
                         }

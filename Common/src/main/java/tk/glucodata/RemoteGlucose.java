@@ -59,6 +59,7 @@ class RemoteGlucose {
    final private Bitmap glucoseBitmap;
    final private Canvas canvas;
    final private Paint glucosePaint;
+   final private int baseForegroundColor;
    final private float density;
    final private float glucosesize;
    final private int notglucosex;
@@ -127,9 +128,14 @@ class RemoteGlucose {
          }
       }
       ;
+      baseForegroundColor = glucosePaint.getColor();
    }
 
    static final String stopalarmAction = "StopAlarm";
+
+   int getBaseForegroundColor() {
+      return baseForegroundColor;
+   }
 
    private void applyWidgetTypeface(Paint paint) {
       try {
@@ -163,7 +169,9 @@ class RemoteGlucose {
       }
 
       final boolean isMmol = Applic.unit == 1;
-      final int glucoseColor = NotificationChartDrawer.getGlucoseColor(Applic.app, snapshot.getPrimaryValue(), isMmol);
+      // Keep the legacy widget on its fixed legacy foreground instead of
+      // following notification/system light-dark theme flips.
+      final int glucoseColor = baseForegroundColor;
       final float useglsize = glucosesize;
       final float usedensity = density;
       float getx = notglucosex;

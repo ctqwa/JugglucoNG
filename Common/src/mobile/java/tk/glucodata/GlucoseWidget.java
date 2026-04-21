@@ -33,6 +33,7 @@ import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.widget.RemoteViews;
@@ -79,10 +80,15 @@ public void onReceive(Context context, Intent intent) {
 
 static private RemoteViews remoteMessage(String message) {
     RemoteViews remoteViews = new RemoteViews(Applic.app.getPackageName(), R.layout.text);
-    remoteViews.setTextColor(R.id.content, Notify.foregroundcolor);
+    remoteViews.setTextColor(R.id.content, getLegacyWidgetForegroundColor());
     remoteViews.setTextViewText(R.id.content, message);
     return remoteViews;
     }
+static private int getLegacyWidgetForegroundColor() {
+    synchronized (widgetLock) {
+        return remote != null ? remote.getBaseForegroundColor() : Color.WHITE;
+    }
+}
 static private long oldage=glucosetimeout;
 static private void showviews(RemoteViews views,int rId,AppWidgetManager appWidgetManager, int appWidgetId) {
     Intent intent = new Intent(Applic.app, MainActivity.class);

@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import tk.glucodata.Applic
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SuperGattCallback
@@ -15,9 +16,14 @@ import tk.glucodata.Natives
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.bluediag
 import tk.glucodata.drivers.ManagedBluetoothSensorDriver
+import tk.glucodata.drivers.ManagedSensorMaintenanceDriver
 import tk.glucodata.drivers.ManagedSensorUiFamily
 import tk.glucodata.drivers.ManagedSensorUiSignals
 import tk.glucodata.drivers.ManagedSensorUiSnapshot
+import tk.glucodata.drivers.mq.MQAuthCredentials
+import tk.glucodata.drivers.mq.MQBootstrapClient
+import tk.glucodata.drivers.mq.MQDriver
+import tk.glucodata.drivers.mq.MQRegistry
 import tk.glucodata.ui.util.getLegacyWarmupStatus
 import kotlin.math.abs
 
@@ -64,6 +70,7 @@ data class SensorInfo(
     val isSibionics: Boolean,
     val isSibionics2: Boolean,
     val isAidex: Boolean,
+    val isMq: Boolean = false,
     val startMs: Long,
     val officialEndMs: Long,
     val expectedEndMs: Long,
@@ -72,6 +79,7 @@ data class SensorInfo(
     val customCalAutoReset: Boolean,
     val supportsDisplayModes: Boolean = false,
     val supportsManualCalibration: Boolean = false,
+    val supportsHardwareReset: Boolean = false,
     val detailedStatus: String = "",
     val isActive: Boolean = false,  // True if this is the primary data source
     val isVendorPaired: Boolean = false,  // AiDex: has saved vendor pairing keys
@@ -265,6 +273,7 @@ class SensorViewModel : ViewModel() {
             )
         }
         val isAiDex = snapshot.uiFamily == ManagedSensorUiFamily.AIDEX
+        val isMq = snapshot.uiFamily == ManagedSensorUiFamily.MQ
         val isIcan = snapshot.uiFamily == ManagedSensorUiFamily.ICAN
         val detailsConnectionStatus = if (snapshot.showConnectionStatusInDetails) {
             snapshot.connectionStatus
@@ -287,6 +296,7 @@ class SensorViewModel : ViewModel() {
             isSibionics = false,
             isSibionics2 = false,
             isAidex = isAiDex,
+            isMq = isMq,
             isIcan = isIcan,
             startMs = snapshot.startTimeMs,
             officialEndMs = snapshot.officialEndMs,
@@ -296,6 +306,7 @@ class SensorViewModel : ViewModel() {
             customCalAutoReset = false,
             supportsDisplayModes = snapshot.supportsDisplayModes,
             supportsManualCalibration = snapshot.supportsManualCalibration,
+            supportsHardwareReset = snapshot.supportsHardwareReset,
             detailedStatus = snapshot.subtitleStatus.ifBlank {
                 snapshot.detailedStatus.ifBlank { snapshot.connectionStatus }
             },
@@ -720,6 +731,12 @@ class SensorViewModel : ViewModel() {
              if (gatt is tk.glucodata.drivers.aidex.AiDexDriver) {
                  // Route AiDex to multi-strategy reset (runs on IO thread)
                  resetAiDexSensor(serial, enableBiasCompensation)
+             } else if (gatt is ManagedSensorMaintenanceDriver && gatt.supportsResetAction()) {
+                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                     val success = runCatching { gatt.resetSensor() }.getOrDefault(false)
+                     android.util.Log.i("SensorVM", "Managed resetSensor result: $success serial=$serial")
+                     refreshSensors()
+                 }
              } else {
                  Natives.setResetSibionics2(gatt.dataptr, true)
              }
@@ -1071,6 +1088,61 @@ class SensorViewModel : ViewModel() {
                 val success = gatt.calibrateSensor(glucoseMgDl)
                 android.util.Log.i("SensorVM", "AiDex calibrateSensor($glucoseMgDl mg/dL) result: $success")
             }
+        }
+    }
+
+    fun calibrateManagedSensor(serial: String, glucoseMgDl: Int) {
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        if (gatt is ManagedSensorMaintenanceDriver) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val success = gatt.calibrateSensor(glucoseMgDl)
+                android.util.Log.i("SensorVM", "Managed calibrateSensor($serial, $glucoseMgDl mg/dL) result: $success")
+                refreshSensors()
+            }
+        }
+    }
+
+    fun fetchMqBootstrap(serial: String, qrCode: String?, account: String?, password: String?) {
+        val context = Applic.app ?: return
+        val gatts = SensorBluetooth.mygatts()
+        val gatt = gatts.find { it.SerialNumber == serial }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            if (gatt is MQDriver) {
+                val success = gatt.refreshVendorBootstrap(
+                    context = context,
+                    qrCode = qrCode,
+                    account = account,
+                    password = password,
+                )
+                android.util.Log.i("SensorVM", "MQ refreshVendorBootstrap($serial) result: $success")
+                refreshSensors()
+                return@launch
+            }
+            val record = MQRegistry.findRecord(context, serial) ?: return@launch
+            val normalizedQr = qrCode?.trim().orEmpty().takeIf { it.isNotEmpty() }
+                ?: MQRegistry.loadQrContent(context, record.sensorId)
+            if (normalizedQr != null) {
+                MQRegistry.saveQrContent(context, record.sensorId, normalizedQr)
+            }
+            val normalizedAccount = account?.trim().orEmpty()
+            val credentials = if (normalizedAccount.isNotEmpty() && !password.isNullOrBlank()) {
+                MQRegistry.saveAuthCredentials(context, normalizedAccount, password)
+                MQAuthCredentials(normalizedAccount, password)
+            } else {
+                MQRegistry.loadAuthCredentials(context)
+            }
+            val result = MQBootstrapClient.fetchBestEffort(
+                context = context,
+                bleId = record.address.takeIf { it.isNotBlank() },
+                qrCode = normalizedQr,
+                authToken = MQRegistry.loadAuthToken(context),
+                credentials = credentials,
+            )
+            result.refreshedToken?.let { MQRegistry.saveAuthToken(context, it) }
+            result.config?.let { MQRegistry.applyBootstrapConfig(context, record.sensorId, it) }
+            android.util.Log.i("SensorVM", "MQ refreshVendorBootstrap($serial) fallback result: ${result.config != null}")
+            refreshSensors()
         }
     }
 

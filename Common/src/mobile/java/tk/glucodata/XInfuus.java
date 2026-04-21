@@ -47,8 +47,9 @@ static public void setlibrenames() {
 	}
 
     private static Bundle setSerial(String serial) {
+        final String stableSerial = SensorIdentity.resolveAppSensorId(serial);
         Bundle bundle = new Bundle();
-        bundle.putString("sensorSerial", serial);
+        bundle.putString("sensorSerial", stableSerial != null ? stableSerial : serial);
         return bundle;
     }
 /*
@@ -68,13 +69,16 @@ static public void setlibrenames() {
 public static final String glucoseaction="com.librelink.app.ThirdPartyIntegration.GLUCOSE_READING";
 public static void sendGlucoseBroadcast(String serial, double currentGlucose,float rate,long mmsec,long sensorStartmsec) {
 	final Context context=Applic.app;
+        final String stableSerial = SensorIdentity.resolveAppSensorId(serial) != null
+                ? SensorIdentity.resolveAppSensorId(serial)
+                : serial;
         if(sensorStartmsec>0L) {
-            maybeSendSensorActivateBroadcast(context, serial, sensorStartmsec/1000L);
+            maybeSendSensorActivateBroadcast(context, stableSerial, sensorStartmsec/1000L);
         }
         Intent intent = new Intent(glucoseaction);
         intent.putExtra("glucose", currentGlucose);
         intent.putExtra("timestamp", mmsec);
-        intent.putExtra("bleManager", setSerial(serial));
+        intent.putExtra("bleManager", setSerial(stableSerial));
         sendIntent(context,intent);
     }
 
@@ -89,17 +93,20 @@ public static void sendGlucoseBroadcast(String serial, double currentGlucose,flo
     }
 
     private static void maybeSendSensorActivateBroadcast(Context context,String serial,long startsec) {
-        if(serial==null||serial.isEmpty()||startsec<=0L) {
+        final String stableSerial = SensorIdentity.resolveAppSensorId(serial) != null
+                ? SensorIdentity.resolveAppSensorId(serial)
+                : serial;
+        if(stableSerial==null||stableSerial.isEmpty()||startsec<=0L) {
             return;
         }
         synchronized (activationLock) {
-            if(serial.equals(lastActivatedSerial) && lastActivatedStartSec == startsec) {
+            if(stableSerial.equals(lastActivatedSerial) && lastActivatedStartSec == startsec) {
                 return;
             }
-            lastActivatedSerial = serial;
+            lastActivatedSerial = stableSerial;
             lastActivatedStartSec = startsec;
         }
-        sendSensorActivateBroadcastInternal(context, serial, startsec);
+        sendSensorActivateBroadcastInternal(context, stableSerial, startsec);
     }
 
     private static void sendSensorActivateBroadcastInternal(Context context,String serial,long startsec) {

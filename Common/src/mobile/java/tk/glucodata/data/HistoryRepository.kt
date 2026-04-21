@@ -12,9 +12,11 @@ import kotlinx.coroutines.CoroutineScope
 import tk.glucodata.Applic
 import tk.glucodata.BatteryTrace
 import tk.glucodata.Natives
+import tk.glucodata.SensorBluetooth
 import tk.glucodata.SensorIdentity
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.data.calibration.CalibrationManager
+import tk.glucodata.drivers.ManagedSensorIdentityRegistry
 import tk.glucodata.ui.GlucosePoint
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -664,8 +666,17 @@ class HistoryRepository(context: Context = Applic.app) {
      * has not yet been merged into Room during this process lifetime.
      */
     suspend fun ensureBackfilled(preferredSerial: String? = null) {
+        val runtimeSensors = LinkedHashSet<String>()
+        SensorBluetooth.mygatts().forEach { callback ->
+            callback.SerialNumber
+                ?.takeIf { it.isNotBlank() }
+                ?.let(runtimeSensors::add)
+        }
+        ManagedSensorIdentityRegistry.persistedSensorIds(Applic.app).forEach { serial ->
+            serial.takeIf { it.isNotBlank() }?.let(runtimeSensors::add)
+        }
         val sensorsToCheck = linkedSetOfSensors(
-            Natives.activeSensors(),
+            runtimeSensors.toTypedArray(),
             Natives.lastsensorname(),
             preferredSerial
         ).filter(SensorIdentity::shouldUseNativeHistorySync)

@@ -2,6 +2,11 @@
 
 package tk.glucodata.ui.stats
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -200,6 +205,7 @@ fun StatsRangeSelectorControl(
             ) {
                 Row(
                     modifier = Modifier
+                        .animateContentSize()
                         .heightIn(min = 36.dp)
                         .padding(horizontal = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -210,12 +216,18 @@ fun StatsRangeSelectorControl(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
-                    Text(
-                        text = subtitle ?: stringResource(R.string.statistics_subtitle),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    AnimatedContent(
+                        targetState = subtitle ?: stringResource(R.string.statistics_subtitle),
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "statsRangeSubtitle"
+                    ) { targetSubtitle ->
+                        Text(
+                            text = targetSubtitle,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

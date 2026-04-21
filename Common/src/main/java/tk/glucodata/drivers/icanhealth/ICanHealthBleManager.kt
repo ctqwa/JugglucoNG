@@ -1670,11 +1670,20 @@ class ICanHealthBleManager(
         if (sequenceNumber < 0) {
             return fallbackNowMs
         }
-        resolveSequenceTimelineTimestampMs(
+        val resolved = resolveSequenceTimelineTimestampMs(
             sequenceNumber = sequenceNumber,
             fallbackNowMs = fallbackNowMs,
             requireRecentCandidate = true
-        )?.let { return it }
+        )
+        if (resolved != null) {
+            if (resolved <= fallbackNowMs) {
+                return resolved
+            }
+            Log.w(
+                TAG,
+                "Rejecting future live timestamp seq=$sequenceNumber candidate=$resolved now=$fallbackNowMs"
+            )
+        }
         return fallbackNowMs
     }
 

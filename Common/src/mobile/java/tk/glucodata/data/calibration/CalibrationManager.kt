@@ -108,6 +108,11 @@ object CalibrationManager {
         val updatedAt: Long = 0L
     )
 
+    data class CalibrationSample(
+        val value: Float,
+        val timestamp: Long
+    )
+
     private data class CalibrationCacheKey(
         val isRawMode: Boolean,
         val sensorId: String,
@@ -121,6 +126,13 @@ object CalibrationManager {
         val isRawMode: Boolean,
         val sensorId: String,
         val revision: Long
+    )
+
+    private data class CalibrationContext(
+        val sensorId: String,
+        val algorithm: CalibrationAlgorithm,
+        val allPoints: List<CalPoint>,
+        val earliestPoint: CalPoint?
     )
     
     private lateinit var database: CalibrationDatabase
@@ -707,30 +719,151 @@ object CalibrationManager {
             return cached
         }
 
+        val context = resolveCalibrationContext(isRawMode, currentSensor) ?: return value
+        val points = resolvePointsForTimestamp(
+            allPoints = context.allPoints,
+            targetTimestamp = timestamp,
+            earliestPoint = context.earliestPoint
+        )
+        if (points.isEmpty()) return value
+
+        val finalValue = computeCalibratedValue(
+            originalValue = value,
+            targetTimestamp = timestamp,
+            isRawMode = isRawMode,
+            points = points,
+            algorithm = algorithm,
+            emitDiagnostics = emitDiagnostics
+        )
+        synchronized(calibrationCache) {
+            calibrationCache[cacheKey] = finalValue
+        }
+        return finalValue
+    }
+
+    @JvmOverloads
+    fun getCalibratedSeries(
+        samples: List<CalibrationSample>,
+        isRawMode: Boolean,
+        emitDiagnostics: Boolean = false,
+        sensorIdOverride: String? = null
+    ): FloatArray {
+        if (samples.isEmpty()) return FloatArray(0)
+
+        val context = resolveCalibrationContext(isRawMode, sensorIdOverride)
+        if (context == null) {
+            return FloatArray(samples.size) { index -> samples[index].value }
+        }
+
+        val results = FloatArray(samples.size)
+        if (!_lockPastHistory.value) {
+            val points = context.allPoints
+            samples.forEachIndexed { index, sample ->
+                results[index] = if (points.isEmpty()) {
+                    sample.value
+                } else {
+                    computeCalibratedValue(
+                        originalValue = sample.value,
+                        targetTimestamp = sample.timestamp,
+                        isRawMode = isRawMode,
+                        points = points,
+                        algorithm = context.algorithm,
+                        emitDiagnostics = emitDiagnostics && index == samples.lastIndex
+                    )
+                }
+            }
+            return results
+        }
+
+        val sortedPoints = context.allPoints.sortedBy { it.timestamp }
+        val indexedSamples = samples.withIndex().sortedBy { it.value.timestamp }
+        var pointCount = 0
+
+        indexedSamples.forEachIndexed { sortedIndex, indexedSample ->
+            val sample = indexedSample.value
+            while (pointCount < sortedPoints.size && sortedPoints[pointCount].timestamp <= sample.timestamp) {
+                pointCount++
+            }
+            val points = when {
+                pointCount > 0 -> sortedPoints.subList(0, pointCount)
+                _applyToPast.value && context.earliestPoint != null -> listOf(context.earliestPoint)
+                else -> emptyList()
+            }
+            results[indexedSample.index] = if (points.isEmpty()) {
+                sample.value
+            } else {
+                computeCalibratedValue(
+                    originalValue = sample.value,
+                    targetTimestamp = sample.timestamp,
+                    isRawMode = isRawMode,
+                    points = points,
+                    algorithm = context.algorithm,
+                    emitDiagnostics = emitDiagnostics && sortedIndex == indexedSamples.lastIndex
+                )
+            }
+        }
+
+        return results
+    }
+
+    private fun resolveCalibrationContext(
+        isRawMode: Boolean,
+        sensorIdOverride: String?
+    ): CalibrationContext? {
+        if (!isEnabledForMode(isRawMode)) {
+            return null
+        }
+        val currentSensor = normalizeSensorId(sensorIdOverride ?: Natives.lastsensorname())
         val allPoints = getValidPointsForSensor(isRawMode = isRawMode, sensorIdOverride = currentSensor)
         if (allPoints.isEmpty()) {
-            return value
+            return null
         }
-        val points = if (_lockPastHistory.value) {
-            val earliestPoint = allPoints.minByOrNull { it.timestamp }
-            allPoints
-                .filter { it.timestamp <= timestamp }
-                .ifEmpty {
-                    if (_applyToPast.value && earliestPoint != null) {
-                        listOf(earliestPoint)
-                    } else {
-                        emptyList()
-                    }
+        return CalibrationContext(
+            sensorId = currentSensor,
+            algorithm = getAlgorithmForMode(isRawMode),
+            allPoints = allPoints,
+            earliestPoint = allPoints.minByOrNull { it.timestamp }
+        )
+    }
+
+    private fun resolvePointsForTimestamp(
+        allPoints: List<CalPoint>,
+        targetTimestamp: Long,
+        earliestPoint: CalPoint?
+    ): List<CalPoint> {
+        if (!_lockPastHistory.value) {
+            return allPoints
+        }
+        return allPoints
+            .filter { it.timestamp <= targetTimestamp }
+            .ifEmpty {
+                if (_applyToPast.value && earliestPoint != null) {
+                    listOf(earliestPoint)
+                } else {
+                    emptyList()
                 }
-        } else {
-            allPoints
+            }
+    }
+
+    private fun computeCalibratedValue(
+        originalValue: Float,
+        targetTimestamp: Long,
+        isRawMode: Boolean,
+        points: List<CalPoint>,
+        algorithm: CalibrationAlgorithm,
+        emitDiagnostics: Boolean
+    ): Float {
+        if (!originalValue.isFinite() || originalValue <= 0f) {
+            return originalValue
         }
-        if (points.isEmpty()) return value
+        if (points.isEmpty()) {
+            return originalValue
+        }
 
         val computation = computeAlgorithm(
             algorithm = algorithm,
-            targetValue = value.toDouble(),
-            targetTimestamp = timestamp,
+            targetValue = originalValue.toDouble(),
+            targetTimestamp = targetTimestamp,
             points = points
         )
 
@@ -741,28 +874,24 @@ object CalibrationManager {
                     algorithm = algorithm,
                     pointCount = points.size,
                     computation = computation,
-                    targetValue = value,
-                    targetTimestamp = timestamp
+                    targetValue = originalValue,
+                    targetTimestamp = targetTimestamp
                 ),
                 force = false
             )
         }
 
-        val calibrated = sanitizeCalibratedValue(computation.prediction, value)
-        val finalValue = if (_applyToPast.value) {
+        val calibrated = sanitizeCalibratedValue(computation.prediction, originalValue)
+        return if (_applyToPast.value) {
             calibrated
         } else {
             applyPastPolicy(
-                originalValue = value,
+                originalValue = originalValue,
                 calibratedValue = calibrated,
-                targetTimestamp = timestamp,
+                targetTimestamp = targetTimestamp,
                 points = points
             )
         }
-        synchronized(calibrationCache) {
-            calibrationCache[cacheKey] = finalValue
-        }
-        return finalValue
     }
 
     private fun applyPastPolicy(

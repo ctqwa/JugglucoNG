@@ -36,7 +36,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
@@ -654,10 +653,6 @@ fun MainApp(themeMode: ThemeMode, onThemeChanged: (ThemeMode) -> Unit) {
         dashboardViewModel.onResume()
     }
 
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-        dashboardViewModel.setCollectionMode(DashboardViewModel.CollectionMode.INACTIVE)
-    }
-
     LaunchedEffect(currentRoute) {
         dashboardViewModel.setCollectionMode(collectionModeForRoute(currentRoute))
     }
@@ -933,33 +928,27 @@ fun DashboardScreen(
     LaunchedEffect(timeRange) {
         dashboardPrefs.edit().putString("dashboard_chart_time_range", timeRange.name).apply()
     }
-    var dashboardResumeAnimationBoundaryMs by rememberSaveable {
-        mutableLongStateOf(0L)
-    }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        dashboardResumeAnimationBoundaryMs = System.currentTimeMillis()
-    }
-    val currentGlucose by viewModel.currentGlucose.collectAsStateWithLifecycle()
-    val currentRate by viewModel.currentRate.collectAsStateWithLifecycle()
-    val sensorName by viewModel.sensorName.collectAsStateWithLifecycle()
-    val daysRemaining by viewModel.daysRemaining.collectAsStateWithLifecycle()
-    val glucoseHistory by viewModel.glucoseHistory.collectAsStateWithLifecycle()
-    val unit by viewModel.unit.collectAsStateWithLifecycle()
-    val targetLow by viewModel.targetLow.collectAsStateWithLifecycle()
-    val targetHigh by viewModel.targetHigh.collectAsStateWithLifecycle()
-    val chartSmoothingMinutes by viewModel.chartSmoothingMinutes.collectAsStateWithLifecycle()
-    val dataSmoothingGraphOnly by viewModel.dataSmoothingGraphOnly.collectAsStateWithLifecycle()
-    val dataSmoothingCollapseChunks by viewModel.dataSmoothingCollapseChunks.collectAsStateWithLifecycle()
-    val previewWindowMode by viewModel.previewWindowMode.collectAsStateWithLifecycle()
-    val sensorStatus by viewModel.sensorStatus.collectAsStateWithLifecycle()
-    val sensorProgress by viewModel.sensorProgress.collectAsStateWithLifecycle()
-    val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val activeSensorList by viewModel.activeSensorList.collectAsStateWithLifecycle()
-    val sensorHoursRemaining by viewModel.sensorHoursRemaining.collectAsStateWithLifecycle()
-    val currentDay by viewModel.currentDay.collectAsStateWithLifecycle()
-    val isRawEnabled by tk.glucodata.data.calibration.CalibrationManager.isEnabledForRaw.collectAsStateWithLifecycle()
-    val isAutoEnabled by tk.glucodata.data.calibration.CalibrationManager.isEnabledForAuto.collectAsStateWithLifecycle()
+    val currentGlucose by viewModel.currentGlucose.collectAsState()
+    val currentRate by viewModel.currentRate.collectAsState()
+    val sensorName by viewModel.sensorName.collectAsState()
+    val daysRemaining by viewModel.daysRemaining.collectAsState()
+    val glucoseHistory by viewModel.glucoseHistory.collectAsState()
+    val unit by viewModel.unit.collectAsState()
+    val targetLow by viewModel.targetLow.collectAsState()
+    val targetHigh by viewModel.targetHigh.collectAsState()
+    val chartSmoothingMinutes by viewModel.chartSmoothingMinutes.collectAsState()
+    val dataSmoothingGraphOnly by viewModel.dataSmoothingGraphOnly.collectAsState()
+    val dataSmoothingCollapseChunks by viewModel.dataSmoothingCollapseChunks.collectAsState()
+    val previewWindowMode by viewModel.previewWindowMode.collectAsState()
+    val sensorStatus by viewModel.sensorStatus.collectAsState()
+    val sensorProgress by viewModel.sensorProgress.collectAsState()
+    val viewMode by viewModel.viewMode.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val activeSensorList by viewModel.activeSensorList.collectAsState()
+    val sensorHoursRemaining by viewModel.sensorHoursRemaining.collectAsState()
+    val currentDay by viewModel.currentDay.collectAsState()
+    val isRawEnabled by tk.glucodata.data.calibration.CalibrationManager.isEnabledForRaw.collectAsState()
+    val isAutoEnabled by tk.glucodata.data.calibration.CalibrationManager.isEnabledForAuto.collectAsState()
 
     // Initialize Calibration Manager
     LaunchedEffect(Unit) {
@@ -1529,7 +1518,6 @@ fun DashboardScreen(
                             calibratedValue = calibratedValue,
                             currentSnapshot = dashboardCurrentSnapshot,
                             dataState = dashboardDataState,
-                            resumeAnimationBoundaryTimestampMs = dashboardResumeAnimationBoundaryMs,
                             isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onHeroClick = {
                                 val autoVal = latestPoint?.value ?: tk.glucodata.GlucoseValueParser.parseFirstOrZero(currentGlucose)
@@ -1544,7 +1532,6 @@ fun DashboardScreen(
                             recentReadings = recentReadings,
                             unit = unit,
                             viewMode = viewMode,
-                            resumeAnimationBoundaryTimestampMs = dashboardResumeAnimationBoundaryMs,
                             onViewHistory = onNavigateToHistory
                         ) { index, item ->
                             ReadingRow(
@@ -1581,7 +1568,6 @@ fun DashboardScreen(
                                 unit = unit,
                                 calibrations = calibrations,
                                 viewMode = viewMode,
-                                resumeAnimationBoundaryTimestampMs = dashboardResumeAnimationBoundaryMs,
                                 onTimeRangeSelected = { timeRange = it },
                                 selectedTimeRange = timeRange,
                                 isExpanded = false,
@@ -1634,7 +1620,6 @@ fun DashboardScreen(
                             calibratedValue = calibratedValue,
                             currentSnapshot = dashboardCurrentSnapshot,
                             dataState = dashboardDataState,
-                            resumeAnimationBoundaryTimestampMs = dashboardResumeAnimationBoundaryMs,
                             isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit),
                             onHeroClick = {
                                 val autoVal = latestPoint?.value ?: tk.glucodata.GlucoseValueParser.parseFirstOrZero(currentGlucose)
@@ -1687,7 +1672,6 @@ fun DashboardScreen(
                                 unit = unit,
                                 calibrations = calibrations,
                                 viewMode = viewMode,
-                                resumeAnimationBoundaryTimestampMs = dashboardResumeAnimationBoundaryMs,
                                 onTimeRangeSelected = { timeRange = it },
                                 selectedTimeRange = timeRange,
                                 isExpanded = isChartExpanded,
@@ -1716,7 +1700,6 @@ fun DashboardScreen(
                             recentReadings = recentReadings,
                             unit = unit,
                             viewMode = viewMode,
-                            resumeAnimationBoundaryTimestampMs = dashboardResumeAnimationBoundaryMs,
                             onViewHistory = onNavigateToHistory
                         ) { index, item ->
                             ReadingRow(
@@ -3551,6 +3534,7 @@ fun InfoRow(label: String, value: String) {
 
 @Composable
 fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.glucodata.ui.viewmodel.SensorViewModel, sensorCount: Int = 1) {
+    val context = LocalContext.current
     var showTerminateDialog by remember { mutableStateOf(false) }
     var showForgetDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -3570,7 +3554,20 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
     var showAiDexClearDialog by remember { mutableStateOf(false) }
     var showAiDexCalibrateDialog by remember { mutableStateOf(false) }
     var showAiDexUnpairDialog by remember { mutableStateOf(false) }
+    var showMqRestoreSheet by remember { mutableStateOf(false) }
+    var showMqCalibrationSheet by remember { mutableStateOf(false) }
     var calibrationInputText by remember { mutableStateOf("") }
+    var mqCalibrationInputText by remember { mutableStateOf("") }
+    var mqShowPassword by remember { mutableStateOf(false) }
+    var mqQrInput by remember(context, sensor.serial) {
+        mutableStateOf(tk.glucodata.drivers.mq.MQRegistry.loadQrContent(context, sensor.serial).orEmpty())
+    }
+    var mqAuthPhoneInput by remember(context, sensor.serial) {
+        mutableStateOf(tk.glucodata.drivers.mq.MQRegistry.loadAuthPhone(context).orEmpty())
+    }
+    var mqAuthPasswordInput by remember(context, sensor.serial) {
+        mutableStateOf(tk.glucodata.drivers.mq.MQRegistry.loadAuthPassword(context).orEmpty())
+    }
     var aiDexBiasChecked by remember(sensor.serial, sensor.resetCompensationActive) { mutableStateOf(sensor.resetCompensationActive) }
     // Edit 78: resetBiasChecked removed — bias toggle now lives in the bottom sheet as an independent switch
 
@@ -3715,7 +3712,13 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
             title = { Text(stringResource(R.string.reset_sensor_title)) },
-            text = { Text(stringResource(R.string.reset_sensor_desc)) },
+            text = {
+                Text(
+                    stringResource(
+                        if (sensor.isSibionics2) R.string.reset_sensor_desc else R.string.unified_reset_desc
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.resetSensor(sensor.serial)
@@ -4242,6 +4245,206 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                 }) { Text(stringResource(R.string.cancel)) }
             }
         )
+    }
+
+    if (showMqRestoreSheet) {
+        @OptIn(ExperimentalMaterial3Api::class)
+        ModalBottomSheet(
+            onDismissRequest = { showMqRestoreSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            val phoneLabel = stringResource(R.string.phone).replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString()
+            }
+            val hasSavedVendorSession =
+                !tk.glucodata.drivers.mq.MQRegistry.loadAuthToken(context).isNullOrBlank() ||
+                    tk.glucodata.drivers.mq.MQRegistry.loadAuthCredentials(context) != null
+            val hasEnteredAuth = mqAuthPhoneInput.isNotBlank() && mqAuthPasswordInput.isNotBlank()
+            val canAttemptVendorRestore = mqQrInput.isNotBlank() || hasEnteredAuth || hasSavedVendorSession
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.mq_bootstrap_dialog_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.mq_bootstrap_dialog_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = mqQrInput,
+                    onValueChange = { mqQrInput = it.trim().uppercase(java.util.Locale.US) },
+                    label = { Text(stringResource(R.string.scan_sensor_qr)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = mqAuthPhoneInput,
+                    onValueChange = { mqAuthPhoneInput = it },
+                    label = { Text(phoneLabel) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = mqAuthPasswordInput,
+                    onValueChange = { mqAuthPasswordInput = it },
+                    label = { Text(stringResource(R.string.password)) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
+                    ),
+                    visualTransformation = if (mqShowPassword) {
+                        androidx.compose.ui.text.input.VisualTransformation.None
+                    } else {
+                        androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { mqShowPassword = !mqShowPassword }) {
+                            Icon(
+                                imageVector = if (mqShowPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (mqShowPassword) {
+                                    stringResource(R.string.hide_password)
+                                } else {
+                                    stringResource(R.string.show_password)
+                                },
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = {
+                        viewModel.fetchMqBootstrap(
+                            sensor.serial,
+                            mqQrInput,
+                            mqAuthPhoneInput,
+                            mqAuthPasswordInput,
+                        )
+                    },
+                    enabled = canAttemptVendorRestore,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.mq_fetch_calibration_action))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = { showMqRestoreSheet = false },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        }
+    }
+
+    if (showMqCalibrationSheet) {
+        @OptIn(ExperimentalMaterial3Api::class)
+        ModalBottomSheet(
+            onDismissRequest = {
+                showMqCalibrationSheet = false
+                mqCalibrationInputText = ""
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmolApp()
+            val unitLabel = if (isMmol) "mmol/L" else "mg/dL"
+            val inputValue = mqCalibrationInputText.toFloatOrNull()
+            val glucoseMgDl = if (inputValue != null) {
+                if (isMmol) (inputValue * 18.0182f).toInt() else inputValue.toInt()
+            } else {
+                null
+            }
+            val canCalibrate = sensor.isVendorConnected && glucoseMgDl != null && glucoseMgDl in 30..500
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.mq_manual_calibration_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.mq_manual_calibration_desc, unitLabel),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = mqCalibrationInputText,
+                    onValueChange = { newVal ->
+                        mqCalibrationInputText = if (isMmol) {
+                            newVal.filter { c -> c.isDigit() || c == '.' }
+                                .let { s ->
+                                    val dotIndex = s.indexOf('.')
+                                    if (dotIndex >= 0) {
+                                        s.substring(0, dotIndex + 1) + s.substring(dotIndex + 1).replace(".", "")
+                                    } else {
+                                        s
+                                    }
+                                }
+                        } else {
+                            newVal.filter { c -> c.isDigit() }
+                        }
+                    },
+                    label = { Text(stringResource(R.string.glucose_with_unit, unitLabel)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = if (isMmol) {
+                            androidx.compose.ui.text.input.KeyboardType.Decimal
+                        } else {
+                            androidx.compose.ui.text.input.KeyboardType.Number
+                        }
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = {
+                        if (glucoseMgDl != null && canCalibrate) {
+                            viewModel.calibrateManagedSensor(sensor.serial, glucoseMgDl)
+                            showMqCalibrationSheet = false
+                            mqCalibrationInputText = ""
+                        }
+                    },
+                    enabled = canCalibrate,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.calibrate_action))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        showMqCalibrationSheet = false
+                        mqCalibrationInputText = ""
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        }
     }
 
     if (showAiDexUnpairDialog) {
@@ -5047,6 +5250,72 @@ fun SensorCard(sensor: tk.glucodata.ui.viewmodel.SensorInfo, viewModel: tk.gluco
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (sensor.isMq) {
+                FilledTonalButton(
+                    onClick = { showMqRestoreSheet = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SettingsBackupRestore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.mq_fetch_calibration_action))
+                }
+                FilledTonalButton(
+                    onClick = { showMqCalibrationSheet = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.mq_manual_calibration_title))
+                }
+            }
+
+            if (!sensor.isAidex && !sensor.isSibionics2 && sensor.supportsHardwareReset) {
+                FilledTonalButton(
+                    onClick = { showResetDialog = true },
+                    enabled = sensor.isVendorConnected,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SettingsBackupRestore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.reset_sensor))
+                }
             }
 
             // Edit 63b: All sensors get the same 2-button row: Reconnect | Disconnect.

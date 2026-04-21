@@ -670,8 +670,11 @@ public:
     const sensor *end = sensorlist() + last() + 1;
     const sensor *sens =
         find_if(sensorlist(), end, [wanted](const sensor &sens) -> bool {
+          if (sens.fullname() == wanted) {
+            return true;
+          }
           if (wanted.rfind("X-", 0) == 0) {
-            return sens.fullname() == wanted;
+            return false;
           }
           return sens.shortsensorname_view() == wanted;
         });
