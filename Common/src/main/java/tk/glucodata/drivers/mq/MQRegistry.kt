@@ -8,6 +8,7 @@
 package tk.glucodata.drivers.mq
 
 import android.content.Context
+import android.content.SharedPreferences
 import tk.glucodata.Log
 import tk.glucodata.Natives
 import tk.glucodata.SensorBluetooth
@@ -30,6 +31,15 @@ object MQRegistry {
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private inline fun editBlocking(
+        context: Context,
+        block: SharedPreferences.Editor.() -> Unit,
+    ) {
+        val editor = prefs(context).edit()
+        editor.block()
+        editor.commit()
+    }
 
     private fun parseRecord(entry: String?): SensorRecord? {
         if (entry.isNullOrBlank()) return null
@@ -195,7 +205,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveProtocolType(context: Context, sensorId: String, value: Int) {
-        prefs(context).edit().putInt("${MQConstants.PREF_PROTOCOL_TYPE_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_PROTOCOL_TYPE_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -205,7 +217,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveDeviation(context: Context, sensorId: String, value: Int) {
-        prefs(context).edit().putInt("${MQConstants.PREF_DEVIATION_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_DEVIATION_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -215,7 +229,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveTransmitter10(context: Context, sensorId: String, value: Int) {
-        prefs(context).edit().putInt("${MQConstants.PREF_TRANSMITTER10_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_TRANSMITTER10_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -224,7 +240,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveWarmupStartedAt(context: Context, sensorId: String, timestamp: Long) {
-        prefs(context).edit().putLong("${MQConstants.PREF_WARMUP_STARTED_AT_PREFIX}$sensorId", timestamp).apply()
+        editBlocking(context) {
+            putLong("${MQConstants.PREF_WARMUP_STARTED_AT_PREFIX}$sensorId", timestamp)
+        }
     }
 
     @JvmStatic
@@ -233,7 +251,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveSensorStartAt(context: Context, sensorId: String, timestamp: Long) {
-        prefs(context).edit().putLong("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$sensorId", timestamp).apply()
+        editBlocking(context) {
+            putLong("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$sensorId", timestamp)
+        }
     }
 
     @JvmStatic
@@ -242,7 +262,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveKValue(context: Context, sensorId: String, value: Float) {
-        prefs(context).edit().putFloat("${MQConstants.PREF_K_VALUE_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putFloat("${MQConstants.PREF_K_VALUE_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -251,7 +273,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveBValue(context: Context, sensorId: String, value: Float) {
-        prefs(context).edit().putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -260,7 +284,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveSensitivity(context: Context, sensorId: String, value: Float) {
-        prefs(context).edit().putFloat("${MQConstants.PREF_SENSITIVITY_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putFloat("${MQConstants.PREF_SENSITIVITY_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -270,7 +296,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveAlgorithmVersion(context: Context, sensorId: String, value: Int) {
-        prefs(context).edit().putInt("${MQConstants.PREF_ALGORITHM_VERSION_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_ALGORITHM_VERSION_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -280,7 +308,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveMultiplier(context: Context, sensorId: String, value: Float) {
-        prefs(context).edit().putFloat("${MQConstants.PREF_MULTIPLIER_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putFloat("${MQConstants.PREF_MULTIPLIER_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -290,7 +320,9 @@ object MQRegistry {
 
     @JvmStatic
     fun savePackages(context: Context, sensorId: String, value: Int) {
-        prefs(context).edit().putInt("${MQConstants.PREF_PACKAGES_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_PACKAGES_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -299,7 +331,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveLastProcessed(context: Context, sensorId: String, value: Float) {
-        prefs(context).edit().putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -308,7 +342,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveLastPacketIndex(context: Context, sensorId: String, value: Int) {
-        prefs(context).edit().putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", value).apply()
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", value)
+        }
     }
 
     @JvmStatic
@@ -317,10 +353,12 @@ object MQRegistry {
 
     @JvmStatic
     fun saveSnapshotId(context: Context, sensorId: String, value: String?) {
-        prefs(context).edit().putString(
-            "${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId",
-            value?.trim()?.takeIf { it.isNotEmpty() },
-        ).apply()
+        editBlocking(context) {
+            putString(
+                "${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId",
+                value?.trim()?.takeIf { it.isNotEmpty() },
+            )
+        }
     }
 
     @JvmStatic
@@ -329,9 +367,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveLocalResetPending(context: Context, sensorId: String, pending: Boolean) {
-        prefs(context).edit()
-            .putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", pending)
-            .apply()
+        editBlocking(context) {
+            putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", pending)
+        }
     }
 
     @JvmStatic
@@ -340,16 +378,16 @@ object MQRegistry {
         sensorId: String,
         markLocalResetPending: Boolean = false,
     ) {
-        prefs(context).edit()
-            .putLong("${MQConstants.PREF_WARMUP_STARTED_AT_PREFIX}$sensorId", 0L)
-            .putLong("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$sensorId", 0L)
-            .putFloat("${MQConstants.PREF_K_VALUE_PREFIX}$sensorId", 0f)
-            .putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", 0f)
-            .putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", 0f)
-            .putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", -1)
-            .remove("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId")
-            .putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", markLocalResetPending)
-            .apply()
+        editBlocking(context) {
+            putLong("${MQConstants.PREF_WARMUP_STARTED_AT_PREFIX}$sensorId", 0L)
+            putLong("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$sensorId", 0L)
+            putFloat("${MQConstants.PREF_K_VALUE_PREFIX}$sensorId", 0f)
+            putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", 0f)
+            putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", 0f)
+            putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", -1)
+            remove("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId")
+            putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", markLocalResetPending)
+        }
     }
 
     @JvmStatic
@@ -357,12 +395,24 @@ object MQRegistry {
         prefs(context).getString("${MQConstants.PREF_QR_CONTENT_PREFIX}$sensorId", null)
 
     @JvmStatic
+    fun saveQrContent(context: Context, sensorId: String, qrCode: String?) {
+        editBlocking(context) {
+            putString(
+                "${MQConstants.PREF_QR_CONTENT_PREFIX}$sensorId",
+                qrCode?.trim()?.takeIf { it.isNotEmpty() },
+            )
+        }
+    }
+
+    @JvmStatic
     fun loadAuthToken(context: Context): String? =
         prefs(context).getString(MQConstants.PREF_AUTH_TOKEN_KEY, null)
 
     @JvmStatic
     fun saveAuthToken(context: Context, token: String?) {
-        prefs(context).edit().putString(MQConstants.PREF_AUTH_TOKEN_KEY, token?.trim()?.takeIf { it.isNotEmpty() }).apply()
+        editBlocking(context) {
+            putString(MQConstants.PREF_AUTH_TOKEN_KEY, token?.trim()?.takeIf { it.isNotEmpty() })
+        }
     }
 
     @JvmStatic
@@ -371,7 +421,9 @@ object MQRegistry {
 
     @JvmStatic
     fun saveAuthPhone(context: Context, phone: String?) {
-        prefs(context).edit().putString(MQConstants.PREF_AUTH_PHONE_KEY, phone?.trim()?.takeIf { it.isNotEmpty() }).apply()
+        editBlocking(context) {
+            putString(MQConstants.PREF_AUTH_PHONE_KEY, phone?.trim()?.takeIf { it.isNotEmpty() })
+        }
     }
 
     @JvmStatic
@@ -380,15 +432,17 @@ object MQRegistry {
 
     @JvmStatic
     fun saveAuthPassword(context: Context, password: String?) {
-        prefs(context).edit().putString(MQConstants.PREF_AUTH_PASSWORD_KEY, password?.takeIf { !it.isNullOrBlank() }).apply()
+        editBlocking(context) {
+            putString(MQConstants.PREF_AUTH_PASSWORD_KEY, password?.takeIf { !it.isNullOrBlank() })
+        }
     }
 
     @JvmStatic
     fun saveAuthCredentials(context: Context, phone: String?, password: String?) {
-        prefs(context).edit()
-            .putString(MQConstants.PREF_AUTH_PHONE_KEY, phone?.trim()?.takeIf { it.isNotEmpty() })
-            .putString(MQConstants.PREF_AUTH_PASSWORD_KEY, password?.takeIf { !it.isNullOrBlank() })
-            .apply()
+        editBlocking(context) {
+            putString(MQConstants.PREF_AUTH_PHONE_KEY, phone?.trim()?.takeIf { it.isNotEmpty() })
+            putString(MQConstants.PREF_AUTH_PASSWORD_KEY, password?.takeIf { !it.isNullOrBlank() })
+        }
     }
 
     @JvmStatic
@@ -400,20 +454,42 @@ object MQRegistry {
     }
 
     @JvmStatic
+    fun loadApiBaseUrl(context: Context): String =
+        MQConstants.normalizeVendorBaseUrl(
+            prefs(context).getString(MQConstants.PREF_API_BASE_URL_KEY, null)
+        ) ?: MQConstants.VENDOR_BASE_URL
+
+    @JvmStatic
+    fun saveApiBaseUrl(context: Context, baseUrl: String?) {
+        editBlocking(context) {
+            putString(
+                MQConstants.PREF_API_BASE_URL_KEY,
+                MQConstants.normalizeVendorBaseUrl(baseUrl),
+            )
+        }
+    }
+
+    @JvmStatic
     fun applyBootstrapConfig(context: Context, sensorId: String, config: MQBootstrapConfig) {
-        config.protocolType?.let { saveProtocolType(context, sensorId, it) }
-        config.deviation?.let { saveDeviation(context, sensorId, it) }
-        config.transmitter10?.let { saveTransmitter10(context, sensorId, it) }
-        config.sensitivity?.let { saveSensitivity(context, sensorId, it) }
-        config.algorithmVersion?.let { saveAlgorithmVersion(context, sensorId, it) }
-        config.packages?.let { savePackages(context, sensorId, it) }
-        config.multiplier?.let { saveMultiplier(context, sensorId, it) }
-        config.snapshotId?.let { saveSnapshotId(context, sensorId, it) }
-        config.sensorStartAtMs?.takeIf { it > 0L }?.let { saveSensorStartAt(context, sensorId, it) }
-        config.restoredKValue?.let { saveKValue(context, sensorId, it) }
-        config.restoredBValue?.let { saveBValue(context, sensorId, it) }
-        config.restoredLastProcessed?.let { saveLastProcessed(context, sensorId, it) }
-        config.restoredPacketIndex?.let { saveLastPacketIndex(context, sensorId, it) }
+        editBlocking(context) {
+            config.protocolType?.let { putInt("${MQConstants.PREF_PROTOCOL_TYPE_PREFIX}$sensorId", it) }
+            config.deviation?.let { putInt("${MQConstants.PREF_DEVIATION_PREFIX}$sensorId", it) }
+            config.transmitter10?.let { putInt("${MQConstants.PREF_TRANSMITTER10_PREFIX}$sensorId", it) }
+            config.sensitivity?.let { putFloat("${MQConstants.PREF_SENSITIVITY_PREFIX}$sensorId", it) }
+            config.algorithmVersion?.let { putInt("${MQConstants.PREF_ALGORITHM_VERSION_PREFIX}$sensorId", it) }
+            config.packages?.let { putInt("${MQConstants.PREF_PACKAGES_PREFIX}$sensorId", it) }
+            config.multiplier?.let { putFloat("${MQConstants.PREF_MULTIPLIER_PREFIX}$sensorId", it) }
+            config.snapshotId?.let {
+                putString("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId", it.trim().takeIf(String::isNotEmpty))
+            }
+            config.sensorStartAtMs?.takeIf { it > 0L }?.let {
+                putLong("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$sensorId", it)
+            }
+            config.restoredKValue?.let { putFloat("${MQConstants.PREF_K_VALUE_PREFIX}$sensorId", it) }
+            config.restoredBValue?.let { putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", it) }
+            config.restoredLastProcessed?.let { putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", it) }
+            config.restoredPacketIndex?.let { putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", it) }
+        }
         (SensorBluetooth.gattcallbacks.firstOrNull { cb ->
             SensorIdentity.matches(cb.SerialNumber, sensorId) ||
                 ((cb as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)

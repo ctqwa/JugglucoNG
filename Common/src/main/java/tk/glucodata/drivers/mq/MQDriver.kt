@@ -6,6 +6,7 @@
 
 package tk.glucodata.drivers.mq
 
+import android.content.Context
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.drivers.ManagedBluetoothSensorDriver
@@ -31,6 +32,12 @@ interface MQDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenanceDrive
     fun getLifecycleSummary(): String = ""
     fun isUiEnabled(): Boolean = true
     fun getPassiveConnectionStatus(): String = ""
+    fun refreshVendorBootstrap(
+        context: Context,
+        qrCode: String? = null,
+        account: String? = null,
+        password: String? = null,
+    ): Boolean = false
 
     fun getCurrentSnapshot(maxAgeMillis: Long): MQCurrentSnapshot? = null
 
@@ -68,7 +75,7 @@ interface MQDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenanceDrive
             serial = sensorSerial,
             displayName = runCatching { callback.mygetDeviceName() }.getOrDefault(sensorSerial),
             deviceAddress = callback.mActiveDeviceAddress ?: "Unknown",
-            uiFamily = ManagedSensorUiFamily.GENERIC,
+            uiFamily = ManagedSensorUiFamily.MQ,
             connectionStatus = passiveStatus,
             detailedStatus = detailedStatus,
             subtitleStatus = detailedStatus.ifBlank { passiveStatus },

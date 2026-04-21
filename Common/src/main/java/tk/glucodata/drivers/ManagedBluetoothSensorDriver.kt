@@ -22,6 +22,7 @@ data class ManagedSensorCalibrationRecord(
 
 enum class ManagedSensorUiFamily {
     GENERIC,
+    MQ,
     AIDEX,
     ICAN,
 }

@@ -13,6 +13,15 @@ package tk.glucodata.drivers.mq
 import java.util.Locale
 import java.util.UUID
 
+data class MQVendorEndpoints(
+    val baseUrl: String,
+    val loginWithPasswordUrl: String,
+    val qrCodeEffectiveUrl: String,
+    val findByBleIdUrl: String,
+    val queryNewestUrl: String,
+    val viewAllSnapshotDetailUrl: String,
+)
+
 object MQConstants {
 
     const val TAG = "MQ"
@@ -156,12 +165,12 @@ object MQConstants {
 
     // ---- Vendor bootstrap endpoints ----
 
-    const val VENDOR_BASE_URL = "http://monitor.glutec.ru/jeecg-boot/v3"
-    const val VENDOR_LOGIN_WITH_PASSWORD_URL = "$VENDOR_BASE_URL/user/monitorUser/loginWithPhoneAndPassword"
-    const val VENDOR_QR_CODE_EFFECTIVE_URL = "$VENDOR_BASE_URL/user/monitorUser/checkQrCodeNew"
-    const val VENDOR_FIND_BY_BLE_ID_URL = "$VENDOR_BASE_URL/emitterBluetooth/findByBleId"
-    const val VENDOR_QUERY_NEWEST_URL = "$VENDOR_BASE_URL/snapshot/snapshot/queryNewest"
-    const val VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_URL = "$VENDOR_BASE_URL/databags/databags/viewAllAppSnapshotDetailCondense"
+    const val VENDOR_BASE_URL = "https://monitor.glutec.ru/jeecg-boot/v3"
+    private const val VENDOR_LOGIN_WITH_PASSWORD_PATH = "/user/monitorUser/loginWithPhoneAndPassword"
+    private const val VENDOR_QR_CODE_EFFECTIVE_PATH = "/user/monitorUser/checkQrCodeNew"
+    private const val VENDOR_FIND_BY_BLE_ID_PATH = "/emitterBluetooth/findByBleId"
+    private const val VENDOR_QUERY_NEWEST_PATH = "/snapshot/snapshot/queryNewest"
+    private const val VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_PATH = "/databags/databags/viewAllAppSnapshotDetailCondense"
     const val VENDOR_TIMEOUT_MS = 5_000
     const val VENDOR_BOOTSTRAP_RETRY_MS = 15 * 60 * 1000L
 
@@ -175,6 +184,7 @@ object MQConstants {
      * UI before the GATT service discovery finishes.
      */
     val KNOWN_PREFIXES = arrayOf("Glutec", "GLUTEC", "MQ", "RU-")
+
 
     @JvmStatic
     fun isMqDevice(name: String?): Boolean {
@@ -246,6 +256,39 @@ object MQConstants {
         return ca.equals(cb, ignoreCase = true)
     }
 
+    @JvmStatic
+    fun normalizeVendorBaseUrl(baseUrl: String?): String? {
+        val trimmed = baseUrl?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null
+        var normalized = trimmed
+        if (!normalized.startsWith("http://", ignoreCase = true) &&
+            !normalized.startsWith("https://", ignoreCase = true)
+        ) {
+            normalized = "https://$normalized"
+        }
+        normalized = normalized.trimEnd('/')
+        return when {
+            normalized.endsWith("/jeecg-boot/v3", ignoreCase = true) -> normalized
+            normalized.endsWith("/jeecg-boot", ignoreCase = true) -> "$normalized/v3"
+            normalized.substringAfter("://", "").substringAfter('/', "").isBlank() ->
+                "$normalized/jeecg-boot/v3"
+            else -> normalized
+        }
+    }
+
+    @JvmStatic
+    fun vendorEndpoints(baseUrl: String?): MQVendorEndpoints {
+        val resolvedBaseUrl = normalizeVendorBaseUrl(baseUrl) ?: VENDOR_BASE_URL
+        return MQVendorEndpoints(
+            baseUrl = resolvedBaseUrl,
+            loginWithPasswordUrl = resolvedBaseUrl + VENDOR_LOGIN_WITH_PASSWORD_PATH,
+            qrCodeEffectiveUrl = resolvedBaseUrl + VENDOR_QR_CODE_EFFECTIVE_PATH,
+            findByBleIdUrl = resolvedBaseUrl + VENDOR_FIND_BY_BLE_ID_PATH,
+            queryNewestUrl = resolvedBaseUrl + VENDOR_QUERY_NEWEST_PATH,
+            viewAllSnapshotDetailUrl = resolvedBaseUrl + VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_PATH,
+        )
+    }
+
     // ---- SharedPreferences keys ----
 
     const val PREF_SENSORS_KEY = "mq_sensors"
@@ -268,4 +311,5 @@ object MQConstants {
     const val PREF_AUTH_TOKEN_KEY = "mq_auth_token"
     const val PREF_AUTH_PHONE_KEY = "mq_auth_phone"
     const val PREF_AUTH_PASSWORD_KEY = "mq_auth_password"
+    const val PREF_API_BASE_URL_KEY = "mq_api_base_url"
 }

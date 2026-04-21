@@ -511,6 +511,13 @@ public:
     inf.interval = interval;
     inf.starttime = time(nullptr);
     inf.lastscantime = inf.starttime;
+    inf.warmup = 60;
+    inf.wearduration =
+        static_cast<uint16_t>((days ? days : static_cast<uint8_t>(14)) * 24 *
+                              60);
+    inf.lastLifeCountReceived = 1;
+    inf.lastHistoricLifeCountReceivedPos = 12;
+    inf.pollinterval = 60.5752;
     inf.ident.len = 8;
     inf.info.len = 6;
     writeall(filename, &inf, sizeof(inf));

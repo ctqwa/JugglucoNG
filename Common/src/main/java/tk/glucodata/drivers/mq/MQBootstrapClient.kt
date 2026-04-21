@@ -83,13 +83,15 @@ object MQBootstrapClient {
         credentials: MQAuthCredentials? = null,
         allowContinueWearRestore: Boolean = true,
     ): MQBootstrapFetchResult {
+        val endpoints = MQConstants.vendorEndpoints(MQRegistry.loadApiBaseUrl(context))
         val account = credentials?.account?.trim().orEmpty().takeIf { it.isNotEmpty() }
         val currentToken = authToken?.trim().orEmpty()
         if (currentToken.isEmpty() && credentials != null) {
-            val login = loginWithPhoneAndPassword(context, credentials)
+            val login = loginWithPhoneAndPassword(context, credentials, endpoints)
             val freshToken = login.token?.trim().orEmpty()
             if (freshToken.isNotEmpty()) {
                 val seeded = fetchBestEffortOnce(
+                    endpoints = endpoints,
                     bleId = bleId,
                     qrCode = qrCode,
                     authToken = freshToken,
@@ -100,6 +102,7 @@ object MQBootstrapClient {
             }
         }
         val initial = fetchBestEffortOnce(
+            endpoints = endpoints,
             bleId = bleId,
             qrCode = qrCode,
             authToken = currentToken,
@@ -109,12 +112,13 @@ object MQBootstrapClient {
         if (initial.failure != MQBootstrapFailure.AUTH_EXPIRED || credentials == null) {
             return initial
         }
-        val login = loginWithPhoneAndPassword(context, credentials)
+        val login = loginWithPhoneAndPassword(context, credentials, endpoints)
         val freshToken = login.token?.trim().orEmpty()
         if (freshToken.isEmpty()) {
             return initial.copy(message = login.message ?: initial.message)
         }
         val retried = fetchBestEffortOnce(
+            endpoints = endpoints,
             bleId = bleId,
             qrCode = qrCode,
             authToken = freshToken,
@@ -125,6 +129,7 @@ object MQBootstrapClient {
     }
 
     private fun fetchBestEffortOnce(
+        endpoints: MQVendorEndpoints,
         bleId: String?,
         qrCode: String?,
         authToken: String? = null,
@@ -136,21 +141,21 @@ object MQBootstrapClient {
         var message: String? = null
 
         bleId?.trim()?.takeIf { it.isNotEmpty() }?.let { id ->
-            val result = fetchBleConfig(id, authToken)
+            val result = fetchBleConfig(endpoints, id, authToken)
             merged = merged.merge(result.config)
             failure = mergeFailure(failure, result.failure)
             message = mergeMessage(message, result.failure, result.message)
         }
 
         qrCode?.trim()?.takeIf { it.isNotEmpty() }?.let { code ->
-            val result = fetchQrConfig(code, authToken)
+            val result = fetchQrConfig(endpoints, code, authToken)
             merged = merged.merge(result.config)
             failure = mergeFailure(failure, result.failure)
             message = mergeMessage(message, result.failure, result.message)
         }
 
         if (allowContinueWearRestore && !authToken.isNullOrBlank() && !account.isNullOrBlank()) {
-            val result = fetchContinueWearConfig(account, authToken)
+            val result = fetchContinueWearConfig(endpoints, account, authToken)
             merged = merged.merge(result.config)
             failure = mergeFailure(failure, result.failure)
             message = mergeMessage(message, result.failure, result.message)
@@ -164,11 +169,12 @@ object MQBootstrapClient {
     }
 
     private fun fetchBleConfig(
+        endpoints: MQVendorEndpoints,
         bleId: String,
         authToken: String? = null,
     ): MQBootstrapFetchResult {
         val root = postForm(
-            url = MQConstants.VENDOR_FIND_BY_BLE_ID_URL,
+            url = endpoints.findByBleIdUrl,
             form = "bleId=${bleId.urlEncode()}",
             authToken = authToken,
         )
@@ -191,11 +197,12 @@ object MQBootstrapClient {
     }
 
     private fun fetchQrConfig(
+        endpoints: MQVendorEndpoints,
         qrCode: String,
         authToken: String? = null,
     ): MQBootstrapFetchResult {
         val root = postForm(
-            url = MQConstants.VENDOR_QR_CODE_EFFECTIVE_URL,
+            url = endpoints.qrCodeEffectiveUrl,
             form = "qrCode=${qrCode.urlEncode()}",
             authToken = authToken,
         )
@@ -230,11 +237,12 @@ object MQBootstrapClient {
     }
 
     private fun fetchContinueWearConfig(
+        endpoints: MQVendorEndpoints,
         account: String,
         authToken: String,
     ): MQBootstrapFetchResult {
         val root = postForm(
-            url = MQConstants.VENDOR_QUERY_NEWEST_URL,
+            url = endpoints.queryNewestUrl,
             form = "account=${account.urlEncode()}",
             authToken = authToken,
         )
@@ -265,6 +273,7 @@ object MQBootstrapClient {
 
         val historyResult = baseConfig.snapshotId?.let { snapshotId ->
             fetchSnapshotRestore(
+                endpoints = endpoints,
                 snapshotId = snapshotId,
                 authToken = authToken,
                 algorithmVersion = baseConfig.algorithmVersion ?: MQConstants.ALGO_DEFAULT_VERSION,
@@ -297,6 +306,7 @@ object MQBootstrapClient {
     }
 
     private fun fetchSnapshotRestore(
+        endpoints: MQVendorEndpoints,
         snapshotId: String,
         authToken: String,
         algorithmVersion: Int,
@@ -309,7 +319,7 @@ object MQBootstrapClient {
             append("&isPage=0&pageNo=1&pageSize=100")
         }
         val root = postForm(
-            url = MQConstants.VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_URL,
+            url = endpoints.viewAllSnapshotDetailUrl,
             form = form,
             authToken = authToken,
         )
@@ -402,6 +412,7 @@ object MQBootstrapClient {
     private fun loginWithPhoneAndPassword(
         context: Context,
         credentials: MQAuthCredentials,
+        endpoints: MQVendorEndpoints,
     ): MQLoginResult {
         val versionCode = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
@@ -420,7 +431,7 @@ object MQBootstrapClient {
             append("&type=").append("4".urlEncode())
         }
         val root = postForm(
-            url = MQConstants.VENDOR_LOGIN_WITH_PASSWORD_URL,
+            url = endpoints.loginWithPasswordUrl,
             form = form,
             authToken = null,
         )

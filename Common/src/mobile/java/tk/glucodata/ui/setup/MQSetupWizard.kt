@@ -69,6 +69,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import tk.glucodata.Log
 import tk.glucodata.R
 import tk.glucodata.drivers.mq.MQBootstrapClient
@@ -107,6 +108,7 @@ fun MQSetupWizard(
     var qrCodeContent by remember { mutableStateOf("") }
     var authPhone by remember { mutableStateOf(MQRegistry.loadAuthPhone(context).orEmpty()) }
     var authPassword by remember { mutableStateOf(MQRegistry.loadAuthPassword(context).orEmpty()) }
+    var apiBaseUrl by remember { mutableStateOf(MQRegistry.loadApiBaseUrl(context)) }
     var showManualQrEntry by remember { mutableStateOf(false) }
 
     if (showManualQrEntry) {
@@ -154,9 +156,11 @@ fun MQSetupWizard(
                     qrCodeContent = qrCodeContent,
                     authPhone = authPhone,
                     authPassword = authPassword,
+                    apiBaseUrl = apiBaseUrl,
                     onQrCodeChanged = { qrCodeContent = normalizeMqQrCode(it) },
                     onAuthPhoneChanged = { authPhone = it },
                     onAuthPasswordChanged = { authPassword = it },
+                    onApiBaseUrlChanged = { apiBaseUrl = it },
                     onShowManualQrEntry = { showManualQrEntry = true },
                     onDeviceSelected = { candidate ->
                         val addressCanonical = candidate.address
@@ -170,20 +174,31 @@ fun MQSetupWizard(
                                 if (normalizedPhone.isNotEmpty() && password.isNotBlank()) {
                                     MQRegistry.saveAuthCredentials(context, normalizedPhone, password)
                                 }
-                                val bootstrapConfig = withContext(Dispatchers.IO) {
-                                    runCatching {
-                                        val result = MQBootstrapClient.fetchBestEffort(
-                                            context = context,
-                                            bleId = addressCanonical,
-                                            qrCode = normalizedQr,
-                                            authToken = MQRegistry.loadAuthToken(context),
-                                            credentials = MQRegistry.loadAuthCredentials(context),
-                                        )
-                                        result.refreshedToken?.let { MQRegistry.saveAuthToken(context, it) }
-                                        result.config
-                                    }.onFailure {
-                                        Log.w(tag, "MQ bootstrap prefetch failed: ${it.message}")
-                                    }.getOrNull()
+                                MQRegistry.saveApiBaseUrl(context, apiBaseUrl)
+                                val storedToken = MQRegistry.loadAuthToken(context)
+                                val storedCredentials = MQRegistry.loadAuthCredentials(context)
+                                val shouldAttemptVendorRestore =
+                                    normalizedQr != null ||
+                                        !storedToken.isNullOrBlank() ||
+                                        storedCredentials != null
+                                val bootstrapConfig = if (shouldAttemptVendorRestore) {
+                                    withContext(Dispatchers.IO) {
+                                        runCatching {
+                                            val result = MQBootstrapClient.fetchBestEffort(
+                                                context = context,
+                                                bleId = addressCanonical,
+                                                qrCode = normalizedQr,
+                                                authToken = storedToken,
+                                                credentials = storedCredentials,
+                                            )
+                                            result.refreshedToken?.let { MQRegistry.saveAuthToken(context, it) }
+                                            result.config
+                                        }.onFailure {
+                                            Log.w(tag, "MQ bootstrap prefetch failed: ${it.message}")
+                                        }.getOrNull()
+                                    }
+                                } else {
+                                    null
                                 }
                                 val sensorId = MQRegistry.addSensor(
                                     context = context,
@@ -246,13 +261,18 @@ private fun MQScanStep(
     qrCodeContent: String,
     authPhone: String,
     authPassword: String,
+    apiBaseUrl: String,
     onQrCodeChanged: (String) -> Unit,
     onAuthPhoneChanged: (String) -> Unit,
     onAuthPasswordChanged: (String) -> Unit,
+    onApiBaseUrlChanged: (String) -> Unit,
     onShowManualQrEntry: () -> Unit,
     onDeviceSelected: (MQScanCandidate) -> Unit,
 ) {
     val context = LocalContext.current
+    val phoneLabel = stringResource(R.string.phone).replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+    }
     var devices by remember { mutableStateOf<List<MQScanCandidate>>(emptyList()) }
     val scanner = rememberBleScanner()
     var scanPermissionGranted by remember { mutableStateOf(hasBleScanPermissions(context)) }
@@ -262,7 +282,6 @@ private fun MQScanStep(
     var requestedPermissionOnce by remember { mutableStateOf(false) }
     var showAllDevices by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -354,159 +373,34 @@ private fun MQScanStep(
 
     Column(modifier = Modifier.fillMaxSize()) {
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(ui.spacerMedium))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = ui.horizontalPadding),
-            verticalAlignment = Alignment.CenterVertically
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = ui.horizontalPadding,
+                end = ui.horizontalPadding,
+                top = ui.spacerMedium,
+                bottom = ui.spacerLarge,
+            ),
+            verticalArrangement = Arrangement.spacedBy(ui.spacerMedium),
         ) {
-            Text(
-                stringResource(R.string.mq_searching_sensors),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium
-            )
-            TextButton(onClick = { showAllDevices = !showAllDevices }) {
-                Text(
-                    if (showAllDevices) stringResource(R.string.show_sensors_only)
-                    else stringResource(R.string.see_all_devices)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(ui.spacerSmall))
-        Card(
-            modifier = Modifier
-                .padding(horizontal = ui.horizontalPadding)
-                .fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.scan_transmitter_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                InlineQrScannerCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp),
-                    onScanResult = onQrCodeChanged,
-                )
-                Spacer(Modifier.height(8.dp))
-                if (qrCodeContent.isNotBlank()) {
-                    Text(
-                        text = "${stringResource(R.string.scan_sensor_qr)}: $qrCodeContent",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
-                OutlinedButton(
-                    onClick = onShowManualQrEntry,
-                    modifier = Modifier.fillMaxWidth()
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.enter_code_manually))
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = authPhone,
-                    onValueChange = onAuthPhoneChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.phone)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = authPassword,
-                    onValueChange = onAuthPasswordChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.password)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showPassword = !showPassword }) {
-                            Icon(
-                                imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (showPassword) {
-                                    stringResource(R.string.hide_password)
-                                } else {
-                                    stringResource(R.string.show_password)
-                                },
-                            )
-                        }
-                    },
-                )
-            }
-        }
-
-        if (!scanPermissionGranted || !bluetoothEnabled || scanError != null) {
-            Spacer(Modifier.height(ui.spacerMedium))
-            Card(
-                modifier = Modifier
-                    .padding(horizontal = ui.horizontalPadding)
-                    .fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    val messageRes = when {
-                        !scanPermissionGranted && Build.VERSION.SDK_INT >= 31 -> R.string.turn_on_nearby_devices_permission
-                        !scanPermissionGranted -> R.string.turn_on_location_permission
-                        !bluetoothEnabled || scanError is BleDeviceScanner.ScanStartError.BluetoothDisabled -> R.string.bluetooth_is_turned_off
-                        else -> R.string.nobluetooth
-                    }
                     Text(
-                        text = stringResource(messageRes),
-                        style = MaterialTheme.typography.bodyMedium
+                        stringResource(R.string.mq_searching_sensors),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                    Spacer(Modifier.height(ui.spacerMedium))
-                    val buttonRes = when {
-                        !scanPermissionGranted -> R.string.permission
-                        !bluetoothEnabled || scanError is BleDeviceScanner.ScanStartError.BluetoothDisabled -> R.string.enable_bluetooth
-                        else -> R.string.search_bluetooth
-                    }
-                    Button(
-                        onClick = {
-                            when {
-                                !scanPermissionGranted -> requestScanPermission()
-                                !bluetoothEnabled || scanError is BleDeviceScanner.ScanStartError.BluetoothDisabled -> {
-                                    enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-                                }
-                                else -> {
-                                    scanError = null
-                                    scanPermissionGranted = hasBleScanPermissions(context)
-                                    bluetoothEnabled = scanner.isBluetoothEnabled()
-                                    scanRetryKey += 1
-                                }
-                            }
-                        },
-                        modifier = Modifier.height(ui.buttonHeight)
-                    ) {
-                        Text(stringResource(buttonRes))
+                    TextButton(onClick = { showAllDevices = !showAllDevices }) {
+                        Text(
+                            if (showAllDevices) stringResource(R.string.show_sensors_only)
+                            else stringResource(R.string.see_all_devices)
+                        )
                     }
                 }
             }
-        }
-
-        if (devices.isEmpty() && scanPermissionGranted && bluetoothEnabled) {
-            Spacer(Modifier.height(ui.spacerMedium))
-            Text(
-                stringResource(R.string.mq_no_sensors_hint),
-                modifier = Modifier.padding(horizontal = ui.horizontalPadding),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        LazyColumn {
             items(devices) { device ->
                 if (!showAllDevices && !device.isLikelyMq) return@items
                 val title = device.displayName.ifBlank { stringResource(R.string.unknown) }
@@ -523,6 +417,158 @@ private fun MQScanStep(
                 )
                 HorizontalDivider()
             }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+//                        Text(
+//                            text = stringResource(R.string.scan_transmitter_desc),
+//                            style = MaterialTheme.typography.bodyMedium,
+//                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                        )
+                        Spacer(Modifier.height(12.dp))
+                        InlineQrScannerCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                            onScanResult = onQrCodeChanged,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (qrCodeContent.isNotBlank()) {
+                            Text(
+                                text = "${stringResource(R.string.scan_sensor_qr)}: $qrCodeContent",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        OutlinedButton(
+                            onClick = onShowManualQrEntry,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.enter_code_manually))
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = stringResource(R.string.mq_bootstrap_dialog_title),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            text = stringResource(R.string.mq_fetch_calibration_on_add_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = authPhone,
+                            onValueChange = onAuthPhoneChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(phoneLabel) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = authPassword,
+                            onValueChange = onAuthPasswordChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.password)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { showPassword = !showPassword }) {
+                                    Icon(
+                                        imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (showPassword) {
+                                            stringResource(R.string.hide_password)
+                                        } else {
+                                            stringResource(R.string.show_password)
+                                        },
+                                    )
+                                }
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = apiBaseUrl,
+                            onValueChange = onApiBaseUrlChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.mq_api_url_label)) },
+                            singleLine = true,
+                            supportingText = {
+                                Text(stringResource(R.string.mq_api_url_desc))
+                            },
+                        )
+                    }
+                }
+            }
+
+            if (!scanPermissionGranted || !bluetoothEnabled || scanError != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            val messageRes = when {
+                                !scanPermissionGranted && Build.VERSION.SDK_INT >= 31 -> R.string.turn_on_nearby_devices_permission
+                                !scanPermissionGranted -> R.string.turn_on_location_permission
+                                !bluetoothEnabled || scanError is BleDeviceScanner.ScanStartError.BluetoothDisabled -> R.string.bluetooth_is_turned_off
+                                else -> R.string.nobluetooth
+                            }
+                            Text(
+                                text = stringResource(messageRes),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(ui.spacerMedium))
+                            val buttonRes = when {
+                                !scanPermissionGranted -> R.string.permission
+                                !bluetoothEnabled || scanError is BleDeviceScanner.ScanStartError.BluetoothDisabled -> R.string.enable_bluetooth
+                                else -> R.string.search_bluetooth
+                            }
+                            Button(
+                                onClick = {
+                                    when {
+                                        !scanPermissionGranted -> requestScanPermission()
+                                        !bluetoothEnabled || scanError is BleDeviceScanner.ScanStartError.BluetoothDisabled -> {
+                                            enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                                        }
+                                        else -> {
+                                            scanError = null
+                                            scanPermissionGranted = hasBleScanPermissions(context)
+                                            bluetoothEnabled = scanner.isBluetoothEnabled()
+                                            scanRetryKey += 1
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.height(ui.buttonHeight)
+                            ) {
+                                Text(stringResource(buttonRes))
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (devices.isEmpty() && scanPermissionGranted && bluetoothEnabled) {
+                item {
+                    Text(
+                        stringResource(R.string.mq_no_sensors_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+
         }
     }
 }

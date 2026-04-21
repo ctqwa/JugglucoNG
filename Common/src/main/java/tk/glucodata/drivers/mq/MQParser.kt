@@ -62,10 +62,22 @@ object MQParser {
             val computed = MQCrc16.compute(frame, 0, frame.size - 2)
             val observedHi = frame[frame.size - 2].toInt() and 0xFF
             val observedLo = frame[frame.size - 1].toInt() and 0xFF
+            val detail = if (frame[MQConstants.OFFSET_CMD] == MQConstants.CMD_NOTIFY_BG_COMPLETE) {
+                "Protocol02 session marker"
+            } else {
+                "Protocol02-style inbound frame"
+            }
             Log.d(
                 MQConstants.TAG,
-                "CRC mismatch cmd=0x%02X len=%d computed=0x%04X observed=0x%02X%02X — accepting anyway"
-                    .format(frame[MQConstants.OFFSET_CMD].toInt() and 0xFF, len, computed, observedHi, observedLo),
+                "CRC mismatch cmd=0x%02X len=%d computed=0x%04X observed=0x%02X%02X — accepting %s"
+                    .format(
+                        frame[MQConstants.OFFSET_CMD].toInt() and 0xFF,
+                        len,
+                        computed,
+                        observedHi,
+                        observedLo,
+                        detail,
+                    ),
             )
         }
         val payload = if (len == 0) ByteArray(0)
