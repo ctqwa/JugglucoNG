@@ -7,11 +7,12 @@
 //   4) onCharacteristicChanged(TX) → MQParser.parse → dispatch by cmd
 //      • 0x06 NOTIFY_BEGIN_WORK  → write confirmWithInit  (fresh session)
 //      • 0x01 NOTIFY_WORKING     → write confirmWithoutInit (heartbeat)
-//      • 0x04 NOTIFY_BG_DATA     → parse BG records, emit glucose, confirm
+//      • 0x04 NOTIFY_BG_DATA     → parse BG records, run vendor math, confirm
 //
-// We run the MQAlgorithm on the raw current/processed values from each BG
-// record and feed the final mg/dL × 10 result into SuperGattCallback.handleGlucoseResult.
-// No encryption. No handshake. Short frames fit default MTU easily.
+// The 0x04 records carry packet index + sample current, not final glucose.
+// We only emit a glucose when we have enough state to reproduce the vendor
+// calculation honestly; otherwise we keep the session alive but do not invent
+// a reading.
 
 package tk.glucodata.drivers.mq
 
@@ -23,10 +24,13 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
+import java.util.Locale
 import java.util.UUID
 import tk.glucodata.Applic
 import tk.glucodata.Log
+import tk.glucodata.Natives
 import tk.glucodata.SuperGattCallback
+import tk.glucodata.UiRefreshBus
 
 @SuppressLint("MissingPermission")
 class MQBleManager(
@@ -40,8 +44,14 @@ class MQBleManager(
         /** SuperGattCallback generation tag — keep at 0 (same as iCan/AiDex). */
         const val SENSOR_GEN = 0
 
-        /** No-data watchdog. Transmitter emits ~every minute; allow 4× slack. */
-        private const val NO_DATA_WATCHDOG_MS = 4L * 60L * 1000L
+        /** Reconnect active sessions aggressively instead of waiting for generic polling. */
+        private const val ACTIVE_SESSION_RECONNECT_DELAY_MS = 2_000L
+
+        /** No-data watchdog multiplier. Real cadence is profile-controlled. */
+        private const val NO_DATA_WATCHDOG_MULTIPLIER = 4L
+
+        /** Give the reset frame time to leave Android before we drop GATT. */
+        private const val RESET_RECONNECT_DELAY_MS = 700L
     }
 
     enum class Phase { IDLE, CONNECTING, DISCOVERING, STREAMING }
@@ -62,6 +72,8 @@ class MQBleManager(
     @Volatile private var protocolType: Int = MQConstants.SERVER_DEFAULT_PROTOCOL_TYPE
     @Volatile private var deviation: Int = MQConstants.SERVER_DEFAULT_DEVIATION
     @Volatile private var transmitter10: Int = MQConstants.SERVER_DEFAULT_TRANSMITTER10
+    @Volatile private var sensitivitySeed: Float = 0f
+    @Volatile private var algorithmVersion: Int = MQConstants.ALGO_DEFAULT_VERSION
     @Volatile private var kValue: Float = 0f
     @Volatile private var bValue: Float = 0f
     @Volatile private var multiplier: Float = MQConstants.ALGO_DEFAULT_MULTIPLIER.toFloat()
@@ -79,7 +91,9 @@ class MQBleManager(
     @Volatile private var warmupStartedAtMs: Long = 0L
     @Volatile private var sensorStartAtMs: Long = 0L
     @Volatile private var packetCount: Int = 0
-    @Volatile private var referenceBGmmol: Double = 0.0
+    @Volatile private var pendingReferenceBgTimes10Mmol: Double = 0.0
+    @Volatile private var lastPacketIndex: Int = -1
+    @Volatile private var lastRecordReceivedAtMs: Long = 0L
     @Volatile private var lastRawCurrent: Double = 0.0
     @Volatile private var lastProcessed: Double = 0.0
     @Volatile private var lastBatteryPercent: Int = -1
@@ -87,8 +101,35 @@ class MQBleManager(
     @Volatile private var lastGlucoseMgdlTimes10: Int = 0
     @Volatile private var vendorModelNameInternal: String = MQConstants.DEFAULT_DISPLAY_NAME
     @Volatile private var vendorFirmwareVersionInternal: String = ""
+    @Volatile private var reconnectReason: String = ""
+    @Volatile private var bootstrapFetchInFlight: Boolean = false
+    @Volatile private var lastBootstrapAttemptAtMs: Long = 0L
+    @Volatile private var lastBootstrapFailure: MQBootstrapFailure = MQBootstrapFailure.NONE
+    @Volatile private var lastBootstrapMessage: String = ""
+    @Volatile private var localResetPending: Boolean = false
 
     override var viewMode: Int = 0
+
+    private val reconnectRunnable = Runnable {
+        if (stop) return@Runnable
+        Log.i(TAG, "Reconnect requested: $reconnectReason")
+        connectDevice(0)
+    }
+
+    private val noDataWatchdog = Runnable {
+        if (stop || phase != Phase.STREAMING) return@Runnable
+        val lastReadingMs = lastGlucoseAtMs
+        if (lastReadingMs <= 0L) return@Runnable
+        val elapsedMs = System.currentTimeMillis() - lastReadingMs
+        if (elapsedMs < noDataWatchdogMs()) {
+            armNoDataWatchdog()
+            return@Runnable
+        }
+        Log.w(TAG, "No MQ glucose for ${elapsedMs / 1000}s — forcing reconnect")
+        mActiveBluetoothDevice = null
+        runCatching { mBluetoothGatt?.disconnect() }
+        scheduleReconnect("No-data watchdog", ACTIVE_SESSION_RECONNECT_DELAY_MS)
+    }
 
     // ---- Persistence ----
 
@@ -99,11 +140,33 @@ class MQBleManager(
         transmitter10 = MQRegistry.loadTransmitter10(context, id)
         warmupStartedAtMs = MQRegistry.loadWarmupStartedAt(context, id)
         sensorStartAtMs = MQRegistry.loadSensorStartAt(context, id)
+        sensitivitySeed = MQRegistry.loadSensitivity(context, id)
+        algorithmVersion = MQRegistry.loadAlgorithmVersion(context, id)
         kValue = MQRegistry.loadKValue(context, id)
         bValue = MQRegistry.loadBValue(context, id)
+        localResetPending = MQRegistry.loadLocalResetPending(context, id)
+        if (!hasValidSlopeSeed(kValue.toDouble()) && kValue != 0f) {
+            Log.w(TAG, "Discarding invalid persisted MQ K seed=$kValue for $id")
+            kValue = 0f
+            bValue = 0f
+            MQRegistry.saveKValue(context, id, 0f)
+            MQRegistry.saveBValue(context, id, 0f)
+        }
         multiplier = MQRegistry.loadMultiplier(context, id)
         packages = MQRegistry.loadPackages(context, id)
+        lastProcessed = MQRegistry.loadLastProcessed(context, id).toDouble().coerceAtLeast(0.0)
+        lastPacketIndex = MQRegistry.loadLastPacketIndex(context, id)
         crcXorOut = if (protocolType == 2) 0x0100 else 0x0000
+        if (hasUsableSlopeSeed()) {
+            if (localResetPending) {
+                clearLocalResetPending("restored-valid-k")
+            }
+            lastBootstrapFailure = MQBootstrapFailure.NONE
+            lastBootstrapMessage = ""
+        }
+        if (!hasUsableSlopeSeed()) {
+            maybeRefreshBootstrapAsync(context, "restore")
+        }
     }
 
     private fun persistSensorStart(context: Context, timestamp: Long) {
@@ -116,19 +179,135 @@ class MQBleManager(
         MQRegistry.saveWarmupStartedAt(context, id, timestamp)
     }
 
+    private fun noDataWatchdogMs(): Long =
+        NO_DATA_WATCHDOG_MULTIPLIER * profile.readingIntervalMinutes * 60L * 1000L
+
+    private fun armNoDataWatchdog() {
+        handler.removeCallbacks(noDataWatchdog)
+        if (lastGlucoseAtMs > 0L) {
+            handler.postDelayed(noDataWatchdog, noDataWatchdogMs())
+        }
+    }
+
+    private fun cancelReconnect() {
+        handler.removeCallbacks(reconnectRunnable)
+        reconnectReason = ""
+    }
+
+    private fun scheduleReconnect(reason: String, delayMs: Long = ACTIVE_SESSION_RECONNECT_DELAY_MS) {
+        if (stop) return
+        reconnectReason = reason
+        handler.removeCallbacks(reconnectRunnable)
+        handler.postDelayed(reconnectRunnable, delayMs)
+    }
+
+    private fun nativeCreationSensorName(sensorId: String): String =
+        MQConstants.canonicalSensorId(sensorId)
+
+    private fun resolveExistingNativeSensorName(sensorId: String): String? {
+        val canonical = nativeCreationSensorName(sensorId)
+        if (canonical.isBlank() || MQConstants.isProvisionalSensorId(canonical)) {
+            return null
+        }
+        runCatching { Natives.activeSensors() }
+            .getOrNull()
+            ?.firstOrNull { MQConstants.matchesCanonicalOrKnownNativeAlias(it, canonical) }
+            ?.takeIf { !it.isNullOrBlank() }
+            ?.let { return it }
+        runCatching { Natives.lastsensorname() }
+            .getOrNull()
+            ?.takeIf { MQConstants.matchesCanonicalOrKnownNativeAlias(it, canonical) }
+            ?.let { return it }
+        return null
+    }
+
+    private fun resolveNativeSensorPtr(sensorId: String): Long {
+        if (sensorId.isBlank() || MQConstants.isProvisionalSensorId(sensorId)) {
+            return 0L
+        }
+        if (dataptr != 0L) {
+            runCatching { Natives.getsensorptr(dataptr) }
+                .getOrNull()
+                ?.takeIf { it != 0L }
+                ?.let { return it }
+        }
+        val nativeName = resolveExistingNativeSensorName(sensorId) ?: return 0L
+        return runCatching { Natives.str2sensorptr(nativeName) }.getOrDefault(0L)
+    }
+
+    private fun applyNativeSensorMetadata(nativeName: String = nativeCreationSensorName(SerialNumber)) {
+        if (nativeName.isBlank()) return
+        if (dataptr != 0L && !mActiveDeviceAddress.isNullOrEmpty()) {
+            runCatching { Natives.setDeviceAddress(dataptr, mActiveDeviceAddress) }
+                .onFailure { Log.stack(TAG, "applyNativeSensorMetadata(setDeviceAddress)", it) }
+            runCatching { Natives.unfinishSensor(dataptr) }
+                .onFailure { Log.stack(TAG, "applyNativeSensorMetadata(unfinishSensor)", it) }
+        }
+        val current = runCatching { Natives.lastsensorname() }.getOrNull()
+        if (current.isNullOrBlank() || MQConstants.matchesCanonicalOrKnownNativeAlias(current, SerialNumber)) {
+            runCatching { Natives.setcurrentsensor(nativeName) }
+                .onFailure { Log.stack(TAG, "applyNativeSensorMetadata(setcurrentsensor)", it) }
+        }
+        if (sensorStartAtMs > 0L) {
+            sensorstartmsec = sensorStartAtMs
+        } else {
+            val sensorPtr = resolveNativeSensorPtr(SerialNumber)
+            if (sensorPtr != 0L) {
+                sensorstartmsec = runCatching { Natives.getSensorStartmsecFromSensorptr(sensorPtr) }
+                    .getOrDefault(sensorstartmsec)
+            }
+        }
+    }
+
+    private fun ensureNativeDataptr(sensorId: String) {
+        val canonical = nativeCreationSensorName(sensorId)
+        if (canonical.isBlank() || MQConstants.isProvisionalSensorId(canonical)) {
+            return
+        }
+        val startSec = if (sensorStartAtMs > 0L) sensorStartAtMs / 1000L else 0L
+        runCatching { Natives.ensureSensorShell(canonical, startSec) }
+            .onFailure { Log.stack(TAG, "ensureNativeDataptr(ensureSensorShell)", it) }
+        if (dataptr == 0L) {
+            dataptr = runCatching { Natives.getdataptr(canonical) }.getOrDefault(0L)
+        }
+        applyNativeSensorMetadata(canonical)
+    }
+
+    private fun mirrorReadingIntoNative(sampleMs: Long, glucoseMgdl: Int) {
+        if (sampleMs <= 0L || glucoseMgdl <= 0 || SerialNumber.isBlank()) {
+            return
+        }
+        val nativeName = nativeCreationSensorName(SerialNumber)
+        runCatching {
+            ensureNativeDataptr(SerialNumber)
+            // Native direct-stream storage multiplies the float by 10 internally.
+            Natives.addGlucoseStream(sampleMs / 1000L, glucoseMgdl / 10f, nativeName)
+            applyNativeSensorMetadata(nativeName)
+            Natives.wakebackup()
+        }.onFailure { Log.stack(TAG, "mirrorReadingIntoNative", it) }
+    }
+
     // ---- ManagedBluetoothSensorDriver / MQDriver overrides ----
 
     override fun matchesManagedSensorId(sensorId: String?): Boolean =
         MQConstants.matchesCanonicalOrKnownNativeAlias(SerialNumber, sensorId)
 
-    override fun hasNativeSensorBacking(): Boolean = false
+    override fun hasNativeSensorBacking(): Boolean =
+        SerialNumber.isNotBlank() && resolveExistingNativeSensorName(SerialNumber) != null
     override fun shouldUseNativeHistorySync(): Boolean = false
 
     override fun getDetailedBleStatus(): String = when (phase) {
         Phase.IDLE -> if (mActiveBluetoothDevice == null) "Searching" else "Idle"
         Phase.CONNECTING -> "Connecting"
         Phase.DISCOVERING -> "Discovering services"
-        Phase.STREAMING -> if (lastGlucoseAtMs == 0L) "Warmup" else "Streaming"
+        Phase.STREAMING -> when {
+            lastGlucoseAtMs > 0L -> "Connected"
+            bootstrapFetchInFlight -> "Refreshing MQ login/bootstrap"
+            lastBootstrapFailure == MQBootstrapFailure.AUTH_EXPIRED -> "MQ login expired"
+            lastBootstrapFailure == MQBootstrapFailure.SERVER -> "MQ bootstrap failed"
+            lastRecordReceivedAtMs > 0L && !hasUsableSlopeSeed() -> "MQ restore session or calibrate"
+            else -> "Warmup"
+        }
     }
 
     override fun getStartTimeMs(): Long = sensorStartAtMs
@@ -159,7 +338,7 @@ class MQBleManager(
 
     override fun calibrateSensor(glucoseMgDl: Int): Boolean {
         if (glucoseMgDl <= 0) return false
-        referenceBGmmol = glucoseMgDl / 18.0
+        pendingReferenceBgTimes10Mmol = (glucoseMgDl / 18.0182) * 10.0
         return true
     }
 
@@ -185,6 +364,70 @@ class MQBleManager(
         MQRegistry.removeSensor(context, SerialNumber)
     }
 
+    override fun softDisconnect() {
+        setPause(true)
+        cancelReconnect()
+        handler.removeCallbacks(noDataWatchdog)
+        phase = Phase.IDLE
+        runCatching { close() }
+            .onFailure { Log.stack(TAG, "softDisconnect(close)", it) }
+        mActiveBluetoothDevice = null
+        UiRefreshBus.requestStatusRefresh()
+    }
+
+    override fun softReconnect() {
+        setPause(false)
+        cancelReconnect()
+        handler.removeCallbacks(noDataWatchdog)
+        if (dataptr != 0L) {
+            runCatching { Natives.unfinishSensor(dataptr) }
+                .onFailure { Log.stack(TAG, "softReconnect(unfinishSensor)", it) }
+        }
+        runCatching { close() }
+            .onFailure { Log.stack(TAG, "softReconnect(close)", it) }
+        phase = Phase.IDLE
+        handler.postDelayed({
+            if (!stop) connectDevice(0)
+        }, 250L)
+        UiRefreshBus.requestStatusRefresh()
+    }
+
+    override fun terminateManagedSensor(wipeData: Boolean) {
+        setPause(true)
+        cancelReconnect()
+        handler.removeCallbacks(noDataWatchdog)
+        phase = Phase.IDLE
+        val sensorPtr = resolveNativeSensorPtr(SerialNumber)
+        runCatching { mBluetoothGatt?.disconnect() }
+            .onFailure { Log.stack(TAG, "terminateManagedSensor(disconnect)", it) }
+        if (sensorPtr != 0L) {
+            runCatching { Natives.finishfromSensorptr(sensorPtr) }
+                .onFailure { Log.stack(TAG, "terminateManagedSensor(finishfromSensorptr)", it) }
+        }
+        dataptr = 0L
+        runCatching { close() }
+            .onFailure { Log.stack(TAG, "terminateManagedSensor(close)", it) }
+    }
+
+    override fun resetSensor(): Boolean {
+        val frame = when {
+            protocolType == 2 || crcXorOut == 0x0100 -> MagicAck.reset00.copyOf()
+            else -> MQParser.buildConfirmReset(0)
+        }
+        if (!writeFrameNow(frame, "confirmReset")) {
+            Log.w(TAG, "MQ reset rejected: GATT write path not ready")
+            return false
+        }
+        markLocalResetPending()
+        handler.postDelayed({
+            if (!stop) {
+                runCatching { mBluetoothGatt?.disconnect() }
+            }
+        }, RESET_RECONNECT_DELAY_MS)
+        UiRefreshBus.requestStatusRefresh()
+        return true
+    }
+
     // ---- BLE lifecycle ----
 
     override fun getService(): UUID = MQConstants.NUS_SERVICE
@@ -204,7 +447,10 @@ class MQBleManager(
         when (newState) {
             BluetoothProfile.STATE_CONNECTED -> {
                 Log.i(TAG, "Connected to ${gatt.device?.address}")
+                cancelReconnect()
+                handler.removeCallbacks(noDataWatchdog)
                 mBluetoothGatt = gatt
+                mActiveBluetoothDevice = gatt.device
                 connectTime = System.currentTimeMillis()
                 phase = Phase.DISCOVERING
                 handler.postDelayed({
@@ -223,11 +469,12 @@ class MQBleManager(
                 charTxNotify = null
                 charRxWrite = null
                 nusService = null
+                mActiveBluetoothDevice = null
                 try { gatt.close() } catch (_: Throwable) {}
                 mBluetoothGatt = null
                 handler.removeCallbacksAndMessages(null)
                 if (!stop) {
-                    // Let SuperGattCallback.shouldreconnect drive reconnect cadence.
+                    scheduleReconnect("GATT disconnected (status=$status)")
                 }
             }
         }
@@ -357,6 +604,8 @@ class MQBleManager(
         val bgData00: ByteArray = byteArrayOf(0x5A, -0x5B, 0x02, 0x01, 0x00, 0x49, 0x7F)
         // confirmWithoutInit (cmd=0x03, payload=0x00) — observed (Modbus^0x0100 form).
         val withoutInit00: ByteArray = byteArrayOf(0x5A, -0x5B, 0x03, 0x01, 0x00, 0x50, -0x51)
+        // confirmReset (cmd=0x11, payload=0x00) — fixed Protocol02 bytes from the official app.
+        val reset00: ByteArray = byteArrayOf(0x5A, -0x5B, 0x11, 0x01, 0x00, -0x56, 0x07)
     }
 
     private data class AckCandidate(
@@ -402,13 +651,18 @@ class MQBleManager(
         val now = System.currentTimeMillis()
         if (sensorStartAtMs == 0L) {
             sensorStartAtMs = now
+            sensorstartmsec = now
             warmupStartedAtMs = now
             packetCount = 0
             Applic.app?.let {
                 persistSensorStart(it, now)
                 persistWarmupStart(it, now)
             }
+            ensureNativeDataptr(SerialNumber)
             Log.i(TAG, "Sensor begin work — session start marked")
+        }
+        Applic.app?.takeIf { !hasUsableSlopeSeed() }?.let {
+            maybeRefreshBootstrapAsync(it, "begin-work")
         }
         if (beginWorkFirstSeenMs == 0L) beginWorkFirstSeenMs = now
         beginWorkRetryCount++
@@ -462,8 +716,178 @@ class MQBleManager(
     private fun onHeartbeat() {
         beginWorkRetryCount = 0
         beginWorkFirstSeenMs = 0L
+        armNoDataWatchdog()
         // Protocol02 magic — computed CRC would be rejected (see HCI log analysis).
         writeFrame(MagicAck.withoutInit00.copyOf(), "confirmWithoutInit(magic)")
+    }
+
+    private fun persistAlgorithmState() {
+        val context = Applic.app ?: return
+        val id = SerialNumber ?: return
+        MQRegistry.saveKValue(context, id, kValue)
+        MQRegistry.saveBValue(context, id, bValue)
+        MQRegistry.saveLastProcessed(context, id, lastProcessed.toFloat())
+        MQRegistry.saveLastPacketIndex(context, id, lastPacketIndex)
+    }
+
+    private fun clearLocalResetPending(reason: String) {
+        if (!localResetPending) return
+        localResetPending = false
+        val context = Applic.app ?: return
+        MQRegistry.saveLocalResetPending(context, SerialNumber, false)
+        Log.i(TAG, "Cleared local MQ reset pending ($reason)")
+    }
+
+    private fun markLocalResetPending() {
+        localResetPending = true
+        val context = Applic.app
+        val id = SerialNumber ?: return
+        clearVolatileSessionState()
+        if (context != null) {
+            MQRegistry.clearRuntimeState(
+                context = context,
+                sensorId = id,
+                markLocalResetPending = true,
+            )
+        }
+        lastBootstrapFailure = MQBootstrapFailure.NONE
+        lastBootstrapMessage = ""
+        Log.i(TAG, "Marked local MQ reset pending for $id")
+    }
+
+    private fun clearVolatileSessionState() {
+        sensorStartAtMs = 0L
+        sensorstartmsec = 0L
+        warmupStartedAtMs = 0L
+        packetCount = 0
+        pendingReferenceBgTimes10Mmol = 0.0
+        lastPacketIndex = -1
+        lastRecordReceivedAtMs = 0L
+        lastRawCurrent = 0.0
+        lastProcessed = 0.0
+        lastGlucoseAtMs = 0L
+        lastGlucoseMgdlTimes10 = 0
+        beginWorkRetryCount = 0
+        beginWorkFirstSeenMs = 0L
+        learnedAckPayload = 0x00
+        learnedAckUseLearnedXor = true
+        ackConventionLocked = false
+        lastBeginWorkCandidate = null
+        kValue = 0f
+        bValue = 0f
+    }
+
+    private fun hasValidSlopeSeed(value: Double): Boolean =
+        value > MQConstants.ALGO_MIN_VALID_K
+
+    private fun hasUsableSlopeSeed(): Boolean =
+        hasValidSlopeSeed(kValue.toDouble())
+
+    private fun maybeRefreshBootstrapAsync(context: Context, reason: String) {
+        val id = SerialNumber ?: return
+        val now = System.currentTimeMillis()
+        if (bootstrapFetchInFlight || now - lastBootstrapAttemptAtMs < MQConstants.VENDOR_BOOTSTRAP_RETRY_MS) {
+            return
+        }
+        val qrCode = MQRegistry.loadQrContent(context, id)?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        val bleId = mActiveDeviceAddress?.takeIf { it.isNotBlank() }
+            ?: MQRegistry.findRecord(context, id)?.address?.takeIf { it.isNotBlank() }
+        if (qrCode == null && bleId == null) return
+        bootstrapFetchInFlight = true
+        lastBootstrapAttemptAtMs = now
+        handler.post {
+            try {
+                val result = MQBootstrapClient.fetchBestEffort(
+                    context = context,
+                    bleId = bleId,
+                    qrCode = qrCode,
+                    authToken = MQRegistry.loadAuthToken(context),
+                    credentials = MQRegistry.loadAuthCredentials(context),
+                    allowContinueWearRestore = !localResetPending,
+                )
+                result.refreshedToken?.let { MQRegistry.saveAuthToken(context, it) }
+                lastBootstrapFailure = result.failure
+                lastBootstrapMessage = result.message.orEmpty()
+                if (result.config != null) {
+                    MQRegistry.applyBootstrapConfig(context, id, result.config)
+                    restoreFromPersistence(context)
+                    if (hasUsableSlopeSeed()) {
+                        lastBootstrapFailure = MQBootstrapFailure.NONE
+                        lastBootstrapMessage = ""
+                    }
+                    Log.i(
+                        TAG,
+                        "Applied MQ bootstrap ($reason): sensitivity=$sensitivitySeed k=$kValue b=$bValue packet=$lastPacketIndex algo=$algorithmVersion packages=$packages multiplier=$multiplier",
+                    )
+                } else {
+                    Log.w(TAG, "MQ bootstrap unavailable for $id ($reason): ${result.message}")
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "maybeRefreshBootstrapAsync($reason)", t)
+            } finally {
+                bootstrapFetchInFlight = false
+            }
+        }
+    }
+
+    private fun calculateInitTimeMinutes(sampleMs: Long): Double {
+        val startAt = sensorStartAtMs.takeIf { it > 0L } ?: return MQConstants.ALGO_DEFAULT_INIT_TIME_MINUTES
+        val elapsedMs = sampleMs - startAt
+        return if (elapsedMs > 0L) {
+            elapsedMs / 60_000.0
+        } else {
+            MQConstants.ALGO_DEFAULT_INIT_TIME_MINUTES
+        }
+    }
+
+    private fun calculateVendorGlucose(rec: MQBgRecord, sampleMs: Long): MQAlgorithm.Result? {
+        val reference = pendingReferenceBgTimes10Mmol.takeIf { it > 0.0 && rec.packetIndex > 8 } ?: 0.0
+        val seedK = kValue.toDouble()
+        if (!hasValidSlopeSeed(seedK) && reference <= 0.0) {
+            return null
+        }
+        val initTimeMinutes = calculateInitTimeMinutes(sampleMs)
+        val previousProcessed = lastProcessed
+        val result = MQAlgorithm.calculateResult(
+            algorithmVersion = algorithmVersion,
+            initTimeMinutes = initTimeMinutes,
+            packetIndex = rec.packetIndex.toDouble(),
+            sampleCurrent = rec.sampleCurrent.toDouble(),
+            previousReviseCurrent2 = previousProcessed,
+            kValue = seedK,
+            referenceBgTimes10Mmol = reference,
+            bValue = bValue.toDouble(),
+            packages = packages.toDouble(),
+            multiplier = multiplier.toDouble(),
+        )
+        lastProcessed = result.reviseCurrent2
+        if (hasValidSlopeSeed(result.kValue)) {
+            kValue = result.kValue.toFloat()
+        }
+        bValue = result.bValue.toFloat()
+        if (reference > 0.0) {
+            pendingReferenceBgTimes10Mmol = 0.0
+        }
+        persistAlgorithmState()
+        if (result.glucoseTimes10Mmol > 0 && hasValidSlopeSeed(result.kValue)) {
+            clearLocalResetPending("live-calculated-k")
+        }
+        Log.d(
+            TAG,
+            String.format(
+                Locale.US,
+                "Calculated packet=%d initMin=%.1f current=%d prev=%.1f revise=%.1f k=%.2f b=%.2f mmol=%.1f",
+                rec.packetIndex,
+                initTimeMinutes,
+                rec.sampleCurrent,
+                previousProcessed,
+                result.reviseCurrent2,
+                result.kValue,
+                result.bValue,
+                result.glucoseMmol,
+            ),
+        )
+        return if (result.glucoseTimes10Mmol > 0) result else null
     }
 
     private fun onBgData(frame: MQFrame) {
@@ -474,52 +898,79 @@ class MQBleManager(
             writeFrame(MagicAck.bgData00.copyOf(), "confirmBgData(empty,magic)")
             return
         }
+        Applic.app?.takeIf { !hasUsableSlopeSeed() }?.let {
+            maybeRefreshBootstrapAsync(it, "bg-data")
+        }
         val nowMs = System.currentTimeMillis()
+        if (sensorStartAtMs == 0L) {
+            sensorStartAtMs = nowMs
+            sensorstartmsec = nowMs
+            warmupStartedAtMs = nowMs
+            Applic.app?.let {
+                persistSensorStart(it, nowMs)
+                persistWarmupStart(it, nowMs)
+            }
+        }
+        ensureNativeDataptr(SerialNumber)
         val intervalMs = profile.readingIntervalMinutes * 60L * 1000L
+        val previousLastPacketIndex = lastPacketIndex
+        var highestPacketIndexSeen = lastPacketIndex
         // The transmitter buffers the most recent record first; each subsequent
         // record is `intervalMs` older.
         for (rec in records) {
+            if (previousLastPacketIndex >= 0 && rec.packetIndex <= previousLastPacketIndex) {
+                Log.i(TAG, "Skipping already-seen MQ packet=${rec.packetIndex} (last=$previousLastPacketIndex)")
+                continue
+            }
             packetCount++
-            lastRawCurrent = rec.rawCurrent.toDouble()
-            lastProcessed = rec.processed.toDouble()
+            highestPacketIndexSeen = maxOf(highestPacketIndexSeen, rec.packetIndex)
+            lastRawCurrent = rec.sampleCurrent.toDouble()
             lastBatteryPercent = rec.batteryPercent
 
-            // EMPIRICAL packet layout for W25101399 (differs from the RE notes
-            // that assumed LE u16s): bytes are big-endian and byte 5 holds the
-            // battery percent.
-            //   [0..1] rawCurrent      u16 BE  (sensor units)
-            //   [2..3] glucose_mgdl    u16 BE  (final mg/dL — no algorithm needed)
-            //   [4]    status flag     (0x01 observed)
-            //   [5]    battery percent (0x32 = 50% observed)
             val rb = rec.recordBytes
-            val rawCurrentBE = ((rb[0].toInt() and 0xFF) shl 8) or (rb[1].toInt() and 0xFF)
-            val glucoseMgdl = ((rb[2].toInt() and 0xFF) shl 8) or (rb[3].toInt() and 0xFF)
-            val statusFlag = rb[4].toInt() and 0xFF
-            val batteryPct = rb[5].toInt() and 0xFF
-            lastRawCurrent = rawCurrentBE.toDouble()
-            lastProcessed = glucoseMgdl.toDouble()
-            lastBatteryPercent = batteryPct
 
             val recHex = rb.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+            val sampleMs = nowMs - rec.indexInPacket * intervalMs
+            lastRecordReceivedAtMs = maxOf(lastRecordReceivedAtMs, sampleMs)
             Log.i(
                 TAG,
-                "BG record #${rec.indexInPacket}: [$recHex]  rawCurrentBE=$rawCurrentBE  glucose=${glucoseMgdl}mg/dL  status=0x%02X  battery=${batteryPct}%%".format(statusFlag)
+                "BG record #${rec.indexInPacket}: [$recHex]  marker=0x%02X  packet=%d  current=%d  battery=%d%%".format(
+                    rec.marker,
+                    rec.packetIndex,
+                    rec.sampleCurrent,
+                    rec.batteryPercent,
+                )
             )
-
-            val mgdlTimes10 = (glucoseMgdl * 10).coerceIn(17, 4000)
-            val glucoseMmol = glucoseMgdl / 18.0182
-            val result = MQAlgorithm.Result(
-                mgdlTimes10 = mgdlTimes10,
-                glucoseMmol = glucoseMmol,
-                rawCurrent = lastRawCurrent,
-                processed = lastProcessed,
-                sensitivity = 0.0,
-            )
-            val sampleMs = nowMs - rec.indexInPacket * intervalMs
-            lastGlucoseAtMs = sampleMs
-            lastGlucoseMgdlTimes10 = result.mgdlTimes10
+            if (rec.marker != MQConstants.BG_RECORD_MARKER) {
+                Log.w(TAG, "Ignoring MQ BG record with unexpected marker 0x%02X".format(rec.marker))
+                continue
+            }
+            val result = calculateVendorGlucose(rec, sampleMs)
+            if (result == null) {
+                lastPacketIndex = highestPacketIndexSeen
+                persistAlgorithmState()
+                Log.w(
+                    TAG,
+                    "Skipping glucose emit for packet=${rec.packetIndex}: current=${rec.sampleCurrent} seedK=%.2f b=%.2f pendingRef=%.1f".format(
+                        kValue,
+                        bValue,
+                        pendingReferenceBgTimes10Mmol,
+                    ),
+                )
+                continue
+            }
+            if (sampleMs >= lastGlucoseAtMs) {
+                lastGlucoseAtMs = sampleMs
+                lastGlucoseMgdlTimes10 = result.mgdlTimes10
+            }
+            mirrorReadingIntoNative(sampleMs, result.mgdlTimes10 / 10)
             emitGlucose(result, sampleMs)
         }
+        if (highestPacketIndexSeen != lastPacketIndex) {
+            lastPacketIndex = highestPacketIndexSeen
+            persistAlgorithmState()
+        }
+        armNoDataWatchdog()
         writeFrame(MagicAck.bgData00.copyOf(), "confirmBgData(magic)")
     }
 
@@ -544,6 +995,33 @@ class MQBleManager(
      */
     private fun writeFrame(bytes: ByteArray, tag: String) {
         attemptWrite(bytes, tag, attempt = 1)
+    }
+
+    private fun writeFrameNow(bytes: ByteArray, tag: String): Boolean {
+        val gatt = mBluetoothGatt ?: return false
+        val ch = charRxWrite ?: return false
+        return try {
+            val props = ch.properties
+            val supportsNoResp = props and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0
+            val supportsResp = props and BluetoothGattCharacteristic.PROPERTY_WRITE != 0
+            ch.writeType = when {
+                supportsNoResp -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                supportsResp -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                else -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            }
+            ch.value = bytes
+            val ok = gatt.writeCharacteristic(ch)
+            val hex = bytes.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+            if (ok) {
+                Log.d(TAG, "wrote $tag [$hex] (immediate writeType=${ch.writeType})")
+            } else {
+                Log.w(TAG, "writeCharacteristic($tag) returned false (immediate bytes=[$hex])")
+            }
+            ok
+        } catch (t: Throwable) {
+            Log.stack(TAG, "writeFrameNow($tag)", t)
+            false
+        }
     }
 
     private fun attemptWrite(bytes: ByteArray, tag: String, attempt: Int) {

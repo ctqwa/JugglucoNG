@@ -1,7 +1,7 @@
 // MQProfile.kt — Per-model lifecycle/cadence profile.
 //
 // The Glutec ecosystem uses one hardware generation today (reusable transmitter
-// plus 14-day disposable patch), so we only keep one profile. The structure
+// plus 16-day rated disposable patch), so we only keep one profile. The structure
 // mirrors the iCanHealth driver so future model variants can slot in cleanly.
 
 package tk.glucodata.drivers.mq

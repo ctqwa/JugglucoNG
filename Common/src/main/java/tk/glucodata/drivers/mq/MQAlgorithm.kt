@@ -1,142 +1,156 @@
 // MQAlgorithm.kt — Glutec glucose calculation.
 //
-// Direct port of com.ruapp.glutec.RuGlutec_GlucoseCalculationArrayNew.GlucoseCalculation(double[])
-// from the decompiled v1.0.1.6 app.
+// Direct port of the vendor GlucoseCalculation(...) path, but with the actual
+// parameter semantics recovered from the service call sites:
+//   dArr[0]  initTimeMinutes
+//   dArr[1]  packetIndex
+//   dArr[2]  sampleCurrent
+//   dArr[4]  previousReviseCurrent2
+//   dArr[5]  kValue
+//   dArr[6]  referenceBgTimes10Mmol
+//   dArr[7]  bValue
+//   dArr[9]  packages
+//   dArr[10] multiplier
 //
-// The pipeline is:
-//   1. Warmup correction (first ~'warmupParam' minutes after the raw current
-//      crosses 19 uA): blend the processed current with a linearly decaying
-//      multiplier so early-life values don't over-read.
-//   2. Reference clamping: once the sensor has settled and the user has a
-//      fingerstick reference BG, clamp the calculated glucose to (refBG+B)±5%
-//      (and force it to refBG+B when the raw value is clearly too low).
-//   3. Offset subtraction: subtract B (if sensitivity==0) or a fixed 2.0
-//      baseline. Floor at 3.0 mmol/L.
-//   4. mg/dL convert: final_mgdl_times10 = ((glucose / sensitivity) + 0.05) * 10
-//      clamped to [17, 400] mg/dL × 10 units.
-//
-// Output array mirrors the app exactly — its row layout feeds the Glutec
-// BloodGlucoseData table:
-//   [0] rawCurrent
-//   [1] processed
-//   [2] final glucose (mmol/L, int-floored)
-//   [3] referenceBG
-//   [4] sensitivity (rawDivisor / 10)
-//   [5] rawDivisor
-//   [6] offsetApplied (B value, or 2.0 in the sensitivity>0 branch)
-//   [7] finalGlucose_mgdl_x10 (int, clamped to [17, 400])
+// Output array mirrors the app:
+//   [0] packetIndex
+//   [1] sampleCurrent
+//   [2] reviseCurrent2
+//   [3] previousReviseCurrent2
+//   [4] kValue
+//   [5] referenceBgTimes10Mmol
+//   [6] bValue
+//   [7] finalGlucose_mmol_x10
 
 package tk.glucodata.drivers.mq
 
 import java.math.BigDecimal
 import java.math.RoundingMode
+import kotlin.math.roundToInt
 
 object MQAlgorithm {
 
-    /**
-     * Inputs map to the decompiled dArr[] indices:
-     *   dArr[0]  packetCount   — time/packet index in session
-     *   dArr[1]  rawCurrent    — raw current from transmitter
-     *   dArr[2]  processed     — processed current (raw-divisor adjusted)
-     *   dArr[4]  referenceBG   — fingerstick calibration reference
-     *   dArr[5]  kValue        — calibration slope flag (non-zero means calibrated)
-     *   dArr[6]  rawDivisor    — /10 = sensitivity
-     *   dArr[7]  bValue        — calibration offset
-     *   dArr[9]  warmupParam   — warmup correction parameter
-     *   dArr[10] multiplier    — warmup correction multiplier
-     */
-    @JvmStatic
-    fun calculate(
-        packetCount: Double,
-        rawCurrent: Double,
-        processed: Double,
-        referenceBG: Double,
-        kValue: Double,
-        rawDivisor: Double,
-        bValue: Double,
-        warmupParam: Double,
-        multiplier: Double,
-    ): DoubleArray {
-        val safeBValue = if (bValue != 0.0) bValue else 0.0
-        val sensitivity = if (rawDivisor != 0.0) rawDivisor / 10.0 else 0.0
-        var offsetApplied = safeBValue
+    private fun roundDown2(value: Double): Double =
+        BigDecimal(value.toString()).setScale(2, RoundingMode.DOWN).toDouble()
 
-        // Step 1: warmup correction
-        var glucose = processed
-        if (rawCurrent >= MQConstants.ALGO_WARMUP_CURRENT_THRESHOLD) {
-            val threshold = warmupParam + MQConstants.ALGO_WARMUP_CURRENT_THRESHOLD
-            glucose = if (rawCurrent <= threshold) {
+    @JvmStatic
+    fun adjustSampleCurrent(
+        algorithmVersion: Int,
+        packetIndex: Double,
+        sampleCurrent: Double,
+        packages: Double,
+        multiplier: Double,
+    ): Double {
+        if (algorithmVersion >= 1) {
+            if (packetIndex < MQConstants.ALGO_WARMUP_PACKET_THRESHOLD) {
+                return sampleCurrent
+            }
+            val threshold = packages + MQConstants.ALGO_WARMUP_PACKET_THRESHOLD
+            return if (packetIndex <= threshold) {
                 val factor = multiplier - (((multiplier - 1.0) / threshold) *
-                    (rawCurrent - MQConstants.ALGO_WARMUP_CURRENT_THRESHOLD))
-                factor * processed
+                    (packetIndex - MQConstants.ALGO_WARMUP_PACKET_THRESHOLD))
+                factor * sampleCurrent
             } else {
-                processed
+                sampleCurrent
             }
         }
+        return if (packetIndex > 8.0 && packetIndex < 250.0) {
+            ((100.0 - ((((250.0 - packetIndex) + 1.0) * 25.0) / 242.0)) * sampleCurrent) / 100.0
+        } else {
+            sampleCurrent
+        }
+    }
 
-        // Step 2: reference clamping (only when we have calibration & enough packets)
-        if (rawCurrent > 8.0 && kValue != 0.0 && safeBValue != 0.0 && packetCount > 9.0) {
-            if (glucose < 5.0) {
-                glucose = referenceBG + bValue
+    @JvmStatic
+    fun calculate(
+        algorithmVersion: Int,
+        initTimeMinutes: Double,
+        packetIndex: Double,
+        sampleCurrent: Double,
+        previousReviseCurrent2: Double,
+        kValue: Double,
+        referenceBgTimes10Mmol: Double,
+        bValue: Double,
+        packages: Double,
+        multiplier: Double,
+    ): DoubleArray {
+        var reviseCurrent = adjustSampleCurrent(
+            algorithmVersion = algorithmVersion,
+            packetIndex = packetIndex,
+            sampleCurrent = sampleCurrent,
+            packages = packages,
+            multiplier = multiplier,
+        )
+
+        var nextBValue = if (bValue != 0.0) bValue else 0.0
+        var nextKValue = if (kValue != 0.0) kValue else 0.0
+
+        if (packetIndex > 8.0 && nextKValue != 0.0 && nextBValue != 0.0 && initTimeMinutes > 9.0) {
+            if (reviseCurrent < 5.0) {
+                reviseCurrent = previousReviseCurrent2 + nextBValue
             } else {
-                val target = referenceBG + bValue
+                val target = previousReviseCurrent2 + nextBValue
                 val tolerance = target * 0.05
                 val upper = target + tolerance + 0.5
                 val lower = target - tolerance - 0.5
-                if (glucose > upper) glucose = upper
-                else if (glucose < lower) glucose = lower
+                if (reviseCurrent > upper) reviseCurrent = upper
+                else if (reviseCurrent < lower) reviseCurrent = lower
             }
         }
 
-        // Step 3: offset subtraction with floor
-        var postOffset = MQConstants.ALGO_MMOL_FLOOR
-        if (sensitivity == 0.0) {
-            if (glucose > safeBValue) glucose -= safeBValue
-            if (glucose >= MQConstants.ALGO_MMOL_FLOOR || safeBValue == 0.0) {
-                postOffset = glucose
+        var reviseCurrent2 = MQConstants.ALGO_MMOL_FLOOR
+        if (referenceBgTimes10Mmol == 0.0) {
+            if (reviseCurrent > nextBValue) reviseCurrent -= nextBValue
+            if (reviseCurrent >= MQConstants.ALGO_MMOL_FLOOR || nextKValue == 0.0) {
+                reviseCurrent2 = reviseCurrent
             }
         } else {
-            offsetApplied = 2.0
-            if (glucose > 2.0) glucose -= 2.0
-            // Match the original: enter the second branch (same result), else floor.
-            postOffset = if (glucose < MQConstants.ALGO_MMOL_FLOOR) MQConstants.ALGO_MMOL_FLOOR else glucose
+            nextBValue = 2.0
+            if (reviseCurrent > 2.0) reviseCurrent -= 2.0
+            reviseCurrent2 =
+                if (reviseCurrent < MQConstants.ALGO_MMOL_FLOOR) MQConstants.ALGO_MMOL_FLOOR else reviseCurrent
+            val referenceBgMmol = referenceBgTimes10Mmol / 10.0
+            nextKValue = if (referenceBgMmol > 0.0) reviseCurrent2 / referenceBgMmol else 0.0
         }
 
-        // Step 4: sensitivity conversion & mg/dL clamp
-        val mgdlTimes10: Double = if (sensitivity > 0.0) {
-            val raw = ((postOffset / sensitivity) + 0.05) * 10.0
+        val glucoseTimes10Mmol: Double = if (nextKValue > 0.0) {
+            val raw = ((reviseCurrent2 / nextKValue) + 0.05) * 10.0
             when {
-                raw <= MQConstants.ALGO_MGDL_MIN_TIMES10 -> MQConstants.ALGO_MGDL_MIN_TIMES10
-                raw >= MQConstants.ALGO_MGDL_MAX_TIMES10 -> MQConstants.ALGO_MGDL_MAX_TIMES10
+                raw <= MQConstants.ALGO_MMOL_MIN_TIMES10 -> MQConstants.ALGO_MMOL_MIN_TIMES10
+                raw >= MQConstants.ALGO_MMOL_MAX_TIMES10 -> MQConstants.ALGO_MMOL_MAX_TIMES10
                 else -> raw
             }
         } else 0.0
 
-        val roundedSensitivity = BigDecimal(sensitivity).setScale(2, RoundingMode.DOWN).toDouble()
-        val roundedOffset = BigDecimal(offsetApplied).setScale(2, RoundingMode.DOWN).toDouble()
-
         return doubleArrayOf(
-            rawCurrent.toInt().toDouble(),
-            processed.toInt().toDouble(),
-            (postOffset + 0.5).toInt().toDouble(),
-            referenceBG.toInt().toDouble(),
-            roundedSensitivity,
-            rawDivisor,
-            roundedOffset,
-            mgdlTimes10.toInt().toDouble(),
+            packetIndex.toInt().toDouble(),
+            sampleCurrent.toInt().toDouble(),
+            (reviseCurrent2 + 0.5).toInt().toDouble(),
+            previousReviseCurrent2.toInt().toDouble(),
+            roundDown2(nextKValue),
+            referenceBgTimes10Mmol.toInt().toDouble(),
+            roundDown2(nextBValue),
+            glucoseTimes10Mmol.toInt().toDouble(),
         )
     }
 
     /** Decoded glucose reading suitable for feeding the app's reading pipeline. */
     data class Result(
-        val mgdlTimes10: Int,
+        val packetIndex: Int,
+        val sampleCurrent: Double,
+        val reviseCurrent2: Double,
+        val previousReviseCurrent2: Double,
+        val kValue: Double,
+        val referenceBgTimes10Mmol: Double,
+        val bValue: Double,
+        val glucoseTimes10Mmol: Int,
         val glucoseMmol: Double,
-        val rawCurrent: Double,
-        val processed: Double,
-        val sensitivity: Double,
     ) {
-        /** True mg/dL value (divides by 10). */
-        val mgdl: Float get() = mgdlTimes10 / 10.0f
+        val mgdlTimes10: Int
+            get() = (glucoseMmol * MQConstants.MMOL_TO_MGDL * 10.0).roundToInt()
+
+        /** True mg/dL value (converted from vendor mmol output). */
+        val mgdl: Float get() = (glucoseMmol * MQConstants.MMOL_TO_MGDL).toFloat()
 
         /** True mmol/L value for unit-agnostic logging. */
         val mmol: Float get() = glucoseMmol.toFloat()
@@ -144,26 +158,40 @@ object MQAlgorithm {
 
     @JvmStatic
     fun calculateResult(
-        packetCount: Double,
-        rawCurrent: Double,
-        processed: Double,
-        referenceBG: Double,
+        algorithmVersion: Int,
+        initTimeMinutes: Double,
+        packetIndex: Double,
+        sampleCurrent: Double,
+        previousReviseCurrent2: Double,
         kValue: Double,
-        rawDivisor: Double,
+        referenceBgTimes10Mmol: Double,
         bValue: Double,
-        warmupParam: Double,
+        packages: Double,
         multiplier: Double,
     ): Result {
         val arr = calculate(
-            packetCount, rawCurrent, processed, referenceBG, kValue,
-            rawDivisor, bValue, warmupParam, multiplier,
+            algorithmVersion,
+            initTimeMinutes,
+            packetIndex,
+            sampleCurrent,
+            previousReviseCurrent2,
+            kValue,
+            referenceBgTimes10Mmol,
+            bValue,
+            packages,
+            multiplier,
         )
+        val glucoseTimes10Mmol = arr[7].toInt()
         return Result(
-            mgdlTimes10 = arr[7].toInt(),
-            glucoseMmol = arr[2],
-            rawCurrent = arr[0],
-            processed = arr[1],
-            sensitivity = arr[4],
+            packetIndex = arr[0].toInt(),
+            sampleCurrent = arr[1],
+            reviseCurrent2 = arr[2],
+            previousReviseCurrent2 = arr[3],
+            kValue = arr[4],
+            referenceBgTimes10Mmol = arr[5],
+            bValue = arr[6],
+            glucoseTimes10Mmol = glucoseTimes10Mmol,
+            glucoseMmol = glucoseTimes10Mmol / 10.0,
         )
     }
 }

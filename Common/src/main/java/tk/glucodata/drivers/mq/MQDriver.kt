@@ -10,6 +10,7 @@ import tk.glucodata.SensorIdentity
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.drivers.ManagedBluetoothSensorDriver
 import tk.glucodata.drivers.ManagedSensorCurrentSnapshot
+import tk.glucodata.drivers.ManagedSensorMaintenanceDriver
 import tk.glucodata.drivers.ManagedSensorUiFamily
 import tk.glucodata.drivers.ManagedSensorUiSnapshot
 
@@ -21,7 +22,7 @@ data class MQCurrentSnapshot(
     val sensorGen: Int = 0,
 )
 
-interface MQDriver : ManagedBluetoothSensorDriver {
+interface MQDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenanceDriver {
 
     override fun canConnectWithoutDataptr(): Boolean = true
     override fun managesLiveRoomStorage(): Boolean = true
@@ -50,6 +51,7 @@ interface MQDriver : ManagedBluetoothSensorDriver {
 
     fun supportsRawDisplayModes(): Boolean = false
     fun supportsSensorCalibration(): Boolean = true
+    override fun supportsResetAction(): Boolean = true
 
     override fun supportsDisplayModes(): Boolean = supportsRawDisplayModes()
     override fun supportsManualCalibration(): Boolean = supportsSensorCalibration()
@@ -81,6 +83,7 @@ interface MQDriver : ManagedBluetoothSensorDriver {
             viewMode = viewMode,
             supportsDisplayModes = supportsDisplayModes(),
             supportsManualCalibration = supportsManualCalibration(),
+            supportsHardwareReset = supportsResetAction(),
             isVendorConnected = callback.mActiveBluetoothDevice != null,
             isSensorExpired = runCatching { isSensorExpired() }.getOrDefault(false),
             sensorRemainingHours = runCatching { getSensorRemainingHours() }.getOrDefault(-1),
@@ -98,7 +101,7 @@ interface MQDriver : ManagedBluetoothSensorDriver {
     fun getSensorRemainingHours(): Int
     fun getSensorAgeHours(): Int
     fun getReadingIntervalMinutes(): Int
-    fun calibrateSensor(glucoseMgDl: Int): Boolean
+    override fun calibrateSensor(glucoseMgDl: Int): Boolean
 
     val vendorFirmwareVersion: String
     val vendorModelName: String

@@ -3,6 +3,8 @@ package tk.glucodata.drivers
 interface ManagedSensorMaintenanceDriver {
     fun shouldDeleteLocalSensorDirectoryOnWipe(): Boolean = false
 
+    fun supportsResetAction(): Boolean = false
+
     fun sendMaintenanceCommand(opCode: Int): Boolean = false
 
     fun resetSensor(): Boolean = false

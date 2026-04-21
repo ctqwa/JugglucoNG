@@ -1,8 +1,7 @@
 // JugglucoNG — MQ/Glutec Setup Wizard
-// Pure BLE-scan onboarding: scan for Nordic UART advertisers, let the user
-// pick a transmitter, register it via MQRegistry. No QR code or server
-// activation required — the transmitter+sensor can be paired cold without
-// the official Glutec app.
+// BLE-scan onboarding: scan for Nordic UART advertisers, let the user pick a
+// transmitter, register it via MQRegistry, and optionally capture the vendor
+// login needed to refresh bootstrap tokens when the Glutec backend expires them.
 
 package tk.glucodata.ui.setup
 
@@ -29,6 +28,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,6 +41,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,17 +57,27 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tk.glucodata.Log
 import tk.glucodata.R
+import tk.glucodata.drivers.mq.MQBootstrapClient
 import tk.glucodata.drivers.mq.MQConstants
 import tk.glucodata.drivers.mq.MQRegistry
 import tk.glucodata.ui.util.BleDeviceScanner
 import tk.glucodata.ui.util.rememberBleScanner
+
+private const val MQ_QR_EXAMPLE = "ABC123"
 
 private enum class MQSetupStep {
     SCAN,
@@ -90,6 +104,21 @@ fun MQSetupWizard(
     val scope = rememberCoroutineScope()
     var currentStep by remember { mutableStateOf(MQSetupStep.SCAN) }
     var selectedLabel by remember { mutableStateOf("") }
+    var qrCodeContent by remember { mutableStateOf("") }
+    var authPhone by remember { mutableStateOf(MQRegistry.loadAuthPhone(context).orEmpty()) }
+    var authPassword by remember { mutableStateOf(MQRegistry.loadAuthPassword(context).orEmpty()) }
+    var showManualQrEntry by remember { mutableStateOf(false) }
+
+    if (showManualQrEntry) {
+        MQManualQrEntryDialog(
+            initialValue = qrCodeContent,
+            onDismiss = { showManualQrEntry = false },
+            onConfirm = { code ->
+                qrCodeContent = code
+                showManualQrEntry = false
+            },
+        )
+    }
 
     BackHandler {
         if (currentStep == MQSetupStep.SCAN) onDismiss() else currentStep = MQSetupStep.SCAN
@@ -122,17 +151,47 @@ fun MQSetupWizard(
             when (step) {
                 MQSetupStep.SCAN -> MQScanStep(
                     ui = ui,
+                    qrCodeContent = qrCodeContent,
+                    authPhone = authPhone,
+                    authPassword = authPassword,
+                    onQrCodeChanged = { qrCodeContent = normalizeMqQrCode(it) },
+                    onAuthPhoneChanged = { authPhone = it },
+                    onAuthPasswordChanged = { authPassword = it },
+                    onShowManualQrEntry = { showManualQrEntry = true },
                     onDeviceSelected = { candidate ->
                         val addressCanonical = candidate.address
                         selectedLabel = candidate.displayName.ifBlank { addressCanonical }
                         currentStep = MQSetupStep.CONNECTING
                         scope.launch {
                             try {
+                                val normalizedQr = normalizeMqQrCode(qrCodeContent).takeIf { it.isNotBlank() }
+                                val normalizedPhone = authPhone.trim()
+                                val password = authPassword
+                                if (normalizedPhone.isNotEmpty() && password.isNotBlank()) {
+                                    MQRegistry.saveAuthCredentials(context, normalizedPhone, password)
+                                }
+                                val bootstrapConfig = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        val result = MQBootstrapClient.fetchBestEffort(
+                                            context = context,
+                                            bleId = addressCanonical,
+                                            qrCode = normalizedQr,
+                                            authToken = MQRegistry.loadAuthToken(context),
+                                            credentials = MQRegistry.loadAuthCredentials(context),
+                                        )
+                                        result.refreshedToken?.let { MQRegistry.saveAuthToken(context, it) }
+                                        result.config
+                                    }.onFailure {
+                                        Log.w(tag, "MQ bootstrap prefetch failed: ${it.message}")
+                                    }.getOrNull()
+                                }
                                 val sensorId = MQRegistry.addSensor(
                                     context = context,
                                     displayName = candidate.displayName.ifBlank { null },
                                     address = addressCanonical,
-                                    qrCodeContent = null,
+                                    qrCodeContent = normalizedQr,
+                                    connectNow = false,
+                                    bootstrapConfig = bootstrapConfig,
                                 )
                                 if (sensorId == null) {
                                     Toast.makeText(
@@ -143,6 +202,7 @@ fun MQSetupWizard(
                                     currentStep = MQSetupStep.SCAN
                                     return@launch
                                 }
+                                MQRegistry.connectSensor(context, sensorId)
                                 delay(2000)
                                 currentStep = MQSetupStep.SUCCESS
                             } catch (t: Throwable) {
@@ -183,6 +243,13 @@ fun MQSetupWizard(
 @Composable
 private fun MQScanStep(
     ui: WizardUiMetrics,
+    qrCodeContent: String,
+    authPhone: String,
+    authPassword: String,
+    onQrCodeChanged: (String) -> Unit,
+    onAuthPhoneChanged: (String) -> Unit,
+    onAuthPasswordChanged: (String) -> Unit,
+    onShowManualQrEntry: () -> Unit,
     onDeviceSelected: (MQScanCandidate) -> Unit,
 ) {
     val context = LocalContext.current
@@ -194,6 +261,7 @@ private fun MQScanStep(
     var scanError by remember { mutableStateOf<BleDeviceScanner.ScanStartError?>(null) }
     var requestedPermissionOnce by remember { mutableStateOf(false) }
     var showAllDevices by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -306,6 +374,78 @@ private fun MQScanStep(
             }
         }
 
+        Spacer(Modifier.height(ui.spacerSmall))
+        Card(
+            modifier = Modifier
+                .padding(horizontal = ui.horizontalPadding)
+                .fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.scan_transmitter_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                InlineQrScannerCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    onScanResult = onQrCodeChanged,
+                )
+                Spacer(Modifier.height(8.dp))
+                if (qrCodeContent.isNotBlank()) {
+                    Text(
+                        text = "${stringResource(R.string.scan_sensor_qr)}: $qrCodeContent",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                OutlinedButton(
+                    onClick = onShowManualQrEntry,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.enter_code_manually))
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = authPhone,
+                    onValueChange = onAuthPhoneChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.phone)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = authPassword,
+                    onValueChange = onAuthPasswordChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.password)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(
+                                imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (showPassword) {
+                                    stringResource(R.string.hide_password)
+                                } else {
+                                    stringResource(R.string.show_password)
+                                },
+                            )
+                        }
+                    },
+                )
+            }
+        }
+
         if (!scanPermissionGranted || !bluetoothEnabled || scanError != null) {
             Spacer(Modifier.height(ui.spacerMedium))
             Card(
@@ -386,3 +526,46 @@ private fun MQScanStep(
         }
     }
 }
+
+@Composable
+private fun MQManualQrEntryDialog(
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var value by remember(initialValue) { mutableStateOf(initialValue) }
+    val normalized = remember(value) { normalizeMqQrCode(value) }
+    val isValid = normalized.length == 6
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.enter_code_manually)) },
+        text = {
+            OutlinedTextField(
+                value = value,
+                onValueChange = { input ->
+                    value = input.uppercase().filter { it.isLetterOrDigit() }.take(6)
+                },
+                label = { Text(stringResource(R.string.scan_sensor_qr)) },
+                placeholder = { Text(MQ_QR_EXAMPLE) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                singleLine = true,
+                isError = value.isNotBlank() && !isValid,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(normalized) }, enabled = isValid) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+private fun normalizeMqQrCode(raw: String): String =
+    raw.uppercase().filter { it.isLetterOrDigit() }.take(6)

@@ -98,6 +98,8 @@ object MQRegistry {
         displayName: String?,
         address: String?,
         qrCodeContent: String? = null,
+        connectNow: Boolean = true,
+        bootstrapConfig: MQBootstrapConfig? = null,
     ): String? {
         val normalizedAddress = address?.trim().orEmpty()
         val normalizedQr = qrCodeContent?.trim().orEmpty()
@@ -124,21 +126,33 @@ object MQRegistry {
         }
         editor.commit()
 
-        val blue = SensorBluetooth.blueone ?: return sensorId
+        if (bootstrapConfig != null) {
+            applyBootstrapConfig(context, sensorId, bootstrapConfig)
+        }
+
+        if (connectNow) {
+            connectSensor(context, sensorId)
+        }
+        return sensorId
+    }
+
+    @JvmStatic
+    fun connectSensor(context: Context, sensorId: String) {
+        val blue = SensorBluetooth.blueone ?: return
+        val record = findRecord(context, sensorId) ?: return
         val existing = SensorBluetooth.gattcallbacks.firstOrNull { cb ->
             SensorIdentity.matches(cb.SerialNumber, sensorId) ||
                 ((cb as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)
         }
-        val callback = (existing as? MQBleManager) ?: MQBleManager(sensorId, 0L).also {
+        val callback = (existing as? MQBleManager) ?: MQBleManager(record.sensorId, 0L).also {
             SensorBluetooth.gattcallbacks.add(it)
             Natives.setmaxsensors(SensorBluetooth.gattcallbacks.size)
         }
-        callback.mActiveDeviceAddress = normalizedAddress.takeIf { it.isNotBlank() }
+        callback.mActiveDeviceAddress = record.address.takeIf { it.isNotBlank() }
         callback.restoreFromPersistence(context)
         if (SensorBluetooth.blueone === blue) {
             callback.connectDevice(0)
         }
-        return sensorId
     }
 
     @JvmStatic
@@ -160,8 +174,14 @@ object MQRegistry {
             .remove("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$canonical")
             .remove("${MQConstants.PREF_K_VALUE_PREFIX}$canonical")
             .remove("${MQConstants.PREF_B_VALUE_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_SENSITIVITY_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_ALGORITHM_VERSION_PREFIX}$canonical")
             .remove("${MQConstants.PREF_MULTIPLIER_PREFIX}$canonical")
             .remove("${MQConstants.PREF_PACKAGES_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$canonical")
             .remove("${MQConstants.PREF_QR_CONTENT_PREFIX}$canonical")
             .commit()
     }
@@ -235,6 +255,25 @@ object MQRegistry {
     }
 
     @JvmStatic
+    fun loadSensitivity(context: Context, sensorId: String): Float =
+        prefs(context).getFloat("${MQConstants.PREF_SENSITIVITY_PREFIX}$sensorId", 0f)
+
+    @JvmStatic
+    fun saveSensitivity(context: Context, sensorId: String, value: Float) {
+        prefs(context).edit().putFloat("${MQConstants.PREF_SENSITIVITY_PREFIX}$sensorId", value).apply()
+    }
+
+    @JvmStatic
+    fun loadAlgorithmVersion(context: Context, sensorId: String): Int =
+        prefs(context).getInt("${MQConstants.PREF_ALGORITHM_VERSION_PREFIX}$sensorId",
+            MQConstants.ALGO_DEFAULT_VERSION)
+
+    @JvmStatic
+    fun saveAlgorithmVersion(context: Context, sensorId: String, value: Int) {
+        prefs(context).edit().putInt("${MQConstants.PREF_ALGORITHM_VERSION_PREFIX}$sensorId", value).apply()
+    }
+
+    @JvmStatic
     fun loadMultiplier(context: Context, sensorId: String): Float =
         prefs(context).getFloat("${MQConstants.PREF_MULTIPLIER_PREFIX}$sensorId",
             MQConstants.ALGO_DEFAULT_MULTIPLIER.toFloat())
@@ -252,5 +291,132 @@ object MQRegistry {
     @JvmStatic
     fun savePackages(context: Context, sensorId: String, value: Int) {
         prefs(context).edit().putInt("${MQConstants.PREF_PACKAGES_PREFIX}$sensorId", value).apply()
+    }
+
+    @JvmStatic
+    fun loadLastProcessed(context: Context, sensorId: String): Float =
+        prefs(context).getFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", 0f)
+
+    @JvmStatic
+    fun saveLastProcessed(context: Context, sensorId: String, value: Float) {
+        prefs(context).edit().putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", value).apply()
+    }
+
+    @JvmStatic
+    fun loadLastPacketIndex(context: Context, sensorId: String): Int =
+        prefs(context).getInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", -1)
+
+    @JvmStatic
+    fun saveLastPacketIndex(context: Context, sensorId: String, value: Int) {
+        prefs(context).edit().putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", value).apply()
+    }
+
+    @JvmStatic
+    fun loadSnapshotId(context: Context, sensorId: String): String? =
+        prefs(context).getString("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId", null)
+
+    @JvmStatic
+    fun saveSnapshotId(context: Context, sensorId: String, value: String?) {
+        prefs(context).edit().putString(
+            "${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId",
+            value?.trim()?.takeIf { it.isNotEmpty() },
+        ).apply()
+    }
+
+    @JvmStatic
+    fun loadLocalResetPending(context: Context, sensorId: String): Boolean =
+        prefs(context).getBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", false)
+
+    @JvmStatic
+    fun saveLocalResetPending(context: Context, sensorId: String, pending: Boolean) {
+        prefs(context).edit()
+            .putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", pending)
+            .apply()
+    }
+
+    @JvmStatic
+    fun clearRuntimeState(
+        context: Context,
+        sensorId: String,
+        markLocalResetPending: Boolean = false,
+    ) {
+        prefs(context).edit()
+            .putLong("${MQConstants.PREF_WARMUP_STARTED_AT_PREFIX}$sensorId", 0L)
+            .putLong("${MQConstants.PREF_SENSOR_START_AT_PREFIX}$sensorId", 0L)
+            .putFloat("${MQConstants.PREF_K_VALUE_PREFIX}$sensorId", 0f)
+            .putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", 0f)
+            .putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", 0f)
+            .putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", -1)
+            .remove("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId")
+            .putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", markLocalResetPending)
+            .apply()
+    }
+
+    @JvmStatic
+    fun loadQrContent(context: Context, sensorId: String): String? =
+        prefs(context).getString("${MQConstants.PREF_QR_CONTENT_PREFIX}$sensorId", null)
+
+    @JvmStatic
+    fun loadAuthToken(context: Context): String? =
+        prefs(context).getString(MQConstants.PREF_AUTH_TOKEN_KEY, null)
+
+    @JvmStatic
+    fun saveAuthToken(context: Context, token: String?) {
+        prefs(context).edit().putString(MQConstants.PREF_AUTH_TOKEN_KEY, token?.trim()?.takeIf { it.isNotEmpty() }).apply()
+    }
+
+    @JvmStatic
+    fun loadAuthPhone(context: Context): String? =
+        prefs(context).getString(MQConstants.PREF_AUTH_PHONE_KEY, null)
+
+    @JvmStatic
+    fun saveAuthPhone(context: Context, phone: String?) {
+        prefs(context).edit().putString(MQConstants.PREF_AUTH_PHONE_KEY, phone?.trim()?.takeIf { it.isNotEmpty() }).apply()
+    }
+
+    @JvmStatic
+    fun loadAuthPassword(context: Context): String? =
+        prefs(context).getString(MQConstants.PREF_AUTH_PASSWORD_KEY, null)
+
+    @JvmStatic
+    fun saveAuthPassword(context: Context, password: String?) {
+        prefs(context).edit().putString(MQConstants.PREF_AUTH_PASSWORD_KEY, password?.takeIf { !it.isNullOrBlank() }).apply()
+    }
+
+    @JvmStatic
+    fun saveAuthCredentials(context: Context, phone: String?, password: String?) {
+        prefs(context).edit()
+            .putString(MQConstants.PREF_AUTH_PHONE_KEY, phone?.trim()?.takeIf { it.isNotEmpty() })
+            .putString(MQConstants.PREF_AUTH_PASSWORD_KEY, password?.takeIf { !it.isNullOrBlank() })
+            .apply()
+    }
+
+    @JvmStatic
+    fun loadAuthCredentials(context: Context): MQAuthCredentials? {
+        val phone = loadAuthPhone(context)?.trim().orEmpty()
+        val password = loadAuthPassword(context).orEmpty()
+        if (phone.isEmpty() || password.isBlank()) return null
+        return MQAuthCredentials(account = phone, password = password)
+    }
+
+    @JvmStatic
+    fun applyBootstrapConfig(context: Context, sensorId: String, config: MQBootstrapConfig) {
+        config.protocolType?.let { saveProtocolType(context, sensorId, it) }
+        config.deviation?.let { saveDeviation(context, sensorId, it) }
+        config.transmitter10?.let { saveTransmitter10(context, sensorId, it) }
+        config.sensitivity?.let { saveSensitivity(context, sensorId, it) }
+        config.algorithmVersion?.let { saveAlgorithmVersion(context, sensorId, it) }
+        config.packages?.let { savePackages(context, sensorId, it) }
+        config.multiplier?.let { saveMultiplier(context, sensorId, it) }
+        config.snapshotId?.let { saveSnapshotId(context, sensorId, it) }
+        config.sensorStartAtMs?.takeIf { it > 0L }?.let { saveSensorStartAt(context, sensorId, it) }
+        config.restoredKValue?.let { saveKValue(context, sensorId, it) }
+        config.restoredBValue?.let { saveBValue(context, sensorId, it) }
+        config.restoredLastProcessed?.let { saveLastProcessed(context, sensorId, it) }
+        config.restoredPacketIndex?.let { saveLastPacketIndex(context, sensorId, it) }
+        (SensorBluetooth.gattcallbacks.firstOrNull { cb ->
+            SensorIdentity.matches(cb.SerialNumber, sensorId) ||
+                ((cb as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)
+        } as? MQBleManager)?.restoreFromPersistence(context)
     }
 }

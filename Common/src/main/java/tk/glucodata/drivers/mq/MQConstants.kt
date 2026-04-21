@@ -78,22 +78,24 @@ object MQConstants {
 
     // ---- BG record layout (inside payload of 0x04 packets) ----
     //
-    // Each BG record is 6 bytes:
-    //   byte 0  : raw current low  byte (u16 LE with byte 1)
-    //   byte 1  : raw current high byte
-    //   byte 2  : processed/temperature low  byte (u16 LE with byte 3)
-    //   byte 3  : processed/temperature high byte
-    //   byte 4  : battery (unit: %)
-    //   byte 5  : reserved / padding
+    // Official service parse on W25101399:
+    //   byte 0  : record marker (0x40 on observed BG records)
+    //   byte 1  : packet index low byte
+    //   byte 2  : packet index high byte
+    //   byte 3  : sample current low byte
+    //   byte 4  : sample current high byte
+    //   byte 5  : battery percent
     //
-    // Record count = LEN / 6.
+    // Record count = LEN / 6. These records do NOT contain final glucose.
 
     const val BG_RECORD_SIZE = 6
-    const val BG_OFFSET_CURRENT_LO = 0
-    const val BG_OFFSET_CURRENT_HI = 1
-    const val BG_OFFSET_PROC_LO = 2
-    const val BG_OFFSET_PROC_HI = 3
-    const val BG_OFFSET_BATTERY = 4
+    const val BG_RECORD_MARKER = 0x40
+    const val BG_OFFSET_MARKER = 0
+    const val BG_OFFSET_PACKET_LO = 1
+    const val BG_OFFSET_PACKET_HI = 2
+    const val BG_OFFSET_CURRENT_LO = 3
+    const val BG_OFFSET_CURRENT_HI = 4
+    const val BG_OFFSET_BATTERY = 5
 
     /** Low-battery warning threshold (percent). */
     const val BATTERY_WARN_PERCENT = 30
@@ -103,18 +105,34 @@ object MQConstants {
     /** Lowest glucose (mmol/L) kept after offset subtraction; matches app. */
     const val ALGO_MMOL_FLOOR = 3.0
 
-    /** Final output clamp (mg/dL × 10 units). App limits to [17, 400] mg/dL. */
-    const val ALGO_MGDL_MIN_TIMES10 = 17.0
-    const val ALGO_MGDL_MAX_TIMES10 = 400.0
+    /** Final output clamp (mmol/L × 10 units). App limits to [1.7, 40.0] mmol/L. */
+    const val ALGO_MMOL_MIN_TIMES10 = 17.0
+    const val ALGO_MMOL_MAX_TIMES10 = 400.0
 
-    /** Warmup guard trigger: current >= 19 uA raw counts. */
-    const val ALGO_WARMUP_CURRENT_THRESHOLD = 19.0
+    /** Unit conversion used when bridging vendor mmol data into the app's mg/dL path. */
+    const val MMOL_TO_MGDL = 18.0182
+
+    /** Warmup guard trigger: packet index >= 19. */
+    const val ALGO_WARMUP_PACKET_THRESHOLD = 19.0
 
     /** Default multiplier from SystemInformation.GuardianFriendsID. */
     const val ALGO_DEFAULT_MULTIPLIER = 1.1
 
     /** Default packages-per-session from SystemInformation.AndroidVersion. */
     const val ALGO_DEFAULT_PACKAGES = 720
+
+    /** Default init-time guard from the vendor service. */
+    const val ALGO_DEFAULT_INIT_TIME_MINUTES = 24.0
+
+    /** Default algorithm version from SystemInformation.spare03. */
+    const val ALGO_DEFAULT_VERSION = 0
+
+    /**
+     * Official sensitivity / solved K values are in current-per-mmol space.
+     * Sub-1 values are not physically plausible for the observed firmware and
+     * are a strong indicator of bogus legacy fallback state.
+     */
+    const val ALGO_MIN_VALID_K = 1.0
 
     /** Default server-derived deviation if no server response is cached. */
     const val SERVER_DEFAULT_DEVIATION = 0
@@ -128,13 +146,24 @@ object MQConstants {
     // ---- Lifetime / cadence ----
 
     /** Sensor rated lifetime in days. */
-    const val DEFAULT_RATED_LIFETIME_DAYS = 14
+    const val DEFAULT_RATED_LIFETIME_DAYS = 16
 
-    /** Reading cadence — the transmitter emits ~1 record per minute. */
-    const val DEFAULT_READING_INTERVAL_MINUTES = 1
+    /** Reading cadence observed on W25101399 in field logs. */
+    const val DEFAULT_READING_INTERVAL_MINUTES = 3
 
     /** Warmup window before reliable values. */
     const val DEFAULT_WARMUP_MINUTES = 60
+
+    // ---- Vendor bootstrap endpoints ----
+
+    const val VENDOR_BASE_URL = "http://monitor.glutec.ru/jeecg-boot/v3"
+    const val VENDOR_LOGIN_WITH_PASSWORD_URL = "$VENDOR_BASE_URL/user/monitorUser/loginWithPhoneAndPassword"
+    const val VENDOR_QR_CODE_EFFECTIVE_URL = "$VENDOR_BASE_URL/user/monitorUser/checkQrCodeNew"
+    const val VENDOR_FIND_BY_BLE_ID_URL = "$VENDOR_BASE_URL/emitterBluetooth/findByBleId"
+    const val VENDOR_QUERY_NEWEST_URL = "$VENDOR_BASE_URL/snapshot/snapshot/queryNewest"
+    const val VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_URL = "$VENDOR_BASE_URL/databags/databags/viewAllAppSnapshotDetailCondense"
+    const val VENDOR_TIMEOUT_MS = 5_000
+    const val VENDOR_BOOTSTRAP_RETRY_MS = 15 * 60 * 1000L
 
     // ---- Device name patterns ----
 
@@ -227,7 +256,16 @@ object MQConstants {
     const val PREF_SENSOR_START_AT_PREFIX = "mq_sensor_start_at_"
     const val PREF_K_VALUE_PREFIX = "mq_k_value_"
     const val PREF_B_VALUE_PREFIX = "mq_b_value_"
+    const val PREF_SENSITIVITY_PREFIX = "mq_sensitivity_"
+    const val PREF_ALGORITHM_VERSION_PREFIX = "mq_algorithm_version_"
     const val PREF_MULTIPLIER_PREFIX = "mq_multiplier_"
     const val PREF_PACKAGES_PREFIX = "mq_packages_"
+    const val PREF_LAST_PROCESSED_PREFIX = "mq_last_processed_"
+    const val PREF_LAST_PACKET_INDEX_PREFIX = "mq_last_packet_"
+    const val PREF_SNAPSHOT_ID_PREFIX = "mq_snapshot_id_"
+    const val PREF_LOCAL_RESET_PENDING_PREFIX = "mq_local_reset_pending_"
     const val PREF_QR_CONTENT_PREFIX = "mq_qr_content_"
+    const val PREF_AUTH_TOKEN_KEY = "mq_auth_token"
+    const val PREF_AUTH_PHONE_KEY = "mq_auth_phone"
+    const val PREF_AUTH_PASSWORD_KEY = "mq_auth_password"
 }

@@ -8,8 +8,9 @@
 //             The two versions differ only in how strictly the transmitter
 //             pattern-matches on the confirm bytes.
 //
-// The BG payload contains N records of 6 bytes each (little-endian u16 for
-// current and processed/temperature; one battery byte; one padding byte).
+// The BG payload contains N records of 6 bytes each. For the validated
+// W25101399 family the layout is:
+//   [marker packet_lo packet_hi current_lo current_hi battery]
 
 package tk.glucodata.drivers.mq
 
@@ -31,8 +32,9 @@ data class MQFrame(
 
 data class MQBgRecord(
     val indexInPacket: Int,
-    val rawCurrent: Int,
-    val processed: Int,
+    val marker: Int,
+    val packetIndex: Int,
+    val sampleCurrent: Int,
     val batteryPercent: Int,
     /** 6 bytes of the raw record for durable storage / replay. */
     val recordBytes: ByteArray,
@@ -87,17 +89,19 @@ object MQParser {
         var idx = 0
         while (idx < count) {
             val base = idx * MQConstants.BG_RECORD_SIZE
-            val curLo = frame.payload[base + MQConstants.BG_OFFSET_CURRENT_LO].toInt() and 0xFF
-            val curHi = frame.payload[base + MQConstants.BG_OFFSET_CURRENT_HI].toInt() and 0xFF
-            val procLo = frame.payload[base + MQConstants.BG_OFFSET_PROC_LO].toInt() and 0xFF
-            val procHi = frame.payload[base + MQConstants.BG_OFFSET_PROC_HI].toInt() and 0xFF
+            val marker = frame.payload[base + MQConstants.BG_OFFSET_MARKER].toInt() and 0xFF
+            val packetLo = frame.payload[base + MQConstants.BG_OFFSET_PACKET_LO].toInt() and 0xFF
+            val packetHi = frame.payload[base + MQConstants.BG_OFFSET_PACKET_HI].toInt() and 0xFF
+            val currentLo = frame.payload[base + MQConstants.BG_OFFSET_CURRENT_LO].toInt() and 0xFF
+            val currentHi = frame.payload[base + MQConstants.BG_OFFSET_CURRENT_HI].toInt() and 0xFF
             val battery = frame.payload[base + MQConstants.BG_OFFSET_BATTERY].toInt() and 0xFF
             val rec = frame.payload.copyOfRange(base, base + MQConstants.BG_RECORD_SIZE)
             out.add(
                 MQBgRecord(
                     indexInPacket = idx,
-                    rawCurrent = (curHi shl 8) or curLo,
-                    processed = (procHi shl 8) or procLo,
+                    marker = marker,
+                    packetIndex = (packetHi shl 8) or packetLo,
+                    sampleCurrent = (currentHi shl 8) or currentLo,
                     batteryPercent = battery,
                     recordBytes = rec,
                 )
