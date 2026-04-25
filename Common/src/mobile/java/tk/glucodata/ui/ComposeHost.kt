@@ -2768,6 +2768,16 @@ private fun DashboardJournalFloatingMenu(
                     val itemProgress = ((menuProgress - (index * 0.08f)) / 0.92f).coerceIn(0f, 1f)
                     val label = stringResource(actionType.dashboardLabelRes())
                     val actionTint = actionType.dashboardActionTint()
+                    val iconContainerColor = lerp(
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        actionTint,
+                        0.22f
+                    )
+                    val labelContainerColor = lerp(
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        actionTint,
+                        0.12f
+                    )
                     Row(
                         modifier = Modifier
                             .wrapContentWidth(if (placeMenuLeft) Alignment.End else Alignment.Start)
@@ -2789,7 +2799,7 @@ private fun DashboardJournalFloatingMenu(
                                     onTypeSelected(actionType)
                                 },
                                 shape = CircleShape,
-                                containerColor = actionTint.copy(alpha = 0.18f + (0.08f * itemProgress)),
+                                containerColor = iconContainerColor,
                                 contentColor = actionTint,
                                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
                             ) {
@@ -2807,7 +2817,7 @@ private fun DashboardJournalFloatingMenu(
                                 onTypeSelected(actionType)
                             },
                             shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f + (0.16f * itemProgress)),
+                            color = labelContainerColor,
                             tonalElevation = 0.dp,
                             shadowElevation = 0.dp
                         ) {
@@ -2825,7 +2835,7 @@ private fun DashboardJournalFloatingMenu(
                                     onTypeSelected(actionType)
                                 },
                                 shape = CircleShape,
-                                containerColor = actionTint.copy(alpha = 0.18f + (0.08f * itemProgress)),
+                                containerColor = iconContainerColor,
                                 contentColor = actionTint,
                                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
                             ) {
@@ -2860,11 +2870,11 @@ private fun JournalEntryType.dashboardIcon(): ImageVector = when (this) {
 }
 
 private fun JournalEntryType.dashboardActionTint(): Color = when (this) {
-    JournalEntryType.INSULIN -> Color(0xFF1565C0)
-    JournalEntryType.CARBS -> Color(0xFF2E7D32)
-    JournalEntryType.FINGERSTICK -> Color(0xFFC62828)
-    JournalEntryType.ACTIVITY -> Color(0xFFEF6C00)
-    JournalEntryType.NOTE -> Color(0xFF5E35B1)
+    JournalEntryType.INSULIN -> Color(0xFF4F78A8)
+    JournalEntryType.CARBS -> Color(0xFF5F8B5D)
+    JournalEntryType.FINGERSTICK -> Color(0xFF9D5A54)
+    JournalEntryType.ACTIVITY -> Color(0xFFA66D39)
+    JournalEntryType.NOTE -> Color(0xFF79639A)
 }
 /*
     // --- PREVIOUS IMPLEMENTATION (Commented as requested) ---

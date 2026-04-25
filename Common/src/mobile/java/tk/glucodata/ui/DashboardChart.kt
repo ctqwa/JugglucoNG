@@ -2323,41 +2323,69 @@ fun InteractiveGlucoseChart(
                                     }
                                     add(Triple(resolvedCurveEndX, curveBaseY, 0f))
                                 }.sortedBy { it.first }
-                                val span = (resolvedCurveEndX - curveStartX).takeIf { abs(it) > 0.001f } ?: 1f
-                                fun edgeFadeFor(x: Float): Float {
-                                    val progress = ((x - curveStartX) / span).coerceIn(0f, 1f)
-                                    val startFade = (progress / 0.22f).coerceIn(0f, 1f)
-                                    val endFade = ((1f - progress) / 0.24f).coerceIn(0f, 1f)
-                                    return minOf(startFade, endFade)
+
+                                fun Path.addSmoothedCurve(
+                                    samples: List<Triple<Float, Float, Float>>,
+                                    moveToFirst: Boolean
+                                ) {
+                                    if (samples.isEmpty()) return
+                                    val first = samples.first()
+                                    if (moveToFirst) {
+                                        moveTo(first.first, first.second)
+                                    } else {
+                                        lineTo(first.first, first.second)
+                                    }
+                                    if (samples.size == 1) return
+                                    if (samples.size == 2) {
+                                        val last = samples.last()
+                                        lineTo(last.first, last.second)
+                                        return
+                                    }
+                                    for (index in 1 until samples.lastIndex) {
+                                        val current = samples[index]
+                                        val next = samples[index + 1]
+                                        val midX = (current.first + next.first) * 0.5f
+                                        val midY = (current.second + next.second) * 0.5f
+                                        quadraticTo(current.first, current.second, midX, midY)
+                                    }
+                                    val last = samples.last()
+                                    lineTo(last.first, last.second)
                                 }
-                                fillPath.moveTo(curveSamples.first().first, curveSamples.first().second)
+
+                                fillPath.moveTo(curveSamples.first().first, curveBaseY)
+                                fillPath.addSmoothedCurve(curveSamples, moveToFirst = false)
+                                fillPath.lineTo(resolvedCurveEndX, curveBaseY)
+                                fillPath.close()
+                                val strokePath = Path().apply {
+                                    addSmoothedCurve(curveSamples, moveToFirst = true)
+                                }
+                                val strokeBrush = Brush.horizontalGradient(
+                                    colorStops = arrayOf(
+                                        0f to tint.copy(alpha = 0f),
+                                        0.16f to tint.copy(alpha = tint.alpha * 0.34f),
+                                        0.5f to tint.copy(alpha = tint.alpha * 0.62f),
+                                        0.84f to tint.copy(alpha = tint.alpha * 0.28f),
+                                        1f to tint.copy(alpha = 0f)
+                                    ),
+                                    startX = curveStartX,
+                                    endX = resolvedCurveEndX
+                                )
                                 drawLine(
                                     color = tint.copy(alpha = tint.alpha * 0.08f),
                                     start = Offset(curveStartX, curveBaseY),
                                     end = Offset(resolvedCurveEndX, curveBaseY),
                                     strokeWidth = 0.8.dp.toPx()
                                 )
-                                curveSamples.drop(1).forEach { sample ->
-                                    fillPath.lineTo(sample.first, sample.second)
-                                }
-                                fillPath.lineTo(resolvedCurveEndX, curveBaseY)
-                                fillPath.close()
                                 drawPath(fillPath, fillBrush)
-                                for (sampleIndex in 0 until curveSamples.lastIndex) {
-                                    val startSample = curveSamples[sampleIndex]
-                                    val endSample = curveSamples[sampleIndex + 1]
-                                    val averageActivity = ((startSample.third + endSample.third) * 0.5f).coerceIn(0f, 1f)
-                                    val averageX = (startSample.first + endSample.first) * 0.5f
-                                    val segmentAlpha = tint.alpha * (0.08f + (0.84f * averageActivity)) * edgeFadeFor(averageX)
-                                    if (segmentAlpha <= 0.01f) continue
-                                    drawLine(
-                                        color = tint.copy(alpha = segmentAlpha),
-                                        start = Offset(startSample.first, startSample.second),
-                                        end = Offset(endSample.first, endSample.second),
-                                        strokeWidth = strokeWidth,
-                                        cap = StrokeCap.Round
+                                drawPath(
+                                    path = strokePath,
+                                    brush = strokeBrush,
+                                    style = Stroke(
+                                        width = strokeWidth,
+                                        cap = StrokeCap.Round,
+                                        join = StrokeJoin.Round
                                     )
-                                }
+                                )
                             } else if (markerX in 0f..dataWidth) {
                                 drawCircle(
                                     color = tint.copy(alpha = tint.alpha * 0.72f),
@@ -2534,8 +2562,9 @@ fun InteractiveGlucoseChart(
                 return insulinBaseCurveHeightPx + (insulinExtraCurveHeightPx * amountFactor)
             }
             val journalChipMaxTopPx = (chartHeightPx - with(LocalDensity.current) { 34.dp.toPx() }).coerceAtLeast(journalChipMinTopPx)
-            val connectorStrokePx = with(LocalDensity.current) { 0.7.dp.toPx() }
+            val connectorStrokePx = with(LocalDensity.current) { 0.85.dp.toPx() }
             val connectorLabelCenterOffsetPx = with(LocalDensity.current) { 16.dp.toPx() }
+            val connectorUnderlapPx = with(LocalDensity.current) { 8.dp.toPx() }
             val insulinConnectorY = chartHeightPx - with(LocalDensity.current) { 1.dp.toPx() }
 
             Canvas(
@@ -2580,13 +2609,13 @@ fun InteractiveGlucoseChart(
                         else -> eventBaseTopPx
                     }
                     val labelEdgeX = if (preferLeadingAnchor) {
-                        markerX - journalChipSideOffsetPx
+                        markerX - journalChipSideOffsetPx - connectorUnderlapPx
                     } else {
-                        markerX + journalChipSideOffsetPx
+                        markerX + journalChipSideOffsetPx + connectorUnderlapPx
                     }.coerceIn(0f, size.width)
                     val labelCenterY = (markerTop + connectorLabelCenterOffsetPx).coerceIn(0f, chartHeightPx)
                     drawLine(
-                        color = Color(marker.accentColor).copy(alpha = 0.16f),
+                        color = Color(marker.accentColor).copy(alpha = 0.22f),
                         start = Offset(markerX, sourceY.coerceIn(0f, chartHeightPx)),
                         end = Offset(labelEdgeX, labelCenterY),
                         strokeWidth = connectorStrokePx,

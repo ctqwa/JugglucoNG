@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -389,7 +391,8 @@ private fun JournalInsulinPresetSheet(
 
     ModalBottomSheet(
         onDismissRequest = { dismissSheet() },
-        sheetState = sheetState
+        sheetState = sheetState,
+        sheetGesturesEnabled = false
     ) {
         LazyColumn(
             modifier = Modifier
@@ -413,13 +416,21 @@ private fun JournalInsulinPresetSheet(
                         )
                     }
                     if (preset != null) {
-                        TextButton(onClick = { draft = draft.copy(isArchived = !draft.isArchived) }) {
+                        FilledTonalButton(
+                            onClick = { draft = draft.copy(isArchived = !draft.isArchived) },
+                            modifier = Modifier.height(38.dp),
+                            shape = RoundedCornerShape(19.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
                             Text(
                                 text = stringResource(
                                     if (draft.isArchived) R.string.enable else R.string.disable
                                 ),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                style = MaterialTheme.typography.labelLarge
                             )
                         }
                     }
@@ -798,24 +809,48 @@ private fun InteractiveJournalCurveEditor(
                 )
             }
 
-            val curvePath = Path()
-            val fillPath = Path()
-            points.forEachIndexed { index, point ->
-                val offset = point.toOffset(bounds, maxMinute)
-                if (index == 0) {
-                    curvePath.moveTo(offset.x, offset.y)
-                    fillPath.moveTo(offset.x, bounds.bottom)
-                    fillPath.lineTo(offset.x, offset.y)
+            val offsets = points.map { it.toOffset(bounds, maxMinute) }
+            fun Path.addSmoothedOffsets(samples: List<Offset>, moveToFirst: Boolean) {
+                if (samples.isEmpty()) return
+                val first = samples.first()
+                if (moveToFirst) {
+                    moveTo(first.x, first.y)
                 } else {
-                    curvePath.lineTo(offset.x, offset.y)
-                    fillPath.lineTo(offset.x, offset.y)
+                    lineTo(first.x, first.y)
                 }
+                if (samples.size == 1) return
+                if (samples.size == 2) {
+                    val last = samples.last()
+                    lineTo(last.x, last.y)
+                    return
+                }
+                for (index in 1 until samples.lastIndex) {
+                    val current = samples[index]
+                    val next = samples[index + 1]
+                    val midX = (current.x + next.x) * 0.5f
+                    val midY = (current.y + next.y) * 0.5f
+                    quadraticTo(current.x, current.y, midX, midY)
+                }
+                val last = samples.last()
+                lineTo(last.x, last.y)
             }
-            fillPath.lineTo(bounds.right, bounds.bottom)
-            fillPath.close()
+
+            val curvePath = Path().apply {
+                addSmoothedOffsets(offsets, moveToFirst = true)
+            }
+            val fillPath = Path().apply {
+                moveTo(offsets.first().x, bounds.bottom)
+                addSmoothedOffsets(offsets, moveToFirst = false)
+                lineTo(offsets.last().x, bounds.bottom)
+                close()
+            }
 
             drawPath(path = fillPath, color = color.copy(alpha = 0.14f))
-            drawPath(path = curvePath, color = color, style = Stroke(width = 3.dp.toPx()))
+            drawPath(
+                path = curvePath,
+                color = color,
+                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
 
             points.forEachIndexed { index, point ->
                 val offset = point.toOffset(bounds, maxMinute)
