@@ -312,6 +312,11 @@ object CurrentDisplaySource {
         if (sensorName.isNullOrEmpty()) {
             return 0
         }
+        tk.glucodata.drivers.ManagedSensorRuntime.resolveUiSnapshot(sensorName, sensorName)
+            ?.let { return it.viewMode }
+        if (!SensorIdentity.hasNativeSensorBacking(sensorName)) {
+            return 0
+        }
         return try {
             val snapshot = Natives.getSensorUiSnapshot(sensorName)
             if (snapshot != null && snapshot.size >= 2) snapshot[1].toInt() else 0
@@ -374,6 +379,9 @@ object CurrentDisplaySource {
     }
 
     private fun resolveNativeAutoMgdl(sensorId: String?, isMmol: Boolean): Int {
+        if (!SensorIdentity.hasNativeSensorBacking(sensorId)) {
+            return 0
+        }
         val latest = try {
             Natives.lastglucose()
         } catch (_: Throwable) {

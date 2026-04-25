@@ -778,13 +778,12 @@ public class SensorBluetooth {
 
     public static void ensureCurrentSensorSelection() {
         final String current = Natives.lastsensorname();
-        if (current != null && !current.isEmpty()) {
+        if (current != null && !current.isEmpty() && SensorIdentity.hasNativeSensorBacking(current)) {
             return;
         }
         final String resolved = resolvePreferredCurrentSensor();
         if (resolved != null && !resolved.isEmpty()) {
-            final String nativeResolved = SensorIdentity.resolveNativeSensorName(resolved);
-            Natives.setcurrentsensor(nativeResolved != null && !nativeResolved.isEmpty() ? nativeResolved : resolved);
+            setCurrentSensorSelection(resolved);
             if (doLog) {
                 Log.i(LOG_ID, "ensureCurrentSensorSelection -> " + resolved);
             }
@@ -796,11 +795,29 @@ public class SensorBluetooth {
             return;
         }
         final String current = Natives.lastsensorname();
-        if (current == null || current.isEmpty()) {
-            final String nativeSerial = SensorIdentity.resolveNativeSensorName(serial);
-            Natives.setcurrentsensor(nativeSerial != null && !nativeSerial.isEmpty() ? nativeSerial : serial);
+        if ((current == null || current.isEmpty()) && ManagedCurrentSensor.get() == null) {
+            setCurrentSensorSelection(serial);
             if (doLog) {
                 Log.i(LOG_ID, "adoptCurrentSensorIfBlank -> " + serial);
+            }
+        }
+    }
+
+    public static void setCurrentSensorSelection(String serial) {
+        if (serial == null || serial.isEmpty()) {
+            ManagedCurrentSensor.clear();
+            Natives.setcurrentsensor("");
+            return;
+        }
+        if (SensorIdentity.hasNativeSensorBacking(serial)) {
+            ManagedCurrentSensor.clearIfMatches(serial);
+            final String nativeSerial = SensorIdentity.resolveNativeSensorName(serial);
+            Natives.setcurrentsensor(nativeSerial != null && !nativeSerial.isEmpty() ? nativeSerial : serial);
+        } else {
+            ManagedCurrentSensor.set(serial);
+            final String current = Natives.lastsensorname();
+            if (current != null && !current.isEmpty() && !SensorIdentity.hasNativeSensorBacking(current)) {
+                Natives.setcurrentsensor("");
             }
         }
     }
@@ -858,15 +875,12 @@ public class SensorBluetooth {
         if (removedSerial == null || removedSerial.isEmpty()) {
             return;
         }
-        final String current = Natives.lastsensorname();
+        final String current = SensorIdentity.resolveMainSensor();
         if (!SensorIdentity.matches(current, removedSerial)) {
             return;
         }
         final String replacement = resolveReplacementSensorSerial(removedSerial, preferredCandidates);
-        final String nativeReplacement = SensorIdentity.resolveNativeSensorName(replacement);
-        Natives.setcurrentsensor(nativeReplacement != null && !nativeReplacement.isEmpty()
-                ? nativeReplacement
-                : (replacement != null ? replacement : ""));
+        setCurrentSensorSelection(replacement != null ? replacement : "");
         if (doLog) {
             Log.i(LOG_ID, "rehomeCurrentSensorAfterRemoval " + removedSerial + " -> "
                     + (replacement != null ? replacement : "<cleared>"));
@@ -1038,7 +1052,10 @@ public class SensorBluetooth {
                 continue;
             }
             gattcallbacks.add(cb);
-            if (dataptr != 0L) {
+            final boolean canRunWithoutNativeData =
+                    cb instanceof ManagedBluetoothSensorDriver
+                            && ((ManagedBluetoothSensorDriver) cb).canConnectWithoutDataptr();
+            if (dataptr != 0L || canRunWithoutNativeData) {
                 adoptCurrentSensorIfBlank(sensorId);
             }
         }

@@ -40,5 +40,7 @@ interface ManagedSensorIdentityAdapter {
 
     fun usesNativeDirectStreamShell(sensorId: String?): Boolean = false
 
+    fun hasNativeSensorBacking(sensorId: String?): Boolean? = null
+
     fun shouldUseNativeHistorySync(sensorId: String?): Boolean? = null
 }

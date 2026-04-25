@@ -129,6 +129,15 @@ object SensorIdentity {
     }
 
     @JvmStatic
+    fun hasNativeSensorBacking(sensorId: String?): Boolean {
+        val raw = normalized(sensorId) ?: return true
+        val canonical = canonicalOrRaw(raw) ?: raw
+        return ManagedSensorIdentityRegistry.hasNativeSensorBacking(canonical)
+            ?: ManagedSensorIdentityRegistry.hasNativeSensorBacking(raw)
+            ?: true
+    }
+
+    @JvmStatic
     fun usesNativeDirectStreamShell(sensorId: String?): Boolean {
         val raw = normalized(sensorId) ?: return false
         val canonical = canonicalOrRaw(raw) ?: raw
@@ -138,6 +147,10 @@ object SensorIdentity {
 
     @JvmStatic
     fun resolveMainSensor(): String? {
+        val managed = canonicalOrRaw(ManagedCurrentSensor.get())
+        if (!managed.isNullOrBlank()) {
+            return managed
+        }
         val main = resolveAppSensorId(Natives.lastsensorname())
         if (!main.isNullOrBlank()) {
             return main
@@ -167,6 +180,10 @@ object SensorIdentity {
         preferredSensorId: String?,
         activeSensors: Array<String?>?
     ): String? {
+        val managed = canonicalOrRaw(ManagedCurrentSensor.get())
+        if (!managed.isNullOrBlank()) {
+            return managed
+        }
         val active = activeSensors
             ?.mapNotNull(::canonicalOrRaw)
             ?.distinct()

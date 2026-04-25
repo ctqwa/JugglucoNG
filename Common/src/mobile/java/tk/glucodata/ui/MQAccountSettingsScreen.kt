@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +53,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tk.glucodata.R
 import tk.glucodata.drivers.mq.MQAuthCredentials
+import tk.glucodata.drivers.mq.MQBootstrapFailure
 import tk.glucodata.drivers.mq.MQCloudClient
+import tk.glucodata.drivers.mq.MQIncomingFriendRequest
 import tk.glucodata.drivers.mq.MQRegistry
 import tk.glucodata.drivers.mq.MQVerifyCodeAction
 import tk.glucodata.ui.components.MasterSwitchCard
@@ -71,9 +74,17 @@ fun MQAccountSettingsScreen(navController: NavController) {
     var cloudSyncEnabled by rememberSaveable {
         mutableStateOf(MQRegistry.isCloudSyncEnabled(context))
     }
+    var followerEnabled by rememberSaveable {
+        mutableStateOf(MQRegistry.isFollowerEnabled(context))
+    }
+    var followerAccount by rememberSaveable {
+        mutableStateOf(MQRegistry.loadFollowerAccount(context))
+    }
     var authToken by rememberSaveable { mutableStateOf(initialAccountState.authToken.orEmpty()) }
     var statusText by rememberSaveable { mutableStateOf("") }
     var busyAction by remember { mutableStateOf<String?>(null) }
+    var incomingRequests by remember { mutableStateOf<List<MQIncomingFriendRequest>>(emptyList()) }
+    var requestsLoaded by remember { mutableStateOf(false) }
 
     val hasCredentials = phone.isNotBlank() && password.isNotBlank()
     val hasVerificationCode = verificationCode.isNotBlank()
@@ -88,6 +99,10 @@ fun MQAccountSettingsScreen(navController: NavController) {
     val signInWithCodeLabel = stringResource(R.string.mq_account_sign_in_with_code_action)
     val createAccountLabel = stringResource(R.string.mq_account_register_action)
     val resetPasswordLabel = stringResource(R.string.mq_account_reset_password_action)
+    val refreshLabel = stringResource(R.string.refresh)
+    val approveRequestLabel = stringResource(R.string.mq_friend_request_approve_action)
+    val rejectRequestLabel = stringResource(R.string.mq_friend_request_reject_action)
+    val followerTitle = stringResource(R.string.mq_follower_title)
     val statusSummary = when {
         hasAuthToken -> stringResource(R.string.mq_account_status_signed_in)
         hasCredentials -> stringResource(R.string.mq_account_status_saved)
@@ -102,6 +117,13 @@ fun MQAccountSettingsScreen(navController: NavController) {
                 stringResource(R.string.mq_sync_disabled_summary)
             }
         )
+        add(
+            if (followerEnabled) {
+                stringResource(R.string.mq_follower_enabled_summary)
+            } else {
+                stringResource(R.string.mq_follower_disabled_summary)
+            }
+        )
     }.joinToString(" · ")
 
     fun persistAccountState() {
@@ -112,6 +134,8 @@ fun MQAccountSettingsScreen(navController: NavController) {
             apiBaseUrl = apiBaseUrl,
         )
         MQRegistry.saveCloudSyncEnabled(context, cloudSyncEnabled)
+        MQRegistry.saveFollowerAccount(context, followerAccount)
+        MQRegistry.saveFollowerEnabled(context, followerEnabled)
         authToken = MQRegistry.loadAccountState(context).authToken.orEmpty()
     }
 
@@ -127,8 +151,158 @@ fun MQAccountSettingsScreen(navController: NavController) {
         try {
             persistAccountState()
             block()
-        } finally {
-            busyAction = null
+            } finally {
+                busyAction = null
+            }
+    }
+
+    suspend fun ensureCloudToken(): String? {
+        MQRegistry.loadAccountState(context).authToken?.takeIf { it.isNotBlank() }?.let { return it }
+        val credentials = MQRegistry.loadAuthCredentials(context) ?: return null
+        val result = withContext(Dispatchers.IO) {
+            MQCloudClient.signInWithPassword(
+                context = context,
+                credentials = credentials,
+            )
+        }
+        if (result.success) {
+            MQRegistry.saveAuthToken(context, result.token)
+            authToken = result.token.orEmpty()
+            return result.token
+        }
+        return null
+    }
+
+    suspend fun refreshIncomingRequests() {
+        val currentUser = phone.trim()
+        if (currentUser.isEmpty()) {
+            incomingRequests = emptyList()
+            requestsLoaded = false
+            return
+        }
+        val token = ensureCloudToken()
+        if (token.isNullOrBlank()) {
+            incomingRequests = emptyList()
+            requestsLoaded = false
+            return
+        }
+        val (requests, result) = withContext(Dispatchers.IO) {
+            MQCloudClient.fetchIncomingFriendRequests(
+                context = context,
+                authToken = token,
+                userAccount = currentUser,
+            )
+        }
+        incomingRequests = requests
+        requestsLoaded = true
+        if (result.failure != MQBootstrapFailure.NONE && result.message?.isNotBlank() == true) {
+            statusText = result.message
+        }
+    }
+
+    suspend fun setFollowerEnabled(enabled: Boolean) {
+        if (!enabled) {
+            followerEnabled = false
+            MQRegistry.disableFollowerSensors(context)
+            withContext(Dispatchers.IO) { tk.glucodata.SensorBluetooth.updateDevices() }
+            setResultMessage(
+                context.getString(R.string.mq_follower_disabled_message),
+                R.string.mq_follower_disabled_message,
+            )
+            return
+        }
+
+        val targetAccount = followerAccount.trim()
+        if (targetAccount.isEmpty()) {
+            followerEnabled = false
+            setResultMessage(
+                context.getString(R.string.mq_follower_requires_target),
+                R.string.mq_follower_requires_target,
+            )
+            return
+        }
+
+        val currentUser = phone.trim()
+        if (currentUser.isEmpty()) {
+            followerEnabled = false
+            setResultMessage(
+                context.getString(R.string.mq_follower_requires_login),
+                R.string.mq_follower_requires_login,
+            )
+            return
+        }
+
+        val token = ensureCloudToken()
+        if (token.isNullOrBlank()) {
+            followerEnabled = false
+            setResultMessage(
+                context.getString(R.string.mq_follower_requires_login),
+                R.string.mq_follower_requires_login,
+            )
+            return
+        }
+
+        val lookup = withContext(Dispatchers.IO) {
+            MQCloudClient.findFriendUser(
+                context = context,
+                authToken = token,
+                userAccount = currentUser,
+                friendAccount = targetAccount,
+            )
+        }
+        if (!lookup.exists && lookup.failure != MQBootstrapFailure.NONE) {
+            followerEnabled = false
+            setResultMessage(lookup.message, R.string.mq_follower_account_not_found)
+            return
+        }
+        if (!lookup.exists) {
+            followerEnabled = false
+            setResultMessage(
+                context.getString(R.string.mq_follower_account_not_found),
+                R.string.mq_follower_account_not_found,
+            )
+            return
+        }
+
+        val statusMessage = if (lookup.isFriend || lookup.friendshipState == 2) {
+            MQRegistry.enableFollowerSensor(context, targetAccount, connectNow = true)
+            if (lookup.isFriend) {
+                context.getString(R.string.mq_follower_enabled_message)
+            } else {
+                context.getString(R.string.mq_follower_request_sent)
+            }
+        } else {
+            val request = withContext(Dispatchers.IO) {
+                MQCloudClient.addFriend(
+                    context = context,
+                    authToken = token,
+                    userAccount = currentUser,
+                    friendAccount = targetAccount,
+                    permission = 2,
+                    remark = "",
+                    type = 2,
+                )
+            }
+            if (!request.success) {
+                followerEnabled = false
+                setResultMessage(request.message, R.string.mq_follower_request_failed)
+                return
+            }
+            MQRegistry.enableFollowerSensor(context, targetAccount, connectNow = true)
+            context.getString(R.string.mq_follower_request_sent)
+        }
+
+        followerEnabled = true
+        withContext(Dispatchers.IO) { tk.glucodata.SensorBluetooth.updateDevices() }
+        setResultMessage(statusMessage, R.string.mq_follower_enabled_message)
+    }
+
+    LaunchedEffect(authToken, phone) {
+        if (authToken.isNotBlank() && phone.isNotBlank()) {
+            refreshIncomingRequests()
+        } else {
+            incomingRequests = emptyList()
+            requestsLoaded = false
         }
     }
 
@@ -171,6 +345,20 @@ fun MQAccountSettingsScreen(navController: NavController) {
                 icon = Icons.Default.Cloud,
             )
 
+            MasterSwitchCard(
+                title = stringResource(R.string.mq_follower_title),
+                subtitle = stringResource(R.string.mq_follower_desc),
+                checked = followerEnabled,
+                onCheckedChange = { enabled ->
+                    coroutineScope.launch {
+                        runCloudAction(followerTitle) {
+                            setFollowerEnabled(enabled)
+                        }
+                    }
+                },
+                icon = Icons.Default.Cloud,
+            )
+
             MQAccountStatusCard(
                 summary = statusSummary,
                 secondarySummary = secondarySummary,
@@ -194,6 +382,22 @@ fun MQAccountSettingsScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            SectionLabel(
+                text = stringResource(R.string.mq_follower_title),
+                topPadding = 8.dp,
+            )
+
+            OutlinedTextField(
+                value = followerAccount,
+                onValueChange = { followerAccount = it.trim() },
+                label = { Text(stringResource(R.string.mq_follower_account_label)) },
+                supportingText = { Text(stringResource(R.string.mq_follower_account_desc)) },
+                singleLine = true,
+                enabled = !followerEnabled && !isBusy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             Button(
                 onClick = {
                     coroutineScope.launch {
@@ -210,6 +414,7 @@ fun MQAccountSettingsScreen(navController: NavController) {
                             if (result.success) {
                                 MQRegistry.saveAuthToken(context, result.token)
                                 authToken = result.token.orEmpty()
+                                refreshIncomingRequests()
                             }
                             setResultMessage(result.message, R.string.mq_account_sign_in_action)
                         }
@@ -268,6 +473,8 @@ fun MQAccountSettingsScreen(navController: NavController) {
                                 }
                                 MQRegistry.clearAuthToken(context)
                                 authToken = ""
+                                incomingRequests = emptyList()
+                                requestsLoaded = false
                                 setResultMessage(result.message, R.string.mq_account_sign_out_action)
                             }
                         }
@@ -276,6 +483,112 @@ fun MQAccountSettingsScreen(navController: NavController) {
                     enabled = (hasAuthToken || hasCredentials) && !isBusy,
                 ) {
                     Text(signOutLabel)
+                }
+            }
+
+            SectionLabel(
+                text = stringResource(R.string.mq_friend_requests_title),
+                topPadding = 8.dp,
+            )
+
+            Text(
+                text = stringResource(R.string.mq_friend_requests_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            OutlinedButton(
+                onClick = {
+                    coroutineScope.launch {
+                        runCloudAction(refreshLabel) {
+                            refreshIncomingRequests()
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = phone.isNotBlank() && !isBusy,
+            ) {
+                Text(refreshLabel)
+            }
+
+            when {
+                requestsLoaded && incomingRequests.isEmpty() -> {
+                    Text(
+                        text = stringResource(R.string.mq_friend_requests_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                incomingRequests.isNotEmpty() -> {
+                    incomingRequests.forEach { request ->
+                        MQIncomingRequestCard(
+                            request = request,
+                            enabled = !isBusy,
+                            onApprove = {
+                                coroutineScope.launch {
+                                    runCloudAction(approveRequestLabel) {
+                                        val token = ensureCloudToken()
+                                        if (token.isNullOrBlank()) {
+                                            setResultMessage(
+                                                context.getString(R.string.mq_follower_requires_login),
+                                                R.string.mq_follower_requires_login,
+                                            )
+                                            return@runCloudAction
+                                        }
+                                        val result = withContext(Dispatchers.IO) {
+                                            MQCloudClient.reviewFriendRequest(
+                                                context = context,
+                                                authToken = token,
+                                                userAccount = phone.trim(),
+                                                applyFriendId = request.requestId,
+                                                approved = true,
+                                                permission = 2,
+                                                aliasName = request.name?.takeIf { it.isNotBlank() }
+                                                    ?: request.phone,
+                                            )
+                                        }
+                                        setResultMessage(
+                                            result.message,
+                                            R.string.mq_friend_request_approved_message,
+                                        )
+                                        refreshIncomingRequests()
+                                    }
+                                }
+                            },
+                            onReject = {
+                                coroutineScope.launch {
+                                    runCloudAction(rejectRequestLabel) {
+                                        val token = ensureCloudToken()
+                                        if (token.isNullOrBlank()) {
+                                            setResultMessage(
+                                                context.getString(R.string.mq_follower_requires_login),
+                                                R.string.mq_follower_requires_login,
+                                            )
+                                            return@runCloudAction
+                                        }
+                                        val result = withContext(Dispatchers.IO) {
+                                            MQCloudClient.reviewFriendRequest(
+                                                context = context,
+                                                authToken = token,
+                                                userAccount = phone.trim(),
+                                                applyFriendId = request.requestId,
+                                                approved = false,
+                                                permission = 2,
+                                                aliasName = request.name?.takeIf { it.isNotBlank() }
+                                                    ?: request.phone,
+                                            )
+                                        }
+                                        setResultMessage(
+                                            result.message,
+                                            R.string.mq_friend_request_rejected_message,
+                                        )
+                                        refreshIncomingRequests()
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
@@ -371,6 +684,7 @@ fun MQAccountSettingsScreen(navController: NavController) {
                             if (result.success) {
                                 MQRegistry.saveAuthToken(context, result.token)
                                 authToken = result.token.orEmpty()
+                                refreshIncomingRequests()
                             }
                             setResultMessage(result.message, R.string.mq_account_sign_in_with_code_action)
                         }
@@ -397,6 +711,7 @@ fun MQAccountSettingsScreen(navController: NavController) {
                             if (result.success) {
                                 MQRegistry.saveAuthToken(context, result.token)
                                 authToken = result.token.orEmpty()
+                                refreshIncomingRequests()
                             }
                             setResultMessage(result.message, R.string.mq_account_register_action)
                         }
@@ -484,6 +799,67 @@ private fun MQAccountStatusCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MQIncomingRequestCard(
+    request: MQIncomingFriendRequest,
+    enabled: Boolean,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = request.name?.takeIf { it.isNotBlank() } ?: request.phone,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (request.name?.isNotBlank() == true && request.phone.isNotBlank()) {
+                Text(
+                    text = request.phone,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            request.remark?.takeIf { it.isNotBlank() }?.let { remark ->
+                Text(
+                    text = stringResource(R.string.mq_friend_request_remark_format, remark),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onReject,
+                    modifier = Modifier.weight(1f),
+                    enabled = enabled,
+                ) {
+                    Text(stringResource(R.string.mq_friend_request_reject_action))
+                }
+                FilledTonalButton(
+                    onClick = onApprove,
+                    modifier = Modifier.weight(1f),
+                    enabled = enabled,
+                ) {
+                    Text(stringResource(R.string.mq_friend_request_approve_action))
+                }
             }
         }
     }

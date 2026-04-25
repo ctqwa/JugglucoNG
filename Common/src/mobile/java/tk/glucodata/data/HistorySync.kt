@@ -275,6 +275,10 @@ object HistorySync {
      */
     private suspend fun doSyncSensor(serial: String, forceFull: Boolean) {
         try {
+            if (!SensorIdentity.shouldUseNativeHistorySync(serial)) {
+                Log.d(TAG, "Skipping native sync for driver-owned Room sensor $serial")
+                return
+            }
             BatteryTrace.bump(
                 key = "history.sync.sensor.run",
                 logEvery = 20L,
@@ -414,6 +418,10 @@ object HistorySync {
      */
     fun forceFullSyncForSensor(serial: String) {
         Log.i(TAG, "forceFullSyncForSensor($serial) — full Room/native resync requested")
+        if (!SensorIdentity.shouldUseNativeHistorySync(serial)) {
+            Log.i(TAG, "forceFullSyncForSensor($serial) skipped: driver-owned Room history")
+            return
+        }
         sensorStability.remove(serial)
         sensorLastSyncTimeMs.remove(serial)
         val legacyAliases = SensorIdentity.resolveNativeHistorySensorNames(serial)
@@ -447,6 +455,10 @@ object HistorySync {
      */
     fun mergeFullSyncForSensor(serial: String) {
         Log.i(TAG, "mergeFullSyncForSensor($serial) — full non-destructive Room/native merge requested")
+        if (!SensorIdentity.shouldUseNativeHistorySync(serial)) {
+            Log.i(TAG, "mergeFullSyncForSensor($serial) skipped: driver-owned Room history")
+            return
+        }
         sensorStability.remove(serial)
         sensorLastSyncTimeMs.remove(serial)
         SensorIdentity.resolveNativeHistorySensorNames(serial).forEach {

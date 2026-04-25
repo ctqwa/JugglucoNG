@@ -7,12 +7,14 @@ import tk.glucodata.SuperGattCallback
 import tk.glucodata.drivers.aidex.AiDexManagedSensorIdentityAdapter
 import tk.glucodata.drivers.icanhealth.ICanHealthManagedSensorIdentityAdapter
 import tk.glucodata.drivers.mq.MQManagedSensorIdentityAdapter
+import tk.glucodata.drivers.nightscout.NightscoutFollowerIdentityAdapter
 
 object ManagedSensorIdentityRegistry {
     val all: List<ManagedSensorIdentityAdapter> = listOf(
         AiDexManagedSensorIdentityAdapter,
         ICanHealthManagedSensorIdentityAdapter,
         MQManagedSensorIdentityAdapter,
+        NightscoutFollowerIdentityAdapter,
     )
 
     private fun orderedAdapters(sensorId: String?, context: Context?): Sequence<ManagedSensorIdentityAdapter> {
@@ -60,6 +62,11 @@ object ManagedSensorIdentityRegistry {
 
     fun usesNativeDirectStreamShell(sensorId: String?): Boolean =
         orderedAdapters(sensorId, Applic.app).any { it.usesNativeDirectStreamShell(sensorId) }
+
+    fun hasNativeSensorBacking(sensorId: String?): Boolean? =
+        orderedAdapters(sensorId, Applic.app)
+            .mapNotNull { it.hasNativeSensorBacking(sensorId) }
+            .firstOrNull()
 
     fun shouldUseNativeHistorySync(sensorId: String?): Boolean? =
         orderedAdapters(sensorId, Applic.app)

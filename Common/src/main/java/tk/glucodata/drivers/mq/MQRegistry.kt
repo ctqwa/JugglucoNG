@@ -15,18 +15,40 @@ import tk.glucodata.SensorBluetooth
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.drivers.ManagedBluetoothSensorDriver
+import tk.glucodata.drivers.ManagedSensorUiSignals
 
 object MQRegistry {
     private const val TAG = MQConstants.TAG
     private const val PREFS_NAME = "tk.glucodata_preferences"
 
+    enum class SensorRecordMode {
+        LOCAL,
+        FOLLOWER,
+    }
+
+    data class AccountState(
+        val phone: String,
+        val password: String,
+        val apiBaseUrl: String,
+        val authToken: String?,
+    ) {
+        val hasCredentials: Boolean get() = phone.isNotBlank() && password.isNotBlank()
+        val hasToken: Boolean get() = !authToken.isNullOrBlank()
+        val credentials: MQAuthCredentials? get() =
+            if (hasCredentials) MQAuthCredentials(account = phone, password = password) else null
+    }
+
     data class SensorRecord(
         val sensorId: String,
         val address: String,
         val displayName: String,
+        val mode: SensorRecordMode = SensorRecordMode.LOCAL,
+        val followerAccount: String = "",
     ) {
         fun matchesId(id: String?): Boolean =
             MQConstants.matchesCanonicalOrKnownNativeAlias(sensorId, id)
+
+        val isFollower: Boolean get() = mode == SensorRecordMode.FOLLOWER
     }
 
     private fun prefs(context: Context) =
@@ -48,13 +70,27 @@ object MQRegistry {
         val sensorId = MQConstants.canonicalSensorId(parts[0])
         if (sensorId.isEmpty()) return null
         val address = parts.getOrNull(1)?.trim().orEmpty()
+        val mode = runCatching {
+            parts.getOrNull(3)?.trim()?.takeIf { it.isNotEmpty() }?.let(SensorRecordMode::valueOf)
+        }.getOrNull() ?: SensorRecordMode.LOCAL
+        val followerAccount = parts.getOrNull(4)?.trim().orEmpty()
         val displayName = parts.getOrNull(2)?.trim().takeUnless { it.isNullOrEmpty() }
-            ?: MQConstants.DEFAULT_DISPLAY_NAME
-        return SensorRecord(sensorId, address, displayName)
+            ?: if (mode == SensorRecordMode.FOLLOWER) {
+                MQConstants.DEFAULT_FOLLOWER_DISPLAY_NAME
+            } else {
+                MQConstants.DEFAULT_DISPLAY_NAME
+            }
+        return SensorRecord(
+            sensorId = sensorId,
+            address = address,
+            displayName = displayName,
+            mode = mode,
+            followerAccount = followerAccount,
+        )
     }
 
     private fun encode(r: SensorRecord): String =
-        "${r.sensorId}|${r.address}|${r.displayName}"
+        "${r.sensorId}|${r.address}|${r.displayName}|${r.mode.name}|${r.followerAccount}"
 
     private fun readAll(context: Context): LinkedHashSet<SensorRecord> {
         val stored = try {
@@ -93,6 +129,12 @@ object MQRegistry {
     }
 
     @JvmStatic
+    fun findFollowerRecord(context: Context?): SensorRecord? {
+        if (context == null) return null
+        return readAll(context).firstOrNull { it.isFollower }
+    }
+
+    @JvmStatic
     fun ensureSensorRecord(
         context: Context,
         sensorId: String?,
@@ -117,6 +159,8 @@ object MQRegistry {
                     address = if (normalizedAddress.isNotEmpty()) normalizedAddress else existing.address,
                     displayName = existing.displayName.takeUnless { it.isBlank() }
                         ?: safeDisplayName,
+                    mode = SensorRecordMode.LOCAL,
+                    followerAccount = "",
                 )
                 if (merged != existing) changed = true
                 updated.add(merged)
@@ -131,6 +175,8 @@ object MQRegistry {
                     sensorId = canonicalId,
                     address = normalizedAddress,
                     displayName = safeDisplayName,
+                    mode = SensorRecordMode.LOCAL,
+                    followerAccount = "",
                 ),
             )
             changed = true
@@ -146,10 +192,23 @@ object MQRegistry {
     fun createRestoredCallback(context: Context?, sensorId: String, dataptr: Long): SuperGattCallback? {
         if (context == null) return null
         val record = findRecord(context, sensorId) ?: return null
-        val cb = MQBleManager(record.sensorId, dataptr)
-        cb.mActiveDeviceAddress = record.address.takeIf { it.isNotBlank() }
-        cb.restoreFromPersistence(context)
-        return cb
+        return when (record.mode) {
+            SensorRecordMode.LOCAL -> {
+                val cb = MQBleManager(record.sensorId, dataptr)
+                cb.mActiveDeviceAddress = record.address.takeIf { it.isNotBlank() }
+                cb.restoreFromPersistence(context)
+                cb
+            }
+
+            SensorRecordMode.FOLLOWER -> {
+                MQFollowerManager(
+                    serial = record.sensorId,
+                    followerAccount = record.followerAccount,
+                    initialDisplayName = record.displayName,
+                    dataptr = dataptr,
+                )
+            }
+        }
     }
 
     @JvmStatic
@@ -193,6 +252,61 @@ object MQRegistry {
         if (connectNow) {
             connectSensor(context, sensorId)
         }
+        ManagedSensorUiSignals.markDeviceListDirty()
+        return sensorId
+    }
+
+    @JvmStatic
+    fun enableFollowerSensor(
+        context: Context,
+        followerAccount: String,
+        connectNow: Boolean = true,
+    ): String? {
+        val normalizedAccount = followerAccount.trim()
+        if (normalizedAccount.isEmpty()) return null
+        val sensorId = MQConstants.deriveFollowerSensorId(normalizedAccount)
+        val safeName = "${MQConstants.DEFAULT_FOLLOWER_DISPLAY_NAME} · $normalizedAccount"
+        val updated = LinkedHashSet<SensorRecord>()
+        var changed = false
+        readAll(context).forEach { existing ->
+            if (existing.isFollower && !existing.matchesId(sensorId)) {
+                changed = true
+                return@forEach
+            }
+            if (existing.matchesId(sensorId)) {
+                val merged = existing.copy(
+                    sensorId = sensorId,
+                    address = "",
+                    displayName = safeName,
+                    mode = SensorRecordMode.FOLLOWER,
+                    followerAccount = normalizedAccount,
+                )
+                updated.add(merged)
+                if (merged != existing) changed = true
+            } else {
+                updated.add(existing)
+            }
+        }
+        if (updated.none { it.matchesId(sensorId) }) {
+            updated.add(
+                SensorRecord(
+                    sensorId = sensorId,
+                    address = "",
+                    displayName = safeName,
+                    mode = SensorRecordMode.FOLLOWER,
+                    followerAccount = normalizedAccount,
+                ),
+            )
+            changed = true
+        }
+        if (changed) {
+            writeAll(context, updated)
+        }
+        saveFollowerAccount(context, normalizedAccount)
+        saveFollowerEnabled(context, true)
+        if (connectNow) {
+            connectSensor(context, sensorId)
+        }
         return sensorId
     }
 
@@ -204,15 +318,30 @@ object MQRegistry {
             SensorIdentity.matches(cb.SerialNumber, sensorId) ||
                 ((cb as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)
         }
-        val callback = (existing as? MQBleManager) ?: MQBleManager(record.sensorId, 0L).also {
+        val callback = existing ?: createRestoredCallback(context, record.sensorId, 0L)?.also {
             SensorBluetooth.gattcallbacks.add(it)
             Natives.setmaxsensors(SensorBluetooth.gattcallbacks.size)
+        } ?: return
+        if (callback is MQBleManager) {
+            callback.mActiveDeviceAddress = record.address.takeIf { it.isNotBlank() }
+            callback.restoreFromPersistence(context)
         }
-        callback.mActiveDeviceAddress = record.address.takeIf { it.isNotBlank() }
-        callback.restoreFromPersistence(context)
+        SensorBluetooth.ensureCurrentSensorSelection()
         if (SensorBluetooth.blueone === blue) {
             callback.connectDevice(0)
         }
+        ManagedSensorUiSignals.markDeviceListDirty()
+    }
+
+    @JvmStatic
+    fun disableFollowerSensors(context: Context?) {
+        if (context == null) return
+        val followerIds = readAll(context)
+            .filter { it.isFollower }
+            .map { it.sensorId }
+        followerIds.forEach { removeSensor(context, it) }
+        saveFollowerEnabled(context, false)
+        ManagedSensorUiSignals.markDeviceListDirty()
     }
 
     @JvmStatic
@@ -226,6 +355,12 @@ object MQRegistry {
         }
         writeAll(context, updated)
         if (canonical.isBlank()) return
+        if (record?.isFollower == true) {
+            val currentFollower = loadFollowerAccount(context)
+            if (currentFollower.equals(record.followerAccount, ignoreCase = true)) {
+                saveFollowerEnabled(context, false)
+            }
+        }
         prefs(context).edit()
             .remove("${MQConstants.PREF_PROTOCOL_TYPE_PREFIX}$canonical")
             .remove("${MQConstants.PREF_DEVIATION_PREFIX}$canonical")
@@ -240,10 +375,12 @@ object MQRegistry {
             .remove("${MQConstants.PREF_PACKAGES_PREFIX}$canonical")
             .remove("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$canonical")
             .remove("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$canonical")
+            .remove("${MQConstants.PREF_LAST_CLOUD_REPORTED_PACKET_PREFIX}$canonical")
             .remove("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$canonical")
             .remove("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$canonical")
             .remove("${MQConstants.PREF_QR_CONTENT_PREFIX}$canonical")
             .commit()
+        ManagedSensorUiSignals.markDeviceListDirty()
     }
 
     // ---- Per-sensor config accessors (used by MQBleManager) ----
@@ -398,6 +535,17 @@ object MQRegistry {
     }
 
     @JvmStatic
+    fun loadLastCloudReportedPacketIndex(context: Context, sensorId: String): Int =
+        prefs(context).getInt("${MQConstants.PREF_LAST_CLOUD_REPORTED_PACKET_PREFIX}$sensorId", -1)
+
+    @JvmStatic
+    fun saveLastCloudReportedPacketIndex(context: Context, sensorId: String, value: Int) {
+        editBlocking(context) {
+            putInt("${MQConstants.PREF_LAST_CLOUD_REPORTED_PACKET_PREFIX}$sensorId", value)
+        }
+    }
+
+    @JvmStatic
     fun loadSnapshotId(context: Context, sensorId: String): String? =
         prefs(context).getString("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId", null)
 
@@ -435,6 +583,7 @@ object MQRegistry {
             putFloat("${MQConstants.PREF_B_VALUE_PREFIX}$sensorId", 0f)
             putFloat("${MQConstants.PREF_LAST_PROCESSED_PREFIX}$sensorId", 0f)
             putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", -1)
+            putInt("${MQConstants.PREF_LAST_CLOUD_REPORTED_PACKET_PREFIX}$sensorId", -1)
             remove("${MQConstants.PREF_SNAPSHOT_ID_PREFIX}$sensorId")
             putBoolean("${MQConstants.PREF_LOCAL_RESET_PENDING_PREFIX}$sensorId", markLocalResetPending)
         }
@@ -515,6 +664,100 @@ object MQRegistry {
             putString(
                 MQConstants.PREF_API_BASE_URL_KEY,
                 MQConstants.normalizeVendorBaseUrl(baseUrl),
+            )
+        }
+    }
+
+    @JvmStatic
+    fun loadAccountState(context: Context): AccountState =
+        AccountState(
+            phone = loadAuthPhone(context).orEmpty(),
+            password = loadAuthPassword(context).orEmpty(),
+            apiBaseUrl = loadApiBaseUrl(context),
+            authToken = loadAuthToken(context),
+        )
+
+    @JvmStatic
+    fun saveAccountState(
+        context: Context,
+        phone: String?,
+        password: String?,
+        apiBaseUrl: String?,
+    ) {
+        val normalizedPhone = phone?.trim()?.takeIf { it.isNotEmpty() }
+        val normalizedPassword = password?.takeIf { !it.isNullOrBlank() }
+        val normalizedApiBaseUrl = MQConstants.normalizeVendorBaseUrl(apiBaseUrl)
+        val tokenIsStale =
+            normalizedPhone != loadAuthPhone(context) ||
+                normalizedPassword != loadAuthPassword(context) ||
+                normalizedApiBaseUrl != loadApiBaseUrl(context)
+        editBlocking(context) {
+            putString(MQConstants.PREF_AUTH_PHONE_KEY, normalizedPhone)
+            putString(MQConstants.PREF_AUTH_PASSWORD_KEY, normalizedPassword)
+            putString(MQConstants.PREF_API_BASE_URL_KEY, normalizedApiBaseUrl)
+            if (tokenIsStale) {
+                remove(MQConstants.PREF_AUTH_TOKEN_KEY)
+            }
+        }
+    }
+
+    @JvmStatic
+    fun clearAccountState(context: Context, keepApiBaseUrl: Boolean = true) {
+        val preservedApiBaseUrl = if (keepApiBaseUrl) loadApiBaseUrl(context) else null
+        editBlocking(context) {
+            remove(MQConstants.PREF_AUTH_TOKEN_KEY)
+            remove(MQConstants.PREF_AUTH_PHONE_KEY)
+            remove(MQConstants.PREF_AUTH_PASSWORD_KEY)
+            if (keepApiBaseUrl) {
+                putString(
+                    MQConstants.PREF_API_BASE_URL_KEY,
+                    MQConstants.normalizeVendorBaseUrl(preservedApiBaseUrl),
+                )
+            } else {
+                remove(MQConstants.PREF_API_BASE_URL_KEY)
+            }
+        }
+    }
+
+    @JvmStatic
+    fun clearAuthToken(context: Context) {
+        editBlocking(context) {
+            remove(MQConstants.PREF_AUTH_TOKEN_KEY)
+        }
+    }
+
+    @JvmStatic
+    fun isCloudSyncEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(MQConstants.PREF_CLOUD_SYNC_ENABLED_KEY, false)
+
+    @JvmStatic
+    fun saveCloudSyncEnabled(context: Context, enabled: Boolean) {
+        editBlocking(context) {
+            putBoolean(MQConstants.PREF_CLOUD_SYNC_ENABLED_KEY, enabled)
+        }
+    }
+
+    @JvmStatic
+    fun isFollowerEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(MQConstants.PREF_FOLLOWER_ENABLED_KEY, false)
+
+    @JvmStatic
+    fun saveFollowerEnabled(context: Context, enabled: Boolean) {
+        editBlocking(context) {
+            putBoolean(MQConstants.PREF_FOLLOWER_ENABLED_KEY, enabled)
+        }
+    }
+
+    @JvmStatic
+    fun loadFollowerAccount(context: Context): String =
+        prefs(context).getString(MQConstants.PREF_FOLLOWER_ACCOUNT_KEY, null)?.trim().orEmpty()
+
+    @JvmStatic
+    fun saveFollowerAccount(context: Context, account: String?) {
+        editBlocking(context) {
+            putString(
+                MQConstants.PREF_FOLLOWER_ACCOUNT_KEY,
+                account?.trim()?.takeIf { it.isNotEmpty() },
             )
         }
     }

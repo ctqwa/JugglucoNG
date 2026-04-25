@@ -1,13 +1,6 @@
 package tk.glucodata.drivers.mq
 
 import android.content.Context
-import android.os.Build
-import android.provider.Settings
-import java.io.BufferedReader
-import java.io.InputStream
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -61,17 +54,6 @@ data class MQBootstrapHistoryPoint(
 object MQBootstrapClient {
     private const val TAG = MQConstants.TAG
 
-    private data class MQLoginResult(
-        val token: String? = null,
-        val message: String? = null,
-    )
-
-    private data class PostResult(
-        val root: JSONObject? = null,
-        val failure: MQBootstrapFailure = MQBootstrapFailure.NONE,
-        val message: String? = null,
-    )
-
     private data class SnapshotRestore(
         val packetIndex: Int,
         val sampleCurrent: Int,
@@ -94,7 +76,7 @@ object MQBootstrapClient {
         val account = credentials?.account?.trim().orEmpty().takeIf { it.isNotEmpty() }
         val currentToken = authToken?.trim().orEmpty()
         if (currentToken.isEmpty() && credentials != null) {
-            val login = loginWithPhoneAndPassword(context, credentials, endpoints)
+            val login = MQCloudClient.signInWithPassword(context, credentials, endpoints)
             val freshToken = login.token?.trim().orEmpty()
             if (freshToken.isNotEmpty()) {
                 val seeded = fetchBestEffortOnce(
@@ -119,7 +101,7 @@ object MQBootstrapClient {
         if (initial.failure != MQBootstrapFailure.AUTH_EXPIRED || credentials == null) {
             return initial
         }
-        val login = loginWithPhoneAndPassword(context, credentials, endpoints)
+        val login = MQCloudClient.signInWithPassword(context, credentials, endpoints)
         val freshToken = login.token?.trim().orEmpty()
         if (freshToken.isEmpty()) {
             return initial.copy(message = login.message ?: initial.message)
@@ -181,7 +163,7 @@ object MQBootstrapClient {
         bleId: String,
         authToken: String? = null,
     ): MQBootstrapFetchResult {
-        val root = postForm(
+        val root = MQCloudClient.postForm(
             url = endpoints.findByBleIdUrl,
             form = "bleId=${bleId.urlEncode()}",
             authToken = authToken,
@@ -209,7 +191,7 @@ object MQBootstrapClient {
         qrCode: String,
         authToken: String? = null,
     ): MQBootstrapFetchResult {
-        val root = postForm(
+        val root = MQCloudClient.postForm(
             url = endpoints.qrCodeEffectiveUrl,
             form = "qrCode=${qrCode.urlEncode()}",
             authToken = authToken,
@@ -250,7 +232,7 @@ object MQBootstrapClient {
         account: String,
         authToken: String,
     ): MQBootstrapFetchResult {
-        val root = postForm(
+        val root = MQCloudClient.postForm(
             url = endpoints.queryNewestUrl,
             form = "account=${account.urlEncode()}",
             authToken = authToken,
@@ -328,7 +310,7 @@ object MQBootstrapClient {
             append("&timeZone=").append(TimeZone.getDefault().id.urlEncode())
             append("&isPage=0&pageNo=1&pageSize=100")
         }
-        val root = postForm(
+        val root = MQCloudClient.postForm(
             url = endpoints.viewAllSnapshotDetailUrl,
             form = form,
             authToken = authToken,
@@ -432,127 +414,6 @@ object MQBootstrapClient {
             recordedAtMs = parseServerTimeMs(item.opt("rd")) ?: 0L,
         )
     }
-
-    private fun loginWithPhoneAndPassword(
-        context: Context,
-        credentials: MQAuthCredentials,
-        endpoints: MQVendorEndpoints,
-    ): MQLoginResult {
-        val versionCode = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
-        }.getOrDefault(0L)
-        val agent = "${Build.BRAND}_${Build.MODEL}_${Build.VERSION.RELEASE}_$versionCode"
-        val imei = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-            ?.take(15)
-            ?.takeIf { it.isNotBlank() }
-            ?: "899999999999999"
-        val form = buildString {
-            append("account=").append(credentials.account.urlEncode())
-            append("&password=").append(credentials.password.urlEncode())
-            append("&agent=").append(agent.urlEncode())
-            append("&imei=").append(imei.urlEncode())
-            append("&model=").append("Android_Phone".urlEncode())
-            append("&type=").append("4".urlEncode())
-        }
-        val root = postForm(
-            url = endpoints.loginWithPasswordUrl,
-            form = form,
-            authToken = null,
-        )
-        if (root.failure != MQBootstrapFailure.NONE) {
-            return MQLoginResult(message = root.message)
-        }
-        val token = root.root
-            ?.optJSONObject("result")
-            ?.optStringOrNull("token")
-        if (token.isNullOrBlank()) {
-            return MQLoginResult(message = root.message ?: "MQ login returned no token")
-        }
-        Log.i(TAG, "MQ vendor login refreshed bootstrap token")
-        return MQLoginResult(token = token)
-    }
-
-    private fun postForm(
-        url: String,
-        form: String,
-        authToken: String?,
-    ): PostResult {
-        var connection: HttpURLConnection? = null
-        return try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = MQConstants.VENDOR_TIMEOUT_MS
-                readTimeout = MQConstants.VENDOR_TIMEOUT_MS
-                doInput = true
-                doOutput = true
-                setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                setRequestProperty("Content-Length", form.toByteArray().size.toString())
-                authToken?.takeIf { it.isNotBlank() }?.let {
-                    setRequestProperty("X-Access-Token", it)
-                }
-            }
-            connection.outputStream.use { it.write(form.toByteArray()) }
-            val stream = if (connection.responseCode in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-            val body = stream?.readUtf8Body().orEmpty()
-            if (body.isBlank()) {
-                Log.w(TAG, "MQ bootstrap returned empty body from $url (http=${connection.responseCode})")
-                return PostResult(
-                    failure = MQBootstrapFailure.SERVER,
-                    message = "empty body",
-                )
-            }
-            val root = JSONObject(body)
-            val code = root.optString("code").toIntOrNull()
-            val message = root.optStringOrNull("message")
-            if (connection.responseCode in 200..299 && code == 200) {
-                return PostResult(root = root, message = message)
-            }
-            val failure = classifyFailure(connection.responseCode, message)
-            Log.w(
-                TAG,
-                "MQ bootstrap rejected by $url: appCode=$code http=${connection.responseCode} body=$body",
-            )
-            PostResult(
-                root = root,
-                failure = failure,
-                message = message ?: "http=${connection.responseCode}",
-            )
-        } catch (t: Throwable) {
-            Log.stack(TAG, "MQ bootstrap POST $url", t)
-            PostResult(
-                failure = MQBootstrapFailure.NETWORK,
-                message = t.message,
-            )
-        } finally {
-            runCatching { connection?.disconnect() }
-        }
-    }
-
-    private fun classifyFailure(httpCode: Int, message: String?): MQBootstrapFailure {
-        val normalized = message.orEmpty()
-        if (httpCode == HttpURLConnection.HTTP_UNAUTHORIZED ||
-            httpCode == HttpURLConnection.HTTP_FORBIDDEN ||
-            normalized.contains("Token", ignoreCase = true) ||
-            normalized.contains("重新登录")
-        ) {
-            return MQBootstrapFailure.AUTH_EXPIRED
-        }
-        return MQBootstrapFailure.SERVER
-    }
-
-    private fun InputStream.readUtf8Body(): String =
-        BufferedReader(InputStreamReader(this)).use { reader ->
-            buildString {
-                while (true) {
-                    val line = reader.readLine() ?: break
-                    append(line)
-                }
-            }
-        }
 
     private fun MQBootstrapConfig?.merge(other: MQBootstrapConfig?): MQBootstrapConfig? {
         if (this == null) return other

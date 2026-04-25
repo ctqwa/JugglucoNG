@@ -39,7 +39,7 @@ class GlucoseRepository {
      */
     private val _currentSerial = MutableStateFlow(
         SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()),
+            selectedMain = SensorIdentity.resolveMainSensor(),
             preferredSensorId = null,
             activeSensors = Natives.activeSensors()
         ) ?: ""
@@ -52,7 +52,7 @@ class GlucoseRepository {
      */
     fun refreshSensorSerial(preferredSerial: String? = null) {
         val current = _currentSerial.value
-        val nativeCurrent = SensorIdentity.resolveAppSensorId(Natives.lastsensorname())
+        val nativeCurrent = SensorIdentity.resolveMainSensor()
             ?.takeIf { it.isNotBlank() }
         val resolved = preferredSerial?.takeIf { it.isNotBlank() }
             ?: nativeCurrent
@@ -123,7 +123,7 @@ class GlucoseRepository {
 
     suspend fun syncLatestNativeReadingOnce() {
         val serial = _currentSerial.value.takeIf { it.isNotBlank() }
-            ?: SensorIdentity.resolveAppSensorId(Natives.lastsensorname())
+            ?: SensorIdentity.resolveMainSensor()
             ?: Natives.lastsensorname()
         if (!SensorIdentity.shouldUseNativeHistorySync(serial)) {
             Log.d(TAG, "syncLatestNativeReadingOnce skipped for driver-owned Room sensor '$serial'")
@@ -206,7 +206,7 @@ class GlucoseRepository {
             ?.takeIf { it.isNotBlank() }
             ?: _currentSerial.value.takeIf { it.isNotBlank() }
         return SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()),
+            selectedMain = SensorIdentity.resolveMainSensor(),
             preferredSensorId = preferred,
             activeSensors = Natives.activeSensors()
         ) ?: preferred

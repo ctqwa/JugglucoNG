@@ -64,6 +64,7 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.delay
 import tk.glucodata.Natives
 import tk.glucodata.R
+import tk.glucodata.drivers.nightscout.NightscoutFollowerRegistry
 import tk.glucodata.ui.components.CardPosition
 import tk.glucodata.ui.components.MasterSwitchCard
 import tk.glucodata.ui.components.SettingsSwitchItem
@@ -79,6 +80,7 @@ fun NightscoutSettingsScreen(navController: NavController) {
     var isActive by rememberSaveable { mutableStateOf(Natives.getuseuploader()) }
     var sendTreatments by rememberSaveable { mutableStateOf(Natives.getpostTreatments()) }
     var isV3 by rememberSaveable { mutableStateOf(Natives.getnightscoutV3()) }
+    var followServer by rememberSaveable { mutableStateOf(NightscoutFollowerRegistry.loadConfig(context).enabled) }
     var showSecret by rememberSaveable { mutableStateOf(false) }
     var lastResponseCode by rememberSaveable { mutableStateOf(0) }
     var lastAttemptTime by rememberSaveable { mutableStateOf(0L) }
@@ -89,6 +91,7 @@ fun NightscoutSettingsScreen(navController: NavController) {
     fun persistSettings() {
         Natives.setNightUploader(url.trim(), secret.trim(), isActive, isV3)
         Natives.setpostTreatments(sendTreatments)
+        NightscoutFollowerRegistry.saveConfig(context, followServer, url, secret)
     }
 
     fun refreshStatus() {
@@ -300,6 +303,33 @@ fun NightscoutSettingsScreen(navController: NavController) {
                         icon = Icons.Default.Science,
                         iconTint = MaterialTheme.colorScheme.tertiary,
                         enabled = isActive,
+                        position = CardPosition.MIDDLE
+                    )
+
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.nightscout_follow_title),
+                        subtitle = stringResource(R.string.nightscout_follow_desc),
+                        checked = followServer,
+                        onCheckedChange = { enabled ->
+                            if (enabled && NightscoutFollowerRegistry.normalizeUrl(url).isBlank()) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.nightscout_follow_url_required),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@SettingsSwitchItem
+                            }
+                            followServer = enabled
+                            persistSettings()
+                            if (enabled) {
+                                NightscoutFollowerRegistry.enableFollowerSensor(context, url, secret)
+                            } else {
+                                NightscoutFollowerRegistry.disableFollowerSensor(context)
+                            }
+                        },
+                        icon = Icons.Default.Link,
+                        iconTint = MaterialTheme.colorScheme.secondary,
+                        enabled = true,
                         position = CardPosition.BOTTOM
                     )
                 }

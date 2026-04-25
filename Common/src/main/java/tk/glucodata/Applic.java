@@ -833,11 +833,22 @@ public class Applic extends Application implements androidx.work.Configuration.P
 
             // Preserve an explicit non-active selection across startup. Historical sensors
             // are still valid dashboard targets even if they are not in activeSensors().
-            // Only seed an empty current selection from the first active sensor.
+            // Virtual/cloud-only sensors must not stay in native lastsensorname: native
+            // status/history paths will try to open non-existent sensor files and spam
+            // getSensorData last()<0. Migrate those ids into the managed current slot.
             try {
                 String currentSensor = Natives.lastsensorname();
+                if (currentSensor != null && !currentSensor.isEmpty()
+                        && !tk.glucodata.SensorIdentity.hasNativeSensorBacking(currentSensor)) {
+                    tk.glucodata.ManagedCurrentSensor.set(currentSensor);
+                    Natives.setcurrentsensor("");
+                    Log.i("Applic", "Moved virtual current sensor '" + currentSensor + "' out of native lastsensorname");
+                    currentSensor = "";
+                }
                 String[] active = Natives.activeSensors();
-                if ((currentSensor == null || currentSensor.isEmpty()) && active != null && active.length > 0) {
+                if ((currentSensor == null || currentSensor.isEmpty())
+                        && tk.glucodata.ManagedCurrentSensor.get() == null
+                        && active != null && active.length > 0) {
                     Natives.setcurrentsensor(active[0]);
                     Log.i("Applic", "Seeded empty lastsensorname from first active sensor '" + active[0] + "'");
                 }

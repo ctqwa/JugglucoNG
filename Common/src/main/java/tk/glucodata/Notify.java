@@ -1338,7 +1338,7 @@ public class Notify {
 
     private static String resolvePrimarySensorName() {
         try {
-            final String mainName = SensorIdentity.resolveAppSensorId(Natives.lastsensorname());
+            final String mainName = SensorIdentity.resolveMainSensor();
             if (mainName != null && !mainName.isEmpty()) {
                 return mainName;
             }
@@ -1360,6 +1360,16 @@ public class Notify {
 
     private static int resolveSensorViewMode(String sensorName) {
         if (sensorName == null || sensorName.isEmpty()) {
+            return 0;
+        }
+        try {
+            final var managedSnapshot = ManagedSensorRuntime.resolveUiSnapshot(sensorName, sensorName);
+            if (managedSnapshot != null) {
+                return managedSnapshot.getViewMode();
+            }
+        } catch (Throwable ignored) {
+        }
+        if (!SensorIdentity.hasNativeSensorBacking(sensorName)) {
             return 0;
         }
         try {

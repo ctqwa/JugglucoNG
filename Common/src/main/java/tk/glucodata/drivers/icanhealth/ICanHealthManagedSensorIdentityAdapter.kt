@@ -139,6 +139,19 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     override fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
         resolveCanonicalSensorId(sensorId) != null
 
+    override fun usesNativeDirectStreamShell(sensorId: String?): Boolean =
+        resolveCanonicalSensorId(sensorId) != null
+
+    override fun hasNativeSensorBacking(sensorId: String?): Boolean? {
+        val canonical = resolveCanonicalSensorId(sensorId) ?: return null
+        val record = ICanHealthRegistry.findRecord(Applic.app, canonical) ?: return null
+        val driver = SensorBluetooth.mygatts()
+            .asSequence()
+            .mapNotNull { it as? ManagedBluetoothSensorDriver }
+            .firstOrNull { it.matchesManagedSensorId(record.sensorId) }
+        return driver?.hasNativeSensorBacking() ?: true
+    }
+
     override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? {
         val canonical = resolveCanonicalSensorId(sensorId) ?: return null
         val hasPersistedRecord = ICanHealthRegistry.findRecord(Applic.app, canonical) != null

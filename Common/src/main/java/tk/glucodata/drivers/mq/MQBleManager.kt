@@ -32,6 +32,7 @@ import tk.glucodata.Log
 import tk.glucodata.Natives
 import tk.glucodata.SuperGattCallback
 import tk.glucodata.UiRefreshBus
+import tk.glucodata.drivers.VirtualGlucoseSensorBridge
 
 @SuppressLint("MissingPermission")
 class MQBleManager(
@@ -69,6 +70,13 @@ class MQBleManager(
 
         /** Reconnect replay can span multiple 0x04 frames before 0x05 arrives. */
         private const val BG_BURST_FLUSH_DELAY_MS = 750L
+
+        /** Avoid hammering Glutec cloud bookkeeping on every packet. */
+        private const val CLOUD_SESSION_RETRY_MS = 60_000L
+        private const val CLOUD_HISTORY_BACKFILL_RETRY_MS = 10L * 60L * 1000L
+        private const val CLOUD_HISTORY_BACKFILL_LOOKBACK_MS = 20L * 24L * 60L * 60L * 1000L
+        private const val CLOUD_HISTORY_BACKFILL_OVERLAP_MS = 15L * 60L * 1000L
+        private const val CLOUD_HISTORY_BACKFILL_FUTURE_GRACE_MS = 5L * 60L * 1000L
     }
 
     enum class Phase { IDLE, CONNECTING, DISCOVERING, STREAMING }
@@ -133,6 +141,13 @@ class MQBleManager(
     @Volatile private var localResetPending: Boolean = false
     @Volatile private var serviceDiscoveryHandled: Boolean = false
     @Volatile private var serviceDiscoveryRetryCount: Int = 0
+    @Volatile private var cloudSessionSyncInFlight: Boolean = false
+    @Volatile private var cloudSessionAttemptedAtMs: Long = 0L
+    @Volatile private var cloudHistoryBackfillInFlight: Boolean = false
+    @Volatile private var cloudHistoryBackfillAttemptedAtMs: Long = 0L
+    @Volatile private var lastCloudHistoryBackfillTailMs: Long = 0L
+    @Volatile private var lastAnnouncedCloudSnapshotId: String = ""
+    @Volatile private var lastCloudReportedPacketIndex: Int = -1
     private val pendingBgBurstRecords = LinkedHashMap<Int, PendingBgRecord>()
 
     override var viewMode: Int = 0
@@ -279,6 +294,7 @@ class MQBleManager(
         packages = MQRegistry.loadPackages(context, id)
         lastProcessed = MQRegistry.loadLastProcessed(context, id).toDouble().coerceAtLeast(0.0)
         lastPacketIndex = MQRegistry.loadLastPacketIndex(context, id)
+        lastCloudReportedPacketIndex = MQRegistry.loadLastCloudReportedPacketIndex(context, id)
         lastObservedPacketIndex = lastPacketIndex
         crcXorOut = if (protocolType == 2) 0x0100 else 0x0000
         ensureNativeDataptr(id)
@@ -293,6 +309,7 @@ class MQBleManager(
         if (needsVendorBootstrap()) {
             maybeRefreshBootstrapAsync(context, "restore")
         }
+        maybeFetchCloudHistoryBackfillAsync(context, "restore")
     }
 
     private fun persistSensorStart(context: Context, timestamp: Long) {
@@ -615,6 +632,7 @@ class MQBleManager(
     }
 
     override fun terminateManagedSensor(wipeData: Boolean) {
+        Applic.app?.let { maybeEndCloudSessionAsync(it, "terminate") }
         setPause(true)
         cancelReconnect()
         flushPendingBgBurst("terminate")
@@ -641,6 +659,7 @@ class MQBleManager(
             Log.w(TAG, "MQ reset rejected: GATT write path not ready")
             return false
         }
+        Applic.app?.let { maybeEndCloudSessionAsync(it, "reset") }
         markLocalResetPending()
         handler.postDelayed({
             if (!stop) {
@@ -1112,25 +1131,89 @@ class MQBleManager(
 
     private fun importBootstrapHistory(history: List<MQBootstrapHistoryPoint>, sensorId: String) {
         if (history.isEmpty()) return
-        val latestRoomTimestamp = HistorySyncAccess.getLatestTimestampForSensor(sensorId)
-        val deduped = LinkedHashMap<Long, MQBootstrapHistoryPoint>()
-        history
-            .asSequence()
-            .filter { it.timestampMs > latestRoomTimestamp && it.glucoseMgdl.isFinite() && it.glucoseMgdl > 0f }
-            .forEach { deduped[it.timestampMs] = it }
-        if (deduped.isEmpty()) return
-
-        val ordered = deduped.values
-            .sortedWith(compareBy<MQBootstrapHistoryPoint> { it.timestampMs }.thenBy { it.packetIndex })
-        val timestamps = LongArray(ordered.size)
-        val values = FloatArray(ordered.size)
-        val rawValues = FloatArray(ordered.size) { Float.NaN }
-        ordered.forEachIndexed { index, point ->
-            timestamps[index] = point.timestampMs
-            values[index] = point.glucoseMgdl
+        val imported = VirtualGlucoseSensorBridge.importHistory(
+            sensorSerial = sensorId,
+            readings = history.map { point ->
+                VirtualGlucoseSensorBridge.Reading(
+                    timestampMs = point.timestampMs,
+                    glucoseMgdl = point.glucoseMgdl,
+                )
+            },
+            logLabel = "MQ snapshot",
+        )
+        if (imported > 0) {
+            Log.i(TAG, "Imported $imported MQ snapshot history points into local history")
         }
-        HistorySyncAccess.storeSensorHistoryBatchAsync(sensorId, timestamps, values, rawValues)
-        Log.i(TAG, "Imported ${ordered.size} MQ snapshot history points into local history")
+    }
+
+    private fun maybeFetchCloudHistoryBackfillAsync(
+        context: Context,
+        reason: String,
+        snapshotIdOverride: String? = null,
+    ) {
+        val sensorId = SerialNumber ?: return
+        val snapshotId = snapshotIdOverride?.trim().orEmpty()
+            .ifEmpty { MQRegistry.loadSnapshotId(context, sensorId)?.trim().orEmpty() }
+            .takeIf { it.isNotEmpty() } ?: return
+        val accountState = MQRegistry.loadAccountState(context)
+        if (accountState.authToken.isNullOrBlank() && accountState.credentials == null) return
+        val now = System.currentTimeMillis()
+        if (cloudHistoryBackfillInFlight ||
+            now - cloudHistoryBackfillAttemptedAtMs < CLOUD_HISTORY_BACKFILL_RETRY_MS
+        ) {
+            return
+        }
+        cloudHistoryBackfillInFlight = true
+        cloudHistoryBackfillAttemptedAtMs = now
+        handler.post {
+            try {
+                val token = ensureCloudSyncToken(context, accountState) ?: return@post
+                val previousBackfillTailMs = lastCloudHistoryBackfillTailMs
+                val latestRoomMs = HistorySyncAccess.getLatestTimestampForSensor(sensorId)
+                val persistedStartMs = MQRegistry.loadSensorStartAt(context, sensorId)
+                val startMs = when {
+                    previousBackfillTailMs > 0L -> (previousBackfillTailMs - CLOUD_HISTORY_BACKFILL_OVERLAP_MS).coerceAtLeast(1L)
+                    sensorStartAtMs > 0L -> sensorStartAtMs
+                    persistedStartMs > 0L -> persistedStartMs
+                    latestRoomMs > 0L -> (latestRoomMs - CLOUD_HISTORY_BACKFILL_OVERLAP_MS).coerceAtLeast(1L)
+                    else -> (now - CLOUD_HISTORY_BACKFILL_LOOKBACK_MS).coerceAtLeast(1L)
+                }
+                val result = MQCloudClient.fetchSnapshotTimeBucketHistory(
+                    context = context,
+                    authToken = token,
+                    snapshotId = snapshotId,
+                    startTimeMs = startMs,
+                    endTimeMs = now + CLOUD_HISTORY_BACKFILL_FUTURE_GRACE_MS,
+                )
+                when {
+                    result.failure == MQBootstrapFailure.AUTH_EXPIRED -> {
+                        MQRegistry.clearAuthToken(context)
+                        Log.w(TAG, "MQ cloud history auth expired ($reason)")
+                    }
+                    result.history.isNotEmpty() -> {
+                        importBootstrapHistory(result.history, sensorId)
+                        lastCloudHistoryBackfillTailMs = maxOf(
+                            lastCloudHistoryBackfillTailMs,
+                            result.history.maxOf { it.timestampMs },
+                        )
+                        Log.i(
+                            TAG,
+                            "MQ cloud history backfill synced ($reason): snapshot=$snapshotId points=${result.history.size}",
+                        )
+                    }
+                    result.failure != MQBootstrapFailure.NONE -> {
+                        Log.w(TAG, "MQ cloud history backfill failed ($reason): ${result.message}")
+                    }
+                    else -> {
+                        Log.i(TAG, "MQ cloud history backfill empty ($reason): snapshot=$snapshotId")
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "maybeFetchCloudHistoryBackfillAsync($reason)", t)
+            } finally {
+                cloudHistoryBackfillInFlight = false
+            }
+        }
     }
 
     private fun applyBootstrapFetchResult(
@@ -1146,6 +1229,7 @@ class MQBleManager(
             MQRegistry.applyBootstrapConfig(context, sensorId, result.config)
             restoreFromPersistence(context)
             importBootstrapHistory(result.history, sensorId)
+            maybeFetchCloudHistoryBackfillAsync(context, "bootstrap-$reason", result.config.snapshotId)
             if (hasUsableSlopeSeed()) {
                 lastBootstrapFailure = MQBootstrapFailure.NONE
                 lastBootstrapMessage = ""
@@ -1160,6 +1244,246 @@ class MQBleManager(
         Log.w(TAG, "MQ bootstrap unavailable for $sensorId ($reason): ${result.message}")
         UiRefreshBus.requestStatusRefresh()
         return false
+    }
+
+    private fun ensureCloudSyncToken(
+        context: Context,
+        accountState: MQRegistry.AccountState,
+    ): String? {
+        accountState.authToken?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        val credentials = accountState.credentials ?: return null
+        val login = MQCloudClient.signInWithPassword(context, credentials)
+        val token = login.token?.trim().orEmpty()
+        if (token.isNotEmpty()) {
+            MQRegistry.saveAuthToken(context, token)
+            return token
+        }
+        if (login.failure == MQBootstrapFailure.AUTH_EXPIRED) {
+            MQRegistry.clearAuthToken(context)
+        }
+        Log.w(TAG, "MQ sync login unavailable: ${login.message}")
+        return null
+    }
+
+    private fun maybeEnsureCloudSessionAsync(context: Context, reason: String) {
+        if (!MQRegistry.isCloudSyncEnabled(context)) return
+        val sensorId = SerialNumber ?: return
+        val qrCode = MQRegistry.loadQrContent(context, sensorId)?.trim().orEmpty().takeIf { it.isNotEmpty() } ?: return
+        val accountState = MQRegistry.loadAccountState(context)
+        val account = accountState.phone.trim().takeIf { it.isNotEmpty() } ?: return
+        val bleId = resolveBootstrapBleId(context, sensorId)
+            ?.let { MQConstants.canonicalSensorId(it) }
+            ?.takeIf { it.isNotEmpty() }
+            ?: return
+        val snapshotId = MQRegistry.loadSnapshotId(context, sensorId)?.trim().orEmpty()
+        if (snapshotId.isNotEmpty()) {
+            maybeFetchCloudHistoryBackfillAsync(context, "session-$reason", snapshotId)
+        }
+        if (snapshotId.isNotEmpty() && snapshotId == lastAnnouncedCloudSnapshotId) return
+        val now = System.currentTimeMillis()
+        if (cloudSessionSyncInFlight || now - cloudSessionAttemptedAtMs < CLOUD_SESSION_RETRY_MS) return
+        cloudSessionSyncInFlight = true
+        cloudSessionAttemptedAtMs = now
+        handler.post {
+            try {
+                val token = ensureCloudSyncToken(context, accountState) ?: return@post
+                if (snapshotId.isNotEmpty()) {
+                    val result = MQCloudClient.continueWearSession(
+                        context = context,
+                        authToken = token,
+                        snapshotId = snapshotId,
+                        bleId = bleId,
+                        qrCode = qrCode,
+                    )
+                    when {
+                        result.success -> {
+                            lastAnnouncedCloudSnapshotId = snapshotId
+                            Log.i(TAG, "MQ cloud continue-wear synced ($reason): snapshot=$snapshotId")
+                        }
+                        result.failure == MQBootstrapFailure.AUTH_EXPIRED -> {
+                            MQRegistry.clearAuthToken(context)
+                            Log.w(TAG, "MQ cloud session sync auth expired ($reason)")
+                        }
+                        else -> {
+                            Log.w(TAG, "MQ cloud session sync failed ($reason): ${result.message}")
+                        }
+                    }
+                } else {
+                    val result = MQCloudClient.startWearSession(
+                        context = context,
+                        authToken = token,
+                        bleId = bleId,
+                        mac = bleId,
+                        account = account,
+                        qrCode = qrCode,
+                    )
+                    when {
+                        result.success && !result.snapshotId.isNullOrBlank() -> {
+                            MQRegistry.saveSnapshotId(context, sensorId, result.snapshotId)
+                            MQRegistry.saveLastCloudReportedPacketIndex(context, sensorId, -1)
+                            lastAnnouncedCloudSnapshotId = result.snapshotId
+                            lastCloudReportedPacketIndex = -1
+                            maybeFetchCloudHistoryBackfillAsync(context, "session-start-$reason", result.snapshotId)
+                            Log.i(TAG, "MQ cloud start-wear created snapshot=${result.snapshotId} ($reason)")
+                        }
+                        result.failure == MQBootstrapFailure.AUTH_EXPIRED -> {
+                            MQRegistry.clearAuthToken(context)
+                            Log.w(TAG, "MQ cloud session sync auth expired ($reason)")
+                        }
+                        else -> {
+                            Log.w(TAG, "MQ cloud session sync failed ($reason): ${result.message}")
+                        }
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "maybeEnsureCloudSessionAsync($reason)", t)
+            } finally {
+                cloudSessionSyncInFlight = false
+            }
+        }
+    }
+
+    private fun maybeUploadCalibrationSyncAsync(
+        context: Context,
+        packetIndex: Int,
+        sampleMs: Long,
+        referenceBgTimes10Mmol: Double,
+        solvedK: Double,
+        solvedB: Double,
+    ) {
+        if (!MQRegistry.isCloudSyncEnabled(context)) return
+        val sensorId = SerialNumber ?: return
+        val snapshotId = MQRegistry.loadSnapshotId(context, sensorId)?.trim().orEmpty().takeIf { it.isNotEmpty() } ?: return
+        val accountState = MQRegistry.loadAccountState(context)
+        handler.post {
+            try {
+                val token = ensureCloudSyncToken(context, accountState) ?: return@post
+                val bgValueMmol = referenceBgTimes10Mmol / 10.0
+                val eventResult = MQCloudClient.uploadCalibrationEvent(
+                    context = context,
+                    authToken = token,
+                    snapshotId = snapshotId,
+                    packetIndex = packetIndex,
+                    bagTimeMs = sampleMs,
+                    bgValueMmol = bgValueMmol,
+                    referenceK = solvedK,
+                    referenceB = solvedB,
+                )
+                val timeResult = MQCloudClient.uploadCalibrationTime(
+                    context = context,
+                    authToken = token,
+                    snapshotId = snapshotId,
+                    bagTimeMs = sampleMs,
+                    packetIndex = packetIndex,
+                )
+                if (eventResult.success && timeResult.success) {
+                    Log.i(TAG, "MQ cloud calibration synced: snapshot=$snapshotId packet=$packetIndex")
+                } else if (eventResult.failure == MQBootstrapFailure.AUTH_EXPIRED ||
+                    timeResult.failure == MQBootstrapFailure.AUTH_EXPIRED
+                ) {
+                    MQRegistry.clearAuthToken(context)
+                    Log.w(TAG, "MQ cloud calibration sync auth expired")
+                } else {
+                    Log.w(
+                        TAG,
+                        "MQ cloud calibration sync incomplete: event=${eventResult.message} time=${timeResult.message}",
+                    )
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "maybeUploadCalibrationSyncAsync", t)
+            }
+        }
+    }
+
+    private fun maybeUploadLiveReportAsync(
+        context: Context,
+        rec: MQBgRecord,
+        result: MQAlgorithm.Result,
+    ) {
+        if (!MQRegistry.isCloudSyncEnabled(context)) return
+        val sensorId = SerialNumber ?: return
+        val snapshotId = MQRegistry.loadSnapshotId(context, sensorId)?.trim().orEmpty().takeIf { it.isNotEmpty() } ?: return
+        if (rec.packetIndex <= lastCloudReportedPacketIndex) return
+        val accountState = MQRegistry.loadAccountState(context)
+        val calculateData = buildVendorCalculateData(rec, result)
+        handler.post {
+            try {
+                if (rec.packetIndex <= lastCloudReportedPacketIndex) return@post
+                val token = ensureCloudSyncToken(context, accountState) ?: return@post
+                val upload = MQCloudClient.reportData(
+                    context = context,
+                    authToken = token,
+                    snapshotId = snapshotId,
+                    calculateDataHex = listOf(calculateData),
+                )
+                if (upload.success) {
+                    lastCloudReportedPacketIndex = rec.packetIndex
+                    MQRegistry.saveLastCloudReportedPacketIndex(context, sensorId, rec.packetIndex)
+                    Log.i(TAG, "MQ cloud report synced: snapshot=$snapshotId packet=${rec.packetIndex}")
+                } else if (upload.failure == MQBootstrapFailure.AUTH_EXPIRED) {
+                    MQRegistry.clearAuthToken(context)
+                    Log.w(TAG, "MQ cloud report auth expired")
+                } else {
+                    Log.w(TAG, "MQ cloud report failed: ${upload.message}")
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "maybeUploadLiveReportAsync", t)
+            }
+        }
+    }
+
+    private fun buildVendorCalculateData(
+        rec: MQBgRecord,
+        result: MQAlgorithm.Result,
+    ): String {
+        fun leU16(value: Int): String {
+            val normalized = value.coerceAtLeast(0) and 0xFFFF
+            val hex = "%04x".format(Locale.US, normalized)
+            return hex.substring(2, 4) + hex.substring(0, 2)
+        }
+        fun u8(value: Int): String = "%02x".format(Locale.US, value.coerceIn(0, 0xFF))
+
+        // The vendor app appends a trailing "0" nibble after the byte-aligned
+        // payload. We preserve that wire shape, but keep battery byte-aligned.
+        return buildString(21) {
+            append("40")
+            append(leU16(rec.packetIndex))
+            append(leU16(rec.sampleCurrent))
+            append(u8(rec.batteryPercent))
+            append(leU16(result.reviseCurrent2.toInt()))
+            append(leU16(result.glucoseTimes10Mmol))
+            append('0')
+        }
+    }
+
+    private fun maybeEndCloudSessionAsync(context: Context, reason: String) {
+        if (!MQRegistry.isCloudSyncEnabled(context)) return
+        val sensorId = SerialNumber ?: return
+        val snapshotId = MQRegistry.loadSnapshotId(context, sensorId)?.trim().orEmpty().takeIf { it.isNotEmpty() } ?: return
+        val accountState = MQRegistry.loadAccountState(context)
+        handler.post {
+            try {
+                val token = ensureCloudSyncToken(context, accountState) ?: return@post
+                val result = MQCloudClient.endWearSession(
+                    context = context,
+                    authToken = token,
+                    snapshotId = snapshotId,
+                )
+                if (result.success) {
+                    if (lastAnnouncedCloudSnapshotId == snapshotId) {
+                        lastAnnouncedCloudSnapshotId = ""
+                    }
+                    Log.i(TAG, "MQ cloud end-wear synced ($reason): snapshot=$snapshotId")
+                } else if (result.failure == MQBootstrapFailure.AUTH_EXPIRED) {
+                    MQRegistry.clearAuthToken(context)
+                    Log.w(TAG, "MQ cloud end-wear auth expired ($reason)")
+                } else {
+                    Log.w(TAG, "MQ cloud end-wear failed ($reason): ${result.message}")
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "maybeEndCloudSessionAsync($reason)", t)
+            }
+        }
     }
 
     private fun maybeRefreshBootstrapAsync(context: Context, reason: String) {
@@ -1284,6 +1608,18 @@ class MQBleManager(
             pendingReferenceBgTimes10Mmol = 0.0
         }
         persistAlgorithmState()
+        if (manualReference > 0.0) {
+            Applic.app?.let { context ->
+                maybeUploadCalibrationSyncAsync(
+                    context = context,
+                    packetIndex = rec.packetIndex,
+                    sampleMs = sampleMs,
+                    referenceBgTimes10Mmol = manualReference,
+                    solvedK = result.kValue,
+                    solvedB = result.bValue,
+                )
+            }
+        }
         if (result.glucoseTimes10Mmol > 0 && hasValidSlopeSeed(result.kValue)) {
             clearLocalResetPending("live-calculated-k")
         }
@@ -1366,6 +1702,8 @@ class MQBleManager(
             }
         }
         ensureNativeDataptr(SerialNumber)
+        Applic.app?.let { maybeEnsureCloudSessionAsync(it, "bg-data") }
+        Applic.app?.let { maybeFetchCloudHistoryBackfillAsync(it, "bg-data") }
         queuePendingBgBurst(records, nowMs)
         writeFrame(MagicAck.bgData00.copyOf(), "confirmBgData(magic)")
     }
@@ -1456,6 +1794,7 @@ class MQBleManager(
             highestProcessedPacketIndex = maxOf(highestProcessedPacketIndex, rec.packetIndex)
             mirrorReadingIntoNative(sampleMs, result.mgdlTimes10 / 10)
             emitGlucose(result, sampleMs)
+            Applic.app?.let { maybeUploadLiveReportAsync(it, rec, result) }
         }
         if (highestProcessedPacketIndex != lastPacketIndex) {
             lastPacketIndex = highestProcessedPacketIndex

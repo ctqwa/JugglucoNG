@@ -52,6 +52,9 @@ object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     override fun resolveNativeSensorName(sensorId: String?): String? {
         val raw = sensorId?.trim().takeIf { !it.isNullOrEmpty() } ?: return null
         val canonical = resolveCanonicalSensorId(raw) ?: raw
+        MQRegistry.findRecord(Applic.app, canonical)
+            ?.takeIf { it.isFollower }
+            ?.let { return null }
         return canonical.takeIf { MQConstants.isLikelyPersistedSensorName(it) }
     }
 
@@ -72,7 +75,19 @@ object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
         val canonical = resolveCanonicalSensorId(sensorId)
             ?.takeIf { it.isNotBlank() && !MQConstants.isProvisionalSensorId(it) }
             ?: return null
-        return MQBleManager(canonical, dataptr).also { it.restoreFromPersistence(context) }
+        val record = MQRegistry.findRecord(context, canonical) ?: return null
+        return when (record.mode) {
+            MQRegistry.SensorRecordMode.LOCAL ->
+                MQBleManager(canonical, dataptr).also { it.restoreFromPersistence(context) }
+
+            MQRegistry.SensorRecordMode.FOLLOWER ->
+                MQFollowerManager(
+                    serial = canonical,
+                    followerAccount = record.followerAccount,
+                    initialDisplayName = record.displayName,
+                    dataptr = dataptr,
+                )
+        }
     }
 
     override fun removePersistedSensor(context: Context, sensorId: String?) {
@@ -80,16 +95,30 @@ object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     }
 
     override fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
-        resolveCanonicalSensorId(sensorId) != null
+        resolveCanonicalSensorId(sensorId)
+            ?.let { MQRegistry.findRecord(Applic.app, it) }
+            ?.mode == MQRegistry.SensorRecordMode.LOCAL
 
     override fun usesNativeDirectStreamShell(sensorId: String?): Boolean =
-        resolveCanonicalSensorId(sensorId) != null
+        resolveCanonicalSensorId(sensorId)
+            ?.let { MQRegistry.findRecord(Applic.app, it) }
+            ?.mode == MQRegistry.SensorRecordMode.LOCAL
+
+    override fun hasNativeSensorBacking(sensorId: String?): Boolean? {
+        val canonical = resolveCanonicalSensorId(sensorId) ?: return null
+        val record = MQRegistry.findRecord(Applic.app, canonical) ?: return null
+        return !record.isFollower
+    }
 
     override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? {
         val canonical = resolveCanonicalSensorId(sensorId) ?: return null
-        val hasPersisted = MQRegistry.findRecord(Applic.app, canonical) != null
-        // Match iCanHealth semantics: if we manage the record, skip native
-        // history sync; if we've only seen it once via restore, fall back.
-        return !hasPersisted
+        val record = MQRegistry.findRecord(Applic.app, canonical) ?: return null
+        return if (record.isFollower) {
+            false
+        } else {
+            // Match iCanHealth semantics: persisted managed records own Room
+            // history; the native path should stay out of the way.
+            false
+        }
     }
 }

@@ -20,7 +20,6 @@ import tk.glucodata.drivers.ManagedSensorMaintenanceDriver
 import tk.glucodata.drivers.ManagedSensorUiFamily
 import tk.glucodata.drivers.ManagedSensorUiSignals
 import tk.glucodata.drivers.ManagedSensorUiSnapshot
-import tk.glucodata.drivers.mq.MQAuthCredentials
 import tk.glucodata.drivers.mq.MQBootstrapClient
 import tk.glucodata.drivers.mq.MQDriver
 import tk.glucodata.drivers.mq.MQRegistry
@@ -86,6 +85,7 @@ data class SensorInfo(
     val vendorCalibrations: List<VendorCalibrationInfo> = emptyList(),  // AiDex: calibration records from sensor
     val isVendorConnected: Boolean = false,  // AiDex: vendor BLE stack actively connected
     val batteryMillivolts: Int = 0,  // AiDex: sensor battery voltage in mV (0 = not yet received)
+    val batteryPercent: Int = -1,  // MQ: vendor reports battery as percent, not voltage
     val isSensorExpired: Boolean = false,  // AiDex: sensor has reported itself as expired
     // Edit 58a/58b/58c: Parsed sensor metadata from vendor protocol
     val sensorRemainingHours: Int = -1,  // AiDex: hours remaining (-1 = unknown)
@@ -234,8 +234,7 @@ class SensorViewModel : ViewModel() {
     fun setMain(serial: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val nativeSerial = SensorIdentity.resolveNativeSensorName(serial) ?: serial
-                Natives.setcurrentsensor(nativeSerial)
+                SensorBluetooth.setCurrentSensorSelection(serial)
                 // Ensure this sensor's data is synced into Room (non-destructive)
                 tk.glucodata.data.HistorySync.mergeFullSyncForSensor(serial)
                 refreshSensorsWithDeviceSync()
@@ -315,6 +314,7 @@ class SensorViewModel : ViewModel() {
             vendorCalibrations = vendorCalibrations,
             isVendorConnected = snapshot.isVendorConnected,
             batteryMillivolts = snapshot.batteryMillivolts,
+            batteryPercent = snapshot.batteryPercent,
             isSensorExpired = snapshot.isSensorExpired,
             sensorRemainingHours = snapshot.sensorRemainingHours,
             sensorAgeHours = snapshot.sensorAgeHours,
@@ -338,7 +338,7 @@ class SensorViewModel : ViewModel() {
             val activeSensors = try { Natives.activeSensors() } catch (_: Exception) { null }
             val activeSensorSerial = try {
                 SensorIdentity.resolveAvailableMainSensor(
-                    selectedMain = Natives.lastsensorname(),
+                    selectedMain = SensorIdentity.resolveMainSensor(),
                     preferredSensorId = null,
                     activeSensors = activeSensors
                 )
@@ -575,12 +575,12 @@ class SensorViewModel : ViewModel() {
     // already synced.
     private fun switchAwayFromSensor(serial: String) {
         try {
-            val current = Natives.lastsensorname()
-            if (current == serial) {
+            val current = SensorIdentity.resolveMainSensor()
+            if (SensorIdentity.matches(current, serial)) {
                 val next = SensorBluetooth.resolveReplacementSensorSerial(serial)
                 if (next != null) {
-                    Natives.setcurrentsensor(next)
-                    android.util.Log.i("SensorVM", "Edit 56b: Switched lastsensorname from $serial to $next")
+                    SensorBluetooth.setCurrentSensorSelection(next)
+                    android.util.Log.i("SensorVM", "Edit 56b: Switched current sensor from $serial to $next")
                     // Ensure the new main sensor's data is up-to-date in Room
                     try {
                         tk.glucodata.data.HistorySync.mergeFullSyncForSensor(next)
@@ -589,8 +589,8 @@ class SensorViewModel : ViewModel() {
                     }
                 } else {
                     // No other active sensor — set to empty to stop Notify from hitting getdataptr
-                    Natives.setcurrentsensor("")
-                    android.util.Log.i("SensorVM", "Edit 56b: Cleared lastsensorname (was $serial, no other active)")
+                    SensorBluetooth.setCurrentSensorSelection("")
+                    android.util.Log.i("SensorVM", "Edit 56b: Cleared current sensor (was $serial, no other active)")
                 }
             }
         } catch (t: Throwable) {
@@ -1103,18 +1103,15 @@ class SensorViewModel : ViewModel() {
         }
     }
 
-    fun fetchMqBootstrap(serial: String, qrCode: String?, account: String?, password: String?, apiBaseUrl: String?) {
+    fun fetchMqBootstrap(serial: String, qrCode: String?) {
         val context = Applic.app ?: return
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            MQRegistry.saveApiBaseUrl(context, apiBaseUrl)
             if (gatt is MQDriver) {
                 val success = gatt.refreshVendorBootstrap(
                     context = context,
                     qrCode = qrCode,
-                    account = account,
-                    password = password,
                 )
                 android.util.Log.i("SensorVM", "MQ refreshVendorBootstrap($serial) result: $success")
                 refreshSensors()
@@ -1126,19 +1123,13 @@ class SensorViewModel : ViewModel() {
             if (normalizedQr != null) {
                 MQRegistry.saveQrContent(context, record.sensorId, normalizedQr)
             }
-            val normalizedAccount = account?.trim().orEmpty()
-            val credentials = if (normalizedAccount.isNotEmpty() && !password.isNullOrBlank()) {
-                MQRegistry.saveAuthCredentials(context, normalizedAccount, password)
-                MQAuthCredentials(normalizedAccount, password)
-            } else {
-                MQRegistry.loadAuthCredentials(context)
-            }
+            val accountState = MQRegistry.loadAccountState(context)
             val result = MQBootstrapClient.fetchBestEffort(
                 context = context,
                 bleId = record.address.takeIf { it.isNotBlank() },
                 qrCode = normalizedQr,
-                authToken = MQRegistry.loadAuthToken(context),
-                credentials = credentials,
+                authToken = accountState.authToken,
+                credentials = accountState.credentials,
             )
             result.refreshedToken?.let { MQRegistry.saveAuthToken(context, it) }
             result.config?.let { MQRegistry.applyBootstrapConfig(context, record.sensorId, it) }

@@ -264,6 +264,59 @@ class HistoryRepository(context: Context = Applic.app) {
                 }
             }
         }
+
+        @JvmStatic
+        fun storeHistoryBatchBlocking(
+            sensorSerial: String,
+            timestamps: LongArray,
+            values: FloatArray,
+            rawValues: FloatArray
+        ): Boolean {
+            if (sensorSerial.isBlank()) return false
+            if (timestamps.isEmpty()) return true
+            if (timestamps.size != values.size || timestamps.size != rawValues.size) {
+                Log.w(
+                    TAG,
+                    "storeHistoryBatchBlocking rejected mismatched arrays for $sensorSerial " +
+                        "(timestamps=${timestamps.size}, values=${values.size}, raw=${rawValues.size})"
+                )
+                return false
+            }
+
+            return try {
+                kotlinx.coroutines.runBlocking {
+                    val readings = ArrayList<HistoryReading>(timestamps.size)
+                    for (index in timestamps.indices) {
+                        val timestamp = timestamps[index]
+                        val value = values[index]
+                        val rawValue = rawValues[index]
+                        if (timestamp <= 0L) continue
+                        if ((!value.isFinite() || value <= 0f) && (!rawValue.isFinite() || rawValue <= 0f)) continue
+                        readings.add(
+                            HistoryReading(
+                                timestamp = timestamp,
+                                sensorSerial = sensorSerial,
+                                value = if (value.isFinite()) value else 0f,
+                                rawValue = if (rawValue.isFinite()) rawValue else 0f,
+                                rate = null
+                            )
+                        )
+                    }
+                    HistoryRepository().storeReadingsReplacingSensorBuckets(
+                        sensorSerial = sensorSerial,
+                        readings = readings,
+                        bucketDurationMs = SENSOR_MINUTE_BUCKET_MS,
+                    )
+                }.also { stored ->
+                    if (stored) {
+                        UiRefreshBus.requestDataRefresh()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed storing blocking history batch for $sensorSerial", e)
+                false
+            }
+        }
     }
     
     /**
@@ -374,20 +427,20 @@ class HistoryRepository(context: Context = Applic.app) {
         sensorSerial: String,
         readings: List<HistoryReading>,
         bucketDurationMs: Long,
-    ) {
-        if (sensorSerial.isBlank() || readings.isEmpty()) return
+    ): Boolean {
+        if (sensorSerial.isBlank() || readings.isEmpty()) return false
 
-        withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             try {
                 val filteredReadings = filterDeletedReadings(readings)
                 if (filteredReadings.isEmpty()) {
                     Log.d(TAG, "Skipped bucket replace for $sensorSerial — all readings were tombstoned")
-                    return@withContext
+                    return@withContext false
                 }
                 val plan = HistoryBucketReplacement.plan(
                     readings = filteredReadings,
                     bucketDurationMs = bucketDurationMs,
-                ) ?: return@withContext
+                ) ?: return@withContext false
                 database.withTransaction {
                     dao.deleteConflictingSensorRowsForBuckets(
                         sensorSerial = sensorSerial,
@@ -402,8 +455,10 @@ class HistoryRepository(context: Context = Applic.app) {
                     logEvery = 20L,
                     detail = "serial=$sensorSerial size=${filteredReadings.size} bucket=${bucketDurationMs}"
                 )
+                true
             } catch (e: Exception) {
                 Log.e(TAG, "Error replacing bucket history batch for $sensorSerial", e)
+                false
             }
         }
     }

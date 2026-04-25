@@ -66,6 +66,17 @@ object HistorySyncAccess {
             )
         }.getOrNull()
     }
+    private val storeHistoryBatchBlockingMethod by lazy {
+        runCatching {
+            repositoryHolder?.getMethod(
+                "storeHistoryBatchBlocking",
+                String::class.java,
+                LongArray::class.java,
+                FloatArray::class.java,
+                FloatArray::class.java
+            )
+        }.getOrNull()
+    }
     private val getLatestTimestampMethod by lazy {
         runCatching {
             repositoryHolder?.getMethod("getLatestTimestampForSensorBlocking", String::class.java)
@@ -231,6 +242,37 @@ object HistorySyncAccess {
                 it
             )
         }.isSuccess
+    }
+
+    @JvmStatic
+    fun storeSensorHistoryBatchBlocking(
+        sensorSerial: String?,
+        timestamps: LongArray,
+        valuesMgdl: FloatArray,
+        rawValuesMgdl: FloatArray
+    ): Boolean {
+        if (sensorSerial.isNullOrBlank()) return false
+        if (timestamps.isEmpty()) return true
+        val method = storeHistoryBatchBlockingMethod
+        if (method == null) {
+            Log.w(TAG, "storeSensorHistoryBatchBlocking unavailable for serial=$sensorSerial; falling back to async")
+            return storeSensorHistoryBatchAsync(sensorSerial, timestamps, valuesMgdl, rawValuesMgdl)
+        }
+        return runCatching {
+            method.invoke(
+                null,
+                sensorSerial,
+                timestamps,
+                valuesMgdl,
+                rawValuesMgdl
+            ) as? Boolean ?: false
+        }.onFailure {
+            Log.w(
+                TAG,
+                "storeSensorHistoryBatchBlocking failed for serial=$sensorSerial size=${timestamps.size}",
+                it
+            )
+        }.getOrDefault(false)
     }
 
     @JvmStatic

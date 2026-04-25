@@ -295,7 +295,7 @@ class StatsViewModel : ViewModel() {
 
     private fun resolveStatsSensorSerial(): String? {
         return SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = SensorIdentity.resolveAppSensorId(Natives.lastsensorname()),
+            selectedMain = SensorIdentity.resolveMainSensor(),
             preferredSensorId = SensorIdentity.resolveAppSensorId(activeSerial) ?: activeSerial,
             activeSensors = Natives.activeSensors()
         ) ?: SensorIdentity.resolveMainSensor()
@@ -304,6 +304,9 @@ class StatsViewModel : ViewModel() {
     private fun resolveViewMode(serial: String): Int {
         ManagedSensorRuntime.resolveUiSnapshot(serial, serial)?.let { managedSnapshot ->
             return managedSnapshot.viewMode
+        }
+        if (!SensorIdentity.hasNativeSensorBacking(serial)) {
+            return 0
         }
         return try {
             val snapshot = Natives.getSensorUiSnapshot(serial)

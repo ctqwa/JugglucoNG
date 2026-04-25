@@ -428,6 +428,10 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     private static long[] loadRecentSensorHistory(String sensorSerial, long startTimeSec) {
         long[] history = null;
+        if (sensorSerial != null && !sensorSerial.isEmpty()
+                && !SensorIdentity.shouldUseNativeHistorySync(sensorSerial)) {
+            return null;
+        }
         if (sensorSerial != null && !sensorSerial.isEmpty()) {
             try {
                 history = Natives.getGlucoseHistoryForSensor(sensorSerial, startTimeSec);
@@ -443,6 +447,10 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             }
         }
         if (history == null || history.length == 0) {
+            final String current = SensorIdentity.resolveMainSensor();
+            if (current != null && !current.isEmpty() && !SensorIdentity.shouldUseNativeHistorySync(current)) {
+                return null;
+            }
             try {
                 history = Natives.getGlucoseHistory(startTimeSec);
             } catch (Throwable ignored) {

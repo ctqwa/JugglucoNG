@@ -16,17 +16,42 @@ import java.util.UUID
 data class MQVendorEndpoints(
     val baseUrl: String,
     val loginWithPasswordUrl: String,
+    val loginByCodeUrl: String,
+    val registerByCodeUrl: String,
+    val getVerifyCodeUrl: String,
+    val resetPasswordByCodeUrl: String,
+    val isAccountExistUrl: String,
+    val checkTokenUrl: String,
+    val logoutUrl: String,
     val qrCodeEffectiveUrl: String,
     val findByBleIdUrl: String,
+    val friendUserFindUrl: String,
+    val addFriendUrl: String,
+    val friendListUrl: String,
+    val applyListUrl: String,
+    val applyFriendListUrl: String,
+    val reviewFriendUrl: String,
+    val permissionUrl: String,
+    val historyListUrl: String,
+    val queryByIdUrl: String,
     val queryNewestUrl: String,
     val viewAllSnapshotDetailUrl: String,
+    val timeBucketUrl: String,
+    val dataRecordStartUrl: String,
+    val dataRecordGoOnUrl: String,
+    val dataRecordEndUrl: String,
+    val dataRecordReportUrl: String,
+    val dataRecordEventUrl: String,
+    val dataRecordCalibrationTimeUrl: String,
 )
 
 object MQConstants {
 
     const val TAG = "MQ"
     const val DEFAULT_DISPLAY_NAME = "Glutec CGM"
+    const val DEFAULT_FOLLOWER_DISPLAY_NAME = "Glutec Follower"
     const val PROVISIONAL_SENSOR_PREFIX = "MQ-"
+    const val FOLLOWER_SENSOR_PREFIX = "MQF-"
     const val MAX_NATIVE_SENSOR_ID_CHARS = 16
 
     // ---- BLE UUIDs (Nordic UART Service) ----
@@ -167,10 +192,33 @@ object MQConstants {
 
     const val VENDOR_BASE_URL = "https://monitor.glutec.ru/jeecg-boot/v3"
     private const val VENDOR_LOGIN_WITH_PASSWORD_PATH = "/user/monitorUser/loginWithPhoneAndPassword"
+    private const val VENDOR_LOGIN_BY_CODE_PATH = "/user/monitorUser/loginByCode"
+    private const val VENDOR_REGISTER_BY_CODE_PATH = "/user/monitorUser/registerByCode"
+    private const val VENDOR_GET_VERIFY_CODE_PATH = "/user/monitorUser/getVerifyCode"
+    private const val VENDOR_RESET_PASSWORD_BY_CODE_PATH = "/user/monitorUser/alterPasswordByCode"
+    private const val VENDOR_IS_ACCOUNT_EXIST_PATH = "/user/monitorUser/isAccountExistNew"
+    private const val VENDOR_CHECK_TOKEN_PATH = "/user/monitorUser/checkToken"
+    private const val VENDOR_LOGOUT_PATH = "/user/monitorUser/logout"
     private const val VENDOR_QR_CODE_EFFECTIVE_PATH = "/user/monitorUser/checkQrCodeNew"
     private const val VENDOR_FIND_BY_BLE_ID_PATH = "/emitterBluetooth/findByBleId"
+    private const val VENDOR_FRIEND_USER_FIND_PATH = "/user/friendUser/find"
+    private const val VENDOR_ADD_FRIEND_PATH = "/user/friendUser/addFriend"
+    private const val VENDOR_FRIEND_LIST_PATH = "/user/friendUser/friendList"
+    private const val VENDOR_APPLY_LIST_PATH = "/user/friendUser/applyList"
+    private const val VENDOR_APPLY_FRIEND_LIST_PATH = "/user/friendUser/applyFriendList"
+    private const val VENDOR_REVIEW_FRIEND_PATH = "/user/friendUser/reviewFriend"
+    private const val VENDOR_PERMISSION_PATH = "/user/friendUser/permission"
+    private const val VENDOR_HISTORY_LIST_PATH = "/snapshot/snapshot/historyList"
+    private const val VENDOR_QUERY_BY_ID_PATH = "/snapshot/snapshot/queryById"
     private const val VENDOR_QUERY_NEWEST_PATH = "/snapshot/snapshot/queryNewest"
     private const val VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_PATH = "/databags/databags/viewAllAppSnapshotDetailCondense"
+    private const val VENDOR_TIME_BUCKET_PATH = "/databags/databags/timeBucket"
+    private const val VENDOR_DATA_RECORD_START_PATH = "/data/dataRecord/start"
+    private const val VENDOR_DATA_RECORD_GO_ON_PATH = "/data/dataRecord/goOn"
+    private const val VENDOR_DATA_RECORD_END_PATH = "/data/dataRecord/end"
+    private const val VENDOR_DATA_RECORD_REPORT_PATH = "/data/dataRecord/report"
+    private const val VENDOR_DATA_RECORD_EVENT_PATH = "/data/dataRecord/event"
+    private const val VENDOR_DATA_RECORD_CALIBRATION_TIME_PATH = "/data/dataRecord/calibrationTime"
     const val VENDOR_TIMEOUT_MS = 5_000
     const val VENDOR_BOOTSTRAP_RETRY_MS = 15 * 60 * 1000L
 
@@ -208,6 +256,10 @@ object MQConstants {
         name?.trim()?.startsWith(PROVISIONAL_SENSOR_PREFIX, ignoreCase = true) == true
 
     @JvmStatic
+    fun isFollowerSensorId(name: String?): Boolean =
+        name?.trim()?.startsWith(FOLLOWER_SENSOR_PREFIX, ignoreCase = true) == true
+
+    @JvmStatic
     fun canonicalSensorId(sensorId: String?): String {
         val trimmed = sensorId?.trim().orEmpty()
         if (trimmed.isEmpty()) return ""
@@ -220,6 +272,21 @@ object MQConstants {
             return trimmed.uppercase(Locale.US).take(MAX_NATIVE_SENSOR_ID_CHARS)
         }
         return trimmed
+    }
+
+    @JvmStatic
+    fun deriveFollowerSensorId(account: String?): String {
+        val normalized = account?.trim().orEmpty()
+        val compact = normalized.uppercase(Locale.US)
+            .filter { it.isLetterOrDigit() }
+            .take(24)
+            .ifEmpty {
+                normalized.hashCode()
+                    .toUInt()
+                    .toString(16)
+                    .uppercase(Locale.US)
+            }
+        return FOLLOWER_SENSOR_PREFIX + compact
     }
 
     @JvmStatic
@@ -282,10 +349,33 @@ object MQConstants {
         return MQVendorEndpoints(
             baseUrl = resolvedBaseUrl,
             loginWithPasswordUrl = resolvedBaseUrl + VENDOR_LOGIN_WITH_PASSWORD_PATH,
+            loginByCodeUrl = resolvedBaseUrl + VENDOR_LOGIN_BY_CODE_PATH,
+            registerByCodeUrl = resolvedBaseUrl + VENDOR_REGISTER_BY_CODE_PATH,
+            getVerifyCodeUrl = resolvedBaseUrl + VENDOR_GET_VERIFY_CODE_PATH,
+            resetPasswordByCodeUrl = resolvedBaseUrl + VENDOR_RESET_PASSWORD_BY_CODE_PATH,
+            isAccountExistUrl = resolvedBaseUrl + VENDOR_IS_ACCOUNT_EXIST_PATH,
+            checkTokenUrl = resolvedBaseUrl + VENDOR_CHECK_TOKEN_PATH,
+            logoutUrl = resolvedBaseUrl + VENDOR_LOGOUT_PATH,
             qrCodeEffectiveUrl = resolvedBaseUrl + VENDOR_QR_CODE_EFFECTIVE_PATH,
             findByBleIdUrl = resolvedBaseUrl + VENDOR_FIND_BY_BLE_ID_PATH,
+            friendUserFindUrl = resolvedBaseUrl + VENDOR_FRIEND_USER_FIND_PATH,
+            addFriendUrl = resolvedBaseUrl + VENDOR_ADD_FRIEND_PATH,
+            friendListUrl = resolvedBaseUrl + VENDOR_FRIEND_LIST_PATH,
+            applyListUrl = resolvedBaseUrl + VENDOR_APPLY_LIST_PATH,
+            applyFriendListUrl = resolvedBaseUrl + VENDOR_APPLY_FRIEND_LIST_PATH,
+            reviewFriendUrl = resolvedBaseUrl + VENDOR_REVIEW_FRIEND_PATH,
+            permissionUrl = resolvedBaseUrl + VENDOR_PERMISSION_PATH,
+            historyListUrl = resolvedBaseUrl + VENDOR_HISTORY_LIST_PATH,
+            queryByIdUrl = resolvedBaseUrl + VENDOR_QUERY_BY_ID_PATH,
             queryNewestUrl = resolvedBaseUrl + VENDOR_QUERY_NEWEST_PATH,
             viewAllSnapshotDetailUrl = resolvedBaseUrl + VENDOR_VIEW_ALL_SNAPSHOT_DETAIL_PATH,
+            timeBucketUrl = resolvedBaseUrl + VENDOR_TIME_BUCKET_PATH,
+            dataRecordStartUrl = resolvedBaseUrl + VENDOR_DATA_RECORD_START_PATH,
+            dataRecordGoOnUrl = resolvedBaseUrl + VENDOR_DATA_RECORD_GO_ON_PATH,
+            dataRecordEndUrl = resolvedBaseUrl + VENDOR_DATA_RECORD_END_PATH,
+            dataRecordReportUrl = resolvedBaseUrl + VENDOR_DATA_RECORD_REPORT_PATH,
+            dataRecordEventUrl = resolvedBaseUrl + VENDOR_DATA_RECORD_EVENT_PATH,
+            dataRecordCalibrationTimeUrl = resolvedBaseUrl + VENDOR_DATA_RECORD_CALIBRATION_TIME_PATH,
         )
     }
 
@@ -305,6 +395,7 @@ object MQConstants {
     const val PREF_PACKAGES_PREFIX = "mq_packages_"
     const val PREF_LAST_PROCESSED_PREFIX = "mq_last_processed_"
     const val PREF_LAST_PACKET_INDEX_PREFIX = "mq_last_packet_"
+    const val PREF_LAST_CLOUD_REPORTED_PACKET_PREFIX = "mq_last_cloud_reported_packet_"
     const val PREF_SNAPSHOT_ID_PREFIX = "mq_snapshot_id_"
     const val PREF_LOCAL_RESET_PENDING_PREFIX = "mq_local_reset_pending_"
     const val PREF_QR_CONTENT_PREFIX = "mq_qr_content_"
@@ -312,4 +403,7 @@ object MQConstants {
     const val PREF_AUTH_PHONE_KEY = "mq_auth_phone"
     const val PREF_AUTH_PASSWORD_KEY = "mq_auth_password"
     const val PREF_API_BASE_URL_KEY = "mq_api_base_url"
+    const val PREF_CLOUD_SYNC_ENABLED_KEY = "mq_cloud_sync_enabled"
+    const val PREF_FOLLOWER_ENABLED_KEY = "mq_follower_enabled"
+    const val PREF_FOLLOWER_ACCOUNT_KEY = "mq_follower_account"
 }
