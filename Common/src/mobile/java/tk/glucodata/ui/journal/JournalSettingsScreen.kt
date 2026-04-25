@@ -3,6 +3,7 @@
 package tk.glucodata.ui.journal
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -26,6 +27,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Palette
@@ -381,6 +384,11 @@ private fun JournalInsulinPresetSheet(
             onDismiss()
         }
     }
+    fun saveDraft() {
+        val input = buildPresetInput(draft) ?: return
+        dismissalHandled = true
+        onSave(input)
+    }
     DisposableEffect(preset?.id) {
         onDispose {
             if (!dismissalHandled) {
@@ -391,8 +399,7 @@ private fun JournalInsulinPresetSheet(
 
     ModalBottomSheet(
         onDismissRequest = { dismissSheet() },
-        sheetState = sheetState,
-        sheetGesturesEnabled = false
+        sheetState = sheetState
     ) {
         LazyColumn(
             modifier = Modifier
@@ -416,16 +423,32 @@ private fun JournalInsulinPresetSheet(
                         )
                     }
                     if (preset != null) {
+                        val actionContainerColor = if (draft.isArchived) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        }
+                        val actionContentColor = if (draft.isArchived) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        }
                         FilledTonalButton(
                             onClick = { draft = draft.copy(isArchived = !draft.isArchived) },
-                            modifier = Modifier.height(38.dp),
+                            modifier = Modifier.height(40.dp),
                             shape = RoundedCornerShape(19.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                containerColor = actionContainerColor,
+                                contentColor = actionContentColor
                             )
                         ) {
+                            Icon(
+                                imageVector = if (draft.isArchived) Icons.Default.CheckCircle else Icons.Default.Block,
+                                contentDescription = null,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
                             Text(
                                 text = stringResource(
                                     if (draft.isArchived) R.string.enable else R.string.disable
@@ -438,7 +461,23 @@ private fun JournalInsulinPresetSheet(
             }
 
             item(key = "meta_card") {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (draft.isArchived) {
+                                Modifier
+                                    .background(
+                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.08f),
+                                        shape = RoundedCornerShape(22.dp)
+                                    )
+                                    .padding(12.dp)
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -475,7 +514,23 @@ private fun JournalInsulinPresetSheet(
             }
 
             item(key = "editor") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (draft.isArchived) {
+                                Modifier
+                                    .background(
+                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.05f),
+                                        shape = RoundedCornerShape(22.dp)
+                                    )
+                                    .padding(12.dp)
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -568,30 +623,23 @@ private fun JournalInsulinPresetSheet(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(text = stringResource(R.string.journal_curve_add_point))
                     }
+                    Button(
+                        onClick = { saveDraft() },
+                        enabled = canSave && hasChanges,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = stringResource(R.string.save))
+                    }
                     if (usesExplicitActions) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            onDelete?.let {
-                                OutlinedButton(
-                                    onClick = it,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.delete),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
-                            Button(
-                                onClick = {
-                                    buildPresetInput(draft)?.let(onSave)
-                                },
-                                enabled = canSave && hasChanges,
-                                modifier = Modifier.weight(1f)
+                        onDelete?.let {
+                            OutlinedButton(
+                                onClick = it,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(text = stringResource(R.string.save))
+                                Text(
+                                    text = stringResource(R.string.delete),
+                                    color = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     }

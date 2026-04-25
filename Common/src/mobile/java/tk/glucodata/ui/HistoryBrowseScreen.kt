@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
@@ -48,7 +49,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -62,6 +62,8 @@ import tk.glucodata.data.journal.JournalEntry
 import tk.glucodata.data.journal.JournalEntryType
 import tk.glucodata.data.journal.JournalInsulinPreset
 import tk.glucodata.ui.journal.buildJournalChartMarkers
+import tk.glucodata.ui.journal.journalTypeColor
+import tk.glucodata.ui.journal.journalTypeSelectedContainerColor
 import tk.glucodata.ui.util.ConnectedButtonGroup
 import tk.glucodata.ui.stats.StatsDateRange
 import tk.glucodata.ui.stats.StatsDateRangePickerHeadline
@@ -101,6 +103,11 @@ private data class TimelineJournalGrouping(
 enum class TimelineBrowseMode {
     HISTORY,
     JOURNAL
+}
+
+private sealed class HistoryFilterOption {
+    object Readings : HistoryFilterOption()
+    data class Journal(val type: JournalEntryType) : HistoryFilterOption()
 }
 
 private fun List<GlucosePoint>.sliceByTimestampRange(startMillis: Long, endMillis: Long): List<GlucosePoint> {
@@ -322,14 +329,6 @@ private fun buildTimelineRows(
     return (pointRows + journalOnlyRows).sortedByDescending { it.timestamp }
 }
 
-private fun JournalEntryType.historyFilterLabel(): Int = when (this) {
-    JournalEntryType.INSULIN -> R.string.journal_type_insulin
-    JournalEntryType.CARBS -> R.string.carbo
-    JournalEntryType.FINGERSTICK -> R.string.journal_type_bg_short
-    JournalEntryType.ACTIVITY -> R.string.journal_type_activity
-    JournalEntryType.NOTE -> R.string.journal_type_note
-}
-
 private fun JournalEntryType.historyFilterIcon(): ImageVector = when (this) {
     JournalEntryType.INSULIN -> Icons.Default.Vaccines
     JournalEntryType.CARBS -> Icons.Default.Restaurant
@@ -338,12 +337,9 @@ private fun JournalEntryType.historyFilterIcon(): ImageVector = when (this) {
     JournalEntryType.NOTE -> Icons.Default.Label
 }
 
-private fun JournalEntryType.historyFilterColor(): Color = when (this) {
-    JournalEntryType.INSULIN -> Color(0xFF1565C0)
-    JournalEntryType.CARBS -> Color(0xFF2E7D32)
-    JournalEntryType.FINGERSTICK -> Color(0xFFC62828)
-    JournalEntryType.ACTIVITY -> Color(0xFFEF6C00)
-    JournalEntryType.NOTE -> Color(0xFF5E35B1)
+private fun HistoryFilterOption.historyFilterIcon(): ImageVector = when (this) {
+    HistoryFilterOption.Readings -> Icons.Default.ShowChart
+    is HistoryFilterOption.Journal -> type.historyFilterIcon()
 }
 
 @Composable
@@ -387,7 +383,10 @@ fun HistoryBrowseScreen(
     var showDateRangePicker by rememberSaveable { mutableStateOf(false) }
     var showExportSheet by rememberSaveable { mutableStateOf(false) }
     var viewportSnapshot by remember { mutableStateOf<ChartViewportSnapshot?>(null) }
-    var selectedJournalTypeFilters by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var showReadingRows by rememberSaveable { mutableStateOf(true) }
+    var selectedJournalTypeFilters by rememberSaveable {
+        mutableStateOf(JournalEntryType.entries.map { it.name })
+    }
     val selectedJournalTypes = remember(selectedJournalTypeFilters) {
         selectedJournalTypeFilters.mapNotNull { name ->
             runCatching { JournalEntryType.valueOf(name) }.getOrNull()
@@ -414,24 +413,31 @@ fun HistoryBrowseScreen(
             journalEntries.filter { entry -> entry.timestamp in range.startMillis..range.endMillis }
         } ?: journalEntries
     }
-    val filteredJournalEntries = remember(activeJournalEntries, selectedJournalTypes) {
-        if (selectedJournalTypes.isEmpty()) {
+    val filteredJournalEntries = remember(activeJournalEntries, selectedJournalTypes, journalEnabled) {
+        if (!journalEnabled) {
             activeJournalEntries
         } else {
             activeJournalEntries.filter { it.type in selectedJournalTypes }
         }
     }
-    val effectiveBrowseMode = if (selectedJournalTypes.isNotEmpty()) {
+    val filteredHistory = remember(activeHistory, showReadingRows, journalEnabled) {
+        if (journalEnabled && !showReadingRows) {
+            emptyList()
+        } else {
+            activeHistory
+        }
+    }
+    val effectiveBrowseMode = if (journalEnabled && !showReadingRows) {
         TimelineBrowseMode.JOURNAL
     } else {
         browseMode
     }
     val viewportStart = viewportSnapshot?.startMillis ?: activeRange?.startMillis ?: availableRange?.startMillis
     val viewportEnd = viewportSnapshot?.endMillis ?: activeRange?.endMillis ?: availableRange?.endMillis
-    val visibleTimelineRows = remember(activeHistory, filteredJournalEntries, viewportStart, viewportEnd, effectiveBrowseMode) {
+    val visibleTimelineRows = remember(filteredHistory, filteredJournalEntries, viewportStart, viewportEnd, effectiveBrowseMode) {
         val windowStart = viewportStart ?: Long.MIN_VALUE
         val windowEnd = viewportEnd ?: Long.MAX_VALUE
-        val visibleHistory = activeHistory.sliceByTimestampRange(windowStart, windowEnd)
+        val visibleHistory = filteredHistory.sliceByTimestampRange(windowStart, windowEnd)
         val visibleJournalEntries = filteredJournalEntries.filter { entry ->
             entry.timestamp in windowStart..windowEnd
         }
@@ -558,7 +564,7 @@ fun HistoryBrowseScreen(
                         readingCount = if (effectiveBrowseMode == TimelineBrowseMode.JOURNAL) {
                             visibleTimelineRows.size
                         } else {
-                            activeHistory.size
+                            filteredHistory.size
                         },
                         countLabelResId = if (effectiveBrowseMode == TimelineBrowseMode.JOURNAL) {
                             R.string.journal_visible_events
@@ -576,14 +582,14 @@ fun HistoryBrowseScreen(
 
 
 
-            if (activeHistory.isNotEmpty()) {
+            if (filteredHistory.isNotEmpty()) {
                 item(key = "history-chart") {
                     Box(modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp)) {
                         DashboardChartSection(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(420.dp),
-                            glucoseHistory = activeHistory,
+                            glucoseHistory = filteredHistory,
                             journalMarkers = journalMarkers,
                             graphSmoothingMinutes = graphSmoothingMinutes,
                             collapseSmoothedData = collapseSmoothedData,
@@ -612,30 +618,63 @@ fun HistoryBrowseScreen(
             }
             if (journalEnabled) {
                 item(key = "history-journal-filter") {
-                    val filterLabels = JournalEntryType.entries.associateWith { filterType ->
-                        stringResource(filterType.historyFilterLabel())
+                    val filterOptions = remember {
+                        listOf(HistoryFilterOption.Readings) +
+                            JournalEntryType.entries.map { HistoryFilterOption.Journal(it) }
+                    }
+                    val selectedFilterOptions = remember(showReadingRows, selectedJournalTypes) {
+                        buildList {
+                            if (showReadingRows) add(HistoryFilterOption.Readings)
+                            selectedJournalTypes.forEach { add(HistoryFilterOption.Journal(it)) }
+                        }
                     }
                     val selectedFilterContentColor = MaterialTheme.colorScheme.onSurface
+                    val selectedFilterContainerBase = MaterialTheme.colorScheme.surfaceContainerHigh
+                    val readingsSelectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                    val readingsSelectedIconColor = MaterialTheme.colorScheme.onSurface
+                    val readingsUnselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ConnectedButtonGroup(
-                        options = JournalEntryType.entries,
-                        selectedOptions = selectedJournalTypes,
+                        options = filterOptions,
+                        selectedOptions = selectedFilterOptions,
                         multiSelect = true,
-                        onOptionSelected = { filterType ->
-                            selectedJournalTypeFilters = if (filterType in selectedJournalTypes) {
-                                selectedJournalTypes.filterNot { it == filterType }.map { it.name }
-                            } else {
-                                (selectedJournalTypes + filterType).map { it.name }
+                        onOptionSelected = { filterOption ->
+                            when (filterOption) {
+                                HistoryFilterOption.Readings -> {
+                                    showReadingRows = !showReadingRows
+                                }
+                                is HistoryFilterOption.Journal -> {
+                                    val filterType = filterOption.type
+                                    selectedJournalTypeFilters = if (filterType in selectedJournalTypes) {
+                                        selectedJournalTypes.filterNot { it == filterType }.map { it.name }
+                                    } else {
+                                        (selectedJournalTypes + filterType).map { it.name }
+                                    }
+                                }
                             }
                             viewportSnapshot = null
                         },
                         label = { _ -> },
-//                        labelText = { filterType -> filterLabels.getValue(filterType) },
-                        icon = { filterType -> filterType.historyFilterIcon() },
-                        selectedContainerColorFor = { filterType ->
-                            filterType.historyFilterColor().copy(alpha = 0.22f)
+                        icon = { filterOption -> filterOption.historyFilterIcon() },
+                        selectedContainerColorFor = { filterOption ->
+                            when (filterOption) {
+                                HistoryFilterOption.Readings -> readingsSelectedContainerColor
+                                is HistoryFilterOption.Journal -> journalTypeSelectedContainerColor(
+                                    filterOption.type,
+                                    selectedFilterContainerBase
+                                )
+                            }
                         },
                         selectedContentColorFor = { selectedFilterContentColor },
-                        iconTint = { filterType, _ -> filterType.historyFilterColor() },
+                        iconTint = { filterOption, selected ->
+                            when (filterOption) {
+                                HistoryFilterOption.Readings -> if (selected) {
+                                    readingsSelectedIconColor
+                                } else {
+                                    readingsUnselectedIconColor
+                                }
+                                is HistoryFilterOption.Journal -> journalTypeColor(filterOption.type)
+                            }
+                        },
                         modifier = Modifier
                             .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                             .fillMaxWidth(),

@@ -59,10 +59,18 @@ fun HistoryExportSheet(
             scope.launch {
                 val isMmol = Natives.getunit() == 1
                 val days = daysText.toLongOrNull() ?: 30L
-                val startTime = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
+                val endTime = System.currentTimeMillis()
+                val startTime = endTime - (days * 24 * 60 * 60 * 1000L)
                 val data = tk.glucodata.data.GlucoseRepository().getHistory(startTime, isMmol)
                 val unit = if (isMmol) "mmol/L" else "mg/dL"
-                val success = tk.glucodata.data.HistoryExporter.exportToCsv(context, uri, data, unit)
+                val success = tk.glucodata.data.HistoryExporter.exportToCsv(
+                    context = context,
+                    uri = uri,
+                    data = data,
+                    unit = unit,
+                    startMillis = startTime,
+                    endMillis = endTime
+                )
 
                 withContext(Dispatchers.Main) {
                     isExporting = false
@@ -85,10 +93,18 @@ fun HistoryExportSheet(
             scope.launch {
                 val isMmol = Natives.getunit() == 1
                 val days = daysText.toLongOrNull() ?: 30L
-                val startTime = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
+                val endTime = System.currentTimeMillis()
+                val startTime = endTime - (days * 24 * 60 * 60 * 1000L)
                 val data = tk.glucodata.data.GlucoseRepository().getHistory(startTime, isMmol)
                 val unit = if (isMmol) "mmol/L" else "mg/dL"
-                val success = tk.glucodata.data.HistoryExporter.exportToReadable(context, uri, data, unit)
+                val success = tk.glucodata.data.HistoryExporter.exportToReadable(
+                    context = context,
+                    uri = uri,
+                    data = data,
+                    unit = unit,
+                    startMillis = startTime,
+                    endMillis = endTime
+                )
 
                 withContext(Dispatchers.Main) {
                     isExporting = false

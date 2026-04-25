@@ -832,6 +832,7 @@ private fun JournalTypeSelector(
     onTypeSelected: (JournalEntryType) -> Unit
 ) {
     val selectedContentColor = MaterialTheme.colorScheme.onSurface
+    val selectedContainerBase = MaterialTheme.colorScheme.surfaceContainerHigh
     ConnectedButtonGroup(
         options = JournalEntryType.entries,
         selectedOption = selectedType,
@@ -841,7 +842,7 @@ private fun JournalTypeSelector(
         iconOnly = true,
         modifier = Modifier.fillMaxWidth(),
         itemHeight = 48.dp,
-        selectedContainerColorFor = { type -> journalTypeColor(type).copy(alpha = 0.22f) },
+        selectedContainerColorFor = { type -> journalTypeSelectedContainerColor(type, selectedContainerBase) },
         selectedContentColorFor = { selectedContentColor },
         iconTint = { type, _ -> journalTypeColor(type) },
         unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f),
@@ -1214,16 +1215,6 @@ private fun String.parseIntOrNull(): Int? {
 
 private fun String.trimTrailingLabel(): String {
     return trim().trimEnd(':').trim()
-}
-
-private fun journalTypeColor(type: JournalEntryType): Color {
-    return when (type) {
-        JournalEntryType.INSULIN -> Color(0xFF1565C0)
-        JournalEntryType.CARBS -> Color(0xFF2E7D32)
-        JournalEntryType.FINGERSTICK -> Color(0xFFC62828)
-        JournalEntryType.ACTIVITY -> Color(0xFFEF6C00)
-        JournalEntryType.NOTE -> Color(0xFF5E35B1)
-    }
 }
 
 private fun journalTypeIcon(type: JournalEntryType): ImageVector {

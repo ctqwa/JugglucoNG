@@ -15,6 +15,9 @@ import java.util.Locale
 
 object HistoryExporter {
     private const val TAG = "HistoryExporter"
+    private const val RECORD_TYPE_GLUCOSE = "glucose"
+    private const val RECORD_TYPE_JOURNAL_ENTRY = "journal_entry"
+    private const val RECORD_TYPE_INSULIN_PRESET = "journal_insulin_preset"
 
     // Use a unified date format for CSV to ensure re-import consistency
     // ISO 8601 is best: yyyy-MM-dd HH:mm:ss
@@ -23,28 +26,70 @@ object HistoryExporter {
     // Friendly format for "Readable" export
     private val READABLE_DATE_FORMAT = SimpleDateFormat("EEE, dd MMM yyyy HH:mm", Locale.getDefault())
 
+    private fun csvCell(value: Any?): String {
+        val text = value?.toString() ?: ""
+        return "\"${text.replace("\"", "\"\"")}\""
+    }
+
+    private fun formatExportFloat(value: Float?): String {
+        return value?.let { String.format(Locale.US, "%.4f", it) }.orEmpty()
+    }
+
+    private suspend fun loadExportJournalEntries(
+        journalDao: tk.glucodata.data.journal.JournalDao,
+        data: List<GlucosePoint>,
+        startMillis: Long?,
+        endMillis: Long?
+    ): List<tk.glucodata.data.journal.JournalEntryEntity> {
+        val rangeStart = startMillis ?: data.minOfOrNull { it.timestamp }
+        val rangeEnd = endMillis ?: data.maxOfOrNull { it.timestamp }
+        return if (rangeStart != null && rangeEnd != null) {
+            journalDao.getEntriesBetween(rangeStart, rangeEnd)
+        } else {
+            journalDao.getEntries()
+        }
+    }
+
     /**
      * Export data to a CSV file.
      * Format: Timestamp(ms),Date,Value,RawValue,Unit,SensorSerial
      * Values are always exported in the User's preferred unit for consistency with what they see.
      * Multi-sensor: includes SensorSerial column for re-import with proper tagging.
      */
-    suspend fun exportToCsv(context: Context, uri: Uri, data: List<GlucosePoint>, unit: String): Boolean {
+    suspend fun exportToCsv(
+        context: Context,
+        uri: Uri,
+        data: List<GlucosePoint>,
+        unit: String,
+        startMillis: Long? = null,
+        endMillis: Long? = null
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 // Get all readings from Room to access sensorSerial
-                val dao = HistoryDatabase.getInstance(context).historyDao()
+                val database = HistoryDatabase.getInstance(context)
+                val dao = database.historyDao()
+                val journalDao = database.journalDao()
                 // Build a map of timestamp -> sensorSerial for enriching export
                 val allReadings = dao.getReadingsSince(0L)
                 val serialByTimestamp = HashMap<Long, String>(allReadings.size)
                 for (reading in allReadings) {
                     serialByTimestamp[reading.timestamp] = reading.sensorSerial
                 }
+                val journalEntries = loadExportJournalEntries(journalDao, data, startMillis, endMillis)
+                val insulinPresets = journalDao.getInsulinPresets()
 
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.bufferedWriter().use { writer ->
                         // Header — new format with SensorSerial
-                        writer.write("Timestamp,Date,Value,RawValue,Unit,SensorSerial\n")
+                        writer.write(
+                            "Timestamp,Date,Value,RawValue,Unit,SensorSerial,RecordType," +
+                                "JournalId,JournalType,JournalTitle,JournalNote,JournalAmount,JournalGlucoseMgDl," +
+                                "JournalDurationMinutes,JournalIntensity,JournalInsulinPresetId,JournalSource," +
+                                "JournalSourceRecordId,JournalCreatedAt,JournalUpdatedAt," +
+                                "PresetId,PresetName,PresetOnsetMinutes,PresetDurationMinutes,PresetAccentColor," +
+                                "PresetCurveJson,PresetBuiltIn,PresetArchived,PresetCountsTowardIob,PresetSortOrder\n"
+                        )
                         
                         // Data
                         for (point in data) {
@@ -54,7 +99,70 @@ object HistoryExporter {
                             val rawStr = tk.glucodata.ui.util.GlucoseFormatter.formatCsv(point.rawValue, unit)
                             val serial = serialByTimestamp[point.timestamp] ?: "unknown"
                             
-                            writer.write("${point.timestamp},$dateStr,$valueStr,$rawStr,$unit,$serial\n")
+                            writer.write("${point.timestamp},$dateStr,$valueStr,$rawStr,$unit,$serial,$RECORD_TYPE_GLUCOSE\n")
+                        }
+                        for (entry in journalEntries) {
+                            val dateStr = CSV_DATE_FORMAT.format(Date(entry.timestamp))
+                            writer.write(
+                                listOf(
+                                    entry.timestamp,
+                                    dateStr,
+                                    "",
+                                    "",
+                                    "",
+                                    entry.sensorSerial.orEmpty(),
+                                    RECORD_TYPE_JOURNAL_ENTRY,
+                                    entry.id,
+                                    entry.entryType,
+                                    entry.title,
+                                    entry.note.orEmpty(),
+                                    formatExportFloat(entry.amount),
+                                    formatExportFloat(entry.glucoseValueMgDl),
+                                    entry.durationMinutes ?: "",
+                                    entry.intensity.orEmpty(),
+                                    entry.insulinPresetId ?: "",
+                                    entry.source,
+                                    entry.sourceRecordId.orEmpty(),
+                                    entry.createdAt,
+                                    entry.updatedAt
+                                ).joinToString(",") { csvCell(it) } + "\n"
+                            )
+                        }
+                        for (preset in insulinPresets) {
+                            writer.write(
+                                listOf(
+                                    0,
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    RECORD_TYPE_INSULIN_PRESET,
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    "",
+                                    preset.id,
+                                    preset.displayName,
+                                    preset.onsetMinutes,
+                                    preset.durationMinutes,
+                                    preset.accentColor,
+                                    preset.curveJson,
+                                    preset.isBuiltIn,
+                                    preset.isArchived,
+                                    preset.countsTowardIob,
+                                    preset.sortOrder
+                                ).joinToString(",") { csvCell(it) } + "\n"
+                            )
                         }
                     }
                 }
@@ -70,16 +178,27 @@ object HistoryExporter {
      * Export data to a human-readable text file.
      * Format: Mon, 01 Jan 2024 12:00: 5.5 mmol/L (Raw: 5.4) [SensorSerial]
      */
-    suspend fun exportToReadable(context: Context, uri: Uri, data: List<GlucosePoint>, unit: String): Boolean {
+    suspend fun exportToReadable(
+        context: Context,
+        uri: Uri,
+        data: List<GlucosePoint>,
+        unit: String,
+        startMillis: Long? = null,
+        endMillis: Long? = null
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 // Get serial map for enriching export
-                val dao = HistoryDatabase.getInstance(context).historyDao()
+                val database = HistoryDatabase.getInstance(context)
+                val dao = database.historyDao()
+                val journalDao = database.journalDao()
                 val allReadings = dao.getReadingsSince(0L)
                 val serialByTimestamp = HashMap<Long, String>(allReadings.size)
                 for (reading in allReadings) {
                     serialByTimestamp[reading.timestamp] = reading.sensorSerial
                 }
+                val journalEntries = loadExportJournalEntries(journalDao, data, startMillis, endMillis)
+                val insulinPresets = journalDao.getInsulinPresets()
 
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.bufferedWriter().use { writer ->
@@ -97,6 +216,27 @@ object HistoryExporter {
                             val sensorTag = if (serial.isNotEmpty() && serial != "unknown") " [$serial]" else ""
                             val line = "$dateStr: $valueStr $unit (Raw: $rawStr)$sensorTag\n"
                             writer.write(line)
+                        }
+                        if (journalEntries.isNotEmpty()) {
+                            writer.write("\nJournal Entries: ${journalEntries.size}\n")
+                            for (entry in journalEntries) {
+                                val dateStr = READABLE_DATE_FORMAT.format(Date(entry.timestamp))
+                                val amount = entry.amount?.let { " · $it" }.orEmpty()
+                                val glucose = entry.glucoseValueMgDl?.let { " · ${it.toInt()} mg/dL" }.orEmpty()
+                                val note = entry.note?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+                                writer.write("$dateStr: ${entry.entryType} · ${entry.title}$amount$glucose$note\n")
+                            }
+                        }
+                        if (insulinPresets.isNotEmpty()) {
+                            writer.write("\nInsulin Presets: ${insulinPresets.size}\n")
+                            for (preset in insulinPresets) {
+                                val archived = if (preset.isArchived) "archived" else "enabled"
+                                val iob = if (preset.countsTowardIob) "IOB" else "no IOB"
+                                writer.write(
+                                    "${preset.displayName}: ${preset.onsetMinutes}-${preset.durationMinutes} min · " +
+                                        "$archived · $iob · color ${preset.accentColor}\n"
+                                )
+                            }
                         }
                     }
                 }
@@ -134,13 +274,23 @@ object HistoryExporter {
                         if (header == null || !header.startsWith("Timestamp")) {
                             return@withContext ImportResult(0, 0, false, "Invalid CSV format")
                         }
+                        val headerColumns = header.split(",")
                         // Detect new format by checking if header has SensorSerial
-                        val hasSerialColumn = header.contains("SensorSerial")
+                        val hasSerialColumn = headerColumns.contains("SensorSerial")
+                        val recordTypeIndex = headerColumns.indexOf("RecordType")
 
                         reader.forEachLine { line ->
                             try {
                                 val parts = line.split(",")
                                 if (parts.size >= 5) {
+                                    val recordType = if (recordTypeIndex >= 0 && parts.size > recordTypeIndex) {
+                                        parts[recordTypeIndex].trim().trim('"').ifBlank { RECORD_TYPE_GLUCOSE }
+                                    } else {
+                                        RECORD_TYPE_GLUCOSE
+                                    }
+                                    if (recordType != RECORD_TYPE_GLUCOSE) {
+                                        return@forEachLine
+                                    }
                                     val timestamp = parts[0].toLong()
                                     // parts[1] is Date string, skip
                                     var value = parts[2].toFloat()
