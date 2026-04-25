@@ -30,15 +30,38 @@ object VirtualGlucoseSensorBridge {
         readings: List<Reading>,
         logLabel: String = "virtual",
         backfill: Boolean = true,
+        nearDuplicateWindowMs: Long = 0L,
     ): Int {
         if (sensorSerial.isBlank() || readings.isEmpty()) return 0
         val latestRoomTimestamp = if (backfill) 0L else HistorySyncAccess.getLatestTimestampForSensor(sensorSerial)
+        val existingTimestamps = if (nearDuplicateWindowMs > 0L) {
+            val minTimestamp = readings.minOf { it.timestampMs }
+            val maxTimestamp = readings.maxOf { it.timestampMs }
+            HistorySyncAccess.getHistoryTimestampsForSensor(
+                sensorSerial = sensorSerial,
+                startTime = (minTimestamp - nearDuplicateWindowMs).coerceAtLeast(1L),
+                endTime = maxTimestamp + nearDuplicateWindowMs,
+            ).sortedArray()
+        } else {
+            LongArray(0)
+        }
         val deduped = LinkedHashMap<Long, Reading>()
         readings
             .asSequence()
             .filter { it.timestampMs > latestRoomTimestamp }
             .filter { it.glucoseMgdl.isFinite() && it.glucoseMgdl > 0f }
+            .filterNot {
+                existingTimestamps.isNotEmpty() &&
+                    hasNearbyTimestamp(existingTimestamps, it.timestampMs, nearDuplicateWindowMs)
+            }
             .forEach { deduped[it.timestampMs] = it }
+        val skippedAsNearDuplicate = readings.size - deduped.size
+        if (skippedAsNearDuplicate > 0 && nearDuplicateWindowMs > 0L) {
+            Log.i(
+                TAG,
+                "Skipped $skippedAsNearDuplicate $logLabel history points near existing $sensorSerial readings"
+            )
+        }
         if (deduped.isEmpty()) return 0
 
         val ordered = deduped.values.sortedBy { it.timestampMs }
@@ -64,6 +87,32 @@ object VirtualGlucoseSensorBridge {
             ),
         )
         return ordered.size
+    }
+
+    private fun hasNearbyTimestamp(
+        sortedTimestamps: LongArray,
+        timestampMs: Long,
+        windowMs: Long,
+    ): Boolean {
+        if (sortedTimestamps.isEmpty() || windowMs <= 0L) return false
+        var low = 0
+        var high = sortedTimestamps.size - 1
+        while (low <= high) {
+            val mid = (low + high).ushr(1)
+            val candidate = sortedTimestamps[mid]
+            when {
+                candidate < timestampMs -> low = mid + 1
+                candidate > timestampMs -> high = mid - 1
+                else -> return true
+            }
+        }
+        if (low < sortedTimestamps.size && kotlin.math.abs(sortedTimestamps[low] - timestampMs) <= windowMs) {
+            return true
+        }
+        if (low > 0 && kotlin.math.abs(sortedTimestamps[low - 1] - timestampMs) <= windowMs) {
+            return true
+        }
+        return false
     }
 
     @JvmStatic

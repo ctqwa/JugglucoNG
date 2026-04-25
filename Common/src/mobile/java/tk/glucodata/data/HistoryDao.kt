@@ -37,6 +37,19 @@ interface HistoryDao {
     @Query("SELECT * FROM history_readings WHERE sensorSerial IN (:serials) AND timestamp >= :startTime ORDER BY timestamp ASC")
     suspend fun getReadingsSinceForSensors(serials: List<String>, startTime: Long): List<HistoryReading>
 
+    @Query("""
+        SELECT timestamp FROM history_readings
+        WHERE sensorSerial IN (:serials)
+          AND timestamp >= :startTime
+          AND timestamp <= :endTime
+        ORDER BY timestamp ASC
+    """)
+    suspend fun getTimestampsForSensors(
+        serials: List<String>,
+        startTime: Long,
+        endTime: Long
+    ): List<Long>
+
     @Query("SELECT * FROM history_readings WHERE sensorSerial = :serial ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatestReadingForSensor(serial: String): HistoryReading?
 

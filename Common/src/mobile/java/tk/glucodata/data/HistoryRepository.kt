@@ -123,6 +123,22 @@ class HistoryRepository(context: Context = Applic.app) {
                 HistoryRepository().getLatestTimestampForSensor(resolvedSerial)
             }
         }
+
+        @JvmStatic
+        fun getHistoryTimestampsForSensorBlocking(
+            sensorSerial: String,
+            startTime: Long,
+            endTime: Long
+        ): LongArray {
+            val resolvedSerial = sensorSerial.takeIf { it.isNotBlank() }
+                ?: return LongArray(0)
+            if (endTime < startTime) return LongArray(0)
+            return kotlinx.coroutines.runBlocking {
+                HistoryRepository()
+                    .getHistoryTimestampsForSensor(resolvedSerial, startTime, endTime)
+                    .toLongArray()
+            }
+        }
         
         /**
          * Blocking version for Notify.java that returns tk.glucodata.GlucosePoint.
@@ -564,6 +580,23 @@ class HistoryRepository(context: Context = Applic.app) {
                 mapReadings(readings)
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting history for sensor $serial", e)
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun getHistoryTimestampsForSensor(
+        serial: String,
+        startTime: Long,
+        endTime: Long
+    ): List<Long> {
+        val serials = resolveQuerySensorSerials(serial)
+        if (serials.isEmpty() || endTime < startTime) return emptyList()
+        return withContext(Dispatchers.IO) {
+            try {
+                dao.getTimestampsForSensors(serials, startTime, endTime)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting history timestamps for sensor $serial", e)
                 emptyList()
             }
         }

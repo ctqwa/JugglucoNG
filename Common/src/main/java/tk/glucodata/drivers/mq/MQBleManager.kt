@@ -77,6 +77,7 @@ class MQBleManager(
         private const val CLOUD_HISTORY_BACKFILL_LOOKBACK_MS = 20L * 24L * 60L * 60L * 1000L
         private const val CLOUD_HISTORY_BACKFILL_OVERLAP_MS = 15L * 60L * 1000L
         private const val CLOUD_HISTORY_BACKFILL_FUTURE_GRACE_MS = 5L * 60L * 1000L
+        private const val CLOUD_HISTORY_NEAR_DUPLICATE_MS = 90L * 1000L
     }
 
     enum class Phase { IDLE, CONNECTING, DISCOVERING, STREAMING }
@@ -1140,6 +1141,7 @@ class MQBleManager(
                 )
             },
             logLabel = "MQ snapshot",
+            nearDuplicateWindowMs = CLOUD_HISTORY_NEAR_DUPLICATE_MS,
         )
         if (imported > 0) {
             Log.i(TAG, "Imported $imported MQ snapshot history points into local history")
