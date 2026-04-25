@@ -5,7 +5,7 @@ object WidgetDisplaySource {
 
     @JvmStatic
     fun resolveActiveSensorSerial(preferredSerial: String? = null): String? {
-        return NotificationHistorySource.resolveSensorSerial(preferredSerial ?: Natives.lastsensorname())
+        return NotificationHistorySource.resolveSensorSerial(preferredSerial ?: SensorIdentity.resolveMainSensor())
     }
 
     @JvmStatic
@@ -25,6 +25,11 @@ object WidgetDisplaySource {
     @JvmStatic
     fun resolveViewMode(sensorName: String?): Int {
         if (sensorName.isNullOrEmpty()) {
+            return 0
+        }
+        tk.glucodata.drivers.ManagedSensorRuntime.resolveUiSnapshot(sensorName, sensorName)
+            ?.let { return it.viewMode }
+        if (!SensorIdentity.hasNativeSensorBacking(sensorName)) {
             return 0
         }
         return try {
