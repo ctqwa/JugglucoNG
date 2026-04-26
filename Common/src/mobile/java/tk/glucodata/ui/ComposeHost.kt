@@ -724,6 +724,7 @@ private fun HistoryRoute(
             suggestedGlucoseMgDl = request.suggestedGlucoseMgDl,
             suggestedAmountFraction = request.suggestedAmountFraction,
             insulinPresets = journalInsulinPresets,
+            doseJournalEntries = scopedJournalEntries,
             doseProfile = JournalDoseProfile(
                 enabled = journalEnabled,
                 carbRatioGramsPerUnit = predictionCarbRatioGramsPerUnit,
@@ -1467,6 +1468,7 @@ fun DashboardScreen(
             suggestedGlucoseMgDl = request.suggestedGlucoseMgDl,
             suggestedAmountFraction = request.suggestedAmountFraction,
             insulinPresets = if (request.existingEntry != null) journalInsulinPresets else activeJournalPresets,
+            doseJournalEntries = scopedJournalEntries,
             doseProfile = JournalDoseProfile(
                 enabled = journalEnabled,
                 carbRatioGramsPerUnit = predictionCarbRatioGramsPerUnit,

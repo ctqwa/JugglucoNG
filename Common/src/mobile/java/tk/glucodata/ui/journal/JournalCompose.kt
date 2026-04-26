@@ -269,6 +269,7 @@ fun JournalEntrySheet(
     suggestedGlucoseMgDl: Float? = null,
     suggestedAmountFraction: Float? = null,
     insulinPresets: List<JournalInsulinPreset>,
+    doseJournalEntries: List<JournalEntry> = emptyList(),
     doseProfile: JournalDoseProfile? = null,
     initialType: JournalEntryType,
     existingEntry: JournalEntry? = null,
@@ -299,6 +300,13 @@ fun JournalEntrySheet(
                 it.insulinSensitivityMgDlPerUnit > 0f
         }
     }
+    val activeInsulinUnits = remember(doseJournalEntries, presetsById, draft.timestamp) {
+        activeInsulinRemainingUnitsAt(
+            entries = doseJournalEntries,
+            presetsById = presetsById,
+            atMillis = draft.timestamp
+        )
+    }
     LaunchedEffect(existingEntry?.id, draft.type, draft.pairWithDose, activeInsulinPresets) {
         if (
             existingEntry != null ||
@@ -319,20 +327,23 @@ fun JournalEntrySheet(
         draft.amountText,
         draft.chartAnchorGlucoseMgDl,
         draft.pairWithDose,
-        calculatorProfile
+        calculatorProfile,
+        activeInsulinUnits
     ) {
         if (!draft.pairWithDose || calculatorProfile == null) return@LaunchedEffect
         val suggestedPair = when (draft.type) {
             JournalEntryType.CARBS -> calculateInsulinForCarbs(
                 carbs = draft.amountText.parseFloatOrNull(),
                 glucoseMgDl = draft.chartAnchorGlucoseMgDl,
-                profile = calculatorProfile
+                profile = calculatorProfile,
+                activeInsulinUnits = activeInsulinUnits
             )?.totalInsulinUnits?.let(::formatInsulinDose)
 
             JournalEntryType.INSULIN -> calculateCoveredCarbsForInsulin(
                 insulinUnits = draft.amountText.parseFloatOrNull(),
                 glucoseMgDl = draft.chartAnchorGlucoseMgDl,
-                profile = calculatorProfile
+                profile = calculatorProfile,
+                activeInsulinUnits = activeInsulinUnits
             )?.let(::formatCarbDose)
 
             else -> null
@@ -479,6 +490,7 @@ fun JournalEntrySheet(
                                 draft = draft,
                                 profile = calculatorProfile,
                                 activeInsulinPresets = activeInsulinPresets,
+                                activeInsulinUnits = activeInsulinUnits,
                                 unit = unit,
                                 onDraftChange = { draft = it }
                             )
@@ -504,6 +516,7 @@ fun JournalEntrySheet(
                                 draft = draft,
                                 profile = calculatorProfile,
                                 activeInsulinPresets = activeInsulinPresets,
+                                activeInsulinUnits = activeInsulinUnits,
                                 unit = unit,
                                 onDraftChange = { draft = it }
                             )
@@ -920,21 +933,24 @@ private fun JournalDoseAssistCard(
     draft: JournalEntryDraft,
     profile: JournalDoseProfile,
     activeInsulinPresets: List<JournalInsulinPreset>,
+    activeInsulinUnits: Float,
     unit: String,
     onDraftChange: (JournalEntryDraft) -> Unit
 ) {
-    val insulinSuggestion = remember(draft.amountText, draft.chartAnchorGlucoseMgDl, profile) {
+    val insulinSuggestion = remember(draft.amountText, draft.chartAnchorGlucoseMgDl, profile, activeInsulinUnits) {
         calculateInsulinForCarbs(
             carbs = draft.amountText.parseFloatOrNull(),
             glucoseMgDl = draft.chartAnchorGlucoseMgDl,
-            profile = profile
+            profile = profile,
+            activeInsulinUnits = activeInsulinUnits
         )
     }
-    val coveredCarbsSuggestion = remember(draft.amountText, draft.chartAnchorGlucoseMgDl, profile) {
+    val coveredCarbsSuggestion = remember(draft.amountText, draft.chartAnchorGlucoseMgDl, profile, activeInsulinUnits) {
         calculateCoveredCarbsForInsulin(
             insulinUnits = draft.amountText.parseFloatOrNull(),
             glucoseMgDl = draft.chartAnchorGlucoseMgDl,
-            profile = profile
+            profile = profile,
+            activeInsulinUnits = activeInsulinUnits
         )
     }
     val pairLabel = when (draft.type) {
@@ -1015,6 +1031,12 @@ private fun JournalDoseAssistCard(
                                         R.string.journal_dose_correction_component,
                                         "${formatInsulinComponent(suggestion.correctionInsulinUnits)} U"
                                     )
+                                )
+                            }
+                            if (suggestion.activeInsulinCreditUnits > 0f) {
+                                JournalDoseMetric(
+                                    label = "${stringResource(R.string.IOB)} -" +
+                                        "${formatInsulinComponent(suggestion.activeInsulinCreditUnits)} U"
                                 )
                             }
                             draft.chartAnchorGlucoseMgDl?.let { glucose ->
@@ -1128,22 +1150,27 @@ private fun JournalDoseMetric(label: String) {
 private data class JournalInsulinDoseSuggestion(
     val foodInsulinUnits: Float,
     val correctionInsulinUnits: Float,
+    val activeInsulinCreditUnits: Float,
     val totalInsulinUnits: Float
 )
 
 private fun calculateInsulinForCarbs(
     carbs: Float?,
     glucoseMgDl: Float?,
-    profile: JournalDoseProfile
+    profile: JournalDoseProfile,
+    activeInsulinUnits: Float
 ): JournalInsulinDoseSuggestion? {
     val carbValue = carbs?.takeIf { it > 0f } ?: return null
     val food = carbValue / profile.carbRatioGramsPerUnit
-    val correction = glucoseMgDl
+    val rawCorrection = glucoseMgDl
         ?.let { ((it - profile.targetHighMgDl) / profile.insulinSensitivityMgDlPerUnit).coerceAtLeast(0f) }
         ?: 0f
+    val activeCredit = minOf(rawCorrection, activeInsulinUnits.coerceAtLeast(0f))
+    val correction = (rawCorrection - activeCredit).coerceAtLeast(0f)
     return JournalInsulinDoseSuggestion(
         foodInsulinUnits = food,
         correctionInsulinUnits = correction,
+        activeInsulinCreditUnits = activeCredit,
         totalInsulinUnits = roundInsulinDose(food + correction)
     )
 }
@@ -1151,15 +1178,60 @@ private fun calculateInsulinForCarbs(
 private fun calculateCoveredCarbsForInsulin(
     insulinUnits: Float?,
     glucoseMgDl: Float?,
-    profile: JournalDoseProfile
+    profile: JournalDoseProfile,
+    activeInsulinUnits: Float
 ): Float? {
     val insulinValue = insulinUnits?.takeIf { it > 0f } ?: return null
-    val correction = glucoseMgDl
+    val rawCorrection = glucoseMgDl
         ?.let { ((it - profile.targetHighMgDl) / profile.insulinSensitivityMgDlPerUnit).coerceAtLeast(0f) }
         ?: 0f
+    val correction = (rawCorrection - minOf(rawCorrection, activeInsulinUnits.coerceAtLeast(0f))).coerceAtLeast(0f)
     return ((insulinValue - correction).coerceAtLeast(0f) * profile.carbRatioGramsPerUnit)
         .let { (it / 5f).roundToInt() * 5f }
         .takeIf { it > 0f }
+}
+
+private fun activeInsulinRemainingUnitsAt(
+    entries: List<JournalEntry>,
+    presetsById: Map<Long, JournalInsulinPreset>,
+    atMillis: Long
+): Float {
+    if (entries.isEmpty()) return 0f
+    return entries.sumOf { entry ->
+        val preset = entry.insulinPresetId?.let(presetsById::get) ?: return@sumOf 0.0
+        if (entry.type != JournalEntryType.INSULIN || !preset.countsTowardIob) return@sumOf 0.0
+        val amount = entry.amount?.takeIf { it > 0f } ?: return@sumOf 0.0
+        val remaining = remainingCurveFraction(preset.curvePoints, entry.timestamp, atMillis)
+        (amount * remaining).toDouble()
+    }.toFloat()
+}
+
+private fun remainingCurveFraction(points: List<JournalCurvePoint>, doseTimestamp: Long, atMillis: Long): Float {
+    if (points.size < 2 || atMillis < doseTimestamp) return 0f
+    val elapsedMinutes = ((atMillis - doseTimestamp) / 60_000f).coerceAtLeast(0f)
+    val total = integrateCurveArea(points, points.last().minute.toFloat())
+    if (total <= 0.0001f) return 0f
+    val delivered = (integrateCurveArea(points, elapsedMinutes) / total).coerceIn(0f, 1f)
+    return (1f - delivered).coerceIn(0f, 1f)
+}
+
+private fun integrateCurveArea(points: List<JournalCurvePoint>, upToMinute: Float): Float {
+    if (points.size < 2 || upToMinute <= points.first().minute) return 0f
+    var area = 0f
+    for (index in 0 until points.lastIndex) {
+        val start = points[index]
+        val end = points[index + 1]
+        if (upToMinute <= start.minute) break
+        val segmentEndMinute = minOf(upToMinute, end.minute.toFloat())
+        val segmentWidth = segmentEndMinute - start.minute
+        if (segmentWidth <= 0f) continue
+        val fullWidth = (end.minute - start.minute).coerceAtLeast(1).toFloat()
+        val endFraction = ((segmentEndMinute - start.minute) / fullWidth).coerceIn(0f, 1f)
+        val segmentEndActivity = start.activity + ((end.activity - start.activity) * endFraction)
+        area += ((start.activity + segmentEndActivity) * 0.5f) * segmentWidth
+        if (upToMinute <= end.minute) break
+    }
+    return area
 }
 
 private fun roundInsulinDose(value: Float): Float {
