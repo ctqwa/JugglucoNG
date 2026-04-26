@@ -506,6 +506,8 @@
     <string name="data_management">数据管理</string>
     <string name="export_data">导出历史记录</string>
     <string name="export_data_desc">将读数保存为 CSV/文本</string>
+    <string name="export_settings">导出设置</string>
+    <string name="export_settings_desc">保存所有应用设置、凭据和设备密钥</string>
     <string name="import_data">导入历史记录</string>
     <string name="import_data_desc">加载备份或 Libreview 文件</string>
     <string name="danger_zone">危险区域</string>
@@ -1370,6 +1372,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">预测时长</string>
     <string name="predictive_horizon_value">%1$d 分钟</string>
+    <string name="journal_dose_math_title">剂量计算器</string>
+    <string name="journal_dose_pair_insulin">配对胰岛素</string>
+    <string name="journal_dose_pair_carbs">配对碳水</string>
+    <string name="journal_dose_suggested_insulin">建议 %1$s U</string>
+    <string name="journal_dose_covers_carbs">覆盖 %1$s g</string>
+    <string name="journal_dose_food_component">餐食 %1$s</string>
+    <string name="journal_dose_correction_component">校正 %1$s</string>
     <string name="journal_manage_title">日志设置</string>
     <string name="journal_manage_desc">调整胰岛素类型和作用区间</string>
     <string name="journal_quick_actions">快速记录</string>

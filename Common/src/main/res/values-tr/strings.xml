@@ -551,6 +551,8 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="data_management">Veri Yönetimi</string>
     <string name="export_data">Geçmişi Dışa Aktar</string>
     <string name="export_data_desc">Okumaları CSV/Metin olarak kaydet</string>
+    <string name="export_settings">Ayarları dışa aktar</string>
+    <string name="export_settings_desc">Tüm uygulama ayarlarını, kimlik bilgilerini ve cihaz anahtarlarını kaydet</string>
     <string name="import_data">Geçmişi İçe Aktar</string>
     <string name="import_data_desc">Yedekleme veya Libreview dosyasını yükle</string>
     <string name="danger_zone">Tehlike Bölgesi</string>
@@ -1382,6 +1384,13 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Tahmin ufku</string>
     <string name="predictive_horizon_value">%1$d dk</string>
+    <string name="journal_dose_math_title">Doz hesaplayıcı</string>
+    <string name="journal_dose_pair_insulin">İnsülini eşleştir</string>
+    <string name="journal_dose_pair_carbs">Karbonhidratı eşleştir</string>
+    <string name="journal_dose_suggested_insulin">%1$s U önerildi</string>
+    <string name="journal_dose_covers_carbs">%1$s g karşılar</string>
+    <string name="journal_dose_food_component">Yemek %1$s</string>
+    <string name="journal_dose_correction_component">Düzeltme %1$s</string>
     <string name="journal_manage_title">Günlük ayarları</string>
     <string name="journal_manage_desc">İnsülin türlerini ve etki aralıklarını düzenleyin</string>
     <string name="journal_quick_actions">Hızlı kayıt</string>

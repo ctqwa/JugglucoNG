@@ -577,6 +577,8 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="data_management">Gegevensbeheer</string>
     <string name="export_data">Geschiedenis exporteren</string>
     <string name="export_data_desc">Sla glucosemetingen op als CSV of tekstbestand</string>
+    <string name="export_settings">Instellingen exporteren</string>
+    <string name="export_settings_desc">Sla alle appinstellingen, inloggegevens en apparaatsleutels op</string>
     <string name="import_data">Geschiedenis importeren</string>
     <string name="import_data_desc">Herstel glucosemetingen uit CSV-bestand</string>
     <string name="danger_zone">Gevarenzone</string>
@@ -1397,6 +1399,13 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Voorspellingshorizon</string>
     <string name="predictive_horizon_value">%1$d min</string>
+    <string name="journal_dose_math_title">Dosiscalculator</string>
+    <string name="journal_dose_pair_insulin">Insuline koppelen</string>
+    <string name="journal_dose_pair_carbs">Koolhydraten koppelen</string>
+    <string name="journal_dose_suggested_insulin">%1$s U voorgesteld</string>
+    <string name="journal_dose_covers_carbs">%1$s g gedekt</string>
+    <string name="journal_dose_food_component">Eten %1$s</string>
+    <string name="journal_dose_correction_component">Correctie %1$s</string>
     <string name="journal_manage_title">Dagboekinstellingen</string>
     <string name="journal_manage_desc">Insulinetypen en werkingsvensters aanpassen</string>
     <string name="journal_quick_actions">Snel loggen</string>

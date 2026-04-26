@@ -399,6 +399,8 @@
     <string name="data_management">Gerenciamento de Dados</string>
     <string name="export_data">Exportar Histórico</string>
     <string name="export_data_desc">Salvar leituras em CSV/Texto</string>
+    <string name="export_settings">Exportar configurações</string>
+    <string name="export_settings_desc">Salvar todas as configurações, credenciais e chaves do dispositivo</string>
     <string name="import_data">Importar Histórico</string>
     <string name="import_data_desc">Carregar backup ou arquivo Libreview</string>
     <string name="danger_zone">Zona de Perigo</string>
@@ -1355,6 +1357,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Horizonte da previsão</string>
     <string name="predictive_horizon_value">%1$d min</string>
+    <string name="journal_dose_math_title">Calculadora de dose</string>
+    <string name="journal_dose_pair_insulin">Associar insulina</string>
+    <string name="journal_dose_pair_carbs">Associar carboidratos</string>
+    <string name="journal_dose_suggested_insulin">%1$s U sugeridas</string>
+    <string name="journal_dose_covers_carbs">%1$s g cobertos</string>
+    <string name="journal_dose_food_component">Comida %1$s</string>
+    <string name="journal_dose_correction_component">Correção %1$s</string>
     <string name="journal_manage_title">Configuração do diário</string>
     <string name="journal_manage_desc">Ajuste tipos de insulina e janelas de ação</string>
     <string name="journal_quick_actions">Registro rápido</string>

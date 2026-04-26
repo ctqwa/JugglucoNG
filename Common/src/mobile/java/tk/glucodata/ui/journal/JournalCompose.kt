@@ -104,7 +104,16 @@ data class JournalEntryDraft(
     val note: String = "",
     val intensity: JournalIntensity? = null,
     val insulinPresetId: Long? = null,
-    val chartAnchorGlucoseMgDl: Float? = null
+    val chartAnchorGlucoseMgDl: Float? = null,
+    val pairWithDose: Boolean = false,
+    val pairedAmountText: String = ""
+)
+
+data class JournalDoseProfile(
+    val enabled: Boolean,
+    val carbRatioGramsPerUnit: Float,
+    val insulinSensitivityMgDlPerUnit: Float,
+    val targetHighMgDl: Float
 )
 
 fun buildJournalChartMarkers(
@@ -260,10 +269,12 @@ fun JournalEntrySheet(
     suggestedGlucoseMgDl: Float? = null,
     suggestedAmountFraction: Float? = null,
     insulinPresets: List<JournalInsulinPreset>,
+    doseProfile: JournalDoseProfile? = null,
     initialType: JournalEntryType,
     existingEntry: JournalEntry? = null,
     onDismiss: () -> Unit,
     onSave: (JournalEntryInput) -> Unit,
+    onSaveEntries: ((List<JournalEntryInput>) -> Unit)? = null,
     onDelete: ((Long) -> Unit)? = null,
     sensorSerialProvider: () -> String?
 ) {
@@ -279,11 +290,21 @@ fun JournalEntrySheet(
     }
     var showDatePicker by remember(existingEntry?.id, initialType, selectedTimestamp) { mutableStateOf(false) }
     var showTimePicker by remember(existingEntry?.id, initialType, selectedTimestamp) { mutableStateOf(false) }
-    val canSave = remember(draft, unit, presetsById) {
-        draft.toInput(unit, sensorSerialProvider(), presetsById) != null
+    val saveInputs = draft.toInputs(unit, sensorSerialProvider(), presetsById)
+    val canSave = saveInputs.isNotEmpty()
+    val calculatorProfile = remember(doseProfile) {
+        doseProfile?.takeIf {
+            it.enabled &&
+                it.carbRatioGramsPerUnit > 0f &&
+                it.insulinSensitivityMgDlPerUnit > 0f
+        }
     }
-    LaunchedEffect(existingEntry?.id, draft.type, activeInsulinPresets) {
-        if (existingEntry != null || draft.type != JournalEntryType.INSULIN || draft.insulinPresetId != null) {
+    LaunchedEffect(existingEntry?.id, draft.type, draft.pairWithDose, activeInsulinPresets) {
+        if (
+            existingEntry != null ||
+            draft.insulinPresetId != null ||
+            (draft.type != JournalEntryType.INSULIN && !(draft.type == JournalEntryType.CARBS && draft.pairWithDose))
+        ) {
             return@LaunchedEffect
         }
         preferredInsulinPreset(activeInsulinPresets)?.let { preset ->
@@ -291,6 +312,33 @@ fun JournalEntrySheet(
                 insulinPresetId = preset.id,
                 title = preset.displayName
             )
+        }
+    }
+    LaunchedEffect(
+        draft.type,
+        draft.amountText,
+        draft.chartAnchorGlucoseMgDl,
+        draft.pairWithDose,
+        calculatorProfile
+    ) {
+        if (!draft.pairWithDose || calculatorProfile == null) return@LaunchedEffect
+        val suggestedPair = when (draft.type) {
+            JournalEntryType.CARBS -> calculateInsulinForCarbs(
+                carbs = draft.amountText.parseFloatOrNull(),
+                glucoseMgDl = draft.chartAnchorGlucoseMgDl,
+                profile = calculatorProfile
+            )?.totalInsulinUnits?.let(::formatInsulinDose)
+
+            JournalEntryType.INSULIN -> calculateCoveredCarbsForInsulin(
+                insulinUnits = draft.amountText.parseFloatOrNull(),
+                glucoseMgDl = draft.chartAnchorGlucoseMgDl,
+                profile = calculatorProfile
+            )?.let(::formatCarbDose)
+
+            else -> null
+        }
+        if (suggestedPair != null && suggestedPair != draft.pairedAmountText) {
+            draft = draft.copy(pairedAmountText = suggestedPair)
         }
     }
 
@@ -425,6 +473,17 @@ fun JournalEntrySheet(
                             suffix = "U"
                         )
                     }
+                    if (existingEntry == null && calculatorProfile != null) {
+                        item(key = "insulin_dose_assist") {
+                            JournalDoseAssistCard(
+                                draft = draft,
+                                profile = calculatorProfile,
+                                activeInsulinPresets = activeInsulinPresets,
+                                unit = unit,
+                                onDraftChange = { draft = it }
+                            )
+                        }
+                    }
                 }
 
                 JournalEntryType.CARBS -> {
@@ -438,6 +497,17 @@ fun JournalEntrySheet(
                             label = stringResource(R.string.carbo),
                             suffix = "g"
                         )
+                    }
+                    if (existingEntry == null && calculatorProfile != null) {
+                        item(key = "carbs_dose_assist") {
+                            JournalDoseAssistCard(
+                                draft = draft,
+                                profile = calculatorProfile,
+                                activeInsulinPresets = activeInsulinPresets,
+                                unit = unit,
+                                onDraftChange = { draft = it }
+                            )
+                        }
                     }
                 }
 
@@ -516,7 +586,11 @@ fun JournalEntrySheet(
                 FilledTonalButton(
                     onClick = {
                         if (canSave) {
-                            draft.toInput(unit, sensorSerialProvider(), presetsById)?.let(onSave)
+                            if (saveInputs.size > 1) {
+                                onSaveEntries?.invoke(saveInputs) ?: saveInputs.forEach(onSave)
+                            } else {
+                                saveInputs.firstOrNull()?.let(onSave)
+                            }
                         }
                     },
                     enabled = canSave,
@@ -663,7 +737,9 @@ private fun JournalEntryDraft.normalizedForType(
             },
             glucoseText = "",
             durationText = "",
-            intensity = null
+            intensity = null,
+            pairWithDose = false,
+            pairedAmountText = ""
         )
 
         JournalEntryType.CARBS -> copy(
@@ -674,7 +750,9 @@ private fun JournalEntryDraft.normalizedForType(
             glucoseText = "",
             durationText = "",
             intensity = null,
-            insulinPresetId = null
+            insulinPresetId = null,
+            pairWithDose = false,
+            pairedAmountText = ""
         )
 
         JournalEntryType.FINGERSTICK -> copy(
@@ -683,6 +761,8 @@ private fun JournalEntryDraft.normalizedForType(
             durationText = "",
             intensity = null,
             insulinPresetId = null,
+            pairWithDose = false,
+            pairedAmountText = "",
             glucoseText = glucoseText.ifBlank {
                 suggestedGlucoseMgDl?.let { formatGlucoseForEditor(it, unit) }
                     ?: if (GlucoseFormatter.isMmol(unit)) "5.6" else "100"
@@ -692,7 +772,9 @@ private fun JournalEntryDraft.normalizedForType(
         JournalEntryType.ACTIVITY -> copy(
             amountText = "",
             glucoseText = "",
-            insulinPresetId = null
+            insulinPresetId = null,
+            pairWithDose = false,
+            pairedAmountText = ""
         )
 
         JournalEntryType.NOTE -> copy(
@@ -700,7 +782,9 @@ private fun JournalEntryDraft.normalizedForType(
             glucoseText = "",
             durationText = "",
             intensity = null,
-            insulinPresetId = null
+            insulinPresetId = null,
+            pairWithDose = false,
+            pairedAmountText = ""
         )
     }
 }
@@ -787,6 +871,309 @@ private fun JournalEntryDraft.toInput(
             )
         }
     }
+}
+
+private fun JournalEntryDraft.toInputs(
+    unit: String,
+    sensorSerial: String?,
+    presetsById: Map<Long, JournalInsulinPreset>
+): List<JournalEntryInput> {
+    val primary = toInput(unit, sensorSerial, presetsById) ?: return emptyList()
+    if (!pairWithDose || entryId != null || type !in setOf(JournalEntryType.INSULIN, JournalEntryType.CARBS)) {
+        return listOf(primary)
+    }
+    val paired = when (type) {
+        JournalEntryType.CARBS -> {
+            val presetId = insulinPresetId ?: return emptyList()
+            val preset = presetsById[presetId] ?: return emptyList()
+            val amountValue = pairedAmountText.parseFloatOrNull()?.takeIf { it > 0f } ?: return emptyList()
+            JournalEntryInput(
+                timestamp = timestamp,
+                sensorSerial = sensorSerial,
+                type = JournalEntryType.INSULIN,
+                title = preset.displayName,
+                amount = amountValue,
+                glucoseValueMgDl = chartAnchorGlucoseMgDl,
+                insulinPresetId = presetId
+            )
+        }
+
+        JournalEntryType.INSULIN -> {
+            val grams = pairedAmountText.parseFloatOrNull()?.takeIf { it > 0f } ?: return emptyList()
+            JournalEntryInput(
+                timestamp = timestamp,
+                sensorSerial = sensorSerial,
+                type = JournalEntryType.CARBS,
+                title = Applic.app.getString(R.string.carbo),
+                amount = grams,
+                glucoseValueMgDl = chartAnchorGlucoseMgDl
+            )
+        }
+
+        else -> null
+    } ?: return listOf(primary)
+    return listOf(primary, paired)
+}
+
+@Composable
+private fun JournalDoseAssistCard(
+    draft: JournalEntryDraft,
+    profile: JournalDoseProfile,
+    activeInsulinPresets: List<JournalInsulinPreset>,
+    unit: String,
+    onDraftChange: (JournalEntryDraft) -> Unit
+) {
+    val insulinSuggestion = remember(draft.amountText, draft.chartAnchorGlucoseMgDl, profile) {
+        calculateInsulinForCarbs(
+            carbs = draft.amountText.parseFloatOrNull(),
+            glucoseMgDl = draft.chartAnchorGlucoseMgDl,
+            profile = profile
+        )
+    }
+    val coveredCarbsSuggestion = remember(draft.amountText, draft.chartAnchorGlucoseMgDl, profile) {
+        calculateCoveredCarbsForInsulin(
+            insulinUnits = draft.amountText.parseFloatOrNull(),
+            glucoseMgDl = draft.chartAnchorGlucoseMgDl,
+            profile = profile
+        )
+    }
+    val pairLabel = when (draft.type) {
+        JournalEntryType.CARBS -> stringResource(R.string.journal_dose_pair_insulin)
+        JournalEntryType.INSULIN -> stringResource(R.string.journal_dose_pair_carbs)
+        else -> ""
+    }
+    val pairAmount = when (draft.type) {
+        JournalEntryType.CARBS -> insulinSuggestion?.totalInsulinUnits?.let(::formatInsulinDose)
+        JournalEntryType.INSULIN -> coveredCarbsSuggestion?.let(::formatCarbDose)
+        else -> null
+    }
+    val pairEnabled = pairAmount != null
+    val pairOnClick: () -> Unit = {
+        val enabled = !draft.pairWithDose
+        onDraftChange(
+            draft.copy(
+                pairWithDose = enabled,
+                pairedAmountText = if (enabled) pairAmount.orEmpty() else "",
+                insulinPresetId = when {
+                    draft.type == JournalEntryType.CARBS && enabled -> draft.insulinPresetId
+                        ?: preferredInsulinPreset(activeInsulinPresets)?.id
+                    draft.type == JournalEntryType.CARBS -> null
+                    else -> draft.insulinPresetId
+                }
+            )
+        )
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.34f),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.journal_dose_math_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = stringResource(R.string.predictive_carb_ratio_value, profile.carbRatioGramsPerUnit),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            when (draft.type) {
+                JournalEntryType.CARBS -> {
+                    val suggestion = insulinSuggestion
+                    if (suggestion != null) {
+                        Text(
+                            text = stringResource(
+                                R.string.journal_dose_suggested_insulin,
+                                formatInsulinDose(suggestion.totalInsulinUnits)
+                            ),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            JournalDoseMetric(
+                                label = stringResource(
+                                    R.string.journal_dose_food_component,
+                                    "${formatInsulinComponent(suggestion.foodInsulinUnits)} U"
+                                )
+                            )
+                            if (suggestion.correctionInsulinUnits > 0f) {
+                                JournalDoseMetric(
+                                    label = stringResource(
+                                        R.string.journal_dose_correction_component,
+                                        "${formatInsulinComponent(suggestion.correctionInsulinUnits)} U"
+                                    )
+                                )
+                            }
+                            draft.chartAnchorGlucoseMgDl?.let { glucose ->
+                                JournalDoseMetric(label = formatGlucoseForEditor(glucose, unit))
+                            }
+                        }
+                    }
+                }
+
+                JournalEntryType.INSULIN -> {
+                    if (coveredCarbsSuggestion != null) {
+                        Text(
+                            text = stringResource(
+                                R.string.journal_dose_covers_carbs,
+                                formatCarbDose(coveredCarbsSuggestion)
+                            ),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                else -> Unit
+            }
+
+            FilledTonalButton(
+                onClick = pairOnClick,
+                enabled = pairEnabled,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = if (draft.pairWithDose) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                    contentColor = if (draft.pairWithDose) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            ) {
+                Icon(
+                    imageVector = if (draft.type == JournalEntryType.CARBS) Icons.Default.Vaccines else Icons.Default.Restaurant,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = pairLabel)
+            }
+
+            if (draft.pairWithDose) {
+                if (draft.type == JournalEntryType.CARBS) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        activeInsulinPresets.forEach { preset ->
+                            JournalPresetPill(
+                                preset = preset,
+                                selected = draft.insulinPresetId == preset.id,
+                                onClick = {
+                                    onDraftChange(
+                                        draft.copy(
+                                            insulinPresetId = preset.id,
+                                            title = if (draft.type == JournalEntryType.INSULIN) preset.displayName else draft.title
+                                        )
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+                JournalStepperField(
+                    value = draft.pairedAmountText,
+                    onValueChange = { onDraftChange(draft.copy(pairedAmountText = it)) },
+                    onStep = { delta ->
+                        val step = if (draft.type == JournalEntryType.CARBS) 0.5f else 5f
+                        onDraftChange(
+                            draft.copy(
+                                pairedAmountText = adjustDecimalDraft(draft.pairedAmountText, delta, step)
+                            )
+                        )
+                    },
+                    label = if (draft.type == JournalEntryType.CARBS) {
+                        stringResource(R.string.journal_type_insulin)
+                    } else {
+                        stringResource(R.string.carbo)
+                    },
+                    suffix = if (draft.type == JournalEntryType.CARBS) "U" else "g"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun JournalDoseMetric(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+        shape = RoundedCornerShape(50)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+        )
+    }
+}
+
+private data class JournalInsulinDoseSuggestion(
+    val foodInsulinUnits: Float,
+    val correctionInsulinUnits: Float,
+    val totalInsulinUnits: Float
+)
+
+private fun calculateInsulinForCarbs(
+    carbs: Float?,
+    glucoseMgDl: Float?,
+    profile: JournalDoseProfile
+): JournalInsulinDoseSuggestion? {
+    val carbValue = carbs?.takeIf { it > 0f } ?: return null
+    val food = carbValue / profile.carbRatioGramsPerUnit
+    val correction = glucoseMgDl
+        ?.let { ((it - profile.targetHighMgDl) / profile.insulinSensitivityMgDlPerUnit).coerceAtLeast(0f) }
+        ?: 0f
+    return JournalInsulinDoseSuggestion(
+        foodInsulinUnits = food,
+        correctionInsulinUnits = correction,
+        totalInsulinUnits = roundInsulinDose(food + correction)
+    )
+}
+
+private fun calculateCoveredCarbsForInsulin(
+    insulinUnits: Float?,
+    glucoseMgDl: Float?,
+    profile: JournalDoseProfile
+): Float? {
+    val insulinValue = insulinUnits?.takeIf { it > 0f } ?: return null
+    val correction = glucoseMgDl
+        ?.let { ((it - profile.targetHighMgDl) / profile.insulinSensitivityMgDlPerUnit).coerceAtLeast(0f) }
+        ?: 0f
+    return ((insulinValue - correction).coerceAtLeast(0f) * profile.carbRatioGramsPerUnit)
+        .let { (it / 5f).roundToInt() * 5f }
+        .takeIf { it > 0f }
+}
+
+private fun roundInsulinDose(value: Float): Float {
+    return ((value / 0.5f).roundToInt() * 0.5f).coerceAtLeast(0.5f)
+}
+
+private fun formatInsulinDose(value: Float): String = formatFloatForEditor(roundInsulinDose(value))
+
+private fun formatInsulinComponent(value: Float): String {
+    return formatFloatForEditor(((value / 0.1f).roundToInt() * 0.1f).coerceAtLeast(0f))
+}
+
+private fun formatCarbDose(value: Float): String {
+    return formatFloatForEditor(((value / 5f).roundToInt() * 5f).coerceAtLeast(5f))
 }
 
 private enum class JournalTrayAction {

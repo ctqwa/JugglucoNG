@@ -710,6 +710,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="data_management">Data Management</string>
     <string name="export_data">Export Data</string>
     <string name="export_data_desc">Save history to CSV/TSV</string>
+    <string name="export_settings">Export Settings</string>
+    <string name="export_settings_desc">Save all app settings, credentials, and device keys</string>
     <string name="import_data">Import Data</string>
     <string name="import_data_desc">Load backup or Libreview file</string>
     <string name="days_to_export">Days to export</string>
@@ -1533,6 +1535,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Forecast horizon</string>
     <string name="predictive_horizon_value">%1$d min</string>
+    <string name="journal_dose_math_title">Dose calculator</string>
+    <string name="journal_dose_pair_insulin">Pair insulin</string>
+    <string name="journal_dose_pair_carbs">Pair carbs</string>
+    <string name="journal_dose_suggested_insulin">%1$s U suggested</string>
+    <string name="journal_dose_covers_carbs">%1$s g covered</string>
+    <string name="journal_dose_food_component">Food %1$s</string>
+    <string name="journal_dose_correction_component">Correction %1$s</string>
     <string name="journal_manage_title">Journal setup</string>
     <string name="journal_manage_desc">Build insulin types, colors, and activity curves</string>
     <string name="journal_settings_summary">%1$s · %2$d insulin types</string>

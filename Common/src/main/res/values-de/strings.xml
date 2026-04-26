@@ -575,6 +575,8 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="data_management">Datenverwaltung</string>
     <string name="export_data">Verlauf exportieren</string>
     <string name="export_data_desc">Glukosewerte als CSV/Text speichern</string>
+    <string name="export_settings">Einstellungen exportieren</string>
+    <string name="export_settings_desc">Alle App-Einstellungen, Zugangsdaten und Geräteschlüssel speichern</string>
     <string name="import_data">Verlauf importieren</string>
     <string name="import_data_desc">Backup oder Libreview-Datei laden</string>
     <string name="danger_zone">Gefahrenzone</string>
@@ -1392,6 +1394,13 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Prognosehorizont</string>
     <string name="predictive_horizon_value">%1$d min</string>
+    <string name="journal_dose_math_title">Dosisrechner</string>
+    <string name="journal_dose_pair_insulin">Insulin koppeln</string>
+    <string name="journal_dose_pair_carbs">Kohlenhydrate koppeln</string>
+    <string name="journal_dose_suggested_insulin">%1$s U vorgeschlagen</string>
+    <string name="journal_dose_covers_carbs">%1$s g abgedeckt</string>
+    <string name="journal_dose_food_component">Essen %1$s</string>
+    <string name="journal_dose_correction_component">Korrektur %1$s</string>
     <string name="journal_manage_title">Journal-Setup</string>
     <string name="journal_manage_desc">Insulintypen und Wirkbänder anpassen</string>
     <string name="journal_quick_actions">Schnell protokollieren</string>

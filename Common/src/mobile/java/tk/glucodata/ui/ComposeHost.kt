@@ -155,6 +155,7 @@ import tk.glucodata.data.prediction.GlucosePredictionSeries
 import tk.glucodata.data.prediction.GlucosePredictionSeriesKind
 import tk.glucodata.data.prediction.PredictiveSimulationSettings
 import tk.glucodata.data.prediction.buildGlucosePrediction
+import tk.glucodata.ui.journal.JournalDoseProfile
 import tk.glucodata.ui.journal.JournalEntrySheet
 import tk.glucodata.ui.journal.JournalInlineChip
 import tk.glucodata.ui.journal.JournalSettingsScreen
@@ -661,6 +662,8 @@ private fun HistoryRoute(
     val journalEnabled by dashboardViewModel.journalEnabled.collectAsStateWithLifecycle()
     val journalEntries by dashboardViewModel.journalEntries.collectAsStateWithLifecycle()
     val journalInsulinPresets by dashboardViewModel.journalInsulinPresets.collectAsStateWithLifecycle()
+    val predictionCarbRatioGramsPerUnit by dashboardViewModel.predictionCarbRatioGramsPerUnit.collectAsStateWithLifecycle()
+    val predictionInsulinSensitivityMgDlPerUnit by dashboardViewModel.predictionInsulinSensitivityMgDlPerUnit.collectAsStateWithLifecycle()
     val calibrations by tk.glucodata.data.calibration.CalibrationManager.calibrations.collectAsStateWithLifecycle()
     var journalEditorRequest by remember { mutableStateOf<JournalEditorRequest?>(null) }
     var lastJournalType by rememberSaveable { mutableStateOf(JournalEntryType.INSULIN) }
@@ -721,12 +724,23 @@ private fun HistoryRoute(
             suggestedGlucoseMgDl = request.suggestedGlucoseMgDl,
             suggestedAmountFraction = request.suggestedAmountFraction,
             insulinPresets = journalInsulinPresets,
+            doseProfile = JournalDoseProfile(
+                enabled = journalEnabled,
+                carbRatioGramsPerUnit = predictionCarbRatioGramsPerUnit,
+                insulinSensitivityMgDlPerUnit = predictionInsulinSensitivityMgDlPerUnit,
+                targetHighMgDl = targetHigh
+            ),
             initialType = request.type,
             existingEntry = request.existingEntry,
             onDismiss = { journalEditorRequest = null },
             onSave = { input ->
                 dashboardViewModel.saveJournalEntry(input)
                 lastJournalType = input.type
+                journalEditorRequest = null
+            },
+            onSaveEntries = { inputs ->
+                inputs.forEach(dashboardViewModel::saveJournalEntry)
+                inputs.firstOrNull()?.let { lastJournalType = it.type }
                 journalEditorRequest = null
             },
             onDelete = { entryId ->
@@ -1453,12 +1467,24 @@ fun DashboardScreen(
             suggestedGlucoseMgDl = request.suggestedGlucoseMgDl,
             suggestedAmountFraction = request.suggestedAmountFraction,
             insulinPresets = if (request.existingEntry != null) journalInsulinPresets else activeJournalPresets,
+            doseProfile = JournalDoseProfile(
+                enabled = journalEnabled,
+                carbRatioGramsPerUnit = predictionCarbRatioGramsPerUnit,
+                insulinSensitivityMgDlPerUnit = predictionInsulinSensitivityMgDlPerUnit,
+                targetHighMgDl = targetHigh
+            ),
             initialType = request.type,
             existingEntry = request.existingEntry,
             onDismiss = { journalEditorRequest = null },
             onSave = { input ->
                 viewModel.saveJournalEntry(input)
                 lastJournalType = input.type
+                journalEditorRequest = null
+                clearJournalAction()
+            },
+            onSaveEntries = { inputs ->
+                inputs.forEach(viewModel::saveJournalEntry)
+                inputs.firstOrNull()?.let { lastJournalType = it.type }
                 journalEditorRequest = null
                 clearJournalAction()
             },

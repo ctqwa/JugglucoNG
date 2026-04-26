@@ -448,6 +448,8 @@
     <string name="data_management">Кіраванне Дадзенымі</string>
     <string name="export_data">Экспарт Гісторыі</string>
     <string name="export_data_desc">Захаваць дадзеныя ў CSV/Тэкст</string>
+    <string name="export_settings">Экспартаваць налады</string>
+    <string name="export_settings_desc">Захаваць усе налады праграмы, уліковыя даныя і ключы прылад</string>
     <string name="import_data">Імпарт Гісторыі</string>
     <string name="import_data_desc">Загрузіць бэкап ці файл Libreview</string>
     <string name="danger_zone">Небяспечная Зона</string>
@@ -1353,6 +1355,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Гарызонт прагнозу</string>
     <string name="predictive_horizon_value">%1$d хв</string>
+    <string name="journal_dose_math_title">Калькулятар дозы</string>
+    <string name="journal_dose_pair_insulin">Дадаць інсулін</string>
+    <string name="journal_dose_pair_carbs">Дадаць вугляводы</string>
+    <string name="journal_dose_suggested_insulin">Прапанавана %1$s АД</string>
+    <string name="journal_dose_covers_carbs">Пакрывае %1$s г</string>
+    <string name="journal_dose_food_component">Ежа %1$s</string>
+    <string name="journal_dose_correction_component">Карэкцыя %1$s</string>
     <string name="journal_manage_title">Налады журнала</string>
     <string name="journal_manage_desc">Наладзьце тыпы інсуліну і вокны дзеяння</string>
     <string name="journal_quick_actions">Хуткі запіс</string>

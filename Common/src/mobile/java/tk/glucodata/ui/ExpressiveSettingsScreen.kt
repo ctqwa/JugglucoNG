@@ -280,6 +280,7 @@ fun ExpressiveSettingsScreen(
                 )
 
                 PredictiveSimulationExpandableSettingsItem(
+                    journalEnabled = journalEnabled,
                     predictiveSimulationEnabled = predictiveSimulationEnabled,
                     trendMomentumEnabled = predictionTrendMomentumEnabled,
                     carbRatioGramsPerUnit = predictionCarbRatioGramsPerUnit,
@@ -1119,6 +1120,7 @@ private fun JournalSettingsItem(
 
 @Composable
 private fun PredictiveSimulationExpandableSettingsItem(
+    journalEnabled: Boolean,
     predictiveSimulationEnabled: Boolean,
     trendMomentumEnabled: Boolean,
     carbRatioGramsPerUnit: Float,
@@ -1218,41 +1220,43 @@ private fun PredictiveSimulationExpandableSettingsItem(
                         onCheckedChange = onToggleTrendMomentum,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
-                    Text(
-                        text = stringResource(R.string.predictive_model_tuning),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
-                    )
-                    PredictiveSimulationParameterRow(
-                        title = stringResource(R.string.predictive_carb_ratio),
-                        valueLabel = stringResource(R.string.predictive_carb_ratio_value, carbRatioGramsPerUnit),
-                        value = carbRatioGramsPerUnit,
-                        valueRange = 3f..30f,
-                        enabled = predictiveSimulationEnabled,
-                        onValueChange = onCarbRatioChange
-                    )
-                    PredictiveSimulationParameterRow(
-                        title = stringResource(R.string.predictive_insulin_sensitivity),
-                        valueLabel = sensitivityValue,
-                        value = insulinSensitivityDisplay,
-                        valueRange = sensitivityRange,
-                        enabled = predictiveSimulationEnabled,
-                        onValueChange = { displayValue ->
-                            onInsulinSensitivityChange(
-                                if (isMmol) displayValue * 18.0182f else displayValue
-                            )
-                        }
-                    )
-                    PredictiveSimulationParameterRow(
-                        title = stringResource(R.string.predictive_carb_absorption),
-                        valueLabel = stringResource(R.string.predictive_absorption_value, carbAbsorptionGramsPerHour),
-                        value = carbAbsorptionGramsPerHour,
-                        valueRange = 10f..90f,
-                        enabled = predictiveSimulationEnabled,
-                        onValueChange = onCarbAbsorptionChange
-                    )
+                    if (journalEnabled) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+                        Text(
+                            text = stringResource(R.string.predictive_model_tuning),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
+                        )
+                        PredictiveSimulationParameterRow(
+                            title = stringResource(R.string.predictive_carb_ratio),
+                            valueLabel = stringResource(R.string.predictive_carb_ratio_value, carbRatioGramsPerUnit),
+                            value = carbRatioGramsPerUnit,
+                            valueRange = 3f..30f,
+                            enabled = predictiveSimulationEnabled,
+                            onValueChange = onCarbRatioChange
+                        )
+                        PredictiveSimulationParameterRow(
+                            title = stringResource(R.string.predictive_insulin_sensitivity),
+                            valueLabel = sensitivityValue,
+                            value = insulinSensitivityDisplay,
+                            valueRange = sensitivityRange,
+                            enabled = predictiveSimulationEnabled,
+                            onValueChange = { displayValue ->
+                                onInsulinSensitivityChange(
+                                    if (isMmol) displayValue * 18.0182f else displayValue
+                                )
+                            }
+                        )
+                        PredictiveSimulationParameterRow(
+                            title = stringResource(R.string.predictive_carb_absorption),
+                            valueLabel = stringResource(R.string.predictive_absorption_value, carbAbsorptionGramsPerHour),
+                            value = carbAbsorptionGramsPerHour,
+                            valueRange = 10f..90f,
+                            enabled = predictiveSimulationEnabled,
+                            onValueChange = onCarbAbsorptionChange
+                        )
+                    }
                     PredictiveSimulationParameterRow(
                         title = stringResource(R.string.predictive_forecast_horizon),
                         valueLabel = stringResource(R.string.predictive_horizon_value, horizonMinutes),

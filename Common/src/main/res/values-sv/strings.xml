@@ -500,6 +500,8 @@
     <string name="data_management">Datahantering</string>
     <string name="export_data">Exportera Historik</string>
     <string name="export_data_desc">Spara avläsningar till CSV/Text</string>
+    <string name="export_settings">Exportera inställningar</string>
+    <string name="export_settings_desc">Spara alla appinställningar, inloggningsuppgifter och enhetsnycklar</string>
     <string name="import_data">Importera Historik</string>
     <string name="import_data_desc">Ladda backup eller Libreview-fil</string>
     <string name="danger_zone">Farozon</string>
@@ -1354,6 +1356,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Prognoshorisont</string>
     <string name="predictive_horizon_value">%1$d min</string>
+    <string name="journal_dose_math_title">Dosräknare</string>
+    <string name="journal_dose_pair_insulin">Koppla insulin</string>
+    <string name="journal_dose_pair_carbs">Koppla kolhydrater</string>
+    <string name="journal_dose_suggested_insulin">%1$s U föreslaget</string>
+    <string name="journal_dose_covers_carbs">%1$s g täcks</string>
+    <string name="journal_dose_food_component">Mat %1$s</string>
+    <string name="journal_dose_correction_component">Korrigering %1$s</string>
     <string name="journal_manage_title">Journalinställningar</string>
     <string name="journal_manage_desc">Justera insulintyper och verkansfönster</string>
     <string name="journal_quick_actions">Snabblogg</string>

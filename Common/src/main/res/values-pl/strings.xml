@@ -574,6 +574,8 @@
     <string name="data_management">Zarządzanie Danymi</string>
     <string name="export_data">Eksportuj Historię</string>
     <string name="export_data_desc">Zapisz odczyty w CSV/Tekst</string>
+    <string name="export_settings">Eksportuj ustawienia</string>
+    <string name="export_settings_desc">Zapisz wszystkie ustawienia aplikacji, dane logowania i klucze urządzeń</string>
     <string name="import_data">Importuj Historię</string>
     <string name="import_data_desc">Załaduj kopię zapasową lub plik Libreview</string>
     <string name="danger_zone">Strefa Niebezpieczeństwa</string>
@@ -1389,6 +1391,13 @@
     <string name="predictive_absorption_value">%1$.0f g/h</string>
     <string name="predictive_forecast_horizon">Horyzont prognozy</string>
     <string name="predictive_horizon_value">%1$d min</string>
+    <string name="journal_dose_math_title">Kalkulator dawki</string>
+    <string name="journal_dose_pair_insulin">Połącz insulinę</string>
+    <string name="journal_dose_pair_carbs">Połącz węglowodany</string>
+    <string name="journal_dose_suggested_insulin">Sugerowane %1$s U</string>
+    <string name="journal_dose_covers_carbs">Pokrywa %1$s g</string>
+    <string name="journal_dose_food_component">Jedzenie %1$s</string>
+    <string name="journal_dose_correction_component">Korekta %1$s</string>
     <string name="journal_manage_title">Ustawienia dziennika</string>
     <string name="journal_manage_desc">Dostosuj typy insuliny i okna działania</string>
     <string name="journal_quick_actions">Szybki wpis</string>
