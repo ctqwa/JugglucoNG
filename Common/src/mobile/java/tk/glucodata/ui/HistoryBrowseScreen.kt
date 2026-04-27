@@ -365,7 +365,7 @@ fun HistoryBrowseScreen(
     onPointClick: ((GlucosePoint) -> Unit)? = null,
     onDeleteReading: ((GlucosePoint) -> Unit)? = null,
     onJournalEntryClick: ((JournalEntry) -> Unit)? = null,
-    onAddJournalEntry: ((Long, JournalEntryType?) -> Unit)? = null,
+    onAddJournalEntry: ((Long, JournalEntryType?, Float?) -> Unit)? = null,
     showTransferActions: Boolean = true
 ) {
     val context = LocalContext.current
@@ -506,7 +506,8 @@ fun HistoryBrowseScreen(
                                         viewportSnapshot?.selectedPoint?.timestamp
                                             ?: viewportEnd
                                             ?: System.currentTimeMillis(),
-                                        selectedJournalTypes.singleOrNull()
+                                        selectedJournalTypes.singleOrNull(),
+                                        viewportSnapshot?.selectedPoint?.value
                                     )
                                 }
                             ) {
@@ -723,7 +724,10 @@ fun HistoryBrowseScreen(
 
                     itemsIndexed(
                         items = section.items,
-                        key = { _, item -> "${item.timestamp}-${item.point?.timestamp ?: "journal"}" }
+                        key = { index, item ->
+                            val journalKey = item.journalEntries.joinToString(separator = ",") { it.id.toString() }
+                            "${item.timestamp}-${item.point?.timestamp ?: "journal"}-$journalKey-$index"
+                        }
                     ) { index, item ->
                         val readingPoint = item.point
                         if (readingPoint != null) {
@@ -747,7 +751,8 @@ fun HistoryBrowseScreen(
                                     {
                                         onAddJournalEntry(
                                             readingPoint.timestamp,
-                                            selectedJournalTypes.singleOrNull()
+                                            selectedJournalTypes.singleOrNull(),
+                                            readingPoint.value
                                         )
                                     }
                                 } else {
@@ -773,7 +778,8 @@ fun HistoryBrowseScreen(
                                     {
                                         onAddJournalEntry(
                                             item.timestamp,
-                                            selectedJournalTypes.singleOrNull()
+                                            selectedJournalTypes.singleOrNull(),
+                                            null
                                         )
                                     }
                                 } else {

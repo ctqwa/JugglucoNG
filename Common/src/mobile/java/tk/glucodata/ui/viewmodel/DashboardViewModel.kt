@@ -28,6 +28,7 @@ import tk.glucodata.alerts.AlertRepository
 import tk.glucodata.alerts.CustomAlertRepository
 import tk.glucodata.drivers.ManagedSensorRuntime
 import tk.glucodata.drivers.ManagedSensorStatusPolicy
+import tk.glucodata.drivers.ManagedSensorUiFamily
 import tk.glucodata.ui.util.resolveDashboardSensorStatus
 import kotlin.math.roundToInt
 
@@ -52,6 +53,7 @@ class DashboardViewModel(
         const val HISTORY_RECOVERY_TOLERANCE_MS = 5L * 60L * 1000L
         const val HISTORY_RECOVERY_TAIL_TOLERANCE_MS = 2L * 60L * 1000L
         const val DASHBOARD_HISTORY_WINDOW_MS = 3L * 24L * 60L * 60L * 1000L
+        const val JOURNAL_DOSE_CALCULATOR_KEY = "dashboard_journal_dose_calculator_enabled"
         const val PREDICTION_CARB_RATIO_KEY = "dashboard_prediction_carb_ratio_g_per_u"
         const val PREDICTION_INSULIN_SENSITIVITY_KEY = "dashboard_prediction_insulin_sensitivity_mgdl_per_u"
         const val PREDICTION_CARB_ABSORPTION_KEY = "dashboard_prediction_carb_absorption_g_per_h"
@@ -166,6 +168,9 @@ class DashboardViewModel(
 
     private val _journalEnabled = MutableStateFlow(true)
     val journalEnabled = _journalEnabled.asStateFlow()
+
+    private val _journalDoseCalculatorEnabled = MutableStateFlow(false)
+    val journalDoseCalculatorEnabled = _journalDoseCalculatorEnabled.asStateFlow()
 
     private val _predictiveSimulationEnabled = MutableStateFlow(true)
     val predictiveSimulationEnabled = _predictiveSimulationEnabled.asStateFlow()
@@ -384,6 +389,7 @@ class DashboardViewModel(
         _previewWindowMode.value = prefs.getInt("dashboard_chart_preview_window_mode", 0)
         val journalEnabled = prefs.getBoolean("dashboard_journal_enabled", true)
         _journalEnabled.value = journalEnabled
+        _journalDoseCalculatorEnabled.value = prefs.getBoolean(JOURNAL_DOSE_CALCULATOR_KEY, false)
         _predictiveSimulationEnabled.value = prefs.getBoolean("dashboard_predictive_simulation_enabled", true)
         _predictionTrendMomentumEnabled.value = prefs.getBoolean("dashboard_prediction_trend_momentum_enabled", true)
         _predictionCarbRatioGramsPerUnit.value = prefs
@@ -478,6 +484,14 @@ class DashboardViewModel(
             } else {
                 null
             }
+            val fallbackDurationDays =
+                if (managedSnapshot?.uiFamily == ManagedSensorUiFamily.AIDEX ||
+                    sName.startsWith("X-", ignoreCase = true)
+                ) {
+                    15
+                } else {
+                    14
+                }
             if (snapshot != null && snapshot.size >= 5) {
                 val sensorKind = snapshot[0].toInt()
                 val vm = snapshot[1].toInt()
@@ -489,11 +503,12 @@ class DashboardViewModel(
                 _viewMode.value = managedSnapshot?.viewMode ?: vm
 
                 val lifecycle = ManagedSensorStatusPolicy.resolveLifecycleSummary(
-                    startTimeMs = managedSnapshot?.startTimeMs ?: startMsec,
-                    officialEndMs = managedSnapshot?.officialEndMs ?: officialEnd,
-                    expectedEndMs = managedSnapshot?.expectedEndMs ?: expectedEnd,
+                    startTimeMs = managedSnapshot?.startTimeMs?.takeIf { it > 0L } ?: startMsec,
+                    officialEndMs = managedSnapshot?.officialEndMs?.takeIf { it > 0L } ?: officialEnd,
+                    expectedEndMs = managedSnapshot?.expectedEndMs?.takeIf { it > 0L } ?: expectedEnd,
                     sensorRemainingHours = managedSnapshot?.sensorRemainingHours ?: -1,
                     sensorAgeHours = managedSnapshot?.sensorAgeHours ?: -1,
+                    fallbackDurationDays = fallbackDurationDays,
                     nowMs = System.currentTimeMillis()
                 )
                 _sensorProgress.value = lifecycle.progress
@@ -509,6 +524,7 @@ class DashboardViewModel(
                     expectedEndMs = managedSnapshot?.expectedEndMs ?: 0L,
                     sensorRemainingHours = managedSnapshot?.sensorRemainingHours ?: -1,
                     sensorAgeHours = managedSnapshot?.sensorAgeHours ?: -1,
+                    fallbackDurationDays = fallbackDurationDays,
                     nowMs = System.currentTimeMillis()
                 )
                 _sensorProgress.value = lifecycle.progress
@@ -802,6 +818,13 @@ class DashboardViewModel(
         } else {
             stopJournalEntriesObservation()
         }
+    }
+
+    fun setJournalDoseCalculatorEnabled(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(JOURNAL_DOSE_CALCULATOR_KEY, enabled).apply()
+        _journalDoseCalculatorEnabled.value = enabled
     }
 
     fun setPredictiveSimulationEnabled(enabled: Boolean) {

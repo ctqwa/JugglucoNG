@@ -16,6 +16,7 @@ import tk.glucodata.Natives
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.bluediag
 import tk.glucodata.drivers.ManagedBluetoothSensorDriver
+import tk.glucodata.drivers.ManagedSensorIdentityRegistry
 import tk.glucodata.drivers.ManagedSensorMaintenanceDriver
 import tk.glucodata.drivers.ManagedSensorUiFamily
 import tk.glucodata.drivers.ManagedSensorUiSignals
@@ -611,6 +612,7 @@ class SensorViewModel : ViewModel() {
         switchAwayFromSensor(serial)
         val gatts = SensorBluetooth.mygatts()
         val gatt = gatts.find { it.SerialNumber == serial }
+            ?: gatts.find { SensorIdentity.matches(it.SerialNumber, serial) }
         if (gatt != null) {
             try {
                 if (gatt is ManagedBluetoothSensorDriver) {
@@ -655,6 +657,15 @@ class SensorViewModel : ViewModel() {
                 // Still try to clean up
                 try { SensorBluetooth.sensorEnded(serial) } catch (_: Throwable) {}
             }
+        } else {
+            // A managed record can still exist after a bad restore/update even if
+            // its live callback is gone or has already promoted to another id.
+            try {
+                ManagedSensorIdentityRegistry.removePersistedSensor(tk.glucodata.Applic.app, serial)
+            } catch (t: Throwable) {
+                android.util.Log.e("SensorViewModel", "terminateSensor($serial) managed persistence cleanup failed: ${t.message}", t)
+            }
+            try { SensorBluetooth.sensorEnded(serial) } catch (_: Throwable) {}
         }
 
         // Force delete AFTER stopping everything and native wipe, to ensure no recreating happens

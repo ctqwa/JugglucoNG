@@ -867,6 +867,11 @@ fun InteractiveGlucoseChart(
         .maxOfOrNull { series -> series.points.lastOrNull()?.timestamp ?: Long.MIN_VALUE }
         ?.takeIf { it != Long.MIN_VALUE }
         ?: 0L
+    val latestJournalTimelineTimestamp = remember(journalMarkers) {
+        journalMarkers.maxOfOrNull { marker ->
+            maxOf(marker.timestamp, marker.activeEndMillis ?: marker.timestamp)
+        } ?: 0L
+    }
     fun predictionLeadMillis(durationMillis: Long): Long {
         return (durationMillis * 0.18f).toLong()
             .coerceIn(15L * 60L * 1000L, 35L * 60L * 1000L)
@@ -1101,10 +1106,11 @@ fun InteractiveGlucoseChart(
         maxOf(72L * 60L * 60L * 1000L, fullSpan + (2L * 60L * 60L * 1000L))
     }
     fun maxAllowedCenterTime(durationMillis: Long): Long {
-        return if (hasPredictionOverlay && predictionEndTimestamp > latestDataTimestamp) {
+        val journalAwareEnd = maxOf(System.currentTimeMillis(), latestDataTimestamp, latestJournalTimelineTimestamp)
+        return if (hasPredictionOverlay && predictionEndTimestamp > journalAwareEnd) {
             predictionEndTimestamp - durationMillis / 2L
         } else {
-            System.currentTimeMillis() + (2L * 60L * 60L * 1000L)
+            journalAwareEnd + (2L * 60L * 1000L)
         }
     }
 
@@ -2682,10 +2688,16 @@ fun InteractiveGlucoseChart(
             }
 
             // --- INFO CARD ---
-            val overlayRightPaddingPx = 16f * density * safeExpandedProgress
+            val overlayRightPaddingPx = if (hasPredictionOverlay) {
+                0f
+            } else {
+                16f * density * safeExpandedProgress
+            }
             val overlayDataWidthPx = (constraints.maxWidth.toFloat() - overlayRightPaddingPx).coerceAtLeast(1f)
-            val overlayViewportStart = centerTime - visibleDuration / 2
-            val overlayViewportEnd = centerTime + visibleDuration / 2
+            val overlayDuration = animatedVisibleDuration.coerceAtLeast(minDuration.toFloat())
+            val overlayDurationMillis = overlayDuration.toLong()
+            val overlayViewportStart = centerTime - overlayDurationMillis / 2
+            val overlayViewportEnd = centerTime + overlayDurationMillis / 2
             val journalChipLaneStepPx = with(LocalDensity.current) { 30.dp.toPx() }
             val journalChipMinTopPx = with(LocalDensity.current) { 8.dp.toPx() }
             val journalChipMinGapPx = with(LocalDensity.current) { 90.dp.toPx() }
@@ -2711,7 +2723,7 @@ fun InteractiveGlucoseChart(
                 marker.timestamp in overlayViewportStart..overlayViewportEnd
             }
             val markerXById = visibleOverlayMarkers.associate { marker ->
-                val xFraction = (marker.timestamp - overlayViewportStart).toFloat() / visibleDuration.toFloat()
+                val xFraction = (marker.timestamp - overlayViewportStart).toFloat() / overlayDuration
                 marker.entryId to (overlayDataWidthPx * xFraction).coerceIn(0f, overlayDataWidthPx)
             }
             val fingerstickLanes = laneAssignments(
@@ -2732,6 +2744,8 @@ fun InteractiveGlucoseChart(
             val fingerstickLiftPx = with(LocalDensity.current) { 48.dp.toPx() }
             val journalChipSideOffsetPx = with(LocalDensity.current) { 10.dp.toPx() }
             val eventBaseTopPx = (chartHeightPx - with(LocalDensity.current) { 44.dp.toPx() }).coerceAtLeast(journalChipMinTopPx)
+            val eventRailOverlayY = (chartHeightPx - with(LocalDensity.current) { 10.dp.toPx() })
+                .coerceAtLeast(with(LocalDensity.current) { 8.dp.toPx() })
             val insulinLabelGapPx = with(LocalDensity.current) { 34.dp.toPx() }
             val insulinBaseCurveHeightPx = (chartHeightPx * 0.018f).coerceIn(
                 with(LocalDensity.current) { 5.dp.toPx() },
@@ -2794,12 +2808,12 @@ fun InteractiveGlucoseChart(
                         JournalEntryType.FINGERSTICK -> marker.chartGlucoseValue
                             ?.let(overlayValueToY)
                             ?.takeIf { it.isFinite() }
-                            ?: eventBaseTopPx
+                            ?: eventRailOverlayY
                         JournalEntryType.INSULIN -> insulinConnectorY
                         else -> marker.chartGlucoseValue
                             ?.let(overlayValueToY)
                             ?.takeIf { it.isFinite() }
-                            ?: eventBaseTopPx
+                            ?: eventRailOverlayY
                     }
                     val labelEdgeX = if (preferLeadingAnchor) {
                         markerX - journalChipSideOffsetPx - connectorUnderlapPx
@@ -2874,7 +2888,7 @@ fun InteractiveGlucoseChart(
             journalActionTimestamp
                 ?.takeIf { selectedPoint == null && it in overlayViewportStart..overlayViewportEnd }
                 ?.let { actionTimestamp ->
-                    val xFraction = (actionTimestamp - overlayViewportStart).toFloat() / visibleDuration.toFloat()
+                    val xFraction = (actionTimestamp - overlayViewportStart).toFloat() / overlayDuration
                     val actionX = (overlayDataWidthPx * xFraction).coerceIn(0f, overlayDataWidthPx)
                     Surface(
                         modifier = Modifier
@@ -3001,8 +3015,7 @@ fun InteractiveGlucoseChart(
 
             selectedPoint?.let { point ->
                 // Calculate X position to follow cursor
-                val viewportStart = centerTime - visibleDuration / 2
-                val xFraction = (point.timestamp - viewportStart).toFloat() / visibleDuration.toFloat()
+                val xFraction = (point.timestamp - overlayViewportStart).toFloat() / overlayDuration
                 // Clamp horizontal position to keep card on screen (assuming approx card width ~120dp)
                 // We use specific offsets in standard DP
                 val cardXOffset = (overlayDataWidthPx * xFraction).coerceIn(0f, overlayDataWidthPx)
@@ -3198,12 +3211,12 @@ fun InteractiveGlucoseChart(
             // Show permanent tooltips for calibration points in visible range (respects mode)
             val isRawModeTooltip = viewMode == 1 || viewMode == 3
             val calibrationsTooltip = tk.glucodata.data.calibration.CalibrationManager.getVisibleCalibrations(isRawModeTooltip)
-            val viewportStartTooltip = centerTime - visibleDuration / 2
-            val viewportEndTooltip = centerTime + visibleDuration / 2
+            val viewportStartTooltip = overlayViewportStart
+            val viewportEndTooltip = overlayViewportEnd
             val visibleCalibrationsTooltip = calibrationsTooltip.filter { it.timestamp in viewportStartTooltip..viewportEndTooltip }
 
             visibleCalibrationsTooltip.forEach { cal ->
-                val calXFraction = (cal.timestamp - viewportStartTooltip).toFloat() / visibleDuration.toFloat()
+                val calXFraction = (cal.timestamp - viewportStartTooltip).toFloat() / overlayDuration
                 val calXOffset = (overlayDataWidthPx * calXFraction).coerceIn(0f, overlayDataWidthPx)
                 val calTimeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
                 val calTimeStr = calTimeFormat.format(java.util.Date(cal.timestamp))
