@@ -6,7 +6,6 @@ import android.content.Context
 import tk.glucodata.Applic
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
-import tk.glucodata.drivers.ManagedBluetoothSensorDriver
 import tk.glucodata.drivers.ManagedSensorIdentityAdapter
 
 object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
@@ -19,24 +18,13 @@ object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
             return true
         }
         return SensorBluetooth.mygatts().any { callback ->
-            val managed = callback as? ManagedBluetoothSensorDriver ?: return@any false
-            managed.matchesManagedSensorId(normalized) && managed.matchesManagedSensorId(sensorId)
+            val mq = callback as? MQDriver ?: return@any false
+            mq.matchesManagedSensorId(normalized) && mq.matchesManagedSensorId(sensorId)
         }
     }
 
     override fun resolveCanonicalSensorId(sensorId: String?): String? {
         val raw = sensorId?.trim().takeIf { !it.isNullOrEmpty() } ?: return null
-        SensorBluetooth.mygatts()
-            .firstOrNull { cb ->
-                val managed = cb as? ManagedBluetoothSensorDriver ?: return@firstOrNull false
-                managed.matchesManagedSensorId(raw)
-            }
-            ?.SerialNumber
-            ?.takeIf { it.isNotBlank() }
-            ?.let(MQConstants::canonicalSensorId)
-            ?.takeIf { it.isNotEmpty() && !MQConstants.isProvisionalSensorId(it) }
-            ?.let { return it }
-
         if (MQConstants.isProvisionalSensorId(raw)) return raw
         val normalized = MQConstants.canonicalSensorId(raw)
         if (normalized.isEmpty()) return null
@@ -46,16 +34,25 @@ object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
             ?.takeIf { it.isNotBlank() }
             ?.let { return it }
 
-        return normalized.takeIf { MQConstants.isLikelyPersistedSensorName(it) }
+        SensorBluetooth.mygatts()
+            .firstOrNull { cb ->
+                val mq = cb as? MQDriver ?: return@firstOrNull false
+                mq.matchesManagedSensorId(raw)
+            }
+            ?.SerialNumber
+            ?.takeIf { it.isNotBlank() }
+            ?.let(MQConstants::canonicalSensorId)
+            ?.takeIf { it.isNotEmpty() && !MQConstants.isProvisionalSensorId(it) }
+            ?.let { return it }
+
+        return null
     }
 
     override fun resolveNativeSensorName(sensorId: String?): String? {
         val raw = sensorId?.trim().takeIf { !it.isNullOrEmpty() } ?: return null
-        val canonical = resolveCanonicalSensorId(raw) ?: raw
-        MQRegistry.findRecord(Applic.app, canonical)
-            ?.takeIf { it.isFollower }
-            ?.let { return null }
-        return canonical.takeIf { MQConstants.isLikelyPersistedSensorName(it) }
+        val canonical = resolveCanonicalSensorId(raw) ?: return null
+        val record = MQRegistry.findRecord(Applic.app, canonical) ?: return null
+        return canonical.takeIf { record.mode == MQRegistry.SensorRecordMode.LOCAL }
     }
 
     override fun hasPersistedManagedRecord(sensorId: String?): Boolean {
@@ -64,7 +61,10 @@ object MQManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     }
 
     override fun resolveCallbackDataptr(sensorId: String?): Long? =
-        resolveCanonicalSensorId(sensorId)?.let { 0L }
+        resolveCanonicalSensorId(sensorId)
+            ?.let { MQRegistry.findRecord(Applic.app, it) }
+            ?.takeIf { it.mode == MQRegistry.SensorRecordMode.LOCAL }
+            ?.let { 0L }
 
     override fun persistedSensorIds(context: Context): List<String> =
         MQRegistry.persistedRecords(context).map { it.sensorId }

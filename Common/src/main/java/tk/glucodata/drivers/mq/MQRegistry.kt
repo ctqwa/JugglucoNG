@@ -14,7 +14,6 @@ import tk.glucodata.Natives
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SuperGattCallback
-import tk.glucodata.drivers.ManagedBluetoothSensorDriver
 import tk.glucodata.drivers.ManagedSensorUiSignals
 
 object MQRegistry {
@@ -315,8 +314,9 @@ object MQRegistry {
         val blue = SensorBluetooth.blueone ?: return
         val record = findRecord(context, sensorId) ?: return
         val existing = SensorBluetooth.gattcallbacks.firstOrNull { cb ->
+            val mq = cb as? MQDriver ?: return@firstOrNull false
             SensorIdentity.matches(cb.SerialNumber, sensorId) ||
-                ((cb as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)
+                mq.matchesManagedSensorId(sensorId)
         }
         val callback = existing ?: createRestoredCallback(context, record.sensorId, 0L)?.also {
             SensorBluetooth.gattcallbacks.add(it)
@@ -784,8 +784,9 @@ object MQRegistry {
             config.restoredPacketIndex?.let { putInt("${MQConstants.PREF_LAST_PACKET_INDEX_PREFIX}$sensorId", it) }
         }
         (SensorBluetooth.gattcallbacks.firstOrNull { cb ->
+            val mq = cb as? MQDriver ?: return@firstOrNull false
             SensorIdentity.matches(cb.SerialNumber, sensorId) ||
-                ((cb as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)
+                mq.matchesManagedSensorId(sensorId)
         } as? MQBleManager)?.restoreFromPersistence(context)
     }
 }

@@ -629,11 +629,11 @@ public class NotificationChartDrawer {
         float maxY = targetHigh + bufferVal;
 
         for (GlucosePoint p : visiblePoints) {
-            if (p.value > 0) {
+            if (showAuto && p.value > 0) {
                 minY = Math.min(minY, p.value);
                 maxY = Math.max(maxY, p.value);
             }
-            if (p.rawValue > 0) {
+            if (showRaw && p.rawValue > 0) {
                 minY = Math.min(minY, p.rawValue);
                 maxY = Math.max(maxY, p.rawValue);
             }

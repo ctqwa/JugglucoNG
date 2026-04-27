@@ -589,9 +589,15 @@ class MQBleManager(
         if (lastGlucoseAtMs == 0L) return null
         val age = System.currentTimeMillis() - lastGlucoseAtMs
         if (age > maxAgeMillis) return null
+        val glucoseMgdl = lastGlucoseMgdlTimes10 / 10f
+        val glucoseDisplay = if (Applic.unit == 1) {
+            (glucoseMgdl / MQConstants.MMOL_TO_MGDL).toFloat()
+        } else {
+            glucoseMgdl
+        }
         return MQCurrentSnapshot(
             timeMillis = lastGlucoseAtMs,
-            glucoseValue = lastGlucoseMgdlTimes10 / 10f,
+            glucoseValue = glucoseDisplay,
             rawValue = lastRawCurrent.toFloat(),
             rate = Float.NaN,
             sensorGen = sensorgen,

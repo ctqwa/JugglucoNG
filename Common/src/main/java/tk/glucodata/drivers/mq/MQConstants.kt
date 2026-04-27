@@ -320,7 +320,24 @@ object MQConstants {
         val ca = canonicalSensorId(a)
         val cb = canonicalSensorId(b)
         if (ca.isEmpty() || cb.isEmpty()) return false
-        return ca.equals(cb, ignoreCase = true)
+        if (ca.equals(cb, ignoreCase = true)) return true
+        return isNativeShortAliasOf(ca, cb) || isNativeShortAliasOf(cb, ca)
+    }
+
+    /**
+     * The native direct-stream shell may expose a suffix of the MQ id as the
+     * current sensor name (observed: CFD8EBDDF969 -> BDDF969). Keep this
+     * MQ-scoped and suffix-exact; generic app identity must not expand legacy
+     * sensor names this way.
+     */
+    private fun isNativeShortAliasOf(canonical: String, alias: String): Boolean {
+        if (!Regex("^[0-9A-F]{12,16}$", RegexOption.IGNORE_CASE).matches(canonical)) {
+            return false
+        }
+        if (!Regex("^[0-9A-F]{6,11}$", RegexOption.IGNORE_CASE).matches(alias)) {
+            return false
+        }
+        return canonical.endsWith(alias, ignoreCase = true)
     }
 
     @JvmStatic

@@ -59,7 +59,6 @@ object SensorIdentity {
             .asSequence()
             .mapNotNull { it.resolveCanonicalSensorId(raw) }
             .firstOrNull { it.isNotBlank() }
-            ?: resolveNativeBackedCanonicalSensorId(raw)
             ?: raw
     }
 
