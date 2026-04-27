@@ -13,7 +13,7 @@ import java.util.UUID
 import java.util.Locale
 
 object ICanHealthConstants {
-    private val FULL_CANONICAL_HEX_SENSOR_ID_REGEX = Regex("^[0-9A-F]{16}$", RegexOption.IGNORE_CASE)
+    private val FULL_CANONICAL_HEX_SENSOR_ID_REGEX = Regex("^[0-9A-Z]{16}$", RegexOption.IGNORE_CASE)
 
     const val TAG = "ICanHealth"
     const val MAX_NATIVE_SENSOR_ID_CHARS = 16
@@ -398,7 +398,7 @@ object ICanHealthConstants {
         return when {
             Regex("^P\\d{9}[A-Z]{3}$", RegexOption.IGNORE_CASE).matches(trimmed) -> true
             Regex("^LT\\d{6,}[A-Z]{2,3}$", RegexOption.IGNORE_CASE).matches(trimmed) -> true
-            Regex("^[0-9A-F]{12,32}$", RegexOption.IGNORE_CASE).matches(trimmed) -> true
+            Regex("^[0-9A-Z]{12,32}$", RegexOption.IGNORE_CASE).matches(trimmed) -> true
             else -> false
         }
     }
@@ -407,7 +407,7 @@ object ICanHealthConstants {
     fun canonicalSensorId(sensorId: String?): String {
         val trimmed = sensorId?.trim().orEmpty()
         if (trimmed.isEmpty()) return ""
-        return if (Regex("^[0-9A-F]{16,32}$", RegexOption.IGNORE_CASE).matches(trimmed)) {
+        return if (Regex("^[0-9A-Z]{16,32}$", RegexOption.IGNORE_CASE).matches(trimmed)) {
             trimmed.uppercase().take(MAX_NATIVE_SENSOR_ID_CHARS)
         } else {
             trimmed

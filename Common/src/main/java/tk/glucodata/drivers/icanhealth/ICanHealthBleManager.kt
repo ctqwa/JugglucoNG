@@ -49,7 +49,7 @@ class ICanHealthBleManager(
         const val SENSOR_GEN = 0
 
         private const val GATT_OP_TIMEOUT_MS = 10_000L
-        private const val MTU_REQUEST_TIMEOUT_MS = 7_000L
+        private const val MTU_REQUEST_TIMEOUT_MS = 12_000L
         private const val TARGET_MTU = 517
         private const val MIN_VENDOR_HISTORY_MTU = 247
         private const val RECONNECT_ALARM_MIN_DELAY_MS = 10_000L
@@ -66,9 +66,6 @@ class ICanHealthBleManager(
         private const val SEQUENCE_UNIT_MS = 60_000L
         private const val SENSOR_INFO_TIMEOUT_MS = 1_500L
         private const val LIVE_SEQUENCE_LAG_ALLOWANCE = 3
-        private const val MAX_OPERATIONAL_LIFETIME_DAYS =
-            ICanHealthConstants.ADVISORY_EXPECTED_LIFETIME_DAYS + 7
-        private const val MAX_HISTORY_SEQUENCE_DELTA_MINUTES = MAX_OPERATIONAL_LIFETIME_DAYS * 24 * 60
         private const val MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS = 6 * 60 * 60 * 1000L
         private const val MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS = 2 * 60 * 1000L
         private const val RECENT_GLUCOSE_WINDOW_SIZE = 24
@@ -1139,6 +1136,13 @@ class ICanHealthBleManager(
             Log.w(TAG, "MTU change failed status=$status; continuing with existing history command family")
         }
         if (phase == Phase.DISCOVERING_SERVICES && !serviceDiscoveryHandled) {
+            // The watchdog may have started discovery early at the default MTU; if no
+            // services-discovered callback has arrived, the late MTU callback supersedes
+            // the watchdog and re-issues discovery so it is queued after MTU negotiation.
+            if (serviceDiscoveryStarted) {
+                Log.i(TAG, "MTU callback after watchdog-triggered discovery; reissuing discoverServices at mtu=$mtu")
+                serviceDiscoveryStarted = false
+            }
             beginServiceDiscovery(gatt, "mtu-changed")
         }
     }
@@ -1949,13 +1953,7 @@ class ICanHealthBleManager(
             }
 
             ICanHealthConstants.RACP_RESULT_FAILED -> {
-                historyBackfillRequested = false
-                historyBackfillPhase = HistoryBackfillPhase.NONE
-                pendingHistoryBatch.clear()
-                sawUnsupportedSnHistoryBatch = false
-                suppressAutomaticHistoryBackfill = false
-                shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
-                Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+                handleRacpFailed()
             }
 
             else -> {
@@ -2283,6 +2281,61 @@ class ICanHealthBleManager(
         }
     }
 
+    // Some firmware variants (e.g. iCGM-t3 V01.00.06.00_B0005, iCGM-t6 V01.05.00.00)
+    // accept the modern F1 RACP prefix but return RACP_RESULT_FAILED instead of
+    // RACP_RESULT_NOT_SUPPORTED. Mirror the not-supported fallback once so legacy
+    // 01-prefixed commands get a chance before we give up for this connection.
+    private fun handleRacpFailed() {
+        when (historyBackfillPhase) {
+            HistoryBackfillPhase.GLUCOSE -> {
+                historyBackfillRequested = false
+                historyBackfillPhase = HistoryBackfillPhase.NONE
+                pendingHistoryBatch.clear()
+                sawUnsupportedSnHistoryBatch = false
+                if (useModernGlucoseHistoryCommand) {
+                    useModernGlucoseHistoryCommand = false
+                    Log.w(TAG, "Modern glucose-history RACP command failed; retrying with legacy command family")
+                    beginHistoryBackfillPhase(
+                        HistoryBackfillPhase.GLUCOSE,
+                        "retrying after RACP-failed on modern glucose-history command"
+                    )
+                } else {
+                    suppressAutomaticHistoryBackfill = false
+                    shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
+                    Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+                }
+            }
+
+            HistoryBackfillPhase.ORIGINAL -> {
+                historyBackfillRequested = false
+                historyBackfillPhase = HistoryBackfillPhase.NONE
+                pendingHistoryBatch.clear()
+                sawUnsupportedSnHistoryBatch = false
+                if (useModernOriginalHistoryCommand) {
+                    useModernOriginalHistoryCommand = false
+                    Log.w(TAG, "Modern original-history RACP command failed; retrying with legacy command family")
+                    beginHistoryBackfillPhase(
+                        HistoryBackfillPhase.ORIGINAL,
+                        "retrying after RACP-failed on modern original-history command"
+                    )
+                } else {
+                    suppressAutomaticHistoryBackfill = false
+                    shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
+                    Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+                }
+            }
+
+            HistoryBackfillPhase.NONE -> {
+                historyBackfillRequested = false
+                pendingHistoryBatch.clear()
+                sawUnsupportedSnHistoryBatch = false
+                suppressAutomaticHistoryBackfill = false
+                shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
+                Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+            }
+        }
+    }
+
     private fun handleRacpNotSupported() {
         when (historyBackfillPhase) {
             HistoryBackfillPhase.GLUCOSE -> {
@@ -2534,33 +2587,71 @@ class ICanHealthBleManager(
             )
         }
         if (currentSequenceNumber >= 0) {
-            val deltaMinutes = currentSequenceNumber - sequenceNumber
-            if (abs(deltaMinutes) <= MAX_HISTORY_SEQUENCE_DELTA_MINUTES) {
-                val candidate = anchorTimeMs - deltaMinutes.toLong() * SEQUENCE_UNIT_MS
-                if (candidate > 0L && candidate <= fallbackNowMs + MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS) {
-                    if (!requireRecentCandidate || candidate >= fallbackNowMs - MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS) {
-                        return candidate
-                    }
-                }
-                Log.w(
-                    TAG,
-                    "Rejecting implausible relative timestamp seq=$sequenceNumber current=$currentSequenceNumber candidate=$candidate anchor=$anchorTimeMs now=$fallbackNowMs requireRecent=$requireRecentCandidate"
-                )
+            val deltaMinutes = currentSequenceNumber.toLong() - sequenceNumber.toLong()
+            val candidate = anchorTimeMs - deltaMinutes * SEQUENCE_UNIT_MS
+            val lowerBound = when {
+                requireRecentCandidate -> fallbackNowMs - MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS
+                sessionStartEpochMs > 0L -> sessionStartEpochMs - MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS
+                else -> 1L
             }
+            if (candidate in lowerBound..(fallbackNowMs + MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS)) {
+                return candidate
+            }
+            Log.w(
+                TAG,
+                "Rejecting implausible relative timestamp seq=$sequenceNumber current=$currentSequenceNumber candidate=$candidate anchor=$anchorTimeMs now=$fallbackNowMs requireRecent=$requireRecentCandidate"
+            )
         }
         return null
     }
 
-    private fun maxHistoryWindowMs(): Long =
-        MAX_HISTORY_SEQUENCE_DELTA_MINUTES.toLong() * SEQUENCE_UNIT_MS
+    private fun observedHistoryWindowMs(): Long {
+        val currentWindowMs = currentSequenceNumber
+            .takeIf { it > 0 }
+            ?.toLong()
+            ?.times(SEQUENCE_UNIT_MS)
+            ?: 0L
+        val persistedWindowMs = persistedCoveredSequence
+            .takeIf { it > 0 }
+            ?.toLong()
+            ?.times(SEQUENCE_UNIT_MS)
+            ?: 0L
+        val sessionWindowMs = if (sessionStartEpochMs > 0L) {
+            (System.currentTimeMillis() - sessionStartEpochMs).coerceAtLeast(0L)
+        } else {
+            0L
+        }
+        return maxOf(currentWindowMs, persistedWindowMs, sessionWindowMs)
+            .coerceAtLeast(readingIntervalMs() * 2L)
+    }
+
+    private fun earliestObservedHistoryTimeMs(fallbackNowMs: Long): Long {
+        if (sessionStartEpochMs > 0L) {
+            return (sessionStartEpochMs - MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS).coerceAtLeast(1L)
+        }
+        val observedWindowMs = observedHistoryWindowMs()
+        return (fallbackNowMs - observedWindowMs - MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS)
+            .coerceAtLeast(1L)
+    }
+
+    private fun latestObservedHistoryTimeMs(fallbackNowMs: Long): Long =
+        fallbackNowMs + MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS
 
     private fun isPlausibleHistoryAnchor(candidateTimeMs: Long, fallbackNowMs: Long): Boolean {
         if (candidateTimeMs <= 0L) {
             return false
         }
-        val earliestAllowed = fallbackNowMs - maxHistoryWindowMs() - MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS
-        val latestAllowed = fallbackNowMs + MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS
-        return candidateTimeMs in earliestAllowed..latestAllowed
+        return candidateTimeMs in
+            earliestObservedHistoryTimeMs(fallbackNowMs)..latestObservedHistoryTimeMs(fallbackNowMs)
+    }
+
+    private fun isPlausibleHistoryTailDelta(deltaMs: Long, anchorTimeMs: Long): Boolean {
+        if (deltaMs < -MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS) {
+            return false
+        }
+        val earliestAllowed = earliestObservedHistoryTimeMs(anchorTimeMs)
+        val tailTimeMs = anchorTimeMs - deltaMs
+        return tailTimeMs >= earliestAllowed
     }
 
     private fun invalidatePersistedCoveredEdge(reason: String) {
@@ -2736,11 +2827,7 @@ class ICanHealthBleManager(
             return null
         }
         val deltaMs = anchorTimeMs - persistedTailTimestamp
-        if (deltaMs < -MAX_SESSION_TIMESTAMP_FUTURE_DRIFT_MS) {
-            return null
-        }
-        val maxHistoryWindowMs = maxHistoryWindowMs()
-        if (deltaMs > maxHistoryWindowMs + MAX_SESSION_TIMESTAMP_PAST_DRIFT_MS) {
+        if (!isPlausibleHistoryTailDelta(deltaMs, anchorTimeMs)) {
             return null
         }
         val deltaIntervals = round(deltaMs.toDouble() / readingIntervalMs().toDouble()).toInt()

@@ -53,8 +53,9 @@ object ICanHealthProfileResolver {
             combined.contains("h3") ->
                 ICanHealthProfile("H3", 3, 120, 8)
             combined.contains("i6pro") || combined.contains("i6s") ||
-                combined.contains(" i6") || combined.startsWith("i6") ->
-                ICanHealthProfile("i6", 3, if (combined.contains(" yl")) 30 else 120, 15)
+                combined.contains(" i6") || combined.startsWith("i6") ||
+                combined.contains("t6") ->
+                ICanHealthProfile("i6", 3, 30, 15)
             combined.contains("o3") ->
                 ICanHealthProfile("o3", 3, 120, 15)
             combined.contains("t3") || combined.contains("i3a") ||

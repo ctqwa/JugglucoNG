@@ -5,7 +5,6 @@ import tk.glucodata.Applic
 import tk.glucodata.Natives
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
-import tk.glucodata.drivers.ManagedBluetoothSensorDriver
 import tk.glucodata.drivers.ManagedSensorIdentityAdapter
 
 object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
@@ -19,25 +18,14 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
                 return@run true
             }
             SensorBluetooth.mygatts().any { callback ->
-                val managed = callback as? ManagedBluetoothSensorDriver ?: return@any false
-                managed.matchesManagedSensorId(normalizedCallbackId) &&
-                    managed.matchesManagedSensorId(sensorId)
+                val iCan = callback as? ICanHealthBleManager ?: return@any false
+                iCan.matchesManagedSensorId(normalizedCallbackId) &&
+                    iCan.matchesManagedSensorId(sensorId)
             }
         }
 
     override fun resolveCanonicalSensorId(sensorId: String?): String? {
         val raw = sensorId?.trim().takeIf { !it.isNullOrEmpty() } ?: return null
-        SensorBluetooth.mygatts()
-            .firstOrNull { callback ->
-                val managed = callback as? ManagedBluetoothSensorDriver ?: return@firstOrNull false
-                managed.matchesManagedSensorId(raw)
-            }
-            ?.SerialNumber
-            ?.takeIf { it.isNotBlank() }
-            ?.let(ICanHealthConstants::canonicalSensorId)
-            ?.takeIf { it.isNotEmpty() && !ICanHealthConstants.isProvisionalSensorId(it) }
-            ?.let { return it }
-
         if (ICanHealthConstants.isProvisionalSensorId(raw)) {
             return raw
         }
@@ -45,31 +33,32 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
         if (normalized.isEmpty()) {
             return null
         }
-        if (ICanHealthConstants.nativeShortSensorAlias(normalized) != null) {
-            return normalized
-        }
-
-        SensorBluetooth.mygatts()
-            .firstOrNull { callback ->
-                val callbackId = callback.SerialNumber ?: return@firstOrNull false
-                (callback as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(normalized) == true ||
-                    ICanHealthConstants.matchesCanonicalOrKnownNativeAlias(callbackId, normalized)
-            }
-            ?.SerialNumber
-            ?.takeIf { it.isNotBlank() }
-            ?.let(ICanHealthConstants::canonicalSensorId)
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { return it }
 
         runCatching { ICanHealthRegistry.resolveCanonicalSensorId(Applic.app, normalized) }
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?.let { return it }
 
-        runCatching { Natives.resolveFullSensorName(normalized) }
-            .getOrNull()
-            ?.trim()
-            ?.takeIf { ICanHealthConstants.isLikelyPersistedSensorName(it) }
+        SensorBluetooth.mygatts()
+            .firstOrNull { callback ->
+                val iCan = callback as? ICanHealthBleManager ?: return@firstOrNull false
+                iCan.matchesManagedSensorId(raw)
+            }
+            ?.SerialNumber
+            ?.takeIf { it.isNotBlank() }
+            ?.let(ICanHealthConstants::canonicalSensorId)
+            ?.takeIf { it.isNotEmpty() && !ICanHealthConstants.isProvisionalSensorId(it) }
+            ?.let { return it }
+
+        SensorBluetooth.mygatts()
+            .firstOrNull { callback ->
+                val iCan = callback as? ICanHealthBleManager ?: return@firstOrNull false
+                val callbackId = iCan.SerialNumber ?: return@firstOrNull false
+                iCan.matchesManagedSensorId(normalized) ||
+                    ICanHealthConstants.matchesCanonicalOrKnownNativeAlias(callbackId, normalized)
+            }
+            ?.SerialNumber
+            ?.takeIf { it.isNotBlank() }
             ?.let(ICanHealthConstants::canonicalSensorId)
             ?.takeIf { it.isNotEmpty() }
             ?.let { return it }
@@ -79,28 +68,27 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
 
     override fun resolveNativeSensorName(sensorId: String?): String? {
         val raw = sensorId?.trim().takeIf { !it.isNullOrEmpty() } ?: return null
-        val canonical = resolveCanonicalSensorId(raw) ?: raw
-        val record = ICanHealthRegistry.findRecord(Applic.app, canonical)
+        val canonical = resolveCanonicalSensorId(raw) ?: return null
+        val record = ICanHealthRegistry.findRecord(Applic.app, canonical) ?: return null
 
-        if (record != null) {
-            Natives.activeSensors()
-                ?.firstOrNull { record.matchesId(it) }
-                ?.takeIf { !it.isNullOrBlank() }
+        Natives.activeSensors()
+            ?.firstOrNull { record.matchesId(it) }
+            ?.takeIf { !it.isNullOrBlank() }
+            ?.let { return it }
+
+        val driver = SensorBluetooth.mygatts()
+            .firstOrNull { callback ->
+                val iCan = callback as? ICanHealthBleManager ?: return@firstOrNull false
+                val callbackId = iCan.SerialNumber ?: return@firstOrNull false
+                iCan.matchesManagedSensorId(canonical) ||
+                    ICanHealthConstants.matchesCanonicalOrKnownNativeAlias(callbackId, canonical)
+            } as? ICanHealthBleManager
+
+        if (driver?.hasNativeSensorBacking() == true) {
+            runCatching { Natives.lastsensorname() }
+                .getOrNull()
+                ?.takeIf { record.matchesId(it) }
                 ?.let { return it }
-
-            val driver = SensorBluetooth.mygatts()
-                .firstOrNull { callback ->
-                    val callbackId = callback.SerialNumber ?: return@firstOrNull false
-                    (callback as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(canonical) == true ||
-                        ICanHealthConstants.matchesCanonicalOrKnownNativeAlias(callbackId, canonical)
-                } as? ManagedBluetoothSensorDriver
-
-            if (driver?.hasNativeSensorBacking() == true) {
-                runCatching { Natives.lastsensorname() }
-                    .getOrNull()
-                    ?.takeIf { record.matchesId(it) }
-                    ?.let { return it }
-            }
         }
 
         runCatching { Natives.resolveFullSensorName(canonical) }
@@ -118,18 +106,16 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     }
 
     override fun resolveCallbackDataptr(sensorId: String?): Long? =
-        resolveCanonicalSensorId(sensorId)?.let { 0L }
+        resolveCanonicalSensorId(sensorId)
+            ?.let { ICanHealthRegistry.findRecord(Applic.app, it) }
+            ?.let { 0L }
 
     override fun persistedSensorIds(context: Context): List<String> =
         ICanHealthRegistry.persistedRecords(context).map { it.sensorId }
 
     override fun createManagedCallback(context: Context, sensorId: String, dataptr: Long): SuperGattCallback? {
         ICanHealthRegistry.createRestoredCallback(context, sensorId, dataptr)?.let { return it }
-
-        val canonical = resolveCanonicalSensorId(sensorId)
-            ?.takeIf { it.isNotBlank() && !ICanHealthConstants.isProvisionalSensorId(it) }
-            ?: return null
-        return ICanHealthBleManager(canonical, dataptr)
+        return null
     }
 
     override fun removePersistedSensor(context: Context, sensorId: String?) {
@@ -137,17 +123,19 @@ object ICanHealthManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
     }
 
     override fun isExternallyManagedBleSensor(sensorId: String?): Boolean =
-        resolveCanonicalSensorId(sensorId) != null
+        resolveCanonicalSensorId(sensorId)
+            ?.let { ICanHealthRegistry.findRecord(Applic.app, it) } != null
 
     override fun usesNativeDirectStreamShell(sensorId: String?): Boolean =
-        resolveCanonicalSensorId(sensorId) != null
+        resolveCanonicalSensorId(sensorId)
+            ?.let { ICanHealthRegistry.findRecord(Applic.app, it) } != null
 
     override fun hasNativeSensorBacking(sensorId: String?): Boolean? {
         val canonical = resolveCanonicalSensorId(sensorId) ?: return null
         val record = ICanHealthRegistry.findRecord(Applic.app, canonical) ?: return null
         val driver = SensorBluetooth.mygatts()
             .asSequence()
-            .mapNotNull { it as? ManagedBluetoothSensorDriver }
+            .mapNotNull { it as? ICanHealthBleManager }
             .firstOrNull { it.matchesManagedSensorId(record.sensorId) }
         return driver?.hasNativeSensorBacking() ?: true
     }

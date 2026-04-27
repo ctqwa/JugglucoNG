@@ -6,7 +6,6 @@ import tk.glucodata.Natives
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
-import tk.glucodata.drivers.ManagedBluetoothSensorDriver
 
 object ICanHealthRegistry {
     private const val TAG = ICanHealthConstants.TAG
@@ -182,8 +181,9 @@ object ICanHealthRegistry {
 
         val blue = SensorBluetooth.blueone ?: return sensorId
         val existing = SensorBluetooth.gattcallbacks.firstOrNull { callback ->
-            SensorIdentity.matches(callback.SerialNumber, sensorId) ||
-                ((callback as? ManagedBluetoothSensorDriver)?.matchesManagedSensorId(sensorId) == true)
+            val iCan = callback as? ICanHealthBleManager ?: return@firstOrNull false
+            SensorIdentity.matches(iCan.SerialNumber, sensorId) ||
+                iCan.matchesManagedSensorId(sensorId)
         }
         val callback = (existing as? ICanHealthBleManager) ?: ICanHealthBleManager(sensorId, 0L).also {
             SensorBluetooth.gattcallbacks.add(it)
