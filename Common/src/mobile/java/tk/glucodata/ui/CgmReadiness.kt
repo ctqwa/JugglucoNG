@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package tk.glucodata.ui
 
@@ -32,6 +32,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -108,6 +110,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import tk.glucodata.R
+import tk.glucodata.alerts.AlertRepository
+import tk.glucodata.alerts.AlertType
 import tk.glucodata.data.settings.FloatingSettingsRepository
 
 private const val CGM_READINESS_PREFS = "cgm_readiness"
@@ -411,7 +415,7 @@ private fun CgmReadinessSummaryCard(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f)
                         )
-                        CgmReadinessCountChip(snapshot = snapshot, items = items)
+//                        CgmReadinessCountChip(snapshot = snapshot, items = items)
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -437,9 +441,9 @@ private fun CgmReadinessSummaryCard(
             }
 
             Spacer(Modifier.height(14.dp))
-            Row(
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 topAction?.let { (action, labelRes) ->
                     Button(
@@ -878,6 +882,8 @@ private fun batteryOptimizationItem(context: Context): CgmReadinessItem? {
 
 private fun dndItem(context: Context): CgmReadinessItem? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+    if (!isDndOverrideEnabledForAnyAlert()) return null
+
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
     val ready = manager?.isNotificationPolicyAccessGranted == true
     return CgmReadinessItem(
@@ -893,6 +899,13 @@ private fun dndItem(context: Context): CgmReadinessItem? {
         action = if (ready) null else CgmReadinessAction.OpenDndSettings,
         actionLabelRes = if (ready) null else R.string.cgm_readiness_open_dnd_action
     )
+}
+
+private fun isDndOverrideEnabledForAnyAlert(): Boolean {
+    return AlertType.settingsEntries.any { type ->
+        val config = AlertRepository.loadConfig(type)
+        config.enabled && config.overrideDND
+    }
 }
 
 private fun overlayItem(context: Context): CgmReadinessItem? {
