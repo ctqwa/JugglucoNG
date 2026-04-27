@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import tk.glucodata.Applic
 import tk.glucodata.Natives
 import tk.glucodata.SensorIdentity
 import tk.glucodata.UiRefreshBus
@@ -138,6 +139,9 @@ object CalibrationManager {
     private lateinit var database: CalibrationDatabase
     private lateinit var dao: CalibrationDao
     private lateinit var prefs: SharedPreferences
+    private val initLock = Any()
+    @Volatile
+    private var calibrationStateLoaded = false
     
     // Reactive list of calibrations
     private val _calibrations = MutableStateFlow<List<CalibrationEntity>>(emptyList())
@@ -197,6 +201,12 @@ object CalibrationManager {
     }
 
     fun init(context: Context) {
+        synchronized(initLock) {
+            initializeLocked(context.applicationContext ?: context)
+        }
+    }
+
+    private fun initializeLocked(context: Context) {
         database = CalibrationDatabase.getInstance(context)
         dao = database.calibrationDao()
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -214,6 +224,42 @@ object CalibrationManager {
         _algorithmForAuto.value = CalibrationAlgorithm.fromStorage(
             prefs.getString(KEY_ALGORITHM_AUTO, CalibrationAlgorithm.ADAPTIVE_ENSEMBLE.storageValue)
         )
+    }
+
+    private fun ensureInitialized(): Boolean {
+        if (::dao.isInitialized && ::prefs.isInitialized) {
+            return true
+        }
+        val context = Applic.app ?: return false
+        synchronized(initLock) {
+            if (!::dao.isInitialized || !::prefs.isInitialized) {
+                initializeLocked(context.applicationContext ?: context)
+            }
+        }
+        return ::dao.isInitialized && ::prefs.isInitialized
+    }
+
+    private fun ensureCalibrationStateLoaded(): Boolean {
+        if (calibrationStateLoaded && ::dao.isInitialized && ::prefs.isInitialized) {
+            return true
+        }
+        if (!ensureInitialized()) {
+            return false
+        }
+        synchronized(initLock) {
+            if (calibrationStateLoaded) {
+                return true
+            }
+            val list = runCatching {
+                runBlocking(Dispatchers.IO) { dao.getAllSync() }
+            }.onFailure {
+                Log.w(TAG, "Failed to load calibrations for background access", it)
+            }.getOrNull() ?: return false
+            _calibrations.value = list
+            calibrationStateLoaded = true
+            invalidateComputationCache("ensureCalibrationStateLoaded")
+        }
+        return true
     }
 
     private fun invalidateComputationCache(reason: String) {
@@ -279,6 +325,7 @@ object CalibrationManager {
     }
 
     private fun getValidPoints(isRawMode: Boolean, sensorId: String): List<CalPoint> {
+        ensureCalibrationStateLoaded()
         val normalizedSensorId = normalizeSensorId(sensorId)
         val cacheKey = ValidPointsCacheKey(
             isRawMode = isRawMode,
@@ -337,6 +384,7 @@ object CalibrationManager {
     }
     
     fun isEnabledForMode(isRawMode: Boolean): Boolean {
+        ensureInitialized()
         return if (isRawMode) _isEnabledForRaw.value else _isEnabledForAuto.value
     }
 
@@ -351,7 +399,10 @@ object CalibrationManager {
         Log.i(TAG, "Hide initial when calibrated: $enabled")
     }
 
-    fun shouldHideInitialWhenCalibrated(): Boolean = _hideInitialWhenCalibrated.value
+    fun shouldHideInitialWhenCalibrated(): Boolean {
+        ensureInitialized()
+        return _hideInitialWhenCalibrated.value
+    }
 
     fun setApplyToPast(enabled: Boolean) {
         if (_applyToPast.value == enabled) return
@@ -366,7 +417,10 @@ object CalibrationManager {
         Log.i(TAG, "Apply calibration to past: $enabled")
     }
 
-    fun shouldApplyToPast(): Boolean = _applyToPast.value
+    fun shouldApplyToPast(): Boolean {
+        ensureInitialized()
+        return _applyToPast.value
+    }
 
     fun setLockPastHistory(enabled: Boolean) {
         if (_lockPastHistory.value == enabled) return
@@ -380,7 +434,10 @@ object CalibrationManager {
         Log.i(TAG, "Lock past history calibration rewrite: $enabled")
     }
 
-    fun shouldLockPastHistory(): Boolean = _lockPastHistory.value
+    fun shouldLockPastHistory(): Boolean {
+        ensureInitialized()
+        return _lockPastHistory.value
+    }
 
     fun setOverwriteSensorValues(enabled: Boolean) {
         if (_overwriteSensorValues.value == enabled) return
@@ -393,7 +450,10 @@ object CalibrationManager {
         Log.i(TAG, "Overwrite sensor values in history DB: $enabled")
     }
 
-    fun shouldOverwriteSensorValues(): Boolean = _overwriteSensorValues.value
+    fun shouldOverwriteSensorValues(): Boolean {
+        ensureInitialized()
+        return _overwriteSensorValues.value
+    }
 
     fun setVisualContinuity(enabled: Boolean) {
         if (_visualContinuity.value == enabled) return
@@ -406,7 +466,10 @@ object CalibrationManager {
         Log.i(TAG, "Visual continuity mode: $enabled")
     }
 
-    fun shouldVisualContinuity(): Boolean = _visualContinuity.value
+    fun shouldVisualContinuity(): Boolean {
+        ensureInitialized()
+        return _visualContinuity.value
+    }
 
     fun setAlgorithmForMode(isRawMode: Boolean, algorithm: CalibrationAlgorithm) {
         if (isRawMode) {
@@ -430,6 +493,7 @@ object CalibrationManager {
     }
 
     fun getAlgorithmForMode(isRawMode: Boolean): CalibrationAlgorithm {
+        ensureInitialized()
         return if (isRawMode) _algorithmForRaw.value else _algorithmForAuto.value
     }
 
@@ -592,6 +656,7 @@ object CalibrationManager {
         if (::dao.isInitialized) {
             val list = withContext(Dispatchers.IO) { dao.getAllSync() }
             _calibrations.value = list
+            calibrationStateLoaded = true
             invalidateComputationCache("loadCalibrations")
             requestUiRefreshAfterCalibrationChange()
         }
@@ -1424,6 +1489,7 @@ object CalibrationManager {
     /** Check if an enabled calibration was added at this timestamp (±30s tolerance) for given mode */
     fun hasCalibrationAt(timestamp: Long, isRawMode: Boolean): Boolean {
         if (!isEnabledForMode(isRawMode)) return false
+        ensureCalibrationStateLoaded()
         val currentSensor = Natives.lastsensorname() ?: ""
         return _calibrations.value.any { cal ->
             cal.isEnabled &&
@@ -1435,6 +1501,7 @@ object CalibrationManager {
     
     /** Get calibration at timestamp for editing (±30s tolerance) */
     fun getCalibrationAt(timestamp: Long, isRawMode: Boolean): CalibrationEntity? {
+        ensureCalibrationStateLoaded()
         val currentSensor = Natives.lastsensorname() ?: ""
         return _calibrations.value.find { cal ->
             cal.isRawMode == isRawMode &&
@@ -1446,6 +1513,7 @@ object CalibrationManager {
     /** Get visible calibrations for chart display (only enabled, matching mode and sensor) */
     fun getVisibleCalibrations(isRawMode: Boolean): List<CalibrationEntity> {
         if (!isEnabledForMode(isRawMode)) return emptyList()
+        ensureCalibrationStateLoaded()
         val currentSensor = Natives.lastsensorname() ?: ""
         return _calibrations.value.filter { cal ->
             cal.isEnabled &&
@@ -1454,7 +1522,10 @@ object CalibrationManager {
         }
     }
 
-    fun getCachedCalibrations(): List<CalibrationEntity> = _calibrations.value
+    fun getCachedCalibrations(): List<CalibrationEntity> {
+        ensureCalibrationStateLoaded()
+        return _calibrations.value
+    }
     
     // Kept for backward compatibility if needed, but redundant now
     fun getCalibrationsFlow(): Flow<List<CalibrationEntity>> = _calibrations
