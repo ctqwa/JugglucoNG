@@ -8,16 +8,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import tk.glucodata.GlucoseUpdateBroadcaster
+import tk.glucodata.Log
 
 class ExpressiveWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ExpressiveAppWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == "tk.glucodata.action.GLUCOSE_UPDATE") {
+        if (intent.action == GlucoseUpdateBroadcaster.ACTION_GLUCOSE_UPDATE) {
             val pendingResult = goAsync()
             scope.launch {
                 try {
                     performUpdate(context.applicationContext)
+                } catch (th: Throwable) {
+                    Log.stack(LOG_ID, "onReceive update", th)
                 } finally {
                     pendingResult.finish()
                 }
@@ -28,12 +32,17 @@ class ExpressiveWidgetReceiver : GlanceAppWidgetReceiver() {
     }
     
     companion object {
+        private const val LOG_ID = "ExpressiveWidget"
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         
         @JvmStatic
         fun updateAll(context: Context) {
             scope.launch {
-                performUpdate(context.applicationContext)
+                try {
+                    performUpdate(context.applicationContext)
+                } catch (th: Throwable) {
+                    Log.stack(LOG_ID, "updateAll", th)
+                }
             }
         }
 
@@ -42,7 +51,11 @@ class ExpressiveWidgetReceiver : GlanceAppWidgetReceiver() {
             val widget = ExpressiveAppWidget()
             val glanceIds = manager.getGlanceIds(ExpressiveAppWidget::class.java)
             glanceIds.forEach { glanceId ->
-                widget.update(context, glanceId)
+                try {
+                    widget.update(context, glanceId)
+                } catch (th: Throwable) {
+                    Log.stack(LOG_ID, "update $glanceId", th)
+                }
             }
         }
     }

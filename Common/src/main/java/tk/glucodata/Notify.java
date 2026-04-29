@@ -3580,8 +3580,9 @@ public class Notify {
             if (doLog) {
                 Log.i(LOG_ID, "fornotify ");
             }
-            // Notify AOD/Widgets of update immediately
-            Applic.app.sendBroadcast(new Intent("tk.glucodata.action.GLUCOSE_UPDATE"));
+            // Notify AOD/widgets of update immediately. The shared data-refresh
+            // path also emits this, so the helper rate-limits duplicate sends.
+            GlucoseUpdateBroadcaster.send(Applic.app);
 
             ;
         }

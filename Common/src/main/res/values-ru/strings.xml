@@ -1430,6 +1430,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_intensity_moderate">Умеренная</string>
     <string name="journal_intensity_intense">Интенсивная</string>
     <string name="journal_insulin_library">Библиотека инсулина</string>
+    <string name="journal_curve_reset">Сбросить кривую</string>
+    <string name="journal_active_insulin_subtitle">Учитывается в активном инсулине и прогнозах</string>
     <string name="notification_settings_title">Настройки уведомлений</string>
     <string name="notification_settings_subtitle">Настройте шторку уведомлений</string>
     <string name="lock_screen_aod">Экран блокировки (AOD)</string>

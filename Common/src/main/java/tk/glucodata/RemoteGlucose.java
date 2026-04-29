@@ -174,39 +174,86 @@ class RemoteGlucose {
       final int glucoseColor = baseForegroundColor;
       final float useglsize = glucosesize;
       final float usedensity = density;
-      float getx = notglucosex;
-      float gety = (canvas.getHeight() - timeHeight) * 0.98f;
+      final int canvasWidth = canvas.getWidth();
+      final int canvasHeight = canvas.getHeight();
       float rate = snapshot.getRate();
 
       canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
       glucosePaint.setColor(glucoseColor);
-      glucosePaint.setTextSize(useglsize);
       applyWidgetTypeface(glucosePaint);
 
-      if (isNaN(rate)) {
-         getx *= 0.82f;
-      } else {
+      // Render the right-side cluster (arrow above small time) so we know its
+      // width before placing the value. The cluster is intentionally compact —
+      // small arrow paired with a small time label, both right-aligned with a
+      // generous offset from the canvas edge.
+      final float rightInset = usedensity * 18f;
+      final float reducedTimeSize = timesize * 0.95f;
+      Bitmap arrowBitmap = null;
+      if (!isNaN(rate)) {
          try {
             float displayDensity = Applic.app.getResources().getDisplayMetrics().density;
-            float arrowScale = Math.max(1.05f, Math.min(1.7f, useglsize / (22f * displayDensity)));
-            Bitmap arrowBitmap = NotificationChartDrawer.drawArrow(Applic.app, rate, isMmol, glucoseColor, arrowScale);
-            float arrowCenterX = getx * 0.85f;
-            float arrowCenterY = gety - useglsize * 0.4f;
-            float arrowLeft = arrowCenterX - (arrowBitmap.getWidth() / 2.0f);
-            float arrowTop = arrowCenterY - (arrowBitmap.getHeight() / 2.0f);
-            canvas.drawBitmap(arrowBitmap, arrowLeft, arrowTop, null);
+            float arrowScale = Math.max(0.85f, Math.min(2.05f, useglsize / (30f * displayDensity)));
+            arrowBitmap = NotificationChartDrawer.drawArrow(Applic.app, rate, isMmol, glucoseColor, arrowScale);
          } catch (Throwable t) {
-            drawarrow(canvas, glucosePaint, usedensity, rate, getx * .85f, gety - useglsize * .4f);
+            arrowBitmap = null;
          }
       }
 
-      canvas.drawText(snapshot.getPrimaryStr(), getx, gety, glucosePaint);
-
       String timestr = minhourstr(snapshot.getTimeMillis());
-      glucosePaint.setTextSize(timesize);
+      glucosePaint.setTextSize(reducedTimeSize);
+      Rect timeBounds = new Rect();
+      glucosePaint.getTextBounds(timestr, 0, timestr.length(), timeBounds);
+      float timeWidth = timeBounds.width();
+
+      float arrowWidth = arrowBitmap != null ? arrowBitmap.getWidth() : 0f;
+      float arrowHeight = arrowBitmap != null ? arrowBitmap.getHeight() : 0f;
+      float clusterWidth = Math.max(arrowWidth, timeWidth);
+      float clusterCenterX = canvasWidth - rightInset - clusterWidth / 2f;
+
+      // Value text — left-anchored at a small inset (the original notglucosex
+      // offset reserved space for a left-side arrow that no longer exists).
+      // If the value is wide enough to collide with the cluster, shrink it
+      // down so the right cluster keeps its breathing room.
+      String valueStr = snapshot.getPrimaryStr();
+      final float leftInset = usedensity * 14f;
+      final float valueClusterGap = useglsize * 0.18f;
+      final float maxValueWidth = (canvasWidth - rightInset - clusterWidth - valueClusterGap) - leftInset;
+      glucosePaint.setTextSize(useglsize);
+      float effectiveSize = useglsize;
+      float valueWidth = glucosePaint.measureText(valueStr);
+      if (maxValueWidth > 0 && valueWidth > maxValueWidth) {
+         effectiveSize = useglsize * (maxValueWidth / valueWidth);
+         glucosePaint.setTextSize(effectiveSize);
+      }
+      Paint.FontMetrics valueMetrics = glucosePaint.getFontMetrics();
+      float valueTextHeight = valueMetrics.descent - valueMetrics.ascent;
+      // Vertically center the value in the canvas (less timeHeight reserve
+      // since we no longer use that bottom strip — time moved into the cluster).
+      float gety = (canvasHeight + valueTextHeight) / 2f - valueMetrics.descent;
+      canvas.drawText(valueStr, leftInset, gety, glucosePaint);
+
+      // Cluster vertical layout: arrow above, time directly below, with the
+      // arrow's vertical center aligned to the value's vertical center so the
+      // pair reads as a single unit beside the value.
+      float valueCenterY = gety + (valueMetrics.ascent + valueMetrics.descent) / 2f;
+      float clusterGap = reducedTimeSize * 0.25f;
+      float clusterHeight = arrowHeight + clusterGap + reducedTimeSize;
+      float clusterTop = valueCenterY - clusterHeight / 2f;
+
+      if (arrowBitmap != null) {
+         float arrowLeft = clusterCenterX - arrowWidth / 2f;
+         canvas.drawBitmap(arrowBitmap, arrowLeft, clusterTop, null);
+      } else if (!isNaN(rate)) {
+         drawarrow(canvas, glucosePaint, usedensity, rate, clusterCenterX, clusterTop + arrowHeight / 2f);
+      }
+
+      glucosePaint.setTextSize(reducedTimeSize);
+      glucosePaint.setTextAlign(Paint.Align.CENTER);
       glucosePaint.setAlpha(200);
-      canvas.drawText(timestr, usedensity * 16, gety + timeHeight, glucosePaint);
+      float timeBaseline = clusterTop + arrowHeight + clusterGap + reducedTimeSize * 0.85f;
+      canvas.drawText(timestr, clusterCenterX, timeBaseline, glucosePaint);
       glucosePaint.setAlpha(255);
+      glucosePaint.setTextAlign(Paint.Align.LEFT);
 
       canvas.setBitmap(glucoseBitmap);
       remoteViews.setImageViewBitmap(arrowandvalue, glucoseBitmap);
