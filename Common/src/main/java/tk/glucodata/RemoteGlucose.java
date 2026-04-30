@@ -236,7 +236,7 @@ class RemoteGlucose {
       // arrow's vertical center aligned to the value's vertical center so the
       // pair reads as a single unit beside the value.
       float valueCenterY = gety + (valueMetrics.ascent + valueMetrics.descent) / 2f;
-      float clusterGap = reducedTimeSize * 0.25f;
+      float clusterGap = reducedTimeSize * 0.65f;
       float clusterHeight = arrowHeight + clusterGap + reducedTimeSize;
       float clusterTop = valueCenterY - clusterHeight / 2f;
 
@@ -250,7 +250,7 @@ class RemoteGlucose {
       glucosePaint.setTextSize(reducedTimeSize);
       glucosePaint.setTextAlign(Paint.Align.CENTER);
       glucosePaint.setAlpha(200);
-      float timeBaseline = clusterTop + arrowHeight + clusterGap + reducedTimeSize * 0.85f;
+      float timeBaseline = clusterTop + arrowHeight + clusterGap + reducedTimeSize * 0.65f;
       canvas.drawText(timestr, clusterCenterX, timeBaseline, glucosePaint);
       glucosePaint.setAlpha(255);
       glucosePaint.setTextAlign(Paint.Align.LEFT);

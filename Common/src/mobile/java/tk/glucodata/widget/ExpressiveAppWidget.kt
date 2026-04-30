@@ -3,6 +3,9 @@ package tk.glucodata.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +41,7 @@ import kotlin.math.roundToInt
 import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.DisplayDataState
 import tk.glucodata.GlucosePoint
+import tk.glucodata.GlucoseUpdateBroadcaster
 import tk.glucodata.MainActivity
 import tk.glucodata.NotificationChartDrawer
 import tk.glucodata.R
@@ -56,30 +60,54 @@ class ExpressiveAppWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val currentDisplay = withContext(Dispatchers.IO) {
-            WidgetDisplaySource.resolveWidgetSnapshot()
+        val initialTick = GlucoseUpdateBroadcaster.tick.value
+        val initialState = withContext(Dispatchers.IO) { loadWidgetState() }
+
+        provideContent {
+            GlanceTheme {
+                val tick by GlucoseUpdateBroadcaster.tick.collectAsState()
+                val state by produceState(initialValue = initialState, key1 = tick) {
+                    if (tick != initialTick) {
+                        value = withContext(Dispatchers.IO) { loadWidgetState() }
+                    }
+                }
+                WidgetContent(
+                    currentDisplay = state.currentDisplay,
+                    history = state.history,
+                    dataState = state.dataState,
+                    activeSensorSerial = state.activeSensorSerial,
+                    viewMode = state.viewMode,
+                    hasCalibration = state.hasCalibration
+                )
+            }
         }
-        val chartHistory = withContext(Dispatchers.IO) {
-            WidgetDisplaySource.resolveChartHistory(currentDisplay, WidgetDisplaySource.CHART_WINDOW_MS)
-        }
+    }
+
+    private data class WidgetState(
+        val currentDisplay: CurrentDisplaySource.Snapshot?,
+        val history: List<GlucosePoint>,
+        val dataState: DisplayDataState.Status,
+        val activeSensorSerial: String?,
+        val viewMode: Int,
+        val hasCalibration: Boolean
+    )
+
+    private fun loadWidgetState(): WidgetState {
+        val currentDisplay = WidgetDisplaySource.resolveWidgetSnapshot()
+        val chartHistory = WidgetDisplaySource.resolveChartHistory(currentDisplay, WidgetDisplaySource.CHART_WINDOW_MS)
         val activeSensorSerial = currentDisplay?.sensorId ?: WidgetDisplaySource.resolveActiveSensorSerial()
         val resolvedDisplay = WidgetDisplaySource.resolveDisplaySnapshot(currentDisplay, chartHistory, activeSensorSerial)
         val viewMode = resolvedDisplay?.viewMode ?: WidgetDisplaySource.resolveViewMode(activeSensorSerial)
         val dataState = WidgetDisplaySource.resolveDataState(resolvedDisplay, chartHistory, activeSensorSerial)
         val hasCalibration = WidgetDisplaySource.hasCalibration(activeSensorSerial, viewMode)
-
-        provideContent {
-            GlanceTheme {
-                WidgetContent(
-                    currentDisplay = resolvedDisplay,
-                    history = chartHistory,
-                    dataState = dataState,
-                    activeSensorSerial = activeSensorSerial,
-                    viewMode = viewMode,
-                    hasCalibration = hasCalibration
-                )
-            }
-        }
+        return WidgetState(
+            currentDisplay = resolvedDisplay,
+            history = chartHistory,
+            dataState = dataState,
+            activeSensorSerial = activeSensorSerial,
+            viewMode = viewMode,
+            hasCalibration = hasCalibration
+        )
     }
 
     @Composable

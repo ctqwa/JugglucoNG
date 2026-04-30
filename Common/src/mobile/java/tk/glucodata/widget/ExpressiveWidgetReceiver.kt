@@ -16,6 +16,11 @@ class ExpressiveWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == GlucoseUpdateBroadcaster.ACTION_GLUCOSE_UPDATE) {
+            if (intent.getBooleanExtra(GlucoseUpdateBroadcaster.EXTRA_TICK_DELIVERED, false) &&
+                GlucoseUpdateBroadcaster.hasActiveTickObservers()
+            ) {
+                return
+            }
             val pendingResult = goAsync()
             scope.launch {
                 try {
