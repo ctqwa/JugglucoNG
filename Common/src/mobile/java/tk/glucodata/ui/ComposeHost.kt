@@ -2479,7 +2479,9 @@ fun ReadingRow(
             CurrentDisplaySource.resolveCurrent(
                 Notify.glucosetimeout,
                 sensorId?.takeIf { it.isNotBlank() } ?: SensorIdentity.resolveMainSensor()
-            )
+            )?.takeIf { snapshot ->
+                kotlin.math.abs(snapshot.timeMillis - point.timestamp) <= 30_000L
+            }
         }
     } else {
         null
