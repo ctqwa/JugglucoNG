@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -402,6 +403,14 @@ private fun JournalInsulinPresetSheet(
         dismissalHandled = true
         onSave(input)
     }
+    fun toggleArchivedAndPersist() {
+        val updated = draft.copy(isArchived = !draft.isArchived)
+        draft = updated
+        buildPresetInput(updated)?.let { input ->
+            dismissalHandled = true
+            onSave(input)
+        }
+    }
     DisposableEffect(preset?.id) {
         onDispose {
             if (!dismissalHandled) {
@@ -412,59 +421,70 @@ private fun JournalInsulinPresetSheet(
 
     ModalBottomSheet(
         onDismissRequest = { dismissSheet() },
-        sheetState = sheetState
+        sheetState = sheetState,
+        dragHandle = {
+            Surface(
+                modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(2.dp)
+            ) {
+                Box(modifier = Modifier.size(width = 32.dp, height = 4.dp))
+            }
+        }
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
-            contentPadding = PaddingValues(top = 0.dp, bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(top = 4.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header") {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(
-                                if (preset == null) R.string.journal_add_preset else R.string.journal_edit_preset
-                            ),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Text(
+                        text = stringResource(
+                            if (preset == null) R.string.journal_add_preset else R.string.journal_edit_preset
+                        ),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
                     if (preset != null) {
-                        val actionContainerColor = if (draft.isArchived) {
+                        val archived = draft.isArchived
+                        val containerColor = if (archived) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
                             MaterialTheme.colorScheme.errorContainer
                         }
-                        val actionContentColor = if (draft.isArchived) {
+                        val contentColor = if (archived) {
                             MaterialTheme.colorScheme.onPrimaryContainer
                         } else {
                             MaterialTheme.colorScheme.onErrorContainer
                         }
                         FilledTonalButton(
-                            onClick = { draft = draft.copy(isArchived = !draft.isArchived) },
+                            onClick = { toggleArchivedAndPersist() },
                             modifier = Modifier.height(40.dp),
-                            shape = RoundedCornerShape(19.dp),
+                            shape = RoundedCornerShape(20.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = actionContainerColor,
-                                contentColor = actionContentColor
+                                containerColor = containerColor,
+                                contentColor = contentColor
                             )
                         ) {
                             Icon(
-                                imageVector = if (draft.isArchived) Icons.Default.CheckCircle else Icons.Default.Block,
+                                imageVector = if (archived) Icons.Default.CheckCircle else Icons.Default.Block,
                                 contentDescription = null,
                                 modifier = Modifier.size(17.dp)
                             )
                             Spacer(modifier = Modifier.width(7.dp))
                             Text(
                                 text = stringResource(
-                                    if (draft.isArchived) R.string.enable else R.string.disable
+                                    if (archived) R.string.enable else R.string.disable
                                 ),
                                 style = MaterialTheme.typography.labelLarge
                             )
@@ -479,20 +499,25 @@ private fun JournalInsulinPresetSheet(
                         .fillMaxWidth()
                         .then(
                             if (draft.isArchived) {
-                                Modifier
-                                    .background(
-                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.08f),
-                                        shape = RoundedCornerShape(22.dp)
-                                    )
-                                    .padding(12.dp)
+                                Modifier.background(
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.08f),
+                                    shape = RoundedCornerShape(22.dp)
+                                )
                             } else {
                                 Modifier
                             }
                         ),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val cardSidePadding = if (draft.isArchived) 12.dp else 0.dp
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = cardSidePadding,
+                                end = cardSidePadding,
+                                top = if (draft.isArchived) 12.dp else 0.dp
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -504,24 +529,33 @@ private fun JournalInsulinPresetSheet(
                         )
                         FilledTonalIconButton(
                             onClick = { showColorDialog = true },
-                            modifier = Modifier.size(50.dp),
+                            modifier = Modifier.size(56.dp),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             )
                         ) {
                             Surface(
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(20.dp),
                                 shape = CircleShape,
                                 color = Color(draft.accentColor)
                             ) {}
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                        modifier = Modifier.padding(horizontal = cardSidePadding)
+                    )
                     CompactPresetToggleRow(
                         title = stringResource(R.string.journal_active_insulin),
+                        subtitle = stringResource(R.string.journal_active_insulin_subtitle),
                         checked = draft.countsTowardIob,
                         enabled = !draft.isArchived,
-                        onCheckedChange = { draft = draft.copy(countsTowardIob = it) }
+                        onCheckedChange = { draft = draft.copy(countsTowardIob = it) },
+                        contentPadding = PaddingValues(
+                            start = cardSidePadding,
+                            end = cardSidePadding,
+                            bottom = if (draft.isArchived) 8.dp else 0.dp
+                        )
                     )
                 }
             }
@@ -544,6 +578,14 @@ private fun JournalInsulinPresetSheet(
                         ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val resetProfile = remember(draft.isBuiltIn, draft.sortOrder) {
+                        if (draft.isBuiltIn) defaultBuiltInProfile(draft.sortOrder) else null
+                    }
+                    val curveDiffersFromDefault = remember(draft.curvePoints, resetProfile) {
+                        resetProfile != null &&
+                            serializeJournalCurve(draft.curvePoints) !=
+                            serializeJournalCurve(builtInJournalCurve(resetProfile))
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -556,6 +598,29 @@ private fun JournalInsulinPresetSheet(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f)
                         )
+                        if (resetProfile != null && curveDiffersFromDefault) {
+                            TextButton(
+                                onClick = {
+                                    val defaultCurve = builtInJournalCurve(resetProfile)
+                                    draft = draft.copy(curvePoints = defaultCurve)
+                                    selectedPointIndex = defaultSelectedPointIndex(defaultCurve)
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Restore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.journal_curve_reset),
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
                         Text(
                             text = curveWindowSummary(draft.curvePoints),
                             style = MaterialTheme.typography.bodySmall,
@@ -682,11 +747,10 @@ private fun JournalCompactSwitchRow(
     icon: ImageVector
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) },
+        onClick = { onCheckedChange(!checked) },
+        modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(26.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -739,7 +803,9 @@ private fun CompactPresetToggleRow(
     title: String,
     checked: Boolean,
     enabled: Boolean = true,
+    subtitle: String? = null,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -747,14 +813,24 @@ private fun CompactPresetToggleRow(
             .fillMaxWidth()
             .alpha(if (enabled) 1f else 0.5f)
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(vertical = 12.dp),
+            .padding(contentPadding)
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         StyledSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
@@ -851,35 +927,40 @@ private fun InteractiveJournalCurveEditor(
     val chartTopInset = with(density) { 12.dp.toPx() }
     val chartBottomInset = with(density) { 12.dp.toPx() }
 
+    val pointsLatest = rememberUpdatedState(points)
+    val chartSizeLatest = rememberUpdatedState(chartSize)
+    val onSelectedPointChangeLatest = rememberUpdatedState(onSelectedPointChange)
+    val onPointChangeLatest = rememberUpdatedState(onPointChange)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(164.dp)
             .onSizeChanged { chartSize = it }
-            .pointerInput(points, chartSize) {
+            .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     nearestCurvePointIndex(
-                        points = points,
-                        chartSize = chartSize,
+                        points = pointsLatest.value,
+                        chartSize = chartSizeLatest.value,
                         touch = offset,
                         horizontalPaddingPx = chartPadding,
                         topInsetPx = chartTopInset,
                         bottomInsetPx = chartBottomInset
-                    )?.let(onSelectedPointChange)
+                    )?.let { onSelectedPointChangeLatest.value(it) }
                 }
             }
-            .pointerInput(points, chartSize) {
+            .pointerInput(Unit) {
                 var draggingPointIndex: Int? = null
                 detectDragGestures(
                     onDragStart = { offset ->
                         draggingPointIndex = nearestCurvePointIndex(
-                            points = points,
-                            chartSize = chartSize,
+                            points = pointsLatest.value,
+                            chartSize = chartSizeLatest.value,
                             touch = offset,
                             horizontalPaddingPx = chartPadding,
                             topInsetPx = chartTopInset,
                             bottomInsetPx = chartBottomInset
-                        )?.also(onSelectedPointChange)
+                        )?.also { onSelectedPointChangeLatest.value(it) }
                     },
                     onDragEnd = { draggingPointIndex = null },
                     onDragCancel = { draggingPointIndex = null },
@@ -887,15 +968,15 @@ private fun InteractiveJournalCurveEditor(
                         val index = draggingPointIndex ?: return@detectDragGestures
                         change.consume()
                         val updatedPoint = pointFromTouch(
-                            points = points,
+                            points = pointsLatest.value,
                             index = index,
-                            chartSize = chartSize,
+                            chartSize = chartSizeLatest.value,
                             touch = change.position,
                             horizontalPaddingPx = chartPadding,
                             topInsetPx = chartTopInset,
                             bottomInsetPx = chartBottomInset
                         )
-                        onPointChange(index, updatedPoint.minute, updatedPoint.activity)
+                        onPointChangeLatest.value(index, updatedPoint.minute, updatedPoint.activity)
                     }
                 )
             }
@@ -1500,6 +1581,21 @@ private fun curveWindowSummary(points: List<JournalCurvePoint>): String {
     val onset = points.firstOrNull { it.activity > 0.01f }?.minute ?: 0
     val duration = points.lastOrNull()?.minute ?: 0
     return "${onset}m -> ${duration}m"
+}
+
+private fun defaultBuiltInProfile(sortOrder: Int): JournalBuiltInCurveProfile? = when (sortOrder) {
+    0 -> JournalBuiltInCurveProfile.RAPID_GENERIC
+    1 -> JournalBuiltInCurveProfile.LONG_BASAL_GENERIC
+    2 -> JournalBuiltInCurveProfile.HUMAN_REGULAR
+    3 -> JournalBuiltInCurveProfile.ASPART
+    4 -> JournalBuiltInCurveProfile.LISPRO
+    5 -> JournalBuiltInCurveProfile.GLULISINE
+    6 -> JournalBuiltInCurveProfile.FIASP
+    7 -> JournalBuiltInCurveProfile.URLI
+    8 -> JournalBuiltInCurveProfile.AFREZZA
+    9 -> JournalBuiltInCurveProfile.NPH
+    10 -> JournalBuiltInCurveProfile.ULTRA_LONG_BASAL
+    else -> null
 }
 
 private fun formatColorHex(color: Int): String {
