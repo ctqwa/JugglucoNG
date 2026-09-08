@@ -30,6 +30,7 @@ enum class SensorType {
     ICANHEALTH,
     MQ,
     ANYTIME,
+    CT14,
     OTTAI
 }
 
@@ -91,6 +92,12 @@ fun SensorTypePicker(
                 icon = Icons.Default.Bluetooth,
                 titleRes = R.string.anytime_sensor,
                 subtitleRes = R.string.anytime_sensor_picker_desc
+            ),
+            SensorTypeEntry(
+                type = SensorType.CT14,
+                icon = Icons.Default.Bluetooth,
+                titleRes = R.string.ct14_sensor,
+                subtitleRes = R.string.ct14_sensor_picker_desc
             ),
             SensorTypeEntry(
                 type = SensorType.DEXCOM,

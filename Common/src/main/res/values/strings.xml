@@ -1011,6 +1011,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="mq_sensor_desc">Pair a Glutec / MQ CGM transmitter via Bluetooth</string>
     <string name="anytime_sensor">Anytime / Yuwell 4 / 4H / 5</string>
     <string name="anytime_sensor_desc">Pair an Anytime / Yuwell CT3 CGM transmitter via Bluetooth</string>
+    <string name="ct14_sensor">CT-14</string>
+    <string name="ct14_sensor_desc">Pair a CT-14 (CT2) CGM transmitter via Bluetooth</string>
+    <string name="ct14_sensor_picker_desc">Bluetooth pairing</string>
     <string name="ottai_sensor">Ottai CGM</string>
     <string name="ottai_sensor_desc">Ottai account or credentials file + Bluetooth</string>
     <string name="ottai_sensor_picker_desc">Chinese-market CGM - cloud sign-in + Bluetooth</string>
@@ -1134,6 +1137,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="anytime_detected_label">%1$s · Anytime CT3 family</string>
     <string name="anytime_selectable_unrecognized">%1$s · shown because \"See all devices\" is on</string>
     <string name="anytime_connecting_to">Pairing %1$s…</string>
+
+    <!-- CT-14 Setup Wizard Strings -->
+    <string name="ct14_setup_title">CT-14 Setup</string>
+    <string name="ct14_searching_sensors">Searching for CT-14 transmitters…</string>
+    <string name="ct14_no_sensors_hint">Keep the transmitter close and make sure it is powered on.</string>
+    <string name="ct14_detected_label">%1$s · CT-14 (CT2) family</string>
+    <string name="ct14_selectable_unrecognized">%1$s · shown because \"See all devices\" is on</string>
 
     <!-- MQ/Glutec Setup Wizard Strings -->
     <string name="mq_setup_title">MQ / Glutec Setup</string>
