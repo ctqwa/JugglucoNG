@@ -184,6 +184,61 @@ object AnytimeConstants {
     /** CT5 encrypted QR/KR response. */
     const val RX_CT5_QUERY_SSN: Byte = 0x3F
 
+    // ---- CT2 opcode catalog — ASCII-letter opcodes, distinct numbering from CT3/CT2.5 ----
+    // Confirmed live on SN08402458, 2026-09-07 (see docs/ct-driver-plan.md §B0-B1).
+
+    /** Transmitter version request. Body: {0x03} (not an ASCII letter). */
+    const val TX_CT2_VERSION: Byte = 0x03
+
+    /** Handshake with the device's own advertised name. Body: {0x48, ASCII(name), sum}. */
+    const val TX_CT2_HANDSHAKE: Byte = 0x48
+
+    /** Sync clock. Body: {0x54, yearHi, yearLo, month, day, hour, min, sec, sum}. */
+    const val TX_CT2_SET_DATE: Byte = 0x54
+
+    /** Init session. Body: {0x53, 0x55, 0xAA, sum}. */
+    const val TX_CT2_INIT: Byte = 0x53
+
+    /** Self-test / check. Body: {0x43, 0x55, 0xAA, sum}. */
+    const val TX_CT2_CHECK: Byte = 0x43
+
+    /** Low power. Body: {0x57, 0x55, 0xAA, sum}. */
+    const val TX_CT2_LOW_POWER: Byte = 0x57
+
+    /** Unbind. Body: {0x58, 0x55, 0xAA, sum}. */
+    const val TX_CT2_UNBIND: Byte = 0x58
+
+    /** Pull one record by id. Body: {0x55, idHi, idLo, sum}. */
+    const val TX_CT2_PULL_GLUCOSE: Byte = 0x55
+
+    /** Fingerstick reference BG (mg/dL big-endian). Body: {0x08, mgdlHi, mgdlLo, sum}. */
+    const val TX_CT2_INPUT_BG_MG: Byte = 0x08
+
+    /** Glucose computed by the transmitter. Body: {0x09, idHi, idLo}. */
+    const val TX_CT2_GLUCOSE_BY_TRANSMITTER: Byte = 0x09
+
+    /** Handshake ACK — fixed frame {0x48, 0x55, 0xAA, sum}. */
+    const val RX_CT2_HANDSHAKE_ACK: Byte = 0x48
+
+    /** setDate ACK — fixed frame {0x54, 0x55, 0xAA, sum}. */
+    const val RX_CT2_SET_DATE_ACK: Byte = 0x54
+
+    /** Init ACK (echoes the init opcode). */
+    const val RX_CT2_INIT_ACK: Byte = 0x53
+
+    /** Self-test / check response (8 bytes: Iw, Ib, T, powerByte, sum). */
+    const val RX_CT2_CHECK: Byte = 0x43
+
+    /** Live glucose push — 15-byte record, battery byte carries real charge. */
+    const val RX_CT2_PUSH_GLUCOSE: Byte = 0x44
+
+    /**
+     * Pull response — same 15-byte layout as RX_CT2_PUSH_GLUCOSE but byte 13 is
+     * always 0xFF (no live battery). Confirmed live: NOT derivable from
+     * TX_CT2_PULL_GLUCOSE (0x55) arithmetically; hard-coded, never computed.
+     */
+    const val RX_CT2_PULL_RESPONSE: Byte = 0x47
+
     // ---- 9-byte / 11-byte raw-current records (RX_PUSH_GLUCOSE / RX_PULL_GLUCOSE) ----
 
     const val RAW_RECORD_SIZE = 9
@@ -244,6 +299,14 @@ object AnytimeConstants {
 
     /** End-of-life warning: percentage threshold under which battery is "low". */
     const val BATTERY_WARN_PERCENT = 30
+
+    /**
+     * CT2 low-battery threshold, percent (not volts). The CT2 check response
+     * byte 6 is a power byte that scales like a percentage (observed 96-100),
+     * not a voltage; no discharged-sensor capture exists yet, so 20 is a
+     * placeholder to revisit with live low-battery data.
+     */
+    const val BATTERY_LOW_PERCENT_CT2 = 20
 
     // ---- Lifecycle / cadence defaults (overridden per family in AnytimeProfile) ----
 

@@ -296,6 +296,7 @@ fun SensorScreen(
     var showICanHealthWizard by remember { mutableStateOf(false) }
     var showMQWizard by remember { mutableStateOf(false) }
     var showAnytimeWizard by remember { mutableStateOf(false) }
+    var showCt14Wizard by remember { mutableStateOf(false) }
     var showOttaiWizard by remember { mutableStateOf(false) }
 
     // Sensor Type Picker Bottom Sheet
@@ -314,6 +315,7 @@ fun SensorScreen(
                     tk.glucodata.ui.components.SensorType.ICANHEALTH -> showICanHealthWizard = true
                     tk.glucodata.ui.components.SensorType.MQ -> showMQWizard = true
                     tk.glucodata.ui.components.SensorType.ANYTIME -> showAnytimeWizard = true
+                    tk.glucodata.ui.components.SensorType.CT14 -> showCt14Wizard = true
                     tk.glucodata.ui.components.SensorType.OTTAI -> showOttaiWizard = true
                 }
             }
@@ -442,6 +444,19 @@ fun SensorScreen(
         return
     }
 
+    // CT-14 Setup Wizard
+    if (showCt14Wizard) {
+        tk.glucodata.ui.setup.Ct14SetupWizard(
+            onDismiss = { showCt14Wizard = false },
+            onNavigateToReadiness = onNavigateToReadiness,
+            onComplete = {
+                showCt14Wizard = false
+                viewModel.refreshSensors()
+            },
+        )
+        return
+    }
+
     // Ottai Setup Wizard
     if (showOttaiWizard) {
         tk.glucodata.ui.setup.OttaiSetupWizard(
@@ -486,6 +501,7 @@ fun SensorScreen(
                             tk.glucodata.ui.components.SensorType.ICANHEALTH -> showICanHealthWizard = true
                             tk.glucodata.ui.components.SensorType.MQ -> showMQWizard = true
                             tk.glucodata.ui.components.SensorType.ANYTIME -> showAnytimeWizard = true
+                            tk.glucodata.ui.components.SensorType.CT14 -> showCt14Wizard = true
                             tk.glucodata.ui.components.SensorType.OTTAI -> showOttaiWizard = true
                         }
                     }

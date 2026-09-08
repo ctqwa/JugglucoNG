@@ -144,6 +144,15 @@ fun SensorSelectionCards(
             )
             SensorCard(
                 icon = Icons.Default.Bluetooth,
+                title = stringResource(R.string.ct14_sensor),
+                subtitle = stringResource(R.string.ct14_sensor_desc),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = { onSensorSelected(SensorType.CT14) },
+                compact = compact
+            )
+            SensorCard(
+                icon = Icons.Default.Bluetooth,
                 title = stringResource(R.string.mq_sensor),
                 subtitle = stringResource(R.string.mq_sensor_desc),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,

@@ -225,6 +225,7 @@ class AnytimeBleManager(
     @Volatile private var glucoseTimelineStartAtMs: Long = 0L
     @Volatile private var warmupStartedAtMs: Long = 0L
     @Volatile private var lastBatteryVolts: Float = 0f
+    @Volatile private var lastCt2BatteryPercent: Int = -1
     @Volatile private var lastIwNa: Float = 0f
     @Volatile private var lastIbNa: Float = 0f
     @Volatile private var lastTemperatureC: Float = 0f
@@ -1747,10 +1748,12 @@ class AnytimeBleManager(
 
     private fun isCt5(): Boolean = familyEntry.family == AnytimeConstants.Family.CT5
 
+    private fun isCt2(): Boolean = familyEntry.family == AnytimeConstants.Family.CT2
+
     private fun usesWideRawRecords(): Boolean = usesSummedFrames() && !isCt5()
 
     private fun supportsLegacySeriesHistory(): Boolean =
-        legacySeriesHistorySupported && usesWideRawRecords()
+        legacySeriesHistorySupported && usesWideRawRecords() && !isCt2()
 
     private fun historyPullCount(nextId: Int): Int {
         // 0x37 carries an explicit count, so a two-record gap asks for two records
@@ -1761,15 +1764,18 @@ class AnytimeBleManager(
     }
 
     private fun checkFrame(): ByteArray =
-        if (usesSummedFrames()) AnytimeFrames.Builders.checkSummed() else AnytimeFrames.Builders.check()
+        if (isCt2()) AnytimeFrames.Builders.ct2Check()
+        else if (usesSummedFrames()) AnytimeFrames.Builders.checkSummed() else AnytimeFrames.Builders.check()
 
     private fun initFrame(): ByteArray =
-        if (usesPlainControlFrames()) AnytimeFrames.Builders.init()
+        if (isCt2()) AnytimeFrames.Builders.ct2Init()
+        else if (usesPlainControlFrames()) AnytimeFrames.Builders.init()
         else if (usesSummedFrames()) AnytimeFrames.Builders.initSummed()
         else AnytimeFrames.Builders.init()
 
     private fun lowPowerFrame(): ByteArray =
-        if (usesPlainControlFrames()) AnytimeFrames.Builders.lowPower()
+        if (isCt2()) AnytimeFrames.Builders.ct2LowPower()
+        else if (usesPlainControlFrames()) AnytimeFrames.Builders.lowPower()
         else if (usesSummedFrames()) AnytimeFrames.Builders.lowPowerSummed()
         else AnytimeFrames.Builders.lowPower()
 
@@ -1777,17 +1783,20 @@ class AnytimeBleManager(
         if (usesSummedFrames()) AnytimeFrames.Builders.resetSummed() else AnytimeFrames.Builders.reset()
 
     private fun unbindFrame(): ByteArray =
-        if (isCt5()) AnytimeFrames.Builders.ct5Unbind(ct5TempId.ifBlank { generateCt5TempId() })
+        if (isCt2()) AnytimeFrames.Builders.ct2Unbind()
+        else if (isCt5()) AnytimeFrames.Builders.ct5Unbind(ct5TempId.ifBlank { generateCt5TempId() })
         else if (usesSummedFrames()) AnytimeFrames.Builders.unbindSummed() else AnytimeFrames.Builders.unbind()
 
     private fun setDateFrame(): ByteArray =
-        if (isCt5()) AnytimeFrames.Builders.ct5GetDate()
+        if (isCt2()) AnytimeFrames.Builders.ct2SetDate()
+        else if (isCt5()) AnytimeFrames.Builders.ct5GetDate()
         else if (usesPlainControlFrames()) AnytimeFrames.Builders.setDate()
         else if (usesSummedFrames()) AnytimeFrames.Builders.setDateSummed()
         else AnytimeFrames.Builders.setDate()
 
     private fun pullGlucoseFrame(nextId: Int, count: Int = 1): ByteArray =
-        if (isCt5()) AnytimeFrames.Builders.ct5PullGlucoseSeries(nextId, count.coerceAtLeast(1))
+        if (isCt2()) AnytimeFrames.Builders.ct2PullGlucose(nextId)
+        else if (isCt5()) AnytimeFrames.Builders.ct5PullGlucoseSeries(nextId, count.coerceAtLeast(1))
         else if (count > 1 && supportsLegacySeriesHistory()) AnytimeFrames.Builders.pullGlucoseSeriesSummed(nextId, count)
         else if (usesPlainControlFrames()) AnytimeFrames.Builders.pullGlucose(nextId)
         else if (usesSummedFrames()) AnytimeFrames.Builders.pullGlucoseSummed(nextId)
@@ -1809,7 +1818,7 @@ class AnytimeBleManager(
     private fun transmitterFormalFrame(): ByteArray =
         if (usesSummedFrames()) AnytimeFrames.Builders.transmitterFormalSummed() else AnytimeFrames.Builders.transmitterFormal()
 
-    private fun usesPlainControlFrames(): Boolean = false
+    private fun usesPlainControlFrames(): Boolean = isCt2()
 
     private fun generateCt5TempId(): String {
         val generated = (1000 + ct5Random.nextInt(9000)).toString()
@@ -2185,6 +2194,10 @@ class AnytimeBleManager(
         profile = AnytimeProfileResolver.resolve(resolvedName.ifBlank { activeName })
 
         when {
+            isCt2() -> {
+                Log.i(TAG, "CT2 family — starting handshake")
+                sendHandshake(resolvedName)
+            }
             familyEntry.family == AnytimeConstants.Family.CT5 && bound -> {
                 val randomB = ct5RandomB
                 if (randomB != null && randomB.size == 4 && ct5CipherKey in 0..255) {
@@ -2233,6 +2246,60 @@ class AnytimeBleManager(
                 writeFrame(checkFrame(), "check")
             }
         }
+    }
+
+    /** CT2 handshake: {0x48, ASCII(own advertised name), sum}. */
+    private fun sendHandshake(deviceName: String) {
+        val name = deviceName.ifBlank { SerialNumber.orEmpty() }
+        if (name.isBlank()) {
+            Log.w(TAG, "CT2 handshake has no device name to send")
+            writeFrame(checkFrame(), "check(ct2-no-name)")
+            return
+        }
+        writeFrame(AnytimeFrames.Builders.ct2Handshake(name), "ct2-handshake")
+    }
+
+    private fun handleHandshakeAck(data: ByteArray) {
+        Log.d(TAG, "RX CT2 handshake ack")
+        if (phase != Phase.HANDSHAKING) {
+            Log.d(TAG, "Ignoring CT2 handshake ack while phase=$phase")
+            return
+        }
+        writeFrame(setDateFrame(), "ct2-setDate")
+    }
+
+    private fun handleCt2SetDateAck(data: ByteArray) {
+        Log.d(TAG, "RX CT2 setDate ack")
+        if (phase != Phase.HANDSHAKING) {
+            Log.d(TAG, "Ignoring CT2 setDate ack while phase=$phase")
+            return
+        }
+        writeFrame(initFrame(), "ct2-init")
+    }
+
+    /** Manual CT2 self-test. Not part of the automatic connect sequence. */
+    override fun requestSelfTest(): Boolean {
+        if (!isCt2()) return false
+        if (phase != Phase.STREAMING && phase != Phase.HANDSHAKING) return false
+        return writeFrame(AnytimeFrames.Builders.ct2Check(), "ct2-check")
+    }
+
+    private fun handleSelfTestResult(data: ByteArray) {
+        val result = AnytimeFrames.parseCt2CheckResponse(data)
+        if (result == null) {
+            Log.w(TAG, "CT2 self-test bad response: ${data.joinToHex()}")
+            return
+        }
+        lastIwNa = result.iwNa
+        lastIbNa = result.ibNa
+        lastTemperatureC = result.temperatureC
+        if (result.powerByte in 0..100) lastCt2BatteryPercent = result.powerByte
+        Log.i(
+            TAG,
+            "CT2 self-test: iw=${result.iwNa} ib=${result.ibNa} T=${result.temperatureC} " +
+                    "power=${result.powerByte} passed=${result.passed}",
+        )
+        UiRefreshBus.requestStatusRefresh()
     }
 
     override fun onCharacteristicWrite(
@@ -2285,6 +2352,11 @@ class AnytimeBleManager(
         if (isCt5() && dispatchCt5(opcode, data)) return
         when (opcode) {
             AnytimeConstants.RX_VERSION -> Log.d(TAG, "RX 0x01 version: ${data.joinToHex()}")
+            AnytimeConstants.RX_CT2_HANDSHAKE_ACK -> handleHandshakeAck(data)
+            AnytimeConstants.RX_CT2_SET_DATE_ACK -> handleCt2SetDateAck(data)
+            AnytimeConstants.RX_CT2_PUSH_GLUCOSE -> handleCt2GlucoseFrame(data, historical = false)
+            AnytimeConstants.RX_CT2_PULL_RESPONSE -> handleCt2GlucoseFrame(data, historical = true)
+            AnytimeConstants.RX_CT2_CHECK -> handleSelfTestResult(data)
             AnytimeConstants.RX_SET_DATE_ACK_A,
             AnytimeConstants.RX_SET_DATE_ACK_B -> {
                 Log.d(TAG, "RX setDate ack")
@@ -2764,11 +2836,34 @@ class AnytimeBleManager(
         } else {
             AnytimeFrames.parseRawRecords(data, usesWideRawRecords())
         }
+        processRawRecords(records, push)
+    }
+
+    private fun handleCt2GlucoseFrame(data: ByteArray, historical: Boolean) {
+        val push = !historical
+        val frame = AnytimeFrames.parseCt2GlucoseRecord(data)
+        if (frame == null) {
+            Log.w(TAG, "CT2 glucose frame rejected (bad sum/size): ${data.joinToHex()}")
+            processRawRecords(emptyList(), push)
+            return
+        }
+        if (push && phase == Phase.HANDSHAKING) {
+            val intervalMs = profile.readingIntervalMinutes * 60L * 1000L
+            updateTimelineFromLiveGlucoseId(frame.record.glucoseId, System.currentTimeMillis(), intervalMs)
+            enterStreaming("CT2 raw glucose during handshake")
+        }
+        if (!historical) {
+            frame.batteryPercent?.takeIf { it in 0..100 }?.let { lastCt2BatteryPercent = it }
+        }
+        processRawRecords(listOf(frame.record), push)
+    }
+
+    private fun processRawRecords(records: List<AnytimeRawRecord>, push: Boolean) {
         val context = Applic.app
         val intervalMs = profile.readingIntervalMinutes * 60L * 1000L
         if (records.isEmpty()) {
             // Empty pull response — transmitter has nothing more to give.
-            Log.d(TAG, "Empty raw frame (pull caught-up): ${data.joinToHex()}")
+            Log.d(TAG, "Empty raw frame (pull caught-up)")
             if (!push) {
                 clearHistoryPullTimeout()
                 historyPullInFlight = false
@@ -4100,7 +4195,7 @@ class AnytimeBleManager(
 
     override val batteryMillivolts: Int get() = (lastBatteryVolts * 1000f).toInt()
     override val batteryPercent: Int
-        get() = AnytimeFrames.batteryPercent(lastBatteryVolts, profile.lowBatteryVolts)
+        get() = if (isCt2()) lastCt2BatteryPercent else AnytimeFrames.batteryPercent(lastBatteryVolts, profile.lowBatteryVolts)
 
     override fun matchesManagedSensorId(sensorId: String?): Boolean =
         AnytimeConstants.matchesCanonicalOrKnownNativeAlias(sensorId, SerialNumber)
@@ -4166,6 +4261,14 @@ class AnytimeBleManager(
     }
 
     override fun getSensorDetailTelemetry(): String = latestTelemetryStatus()
+
+    override fun integratesUserCalibration(isRawMode: Boolean): Boolean = !isRawMode
+
+    override fun onUserCalibrationRevisionChanged(revision: Long) {
+        // TODO(A1): recompute the contiguous window via AnytimeCalibrator + affine
+        // layer. Until phase A1 lands this is a no-op and the driver keeps returning
+        // the linear/chain calculation without user calibration applied.
+    }
 
     /**
      * Format the rich algorithm-internal state for a debug pane. Returns null if

@@ -54,16 +54,24 @@ object AnytimeProfileResolver {
             else -> AnytimeConstants.DEFAULT_READING_INTERVAL_MINUTES
         }
         // CT5 warm-up is shorter than the shared default; see CT5_WARMUP_MINUTES.
-        val warmupMinutes = when (entry.family) {
-            AnytimeConstants.Family.CT5 -> AnytimeConstants.CT5_WARMUP_MINUTES
+        // CT2 warm-up is initNumber × 3 min: SN06/SN12 = 180, all other prefixes 60.
+        // Confirmed live on SN08: first live push arrived right after Init, i.e. the
+        // warmup gates the first initNumber "unreliable" records, not the session.
+        val warmupMinutes = when {
+            entry.family == AnytimeConstants.Family.CT2 &&
+                (entry.prefix == "SN06" || entry.prefix == "SN12") -> 180
+            entry.family == AnytimeConstants.Family.CT2 -> 60
+            entry.family == AnytimeConstants.Family.CT5 -> AnytimeConstants.CT5_WARMUP_MINUTES
             else -> AnytimeConstants.DEFAULT_WARMUP_MINUTES
         }
-        val lowVolts = when (entry.family) {
-            AnytimeConstants.Family.CT2_5 -> AnytimeConstants.BATTERY_LOW_VOLTS_CT2_5
-            AnytimeConstants.Family.CT4 -> AnytimeConstants.BATTERY_LOW_VOLTS_CT4
-            AnytimeConstants.Family.CT3_PLUS,
-            AnytimeConstants.Family.CT3_YUWELL,
-            AnytimeConstants.Family.CT3_ULTRASONIC -> AnytimeConstants.BATTERY_LOW_VOLTS_CT3_A
+        val lowVolts = when {
+            entry.family == AnytimeConstants.Family.CT2_5 -> AnytimeConstants.BATTERY_LOW_VOLTS_CT2_5
+            entry.family == AnytimeConstants.Family.CT4 -> AnytimeConstants.BATTERY_LOW_VOLTS_CT4
+            entry.family == AnytimeConstants.Family.CT3_PLUS ||
+                entry.family == AnytimeConstants.Family.CT3_YUWELL ||
+                entry.family == AnytimeConstants.Family.CT3_ULTRASONIC -> AnytimeConstants.BATTERY_LOW_VOLTS_CT3_A
+            // CT2 battery is a percent in the record/check bytes, not volts;
+            // lowBatteryVolts is therefore unused for CT2 (see BATTERY_LOW_PERCENT_CT2).
             else -> AnytimeConstants.BATTERY_LOW_VOLTS_CT3
         }
         return AnytimeProfile(
